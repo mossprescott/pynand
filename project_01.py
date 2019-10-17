@@ -51,9 +51,9 @@ def mkMux(inputs, outputs):
     a = inputs.a
     b = inputs.b
     sel = inputs.sel
-    fromA = And(a=a, b=Not(in_=sel).out).out
-    fromB = And(a=b, b=sel).out
-    outputs.out = Or(a=fromA, b=fromB).out
+    fromAneg = Nand(a=a, b=Not(in_=sel).out).out
+    fromBneg = Nand(a=b, b=sel).out
+    outputs.out = Nand(a=fromAneg, b=fromBneg).out
 
 Mux = Component(mkMux)
 

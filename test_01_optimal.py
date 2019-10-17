@@ -21,7 +21,7 @@ def test_xor():
     assert gate_count(Xor) == 5
 
 def test_mux():
-    assert gate_count(Mux) == -1 # < 8
+    assert gate_count(Mux) == 4
 
 def test_dmux():
     assert gate_count(DMux) == 5
