@@ -1,4 +1,4 @@
-"""Tests of the effiency/optimality of each component. Run these tests only if you're interested
+"""Tests of the efficiency/optimality of each component. Run these tests only if you're interested
 in using the minimum number of gates and/or making the (theoretically) fastest circuits.
 """
 
@@ -21,7 +21,7 @@ def test_xor():
     assert gate_count(Xor) == 5
 
 def test_mux():
-    assert gate_count(Mux) == -1 # < 8
+    assert gate_count(Mux) == 4
 
 def test_dmux():
     assert gate_count(DMux) == 5
