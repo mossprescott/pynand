@@ -36,15 +36,12 @@ class Inputs:
 
 class InputRef:
     def __init__(self, inst, name, bit=None):
-        # print(f"InputRef: {inst}.{name}[{bit}]")
-        print(f"InputRef: ?.{name}[{bit}]")
         self.inst = inst
         self.name = name
         self.bit = bit
         
     def __getitem__(self, key):
         """Called when the builder asks for a bit slice of an input."""
-        print(f"slice: {self.inst}.{self.name}[{key}]")
         return InputRef(self.inst, self.name, key)
         
     def __repr__(self):
@@ -66,7 +63,6 @@ class Outputs:
             return object.__setattr__(self, name, value)
 
         # TODO: trap conflicting wiring (including with inputs)
-        print(f"set output: {name}; {value}")
         self.dict[(name, None)] = value
         
     def __getattr__(self, name):
@@ -82,7 +78,6 @@ class OutputSlice:
         """Value is an int between 0 and 15, or (eventually) a slice object with
         .start and .step on the same interval.
         """
-        print(f"output slice: {self.name}[{key}]={value}")
         self.outputs.dict[(self.name, key)] = value
         
     
@@ -104,10 +99,7 @@ class Instance:
         """Update outputs found in `state`, based on the inputs found there."""
 
         # invoke each child:
-        print(f"state: {pprint_state(state)}")
-        print(f"outputs: {self.outputs.dict}")
         for child in set(self.outputs.dict.values()):
-            print(f"child: {child}")
             child.inst.update_state(state)
 
         # copy outputs:
@@ -134,7 +126,6 @@ class NandInstance:
         return set([self.a, self.b])
 
     def update_state(self, state):
-        print(f"nand: {self.a}; {self.b}")
         self.a.inst.update_state(state)
         self.b.inst.update_state(state)
 
@@ -175,8 +166,6 @@ def eval(comp, **args):
     def zero(): return 0
     state = collections.defaultdict(zero, [((env, name), value) for (name, value) in args.items()])
     inst.update_state(state)
-    print(f"after update: {state}")
-    print(f"after update: {pprint_state(state)}")
     return ResultOutputs({name: value for ((comp, name), value) in state.items() if comp == inst})
     
 def gate_count(comp):
