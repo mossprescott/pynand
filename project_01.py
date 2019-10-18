@@ -38,11 +38,10 @@ And = Component(mkAnd)
 def mkXor(inputs, outputs):
     a = inputs.a
     b = inputs.b
-    notA = Not(in_=a).out
-    notB = Not(in_=b).out
-    not_AandNotB = Nand(a=a, b=notB).out
-    not_BandNotA = Nand(a=notA, b=b).out
-    outputs.out = Nand(a=not_AandNotB, b=not_BandNotA).out
+    nand = Nand(a=a, b=b).out
+    nandANand = Nand(a=a, b=nand).out
+    nandBNand = Nand(a=nand, b=b).out
+    outputs.out = Nand(a=nandANand, b=nandBNand).out
 
 Xor = Component(mkXor)
 
