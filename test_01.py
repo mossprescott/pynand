@@ -46,10 +46,10 @@ def test_dmux():
     assert dmux00.a == 0 and dmux00.b == 0
 
     dmux10 = eval(DMux, in_=1, sel=0)
-    assert dmux00.a == 1 and dmux00.b == 0
+    assert dmux10.a == 1 and dmux10.b == 0
 
     dmux11 = eval(DMux, in_=1, sel=1)
-    assert dmux00.a == 0 and dmux00.b == 1
+    assert dmux11.a == 0 and dmux11.b == 1
 
 # TODO: these require multi-bit inputs/outputs:
 # DMux4Way
