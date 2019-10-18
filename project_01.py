@@ -7,7 +7,7 @@ def mkNot(inputs, outputs):
     outputs.out = n.out
 
     # Or you can run it all together:
-    outputs.out = Nand(a=inputs.in_, b=inputs.in_).out
+    # outputs.out = Nand(a=inputs.in_, b=inputs.in_).out
 
 Not = Component(mkNot)
 
@@ -35,7 +35,6 @@ And = Component(mkAnd)
 
 
 def mkXor(inputs, outputs):
-    # When there's only one output from a component, you can extract it immediately:
     a = inputs.a
     b = inputs.b
     outputs.out = ___
@@ -65,7 +64,7 @@ DMux = Component(mkDMux)
 def mkNot16(inputs, outputs):
     in_ = inputs.in_
     for i in range(16):
-        outputs.out[i] = ___
+        outputs.out[i] = Not(in_=in_[i]).out
 
 Not16 = Component(mkNot16)
         
