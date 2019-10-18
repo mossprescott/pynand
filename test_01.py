@@ -43,7 +43,7 @@ def test_dmux():
     assert dmux00.a == 0 and dmux00.b == 0
 
     dmux01 = eval(DMux, in_=0, sel=1)
-    assert dmux00.a == 0 and dmux00.b == 0
+    assert dmux01.a == 0 and dmux01.b == 0
 
     dmux10 = eval(DMux, in_=1, sel=0)
     assert dmux10.a == 1 and dmux10.b == 0
