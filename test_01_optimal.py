@@ -24,4 +24,4 @@ def test_mux():
     assert gate_count(Mux) == 4
 
 def test_dmux():
-    assert gate_count(DMux) <= 5
+    assert gate_count(DMux) == 5
