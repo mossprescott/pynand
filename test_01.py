@@ -51,10 +51,16 @@ def test_dmux():
     dmux11 = eval(DMux, in_=1, sel=1)
     assert dmux11.a == 0 and dmux11.b == 1
 
+def test_not16():
+    assert eval(Not16, in_=0b0000_0000_0000_0000).out == 0b1111_1111_1111_1111
+    assert eval(Not16, in_=0b1111_1111_1111_1111).out == 0b0000_0000_0000_0000
+    assert eval(Not16, in_=0b1010_1010_1010_1010).out == 0b0101_0101_0101_0101
+    assert eval(Not16, in_=0b0011_1100_1100_0011).out == 0b1100_0011_0011_1100
+    assert eval(Not16, in_=0b0001_0010_0011_0100).out == 0b1110_1101_1100_1011
+
 # TODO: these require multi-bit inputs/outputs:
 # DMux4Way
 # DMux8Way
-# Not16
 # And16
 # Mux16
 # Mux4Way16

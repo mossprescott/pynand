@@ -62,10 +62,17 @@ def mkDMux(inputs, outputs):
 DMux = Component(mkDMux)
 
 
-# TODO: these require multi-bit inputs/outputs:
+def mkNot16(inputs, outputs):
+    in_ = inputs.in_
+    for i in range(16):
+        outputs.out[i] = ___
+
+Not16 = Component(mkNot16)
+        
+
+# TODO:
 # DMux4Way
 # DMux8Way
-# Not16
 # And16
 # Mux16
 # Mux4Way16

@@ -25,3 +25,6 @@ def test_mux():
 
 def test_dmux():
     assert gate_count(DMux) == 5
+
+def test_not16():
+    assert gate_count(Not16) == 16
