@@ -68,6 +68,13 @@ def mkNot16(inputs, outputs):
 Not16 = Component(mkNot16)
         
 
+def mkAnd16(inputs, outputs):
+    for i in range(16):
+        outputs.out[i] = And(a=inputs.a[i], b=inputs.b[i]).out
+
+And16 = Component(mkAnd16)
+        
+
 # TODO:
 # DMux4Way
 # DMux8Way
