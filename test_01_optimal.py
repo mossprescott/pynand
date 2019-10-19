@@ -18,7 +18,7 @@ def test_and():
     assert gate_count(And) == 2
 
 def test_xor():
-    assert gate_count(Xor) == 5
+    assert gate_count(Xor) == 4
 
 def test_mux():
     assert gate_count(Mux) == 4

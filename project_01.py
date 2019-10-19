@@ -6,22 +6,16 @@ def mkNot(inputs, outputs):
     n = Nand(a=in_, b=in_)
     outputs.out = n.out
 
-    # Or you can run it all together:
-    # outputs.out = Nand(a=inputs.in_, b=inputs.in_).out
-
 Not = Component(mkNot)
-
-# possible alt:
-# class Not(Component3):
-#     def construct(self):
-#         n = Nand(a=self.in_, b=self.in_)
-#         self.out = n.out
 
 
 def mkOr(inputs, outputs):
     a = inputs.a
     b = inputs.b
-    outputs.out = ___
+    notA = Not(in_=a)
+    notB = Not(in_=b)
+    notNotBoth = Nand(a=notA.out, b=notB.out)
+    outputs.out = notNotBoth.out
 
 Or = Component(mkOr)
 
@@ -29,7 +23,8 @@ Or = Component(mkOr)
 def mkAnd(inputs, outputs):
     a = inputs.a
     b = inputs.b
-    outputs.out = ___
+    notAandB = Nand(a=a, b=b).out
+    outputs.out = Not(in_=notAandB).out
 
 And = Component(mkAnd)
 
@@ -37,7 +32,10 @@ And = Component(mkAnd)
 def mkXor(inputs, outputs):
     a = inputs.a
     b = inputs.b
-    outputs.out = ___
+    nand = Nand(a=a, b=b).out
+    nandANand = Nand(a=a, b=nand).out
+    nandBNand = Nand(a=nand, b=b).out
+    outputs.out = Nand(a=nandANand, b=nandBNand).out
 
 Xor = Component(mkXor)
 
@@ -46,7 +44,9 @@ def mkMux(inputs, outputs):
     a = inputs.a
     b = inputs.b
     sel = inputs.sel
-    outputs.out = ___
+    fromAneg = Nand(a=a, b=Not(in_=sel).out).out
+    fromBneg = Nand(a=b, b=sel).out
+    outputs.out = Nand(a=fromAneg, b=fromBneg).out
 
 Mux = Component(mkMux)
 
@@ -54,9 +54,8 @@ Mux = Component(mkMux)
 def mkDMux(inputs, outputs):
     in_ = inputs.in_
     sel = inputs.sel
-
-    outputs.a = ___
-    outputs.b = ___
+    outputs.a = And(a=in_, b=Not(in_=sel).out).out
+    outputs.b = And(a=in_, b=sel).out
 
 DMux = Component(mkDMux)
 
