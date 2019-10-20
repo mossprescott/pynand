@@ -45,7 +45,15 @@ def test_inc16():
     assert eval(Inc16, in_=-5).out == -4
     
 def test_add16():
-    pass
+    assert eval(Add16, a=0, b=0).out == 0
+    assert eval(Add16, a=0, b=-1).out == -1
+    assert eval(Add16, a=-1, b=-1).out == -2
+    # Note: values get sign extended for convenience, but here we strip
+    # that off for easy hex comparison in these odd cases
+    assert eval(Add16, a=0xAAAA, b=0x5555).out & 0xFFFF == 0xFFFF
+    assert eval(Add16, a=0x3CC3, b=0x0FF0).out & 0xFFFF == 0x4CB3
+    assert eval(Add16, a=0x1234, b=0x9876).out & 0xFFFF == 0xAAAA
+
     
 def test_alu_nostat():
     pass
