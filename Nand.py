@@ -98,10 +98,6 @@ class Instance:
     def update_state(self, state):
         """Update outputs found in `state`, based on the inputs found there."""
 
-        # invoke each child:
-        for child in set(self.outputs.dict.values()):
-            child.inst.update_state(state)
-
         # copy outputs:
         for (name, bit), ref in self.outputs.dict.items():
             update_state_bit(state, InputRef(self, name, bit), lookup_state_bit(state, ref))
@@ -126,19 +122,41 @@ class NandInstance:
         return set([self.a, self.b])
 
     def update_state(self, state):
-        self.a.inst.update_state(state)
-        self.b.inst.update_state(state)
-
-        # meet(rubber, road):
         a = lookup_state_bit(state, self.a)
         b = lookup_state_bit(state, self.b)
-        update_state_bit(state, InputRef(self, 'out'), int(not (a and b)))
+
+        # meet(rubber, road):
+        out = int(not (a and b))
+
+        update_state_bit(state, InputRef(self, 'out'), out)
 
     def __repr__(self):
         return f"nand{self.seq}"
 
 Nand = NandComponent()
 
+
+class Const:
+    def __init__(self, value):
+        self.value = value
+        self.inst = self
+        
+    def refs(self):
+        return set()
+        
+    def update_state(self, state):
+        state[(self, None)] = self.value
+        
+    @property
+    def name(self): 
+        return None
+        
+    @property
+    def bit(self):
+        return None
+    
+    def __repr__(self):
+        return f"const({self.value})"
 
 class ResultOutputs:
     def __init__(self, values):
@@ -149,6 +167,9 @@ class ResultOutputs:
         if name != 'values':
             return self.values[name]
 
+    def __repr__(self):
+        return str(self.values)
+
 class EnvInstance:
     """Pseudo-instance that the supplied values hang off of."""
     def __init__(self, **args):
@@ -156,6 +177,9 @@ class EnvInstance:
 
     def update_state(self, state):
         pass  # nothing to do
+
+    def refs(self):
+        return set()
 
     def __repr__(self):
         return f"env{self.seq}"
@@ -165,23 +189,22 @@ def eval(comp, **args):
     inst = comp(**{name: InputRef(env, name) for name in args})
     def zero(): return 0
     state = collections.defaultdict(zero, [((env, name), value) for (name, value) in args.items()])
-    inst.update_state(state)
-    return ResultOutputs({name: value for ((comp, name), value) in state.items() if comp == inst})
+    prev = state.copy()
+    while True:
+        for n in _sorted_nodes(inst):
+            n.update_state(state)
+        if state == prev: break
+        prev = state.copy()
+        
+    def extend_sign(x):
+        if x & 0x7000 != 0:
+            return (-1 & ~0xffff) | x
+        else:
+            return x
+    return ResultOutputs({name: extend_sign(value) for ((comp, name), value) in state.items() if comp == inst})
     
 def gate_count(comp):
-    # Search the node graph:
-    inst = comp()
-    nodes = [inst]
-    visited = set()
-    count = 0
-    while nodes:
-        n, nodes = nodes[0], nodes[1:]
-        if n not in visited:
-            visited.add(n)
-            if isinstance(n, NandInstance):
-                count += 1
-            nodes += [r.inst for r in n.refs() if r.inst != MISSING_NODE.inst]
-    return count
+    return sum(1 for n in _sorted_nodes(comp()) if isinstance(n, NandInstance))
 
 def delay(self):
     raise NotImplemented()
@@ -190,8 +213,23 @@ def delay(self):
 # TODO: any other interesting properties?
 
 
+def _sorted_nodes(inst):
+    """List of unique nodes, in topological order (so that evaluating them once 
+    from left to right produces the correct result in the absence of cycles.)
+    """
+    # Search the node graph:
+    nodes = [inst]
+    visited = []  # a set would be more efficient but insertion order matters
+    while nodes:
+        n, nodes = nodes[0], nodes[1:]
+        if n not in visited:
+            visited.append(n)
+            nodes += [r.inst for r in n.refs() if r.inst != MISSING_NODE.inst]
+    visited.reverse()
+    return visited
+
 def pprint_state(state):
-    return '{' + ', '.join(f"{c}.{n}: {v}" for (c, n), v in state.items()) + '}'
+    return '{\n  ' + '\n  '.join(f"{c}.{n}: {v}" for (c, n), v in state.items()) + '\n}'
 
 def lookup_state_bit(state, ref):
     val = state[(ref.inst, ref.name)]
