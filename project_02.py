@@ -41,3 +41,31 @@ def mkAdd16(inputs, outputs):
         a = tmp
 
 Add16 = Component(mkAdd16)
+
+
+def mkALU(inputs, outputs):
+    x = inputs.x
+    y = inputs.y
+    
+    zx = inputs.zx
+    nx = inputs.nx
+    zy = inputs.zy
+    ny = inputs.ny
+    f  = inputs.f
+    no = inputs.no
+    
+    x_zeroed = Mux16(a=x, b=Const(0), sel=zx).out
+    y_zeroed = Mux16(a=y, b=Const(0), sel=zy).out
+
+    x_inverted = Mux16(a=x_zeroed, b=Not16(in_=x_zeroed).out, sel=nx).out
+    y_inverted = Mux16(a=y_zeroed, b=Not16(in_=y_zeroed).out, sel=ny).out
+    
+    anded = And16(a=x_inverted, b=y_inverted).out
+    added = Add16(a=x_inverted, b=y_inverted).out
+    
+    result = Mux16(a=anded, b=added, sel=f).out
+    result_inverted = Not16(in_=result).out
+    
+    outputs.out = Mux16(a=result, b=result_inverted, sel=no).out
+    
+ALU = Component(mkALU)

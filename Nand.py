@@ -155,6 +155,11 @@ class Const:
     def bit(self):
         return None
     
+    def __getitem__(self, key):
+        if key < 0 or key > 15:
+            raise Exception(f"Bit slice out of range: {key}")
+        return self
+    
     def __repr__(self):
         return f"const({self.value})"
 
