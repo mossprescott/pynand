@@ -1,11 +1,19 @@
 from Nand import *
-from project_01 import And, Or, Xor
+from project_01 import And, And16, Or, Mux16, Not, Not16, Xor
 
 def mkHalfAdder(inputs, outputs):
     a = inputs.a
     b = inputs.b
-    outputs.sum = Xor(a=a, b=b).out
-    outputs.carry = And(a=a, b=b).out
+    
+    nand = Nand(a=a, b=b).out
+
+    # Xor:
+    nandANand = Nand(a=a, b=nand).out
+    nandBNand = Nand(a=nand, b=b).out
+    outputs.sum = Nand(a=nandANand, b=nandBNand).out
+
+    # And:
+    outputs.carry = Not(in_=nand).out
 
 HalfAdder = Component(mkHalfAdder)
 
@@ -15,8 +23,16 @@ def mkFullAdder(inputs, outputs):
     b = inputs.b
     c = inputs.c
     ab = HalfAdder(a=a, b=b)
-    outputs.sum = Xor(a=ab.sum, b=c).out
-    outputs.carry = Or(a=ab.carry, b=And(a=ab.sum, b=c).out).out
+
+    absum_nand_c = Nand(a=ab.sum, b=c).out
+
+    # Xor:
+    nandSumNand = Nand(a=ab.sum, b=absum_nand_c).out
+    nandCNand = Nand(a=absum_nand_c, b=c).out
+    outputs.sum = Nand(a=nandSumNand, b=nandCNand).out
+
+    # Or(ab.carry, Not(absum_nand_c))
+    outputs.carry = Nand(a=Not(in_=ab.carry).out, b=absum_nand_c).out
 
 FullAdder = Component(mkFullAdder)
 
