@@ -109,5 +109,4 @@ def mkALU(inputs, outputs):
     outputs.zr = Zero16(in_=out).out
     outputs.ng = out[15]
     
-    
 ALU = Component(mkALU)
