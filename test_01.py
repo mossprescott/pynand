@@ -134,16 +134,16 @@ def test_mux16():
 def test_mux4way16():
     for i in range(4):
         assert eval(Mux4Way16, a=0, b=0, c=0, d=0, sel=i).out == 0
-    assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b00).out & 0xFFFF == 11111
-    assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b01).out & 0xFFFF == 22222
+    assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b00).out == 11111
+    assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b01).out == 22222
     assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b10).out & 0xFFFF == 33333
     assert eval(Mux4Way16, a=11111, b=22222, c=33333, d=44444, sel=0b11).out & 0xFFFF == 44444
     
 def test_mux8way16():
     for i in range(4):
         assert eval(Mux8Way16, a=0, b=0, c=0, d=0, e=0, f=0, g=0, h=0, sel=i).out == 0
-    assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b000).out & 0xFFFF == 11111
-    assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b001).out & 0xFFFF == 22222
+    assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b000).out == 11111
+    assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b001).out == 22222
     assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b010).out & 0xFFFF == 33333
     assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b011).out & 0xFFFF == 44444
     assert eval(Mux8Way16, a=11111, b=22222, c=33333, d=44444, e=55555, f=12345, g=23456, h=34567, sel=0b100).out & 0xFFFF == 55555

@@ -202,7 +202,7 @@ def eval(comp, **args):
         prev = state.copy()
         
     def extend_sign(x):
-        if x & 0x7000 != 0:
+        if x & 0x8000 != 0:
             return (-1 & ~0xffff) | x
         else:
             return x
