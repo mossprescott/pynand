@@ -96,43 +96,111 @@ def test_alu_nostat():
 
 
 def test_alu():
-# |        x         |        y         |zx |nx |zy |ny | f |no |       out        |zr |ng |
-# | 0000000000000000 | 1111111111111111 | 1 | 0 | 1 | 0 | 1 | 0 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 1 | 1 | 1 | 1 | 0000000000000001 | 0 | 0 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 1 | 0 | 1 | 0 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 1 | 1 | 0 | 0 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 0 | 0 | 0 | 0 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 1 | 1 | 0 | 1 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 0 | 0 | 0 | 1 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 1 | 1 | 1 | 1 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 0 | 0 | 1 | 1 | 0000000000000001 | 0 | 0 |
-# | 0000000000000000 | 1111111111111111 | 0 | 1 | 1 | 1 | 1 | 1 | 0000000000000001 | 0 | 0 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 0 | 1 | 1 | 1 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 1 | 1 | 1 | 0 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 1 | 1 | 0 | 0 | 1 | 0 | 1111111111111110 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 0 | 0 | 1 | 0 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 0 | 1 | 0 | 0 | 1 | 1 | 0000000000000001 | 0 | 0 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 0 | 1 | 1 | 1 | 1111111111111111 | 0 | 1 |
-# | 0000000000000000 | 1111111111111111 | 0 | 0 | 0 | 0 | 0 | 0 | 0000000000000000 | 1 | 0 |
-# | 0000000000000000 | 1111111111111111 | 0 | 1 | 0 | 1 | 0 | 1 | 1111111111111111 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 1 | 0 | 1 | 0 | 1 | 0 | 0000000000000000 | 1 | 0 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 1 | 1 | 1 | 1 | 0000000000000001 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 1 | 0 | 1 | 0 | 1111111111111111 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 1 | 1 | 0 | 0 | 0000000000010001 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 0 | 0 | 0 | 0 | 0000000000000011 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 1 | 1 | 0 | 1 | 1111111111101110 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 0 | 0 | 0 | 1 | 1111111111111100 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 1 | 1 | 1 | 1 | 1111111111101111 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 0 | 0 | 1 | 1 | 1111111111111101 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 0 | 1 | 1 | 1 | 1 | 1 | 0000000000010010 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 0 | 1 | 1 | 1 | 0000000000000100 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 1 | 1 | 1 | 0 | 0000000000010000 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 1 | 1 | 0 | 0 | 1 | 0 | 0000000000000010 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 0 | 0 | 1 | 0 | 0000000000010100 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 1 | 0 | 0 | 1 | 1 | 0000000000001110 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 0 | 1 | 1 | 1 | 1111111111110010 | 0 | 1 |
-# | 0000000000010001 | 0000000000000011 | 0 | 0 | 0 | 0 | 0 | 0 | 0000000000000001 | 0 | 0 |
-# | 0000000000010001 | 0000000000000011 | 0 | 1 | 0 | 1 | 0 | 1 | 0000000000010011 | 0 | 0 |
-    
-    
-    pass
+    result = eval(ALU, x=0, y=-1, zx=1, nx=0, zy=1, ny=0, f=1, no=0)  # 0
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=1, ny=1, f=1, no=1)  # 1
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=1, ny=0, f=1, no=0)  # -1
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=1, ny=1, f=0, no=0)  # X
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=0, ny=0, f=0, no=0)  # Y
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=1, ny=1, f=0, no=1)  # !X
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=0, ny=0, f=0, no=1)  # !Y
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=1, ny=1, f=1, no=1)  # -X
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=0, ny=0, f=1, no=1)  # -Y
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=1, zy=1, ny=1, f=1, no=1)  # X + 1
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=0, ny=1, f=1, no=1)  # Y + 1
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=1, ny=1, f=1, no=0)  # X-1
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=1, nx=1, zy=0, ny=0, f=1, no=0)  # Y-1
+    assert result.out == -2 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=0, ny=0, f=1, no=0)  # X + Y
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=1, zy=0, ny=0, f=1, no=1)  # X - Y
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=0, ny=1, f=1, no=1)  # Y - X
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=0, zy=0, ny=0, f=0, no=0)  # X & Y
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=0, y=-1, zx=0, nx=1, zy=0, ny=1, f=0, no=1)  # X | Y
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=0, zy=1, ny=0, f=1, no=0)  # 0
+    assert result.out == 0 and result.zr == 1 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=1, ny=1, f=1, no=1)  # 1
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=1, ny=0, f=1, no=0)  # -1
+    assert result.out == -1 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=1, ny=1, f=0, no=0)  # X
+    assert result.out == 17 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=0, ny=0, f=0, no=0)  # Y
+    assert result.out == 3 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=1, ny=1, f=0, no=1)  # !X
+    assert result.out == -18 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=0, ny=0, f=0, no=1)  # !Y
+    assert result.out == -4 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=1, ny=1, f=1, no=1)  # -X
+    assert result.out == -17 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=0, ny=0, f=1, no=1)  # -Y
+    assert result.out == -3 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=1, zy=1, ny=1, f=1, no=1)  # X + 1
+    assert result.out == 18 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=0, ny=1, f=1, no=1)  # Y + 1
+    assert result.out == 4 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=1, ny=1, f=1, no=0)  # X-1
+    assert result.out == 16 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=1, nx=1, zy=0, ny=0, f=1, no=0)  # Y-1
+    assert result.out == 2 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=0, ny=0, f=1, no=0)  # X + Y
+    assert result.out == 20 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=1, zy=0, ny=0, f=1, no=1)  # X - Y
+    assert result.out == 14 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=0, ny=1, f=1, no=1)  # Y - X
+    assert result.out == -14 and result.zr == 0 and result.ng == 1
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=0, zy=0, ny=0, f=0, no=0)  # X & Y
+    assert result.out == 1 and result.zr == 0 and result.ng == 0
+
+    result = eval(ALU, x=17, y=3, zx=0, nx=1, zy=0, ny=1, f=0, no=1)  # X | Y
+    assert result.out == 19 and result.zr == 0 and result.ng == 0

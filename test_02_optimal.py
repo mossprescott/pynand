@@ -17,4 +17,4 @@ def test_add16():
     assert gate_count(Add16) == 170  # ?
 
 def test_alu():
-    assert gate_count(ALU) == 634  # ?
+    assert gate_count(ALU) == 680  # ?

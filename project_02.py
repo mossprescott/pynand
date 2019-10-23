@@ -82,6 +82,32 @@ def mkALU(inputs, outputs):
     result = Mux16(a=anded, b=added, sel=f).out
     result_inverted = Not16(in_=result).out
     
-    outputs.out = Mux16(a=result, b=result_inverted, sel=no).out
+    out = Mux16(a=result, b=result_inverted, sel=no).out
+    
+    def mkZero16(inputs, outputs):
+        in_ = inputs.in_
+        outputs.out = And(
+            a=And(a=And(a=And(a=Not(in_=in_[15]).out,
+                              b=Not(in_=in_[14]).out).out,
+                        b=And(a=Not(in_=in_[13]).out,
+                              b=Not(in_=in_[12]).out).out).out,
+                  b=And(a=And(a=Not(in_=in_[11]).out,
+                              b=Not(in_=in_[10]).out).out,
+                        b=And(a=Not(in_=in_[ 9]).out,
+                              b=Not(in_=in_[ 8]).out).out).out).out,
+            b=And(a=And(a=And(a=Not(in_=in_[ 7]).out,
+                              b=Not(in_=in_[ 6]).out).out,
+                        b=And(a=Not(in_=in_[ 5]).out,
+                              b=Not(in_=in_[ 4]).out).out).out,
+                  b=And(a=And(a=Not(in_=in_[ 3]).out,
+                              b=Not(in_=in_[ 2]).out).out,
+                        b=And(a=Not(in_=in_[ 1]).out,
+                              b=Not(in_=in_[ 0]).out).out).out).out).out
+    Zero16 = Component(mkZero16)
+    
+    outputs.out = out
+    outputs.zr = Zero16(in_=out).out
+    outputs.ng = out[15]
+    
     
 ALU = Component(mkALU)
