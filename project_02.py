@@ -7,32 +7,31 @@ def mkHalfAdder(inputs, outputs):
     
     nand = Nand(a=a, b=b).out
 
-    # Xor:
+    # Xor(a, b):
     nandANand = Nand(a=a, b=nand).out
     nandBNand = Nand(a=nand, b=b).out
     outputs.sum = Nand(a=nandANand, b=nandBNand).out
 
-    # And:
+    # And(a, b):
     outputs.carry = Not(in_=nand).out
 
 HalfAdder = Component(mkHalfAdder)
 
 
 def mkFullAdder(inputs, outputs):
-    a = inputs.a
-    b = inputs.b
-    c = inputs.c
-    ab = HalfAdder(a=a, b=b)
+    def mkHalfAdderNot(inputs, outputs):
+        """Half-adder with one less gate by exposing the opposite of carry."""
+        nand = Nand(a=inputs.a, b=inputs.b).out
+        nandANand = Nand(a=inputs.a, b=nand).out
+        nandBNand = Nand(a=nand, b=inputs.b).out
+        outputs.sum = Nand(a=nandANand, b=nandBNand).out
+        outputs.not_carry = nand
+    HalfAdderNot = Component(mkHalfAdderNot)
 
-    absum_nand_c = Nand(a=ab.sum, b=c).out
-
-    # Xor:
-    nandSumNand = Nand(a=ab.sum, b=absum_nand_c).out
-    nandCNand = Nand(a=absum_nand_c, b=c).out
-    outputs.sum = Nand(a=nandSumNand, b=nandCNand).out
-
-    # Or(ab.carry, Not(absum_nand_c))
-    outputs.carry = Nand(a=Not(in_=ab.carry).out, b=absum_nand_c).out
+    ab = HalfAdderNot(a=inputs.a, b=inputs.b)
+    abc = HalfAdderNot(a=ab.sum, b=inputs.c)
+    outputs.carry = Nand(ab.not_carry, abc.not_carry).out
+    outputs.sum = abc.sum
 
 FullAdder = Component(mkFullAdder)
 
