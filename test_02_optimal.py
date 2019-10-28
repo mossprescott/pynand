@@ -17,4 +17,4 @@ def test_add16():
     assert gate_count(Add16) == 140
 
 def test_alu():
-    assert gate_count(ALU) == 650  # ?
+    assert gate_count(ALU) == 650  # < 608, according to nandgame
