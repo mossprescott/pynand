@@ -195,11 +195,14 @@ def eval(comp, **args):
     def zero(): return 0
     state = collections.defaultdict(zero, [((env, name), value) for (name, value) in args.items()])
     prev = state.copy()
-    while True:
+    limit = 50
+    for i in range(limit):
         for n in _sorted_nodes(inst):
             n.update_state(state)
         if state == prev: break
         prev = state.copy()
+    else:
+        raise Exception(f"outputs didn't stabilize after {limit} iterations")
         
     def extend_sign(x):
         if x & 0x8000 != 0:
