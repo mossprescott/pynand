@@ -1,5 +1,9 @@
 from project_02 import *
 
+# TEMP
+import eval.Compiler as Compiler
+eval = Compiler.eval_fast
+
 def test_halfAdder():
     result = eval(HalfAdder, a=0, b=0)
     assert result.sum == 0 and result.carry == 0
@@ -54,7 +58,8 @@ def test_add16():
     assert eval(Add16, a=0x3CC3, b=0x0FF0).out & 0xFFFF == 0x4CB3
     assert eval(Add16, a=0x1234, b=0x9876).out & 0xFFFF == 0xAAAA
 
-    
+# Note: about 17.5s to run just the ALU tests with the second evaluator (using a dict for state, 
+# and precomputing the list of instances to call update_state on.)
 def test_alu_nostat():
     assert eval(ALU, x=0, y=-1, zx=1, nx=0, zy=1, ny=0, f=1, no=0).out == 0   # 0
     assert eval(ALU, x=0, y=-1, zx=1, nx=1, zy=1, ny=1, f=1, no=1).out == 1   # 1

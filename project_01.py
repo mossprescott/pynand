@@ -1,4 +1,4 @@
-from Nand import *
+from eval.Nand import *
 
 
 def mkNot(inputs, outputs):

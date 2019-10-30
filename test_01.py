@@ -1,5 +1,9 @@
 from project_01 import *
 
+# TEMP
+import eval.Compiler as Compiler
+eval = Compiler.eval_fast
+
 def test_nand():
     assert eval(Nand, a=0, b=0).out == 1
     assert eval(Nand, a=0, b=1).out == 1

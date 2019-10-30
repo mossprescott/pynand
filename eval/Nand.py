@@ -26,13 +26,31 @@ class Component:
 class Inputs:
     def __init__(self, inst):
         self.inst = inst
+        self.names = set()
 
     def __getattr__(self, name):
         """Called when the builder asks for an input to hand to an internal component."""
         # Tricky: need to be able to return (not fail) when called without args since we use this
-        # to construct a bogus instance for counting gates, etc. But returning None is a terrible
-        # idea the rest of the time.
-        return self.inst.args.get(name, MISSING_NODE)
+        # to the top-level component, which should implicitly refer to its inputs.
+        # FIXME: this does the wrong thing if you leave out an arg in a builder. I think I'm just
+        # confused.
+        if name in self.inst.args:
+            return self.inst.args[name]
+        else:
+            self.names.add(name)
+            return InputRef(INPUT_INSTANCE, name)
+
+class InputInstance:
+    def refs(self):
+        return set()
+        
+    def __repr__(self):
+        return "inputs"
+
+    def update_state(self, state):
+        pass  # nothing to do
+        
+INPUT_INSTANCE = InputInstance()
 
 class InputRef:
     def __init__(self, inst, name, bit=None):
@@ -49,8 +67,14 @@ class InputRef:
             return f"Ref({self.inst}.{self.name}[{self.bit}])"
         else:
             return f"Ref({self.inst}.{self.name})"
+            
+    def __eq__(self, other):
+        return self.inst == other.inst and self.name == other.name and self.bit == other.bit
+        
+    def __hash__(self):
+        return hash((self.inst, self.name, self.bit))
 
-MISSING_NODE = InputRef('missing', 'missing')
+# MISSING_NODE = InputRef('missing', 'missing')
 
 class Outputs:
     def __init__(self, comp):
@@ -87,10 +111,10 @@ class Instance:
         self.args = args  # add...?
         self.seq = NODE_SEQ.next()
 
-        inputs = Inputs(self)
+        self.inputs = Inputs(self)
         self.outputs = Outputs(self)
 
-        self.comp.builder(inputs, self.outputs)
+        self.comp.builder(self.inputs, self.outputs)
 
     def __getattr__(self, name):
         return InputRef(self, name)
@@ -104,6 +128,10 @@ class Instance:
 
     def refs(self):
         return set(self.outputs.dict.values())
+        
+    def input_names(self):
+        # TODO: capture these from the builder, not the args (which could be wrong)
+        return self.inputs.names
 
     def __repr__(self):
         return f"instance{self.seq}"
@@ -120,6 +148,9 @@ class NandInstance:
 
     def refs(self):
         return set([self.a, self.b])
+        
+    def input_names(self):
+        return ['a', 'b']
 
     def update_state(self, state):
         a = lookup_state_bit(state, self.a)
@@ -175,25 +206,24 @@ class ResultOutputs:
     def __repr__(self):
         return str(self.values)
 
-class EnvInstance:
-    """Pseudo-instance that the supplied values hang off of."""
-    def __init__(self, **args):
-        self.seq = NODE_SEQ.next()
+# class EnvInstance:
+#     """Pseudo-instance that the supplied values hang off of."""
+#     def __init__(self, **args):
+#         self.seq = NODE_SEQ.next()
+#
+#     def update_state(self, state):
+#         pass  # nothing to do
+#
+#     def refs(self):
+#         return set()
+#
+#     def __repr__(self):
+#         return f"env{self.seq}"
 
-    def update_state(self, state):
-        pass  # nothing to do
-
-    def refs(self):
-        return set()
-
-    def __repr__(self):
-        return f"env{self.seq}"
-
-def eval(comp, **args):
-    env = EnvInstance()
-    inst = comp(**{name: InputRef(env, name) for name in args})
+def eval_slow(comp, **args):
+    inst = comp(**{name: InputRef(INPUT_INSTANCE, name) for name in args})
     def zero(): return 0
-    state = collections.defaultdict(zero, [((env, name), value) for (name, value) in args.items()])
+    state = collections.defaultdict(zero, [((INPUT_INSTANCE, name), value) for (name, value) in args.items()])
     prev = state.copy()
     limit = 50
     for i in range(limit):
@@ -210,13 +240,13 @@ def eval(comp, **args):
         else:
             return x
     return ResultOutputs({name: extend_sign(value) for ((comp, name), value) in state.items() if comp == inst})
-    
+
 def gate_count(comp):
     return sum(1 for n in _sorted_nodes(comp()) if isinstance(n, NandInstance))
 
 def delay(self):
     raise NotImplemented()
-
+    
 # TODO: also answer questions about fan-out
 # TODO: any other interesting properties?
 
@@ -232,7 +262,7 @@ def _sorted_nodes(inst):
         n, nodes = nodes[0], nodes[1:]
         if n not in visited:
             visited.append(n)
-            nodes += [r.inst for r in n.refs() if r.inst != MISSING_NODE.inst]
+            nodes += [r.inst for r in n.refs() if r.inst != INPUT_INSTANCE]
     visited.reverse()
     return visited
 

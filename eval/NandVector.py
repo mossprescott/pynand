@@ -8,10 +8,10 @@ class NandVector:
     `inputs` maps the name/id of each input to a bit vector which is the location of the 
     corresponding bit. `outputs` has the same structure.
     
-    `ops` is a list of tuples (in_bits, out_bits). When any input changes, each op is applied in 
+    `ops` is a list of tuples (in_bits, out_bit). When any input changes, each op is applied in 
     sequence (via `_nand_bits`), with just three bit-wise operations on the ints. In case there are 
-    any circular dependencies, the entire loop is repeated until no more changes are seen (or, if 
-    no fixed-point is found, an exceptions is raised.)
+    any out-of-order or circular dependencies, the entire loop is repeated until no more changes are 
+    seen (or, if no fixed-point is found, an exceptions is raised.)
     """
     
     def __init__(self, inputs, outputs, ops):
@@ -33,8 +33,8 @@ class NandVector:
         if not self.dirty: return
 
         def f(ts):
-            for (in_bits, out_bits) in self.ops:
-                ts = _nand_bits(in_bits, out_bits, ts)
+            for (in_bits, out_bit) in self.ops:
+                ts = _nand_bits(in_bits, out_bit, ts)
             return ts
 
         self.traces = _fixed_point(f, self.traces)
@@ -61,8 +61,8 @@ def _nand_bits(in_bits, out_bits, traces):
         return traces | out_bits
 
 
-def _fixed_point(f, x, limit=10):
-    for i in range(limit):
+def _fixed_point(f, x, limit=50):
+    for _ in range(limit):
         tmp = f(x)
         if tmp == x:
             return x
