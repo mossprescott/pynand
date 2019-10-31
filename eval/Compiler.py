@@ -9,7 +9,6 @@ class NandVectorWrapper:
         
     def __setattr__(self, name, value):
         """Set the value of an input."""
-        # TODO: handle multi-bit inputs
         if name == '_vector': return object.__setattr__(self, name, value)
         
         if (name, None) in self._vector.inputs:
@@ -20,9 +19,15 @@ class NandVectorWrapper:
 
     def __getattr__(self, name):
         """Get the value of an input or output."""
-        
-        # TODO: handle multi-bit inputs/outputs
-        return self._vector.get_output(name)
+
+        if (name, None) in self._vector.outputs:
+            return self._vector.get_output((name, None))
+        else:
+            tmp = 0
+            for i in range(16):
+                if (name, i) in self._vector.outputs and self._vector.get_output((name, i)):
+                    tmp |= 1 << i
+            return tmp
 
 
 def component_to_vector(comp):
@@ -50,23 +55,23 @@ def component_to_vector(comp):
         for ref in n.refs()
         if ref.inst == inst
     ])
-    print(f"input_refs: {input_refs}")
+    # print(f"input_refs: {input_refs}")
 
     # first allocate a bit for each input:
     inputs = {}
     for ref in input_refs:
         inputs[(ref.name, ref.bit)] = internal[ref] = next_bit()
-    print(f"inputs: {inputs}")
+    # print(f"inputs: {inputs}")
     # print(f"   ...: {internal}")
     
     # now allocate a bit for the output of each nand gate:
     for r in _sorted_nodes(inst):
         if isinstance(r, NandInstance):
-            print(f"r: {r}")
-            print(f"  a: {r.a}")
-            print(f"  b: {r.b}")
+            # print(f"r: {r}")
+            # print(f"  a: {r.a}")
+            # print(f"  b: {r.b}")
             internal[InputRef(r, 'out')] = next_bit()
-    print(f"nands: {internal}")
+    # print(f"nands: {internal}")
 
     # map other component's outputs to nand outputs, transitively
     for r in _sorted_nodes(inst):
@@ -76,15 +81,16 @@ def component_to_vector(comp):
             for (name, bit), ref in r.outputs.dict.items(): 
                 internal[InputRef(r, name, bit)] = internal[ref]
         elif isinstance(r, RootInstance):
-            print(f"root: {r}")
+            # print(f"root: {r}")
             # TODO
+            pass
     # print(f"all: {internal}")
     
     # extract output assignments:
     outputs = {}
     for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
-        outputs[pred_name] = internal[pred_ref]
-    print(f"outputs: {outputs}")
+        outputs[(pred_name, pred_index)] = internal[pred_ref]
+    # print(f"outputs: {outputs}")
     
     # finally, construct an op for each nand:
     ops = []
@@ -102,7 +108,7 @@ def component_to_vector(comp):
 def eval_fast(comp, **args):
     nv = component_to_vector(comp)
 
+    w = NandVectorWrapper(nv)
     for name, value in args.items():
-        nv.set_input(name, value)
-
-    return NandVectorWrapper(nv)
+        w.__setattr__(name, value)
+    return w

@@ -282,7 +282,7 @@ def _sorted_nodes(inst):
         n, nodes = nodes[0], nodes[1:]
         if n not in visited:
             visited.append(n)
-            print(f"n: {n}; {n.refs()}")
+            # print(f"n: {n}; {n.refs()}")
             nodes += [r.inst for r in n.refs() if r.inst != INPUT_INSTANCE]
     visited.reverse()
     return visited
