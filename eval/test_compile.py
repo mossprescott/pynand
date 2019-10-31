@@ -6,7 +6,7 @@ def test_wrapper():
     """Test the wrapper that provides a nice syntax around a NandVector."""
     
     nand_vec = NandVector(
-        {'a': 0b001, 'b': 0b010},
+        {('a', None): 0b001, ('b', None): 0b010},
         {'out': 0b100},
         [(0b011, 0b100)])
     nand = NandVectorWrapper(nand_vec)

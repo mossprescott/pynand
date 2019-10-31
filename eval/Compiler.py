@@ -11,8 +11,12 @@ class NandVectorWrapper:
         """Set the value of an input."""
         # TODO: handle multi-bit inputs
         if name == '_vector': return object.__setattr__(self, name, value)
- 
-        self._vector.set_input(name, value)
+        
+        if (name, None) in self._vector.inputs:
+            self._vector.set_input((name, None), value)
+        for i in range(16):
+            if (name, i) in self._vector.inputs:
+                self._vector.set_input((name, i), bool(value & (1 << i)))
 
     def __getattr__(self, name):
         """Get the value of an input or output."""
@@ -51,7 +55,7 @@ def component_to_vector(comp):
     # first allocate a bit for each input:
     inputs = {}
     for ref in input_refs:
-        internal[ref] = inputs[ref] = next_bit()
+        inputs[(ref.name, ref.bit)] = internal[ref] = next_bit()
     print(f"inputs: {inputs}")
     # print(f"   ...: {internal}")
     
@@ -80,7 +84,7 @@ def component_to_vector(comp):
     outputs = {}
     for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
         outputs[pred_name] = internal[pred_ref]
-    # print(f"outputs: {outputs}")
+    print(f"outputs: {outputs}")
     
     # finally, construct an op for each nand:
     ops = []
