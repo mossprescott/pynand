@@ -1,6 +1,6 @@
 # TODO: what to call this module?
 
-from eval.Nand import NandInstance, InputRef, _sorted_nodes, INPUT_INSTANCE
+from eval.Nand import NandInstance, InputRef, Instance, RootInstance, _sorted_nodes, INPUT_INSTANCE
 from eval.NandVector import NandVector
 
 class NandVectorWrapper:
@@ -29,7 +29,7 @@ def component_to_vector(comp):
     3) construct the op for each Nand gate, in the correct sequence.
     """
     
-    inst = comp()
+    inst = comp.root()
     
     seq = 1
     def next_bit():
@@ -40,30 +40,40 @@ def component_to_vector(comp):
     
     internal = {}
 
+    input_refs = set([
+        ref
+        for n in _sorted_nodes(inst)
+        for ref in n.refs()
+        if ref.inst == inst
+    ])
+    print(f"input_refs: {input_refs}")
+
     # first allocate a bit for each input:
     inputs = {}
-    for n in inst.input_names():
-        inputs[n] = next_bit()
-        internal[InputRef(INPUT_INSTANCE, n)] = inputs[n]
-    # print(f"inputs: {inputs}")
+    for ref in input_refs:
+        internal[ref] = inputs[ref] = next_bit()
+    print(f"inputs: {inputs}")
     # print(f"   ...: {internal}")
     
     # now allocate a bit for the output of each nand gate:
     for r in _sorted_nodes(inst):
         if isinstance(r, NandInstance):
-            # print(f"r: {r}")
-            # print(f"  a: {r.a}")
-            # print(f"  b: {r.b}")
+            print(f"r: {r}")
+            print(f"  a: {r.a}")
+            print(f"  b: {r.b}")
             internal[InputRef(r, 'out')] = next_bit()
-    # print(f"nands: {internal}")
+    print(f"nands: {internal}")
 
     # map other component's outputs to nand outputs, transitively
     for r in _sorted_nodes(inst):
-        if not isinstance(r, NandInstance):
+        if isinstance(r, Instance):
             for name, ref in r.args.items():
                 internal[InputRef(r, name)] = internal[ref]
             for (name, bit), ref in r.outputs.dict.items(): 
                 internal[InputRef(r, name, bit)] = internal[ref]
+        elif isinstance(r, RootInstance):
+            print(f"root: {r}")
+            # TODO
     # print(f"all: {internal}")
     
     # extract output assignments:

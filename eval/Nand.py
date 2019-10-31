@@ -22,23 +22,17 @@ class Component:
 
     def __call__(self, **args):
         return Instance(self, **args)
+        
+    def root(self):
+        return RootInstance(self)
 
-class Inputs:
+class Args:
     def __init__(self, inst):
         self.inst = inst
-        self.names = set()
 
     def __getattr__(self, name):
         """Called when the builder asks for an input to hand to an internal component."""
-        # Tricky: need to be able to return (not fail) when called without args since we use this
-        # to the top-level component, which should implicitly refer to its inputs.
-        # FIXME: this does the wrong thing if you leave out an arg in a builder. I think I'm just
-        # confused.
-        if name in self.inst.args:
-            return self.inst.args[name]
-        else:
-            self.names.add(name)
-            return InputRef(INPUT_INSTANCE, name)
+        return self.inst.args[name]
 
 class InputInstance:
     def refs(self):
@@ -108,13 +102,13 @@ class OutputSlice:
 class Instance:
     def __init__(self, comp, **args):
         self.comp = comp
-        self.args = args  # add...?
+        self.args = args
         self.seq = NODE_SEQ.next()
 
-        self.inputs = Inputs(self)
+        inputs = Args(self)
         self.outputs = Outputs(self)
 
-        self.comp.builder(self.inputs, self.outputs)
+        comp.builder(inputs, self.outputs)
 
     def __getattr__(self, name):
         return InputRef(self, name)
@@ -129,13 +123,39 @@ class Instance:
     def refs(self):
         return set(self.outputs.dict.values())
         
-    def input_names(self):
-        # TODO: capture these from the builder, not the args (which could be wrong)
-        return self.inputs.names
+    # def input_names(self):
+    #     # TODO: capture these from the builder, not the args (which could be wrong)
+    #     return self.inputs.names
 
     def __repr__(self):
         return f"instance{self.seq}"
 
+class RootInstance:
+    def __init__(self, comp):
+        self.comp = comp
+
+        self.inputs = Inputs(self)
+        self.outputs = Outputs(self)
+        comp.builder(self.inputs, self.outputs)
+        
+    # def __getattr__(self, name):
+    #     return InputRef(self, name)
+
+    # FIXME: copied from Instance
+    def refs(self):
+        return set(self.outputs.dict.values())
+
+    def __repr__(self):
+        return "root"
+
+class Inputs:
+    def __init__(self, inst):
+        self.inst = inst
+
+    def __getattr__(self, name):
+        """Called when the builder asks for an input to hand to an internal component."""
+        return InputRef(self.inst, name)
+    
 class NandComponent:
     def __call__(self, a, b):
         return NandInstance(a, b)
@@ -262,6 +282,7 @@ def _sorted_nodes(inst):
         n, nodes = nodes[0], nodes[1:]
         if n not in visited:
             visited.append(n)
+            print(f"n: {n}; {n.refs()}")
             nodes += [r.inst for r in n.refs() if r.inst != INPUT_INSTANCE]
     visited.reverse()
     return visited
