@@ -160,6 +160,9 @@ class NandComponent:
     def __call__(self, a, b):
         return NandInstance(a, b)
 
+    def root(self):
+        return NandRootInstance()
+
 class NandInstance:
     def __init__(self, a, b):
         self.a, self.b = a, b
@@ -183,6 +186,19 @@ class NandInstance:
 
     def __repr__(self):
         return f"nand{self.seq}"
+
+class NandRootInstance:
+    def __init__(self):
+        self.a = InputRef(self, "a")
+        self.b = InputRef(self, "b")
+        self.outputs = {('out', None): None}
+    
+    def refs(self):
+        return set([InputRef(self, "a"), InputRef(self, "b")])
+
+    def __repr__(self):
+        return f"nand"
+    
 
 Nand = NandComponent()
 

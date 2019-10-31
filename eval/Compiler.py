@@ -1,6 +1,6 @@
 # TODO: what to call this module?
 
-from eval.Nand import NandInstance, InputRef, Instance, RootInstance, _sorted_nodes, INPUT_INSTANCE
+from eval.Nand import InputRef, Instance, NandInstance, NandRootInstance, RootInstance, _sorted_nodes, INPUT_INSTANCE
 from eval.NandVector import NandVector
 
 class NandVectorWrapper:
@@ -66,7 +66,7 @@ def component_to_vector(comp):
     
     # now allocate a bit for the output of each nand gate:
     for r in _sorted_nodes(inst):
-        if isinstance(r, NandInstance):
+        if isinstance(r, (NandInstance, NandRootInstance)):
             # print(f"r: {r}")
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
@@ -84,18 +84,21 @@ def component_to_vector(comp):
             # print(f"root: {r}")
             # TODO
             pass
-    # print(f"all: {internal}")
+    print(f"all: {internal}")
     
     # extract output assignments:
     outputs = {}
-    for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
-        outputs[(pred_name, pred_index)] = internal[pred_ref]
+    if isinstance(inst, RootInstance):
+        for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
+            outputs[(pred_name, pred_index)] = internal[pred_ref]
+    elif isinstance(inst, NandRootInstance):
+        outputs[("out", None)] = internal[InputRef(inst, "out")]
     # print(f"outputs: {outputs}")
     
     # finally, construct an op for each nand:
     ops = []
     for r in _sorted_nodes(inst):
-        if isinstance(r, NandInstance):
+        if isinstance(r, (NandInstance, NandRootInstance)):
             # print(f"r: {r}")
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
