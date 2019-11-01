@@ -109,8 +109,11 @@ And16 = Component(mkAnd16)
 
 
 def mkMux16(inputs, outputs):
+    not_sel = Not(in_=inputs.sel).out
     for i in range(16):
-        outputs.out[i] = Mux(a=inputs.a[i], b=inputs.b[i], sel=inputs.sel).out
+        fromAneg = Nand(a=inputs.a[i], b=not_sel).out
+        fromBneg = Nand(a=inputs.b[i], b=inputs.sel).out
+        outputs.out[i] = Nand(a=fromAneg, b=fromBneg).out
 
 Mux16 = Component(mkMux16)
 

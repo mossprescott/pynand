@@ -39,7 +39,7 @@ def test_and16():
     assert gate_count(And16) == 32
 
 def test_mux16():
-    assert gate_count(Mux16) == 64
+    assert gate_count(Mux16) == 49  # optimal?
 
 def test_mux4Way16():
     assert gate_count(Mux4Way16) == 4*32 #?
