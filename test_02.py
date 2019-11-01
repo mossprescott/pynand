@@ -58,8 +58,6 @@ def test_add16():
     assert eval(Add16, a=0x3CC3, b=0x0FF0).out & 0xFFFF == 0x4CB3
     assert eval(Add16, a=0x1234, b=0x9876).out & 0xFFFF == 0xAAAA
 
-# Note: about 17.5s to run just the ALU tests with the second evaluator (using a dict for state, 
-# and precomputing the list of instances to call update_state on.)
 def test_alu_nostat():
     alu = eval(ALU)
     
