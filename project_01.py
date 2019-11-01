@@ -61,34 +61,50 @@ DMux = Component(mkDMux)
 
 
 def mkDMux4Way(inputs, outputs):
+    def mkDMuxPlus(inputs, outputs):
+        outputs.a = And(a=inputs.in_, b=inputs.not_sel).out
+        outputs.b = And(a=inputs.in_, b=inputs.sel).out
+    DMuxPlus = Component(mkDMuxPlus)
+
     # TODO: optimal?
     in_ = inputs.in_
     sel = inputs.sel
     lo = DMux(in_=in_, sel=sel[0])
-    outputs.a = DMux(in_=lo.a, sel=sel[1]).a
-    outputs.b = DMux(in_=lo.b, sel=sel[1]).a
-    outputs.c = DMux(in_=lo.a, sel=sel[1]).b
-    outputs.d = DMux(in_=lo.b, sel=sel[1]).b
+    sel1 = sel[1]
+    not_sel1 = Not(in_=sel1).out
+    outputs.a = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1).a
+    outputs.b = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1).a
+    outputs.c = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1).b
+    outputs.d = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1).b
     
 DMux4Way = Component(mkDMux4Way)
 
 
 def mkDMux8Way(inputs, outputs):
+    def mkDMuxPlus(inputs, outputs):
+        outputs.a = And(a=inputs.in_, b=inputs.not_sel).out
+        outputs.b = And(a=inputs.in_, b=inputs.sel).out
+    DMuxPlus = Component(mkDMuxPlus)
+
     # TODO: optimal?
     # TODO: implement bit slice syntax and use DMux4Way?
     in_ = inputs.in_
     sel = inputs.sel
+    sel1 = sel[1]
+    not_sel1 = Not(in_=sel1).out
+    sel2 = sel[2]
+    not_sel2 = Not(in_=sel2).out
     lo = DMux(in_=in_, sel=sel[0])
-    lo0 = DMux(in_=lo.a, sel=sel[1])
-    lo1 = DMux(in_=lo.b, sel=sel[1])
-    outputs.a = DMux(in_=lo0.a, sel=sel[2]).a
-    outputs.b = DMux(in_=lo1.a, sel=sel[2]).a
-    outputs.c = DMux(in_=lo0.b, sel=sel[2]).a
-    outputs.d = DMux(in_=lo1.b, sel=sel[2]).a
-    outputs.e = DMux(in_=lo0.a, sel=sel[2]).b
-    outputs.f = DMux(in_=lo1.a, sel=sel[2]).b
-    outputs.g = DMux(in_=lo0.b, sel=sel[2]).b
-    outputs.h = DMux(in_=lo1.b, sel=sel[2]).b
+    lo0 = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1)
+    lo1 = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1)
+    outputs.a = DMuxPlus(in_=lo0.a, not_sel=not_sel2, sel=sel2).a
+    outputs.b = DMuxPlus(in_=lo1.a, not_sel=not_sel2, sel=sel2).a
+    outputs.c = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2).a
+    outputs.d = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2).a
+    outputs.e = DMuxPlus(in_=lo0.a, not_sel=not_sel2, sel=sel2).b
+    outputs.f = DMuxPlus(in_=lo1.a, not_sel=not_sel2, sel=sel2).b
+    outputs.g = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2).b
+    outputs.h = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2).b
     
 DMux8Way = Component(mkDMux8Way)
 

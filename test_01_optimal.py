@@ -27,10 +27,10 @@ def test_dmux():
     assert gate_count(DMux) == 5
 
 def test_dmux4way():
-    assert gate_count(DMux4Way) == 20  #?
+    assert gate_count(DMux4Way) == 22  # optimal?
 
 def test_dmux8way():
-    assert gate_count(DMux8Way) == 40  #?
+    assert gate_count(DMux8Way) == 47  # optimal?
 
 def test_not16():
     assert gate_count(Not16) == 16
@@ -42,7 +42,7 @@ def test_mux16():
     assert gate_count(Mux16) == 49  # optimal?
 
 def test_mux4Way16():
-    assert gate_count(Mux4Way16) == 4*32 #?
+    assert gate_count(Mux4Way16) == 147 # optimal?
 
 def test_mux8Way16():
-    assert gate_count(Mux8Way16) == 8*32 #?
+    assert gate_count(Mux8Way16) == 343 # optimal?
