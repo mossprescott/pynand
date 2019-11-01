@@ -29,6 +29,8 @@ class NandVectorWrapper:
                     tmp |= 1 << i
             return tmp
 
+    def __repr__(self):
+        return str(dict([(name, self.__getattr__(name)) for (name, _) in self._vector.outputs.keys()]))
 
 def component_to_vector(comp):
     """Compile a component to a NandVector.
@@ -76,21 +78,38 @@ def component_to_vector(comp):
     # map other component's outputs to nand outputs, transitively
     for r in _sorted_nodes(inst):
         if isinstance(r, Instance):
+            # print(f"inst: {r}; {r.args}")
             for name, ref in r.args.items():
-                internal[InputRef(r, name)] = internal[ref]
+                # print(f"  propagate: {(name, ref)}")
+                # propagate a single bit or upt to 16 bits, whichever are present:
+                if ref in internal:
+                    internal[InputRef(r, name)] = internal[ref]
+                for i in range(16):
+                    bit_ref = ref[i]
+                    if bit_ref in internal:
+                        internal[InputRef(r, name, i)] = internal[bit_ref]
             for (name, bit), ref in r.outputs.dict.items(): 
                 internal[InputRef(r, name, bit)] = internal[ref]
         elif isinstance(r, RootInstance):
             # print(f"root: {r}")
+            # for name, ref in r.args.items():
+            #     print(f"  propagate from root: {(name, ref)}")
             # TODO
             pass
-    print(f"all: {internal}")
+    # print(f"all: {internal}")
     
     # extract output assignments:
     outputs = {}
     if isinstance(inst, RootInstance):
         for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
-            outputs[(pred_name, pred_index)] = internal[pred_ref]
+            # propagate a single bit or upt to 16 bits, whichever are present:
+            if pred_ref in internal:
+                outputs[(pred_name, pred_index)] = internal[pred_ref]
+            if pred_index is None:
+                for i in range(16):
+                    bit_ref = pred_ref[i]
+                    if bit_ref in internal:
+                        outputs[(pred_name, i)] = internal[bit_ref]
     elif isinstance(inst, NandRootInstance):
         outputs[("out", None)] = internal[InputRef(inst, "out")]
     # print(f"outputs: {outputs}")
