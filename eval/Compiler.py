@@ -1,6 +1,6 @@
 # TODO: what to call this module?
 
-from eval.Nand import InputRef, Instance, NandInstance, NandRootInstance, RootInstance, _sorted_nodes, INPUT_INSTANCE
+from eval.Nand import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes, INPUT_INSTANCE
 from eval.NandVector import NandVector
 
 class NandVectorWrapper:
@@ -21,16 +21,17 @@ class NandVectorWrapper:
         """Get the value of an input or output."""
 
         if (name, None) in self._vector.outputs:
-            return self._vector.get_output((name, None))
+            return extend_sign(self._vector.get_output((name, None)))
         else:
             tmp = 0
             for i in range(16):
                 if (name, i) in self._vector.outputs and self._vector.get_output((name, i)):
                     tmp |= 1 << i
-            return tmp
+            return extend_sign(tmp)
 
     def __repr__(self):
         return str(dict([(name, self.__getattr__(name)) for (name, _) in self._vector.outputs.keys()]))
+
 
 def component_to_vector(comp):
     """Compile a component to a NandVector.
@@ -81,7 +82,7 @@ def component_to_vector(comp):
             # print(f"inst: {r}; {r.args}")
             for name, ref in r.args.items():
                 # print(f"  propagate: {(name, ref)}")
-                # propagate a single bit or upt to 16 bits, whichever are present:
+                # propagate a single bit or up to 16 bits, whichever are present:
                 if ref in internal:
                     internal[InputRef(r, name)] = internal[ref]
                 for i in range(16):
@@ -102,7 +103,7 @@ def component_to_vector(comp):
     outputs = {}
     if isinstance(inst, RootInstance):
         for (pred_name, pred_index), pred_ref in inst.outputs.dict.items():
-            # propagate a single bit or upt to 16 bits, whichever are present:
+            # propagate a single bit or up to 16 bits, whichever are present:
             if pred_ref in internal:
                 outputs[(pred_name, pred_index)] = internal[pred_ref]
             if pred_index is None:
@@ -121,7 +122,13 @@ def component_to_vector(comp):
             # print(f"r: {r}")
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
-            in_bits = internal[r.a] | internal[r.b] 
+            if r.a == Const(0) or r.b == Const(0):
+                in_bits = 0  # Nand(a, 0) = !(a & 0) = 1
+            else:
+                def to_bits(ref):
+                    if ref == Const(1): return 0  # Nand(a, 1) = !(a & 1) = !a
+                    else: return internal[ref]
+                in_bits = to_bits(r.a) | to_bits(r.b)
             out_bit = internal[InputRef(r, "out")]
             ops.append((in_bits, out_bit))
     

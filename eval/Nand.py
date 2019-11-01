@@ -227,6 +227,12 @@ class Const:
             raise Exception(f"Bit slice out of range: {key}")
         return self
     
+    def __eq__(self, other):
+        return isinstance(other, Const) and self.value == other.value
+        
+    def __hash__(self):
+        return hash(self.value)
+
     def __repr__(self):
         return f"const({self.value})"
 
@@ -270,11 +276,6 @@ def eval_slow(comp, **args):
     else:
         raise Exception(f"outputs didn't stabilize after {limit} iterations")
         
-    def extend_sign(x):
-        if x & 0x8000 != 0:
-            return (-1 & ~0xffff) | x
-        else:
-            return x
     return ResultOutputs({name: extend_sign(value) for ((comp, name), value) in state.items() if comp == inst})
 
 def gate_count(comp):
@@ -286,6 +287,15 @@ def delay(self):
 # TODO: also answer questions about fan-out
 # TODO: any other interesting properties?
 
+
+def extend_sign(x):
+    if x & 0x8000 != 0:
+        return (-1 & ~0xffff) | x
+    else:
+        return x
+
+def unsigned(x):
+    return x & 0xffff
 
 def _sorted_nodes(inst):
     """List of unique nodes, in topological order (so that evaluating them once 
