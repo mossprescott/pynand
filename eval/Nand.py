@@ -279,7 +279,7 @@ def eval_slow(comp, **args):
     return ResultOutputs({name: extend_sign(value) for ((comp, name), value) in state.items() if comp == inst})
 
 def gate_count(comp):
-    return sum(1 for n in _sorted_nodes(comp()) if isinstance(n, NandInstance))
+    return sum(1 for n in _sorted_nodes(comp.root()) if isinstance(n, NandInstance))
 
 def delay(self):
     raise NotImplemented()
