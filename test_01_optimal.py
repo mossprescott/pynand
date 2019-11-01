@@ -42,7 +42,7 @@ def test_mux16():
     assert gate_count(Mux16) == 49  # optimal?
 
 def test_mux4Way16():
-    assert gate_count(Mux4Way16) == 147 # optimal?
+    assert gate_count(Mux4Way16) == 146 # optimal?
 
 def test_mux8Way16():
-    assert gate_count(Mux8Way16) == 343 # optimal?
+    assert gate_count(Mux8Way16) == 339 # optimal?
