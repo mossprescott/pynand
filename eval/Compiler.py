@@ -43,7 +43,7 @@ def component_to_vector(comp):
     
     inst = comp.root()
     
-    seq = 1
+    seq = 2  # Note: the lowest bit is reserved for the constant 1
     def next_bit():
         nonlocal seq
         tmp = seq
@@ -123,7 +123,8 @@ def component_to_vector(comp):
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
             if r.a == Const(0) or r.b == Const(0):
-                in_bits = 0  # Nand(a, 0) = !(a & 0) = 1
+                # use the constant lowest bit (which is always set):
+                in_bits = 0b1  # Nand(a, 0) = !(a & 0) = 1
             else:
                 def to_bits(ref):
                     if ref == Const(1): return 0  # Nand(a, 1) = !(a & 1) = !a
@@ -131,6 +132,7 @@ def component_to_vector(comp):
                 in_bits = to_bits(r.a) | to_bits(r.b)
             out_bit = internal[InputRef(r, "out")]
             ops.append((in_bits, out_bit))
+    # print(f"ops: {ops}")
     
     return NandVector(inputs, outputs, ops)
     
