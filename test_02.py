@@ -54,9 +54,9 @@ def test_add16():
     assert eval(Add16, a=-1, b=-1).out == -2
     # Note: values get sign extended for convenience, but here we strip
     # that off for easy hex comparison in these odd cases
-    assert eval(Add16, a=0xAAAA, b=0x5555).out & 0xFFFF == 0xFFFF
-    assert eval(Add16, a=0x3CC3, b=0x0FF0).out & 0xFFFF == 0x4CB3
-    assert eval(Add16, a=0x1234, b=0x9876).out & 0xFFFF == 0xAAAA
+    assert unsigned(eval(Add16, a=0xAAAA, b=0x5555).out) == 0xFFFF
+    assert unsigned(eval(Add16, a=0x3CC3, b=0x0FF0).out) == 0x4CB3
+    assert unsigned(eval(Add16, a=0x1234, b=0x9876).out) == 0xAAAA
 
 def test_alu_nostat():
     alu = eval(ALU)
