@@ -5,7 +5,7 @@ in using the minimum number of gates and/or making the (theoretically) fastest c
 from project_01 import *
 
 def test_nand():
-    # assert gate_count(Nand) == 1
+    assert gate_count(Nand) == 1
     pass
 
 def test_not():
