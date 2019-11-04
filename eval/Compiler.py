@@ -1,7 +1,7 @@
-# TODO: what to call this module?
+"""A compiler from components to the form that can be efficiently evaluated."""
 
-from eval.Nand import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes
-from eval.NandVector import NandVector
+from eval.component import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes
+from eval.evaluator import NandVector
 
 class NandVectorWrapper:
     def __init__(self, vector):
@@ -136,7 +136,12 @@ def component_to_vector(comp):
     
     return NandVector(inputs, outputs, ops)
     
-def eval_fast(comp, **args):
+def run(comp, **args):
+    """Evaluate a component, accepting input values and returning a wrapper which can be used to .
+    
+    
+    """
+    
     nv = component_to_vector(comp)
 
     w = NandVectorWrapper(nv)

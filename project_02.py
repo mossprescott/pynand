@@ -1,4 +1,4 @@
-from eval.Nand import *
+from Nand import *
 from project_01 import And, And16, Or, Mux16, Not, Not16, Xor
 
 def mkHalfAdder(inputs, outputs):

@@ -34,10 +34,10 @@ class NandVector:
 
         def f(ts):
             for (in_bits, out_bit) in self.ops:
-                ts = _nand_bits(in_bits, out_bit, ts)
+                ts = nand_bits(in_bits, out_bit, ts)
             return ts
 
-        self.traces = _fixed_point(f, self.traces)
+        self.traces = fixed_point(f, self.traces)
         
         self.dirty = False
             
@@ -47,7 +47,7 @@ class NandVector:
         return bool(self.traces & self.outputs[name])
         
         
-def _nand_bits(in_bits, out_bits, traces):
+def nand_bits(in_bits, out_bits, traces):
     """Apply NAND to the bits identified in `in_bits`, and store the result in the bit(s) identified 
     in `out_bits`.
     
@@ -61,14 +61,15 @@ def _nand_bits(in_bits, out_bits, traces):
         return traces | out_bits
 
 
-def _fixed_point(f, x, limit=50):
-    for _ in range(limit):
+def fixed_point(f, x, limit=50):
+    for i in range(limit):
         tmp = f(x)
         if tmp == x:
+            # raise Exception(f"iterations: {i}")
             return x
         else:
             x = tmp
     else:
-        raise Exception(f"state did not settle after {limit} loops")        
+        raise Exception(f"state did not settle after {limit} loops")
     
 

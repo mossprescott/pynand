@@ -1,6 +1,6 @@
-from eval.Nand import Component, Nand
-from eval.NandVector import NandVector
-from eval.Compiler import *
+from eval.component import Component, Nand
+from eval.evaluator import NandVector
+from eval.compiler import *
 
 def test_wrapper_nand():
     """Test the wrapper that provides a nice syntax around a NandVector."""
