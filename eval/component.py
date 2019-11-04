@@ -185,6 +185,24 @@ class Const:
     def __repr__(self):
         return f"const({self.value})"
 
+class Forward:
+    """A component that just forwards all interactions to a component that is provided later, 
+    allowing circular references to be created.
+    """
+    
+    def __init__(self):
+        self.comp = None
+
+    def set(self, comp):
+        self.comp = comp
+
+    def __getattr__(self, name):
+        return InputRef(self, name)
+
+def lazy():
+    """Syntax for creating late-bound (potentially circular) references."""
+    return Forward()
+
 def gate_count(comp):
     return sum(1 for n in _sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
 

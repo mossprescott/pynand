@@ -6,5 +6,5 @@ This module just re-exports the definitions that are most often needed from wher
 implemented (in the `eval` sub-dir.)
 """
 
-from eval.component import Component, Const, Nand, gate_count, unsigned
+from eval.component import Component, Const, Nand, lazy, gate_count, unsigned
 from eval.compiler import run
