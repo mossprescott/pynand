@@ -1,6 +1,6 @@
 # TODO: what to call this module?
 
-from eval.Nand import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes, INPUT_INSTANCE
+from eval.Nand import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes
 from eval.NandVector import NandVector
 
 class NandVectorWrapper:

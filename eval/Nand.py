@@ -34,18 +34,6 @@ class Args:
         """Called when the builder asks for an input to hand to an internal component."""
         return self.inst.args[name]
 
-class InputInstance:
-    def refs(self):
-        return set()
-        
-    def __repr__(self):
-        return "inputs"
-
-    def update_state(self, state):
-        pass  # nothing to do
-        
-INPUT_INSTANCE = InputInstance()
-
 class InputRef:
     def __init__(self, inst, name, bit=None):
         self.inst = inst
@@ -67,8 +55,6 @@ class InputRef:
         
     def __hash__(self):
         return hash((self.inst, self.name, self.bit))
-
-# MISSING_NODE = InputRef('missing', 'missing')
 
 class Outputs:
     def __init__(self, comp):
@@ -113,20 +99,9 @@ class Instance:
     def __getattr__(self, name):
         return InputRef(self, name)
 
-    def update_state(self, state):
-        """Update outputs found in `state`, based on the inputs found there."""
-
-        # copy outputs:
-        for (name, bit), ref in self.outputs.dict.items():
-            update_state_bit(state, InputRef(self, name, bit), lookup_state_bit(state, ref))
-
     def refs(self):
         return set(self.outputs.dict.values())
         
-    # def input_names(self):
-    #     # TODO: capture these from the builder, not the args (which could be wrong)
-    #     return self.inputs.names
-
     def __repr__(self):
         return f"instance{self.seq}"
 
@@ -138,9 +113,6 @@ class RootInstance:
         self.outputs = Outputs(self)
         comp.builder(self.inputs, self.outputs)
         
-    # def __getattr__(self, name):
-    #     return InputRef(self, name)
-
     # FIXME: copied from Instance
     def refs(self):
         return set(self.outputs.dict.values())
@@ -172,18 +144,6 @@ class NandInstance:
     def refs(self):
         return set([self.a, self.b])
         
-    def input_names(self):
-        return ['a', 'b']
-
-    def update_state(self, state):
-        a = lookup_state_bit(state, self.a)
-        b = lookup_state_bit(state, self.b)
-
-        # meet(rubber, road):
-        out = int(not (a and b))
-
-        update_state_bit(state, InputRef(self, 'out'), out)
-
     def __repr__(self):
         return f"nand{self.seq}"
 
@@ -211,17 +171,6 @@ class Const:
     def refs(self):
         return set()
         
-    def update_state(self, state):
-        state[(self, None)] = self.value
-        
-    @property
-    def name(self): 
-        return None
-        
-    @property
-    def bit(self):
-        return None
-    
     def __getitem__(self, key):
         if key < 0 or key > 15:
             raise Exception(f"Bit slice out of range: {key}")
@@ -235,48 +184,6 @@ class Const:
 
     def __repr__(self):
         return f"const({self.value})"
-
-class ResultOutputs:
-    def __init__(self, values):
-        self.values = values
-
-    def __getattr__(self, name):
-        """Called when an output value is requested from the result state."""
-        if name != 'values':
-            return self.values[name]
-
-    def __repr__(self):
-        return str(self.values)
-
-# class EnvInstance:
-#     """Pseudo-instance that the supplied values hang off of."""
-#     def __init__(self, **args):
-#         self.seq = NODE_SEQ.next()
-#
-#     def update_state(self, state):
-#         pass  # nothing to do
-#
-#     def refs(self):
-#         return set()
-#
-#     def __repr__(self):
-#         return f"env{self.seq}"
-
-def eval_slow(comp, **args):
-    inst = comp(**{name: InputRef(INPUT_INSTANCE, name) for name in args})
-    def zero(): return 0
-    state = collections.defaultdict(zero, [((INPUT_INSTANCE, name), value) for (name, value) in args.items()])
-    prev = state.copy()
-    limit = 50
-    for i in range(limit):
-        for n in _sorted_nodes(inst):
-            n.update_state(state)
-        if state == prev: break
-        prev = state.copy()
-    else:
-        raise Exception(f"outputs didn't stabilize after {limit} iterations")
-        
-    return ResultOutputs({name: extend_sign(value) for ((comp, name), value) in state.items() if comp == inst})
 
 def gate_count(comp):
     return sum(1 for n in _sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
@@ -309,25 +216,6 @@ def _sorted_nodes(inst):
         if n not in visited:
             visited.append(n)
             # print(f"n: {n}; {n.refs()}")
-            nodes += [r.inst for r in n.refs() if r.inst != INPUT_INSTANCE]
+            nodes += [r.inst for r in n.refs()]
     visited.reverse()
     return visited
-
-def pprint_state(state):
-    return '{\n  ' + '\n  '.join(f"{c}.{n}: {v}" for (c, n), v in state.items()) + '\n}'
-
-def lookup_state_bit(state, ref):
-    val = state[(ref.inst, ref.name)]
-    if ref.bit is not None:
-        return val & (1 << ref.bit) != 0
-    else:
-        return val
-
-def update_state_bit(state, ref, val):
-    if ref.bit is not None:
-        if val:
-            state[(ref.inst, ref.name)] |= (1 << ref.bit)
-        else:
-            state[(ref.inst, ref.name)] &= ~(1 << ref.bit)
-    else:
-        state[(ref.inst, ref.name)] = val
