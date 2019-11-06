@@ -1,4 +1,4 @@
-from Nand import *
+from nand import *
 
 
 def mkNot(inputs, outputs):

@@ -1,4 +1,3 @@
-from Nand import run
 from project_01 import *
 
 def test_nand():
