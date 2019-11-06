@@ -1,7 +1,7 @@
 """A compiler from components to the form that can be efficiently evaluated."""
 
-from eval.component import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes
-from eval.evaluator import NandVector
+from nand.component import Const, InputRef, Instance, NandInstance, NandRootInstance, RootInstance, extend_sign, _sorted_nodes
+from nand.evaluator import NandVector
 
 class NandVectorWrapper:
     def __init__(self, vector):

@@ -1,4 +1,4 @@
-from eval.evaluator import NandVector
+from nand.evaluator import NandVector
 
 def test_xor():
     xor = NandVector(
