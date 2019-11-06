@@ -1,4 +1,3 @@
-from Nand import run
 from project_03 import *
 
 def test_dff():

@@ -1,4 +1,4 @@
-from Nand import Component
+from nand import Component
 from project_01 import *
 from project_02 import *
 
