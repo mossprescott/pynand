@@ -37,12 +37,13 @@ FullAdder = Component(mkFullAdder)
 
 
 def mkInc16(inputs, outputs):
-    a = HalfAdder(a=inputs.in_[0], b=Const(1))
-    outputs.out[0] = a.sum
+    # Don't even need a whole HalfAdder for the low bit:
+    outputs.out[0] = Not(in_=inputs.in_[0]).out
+    carry = inputs.in_[0]
     for i in range(1, 16):
-        tmp = HalfAdder(a=inputs.in_[i], b=a.carry)
+        tmp = HalfAdder(a=inputs.in_[i], b=carry)
         outputs.out[i] = tmp.sum
-        a = tmp
+        carry = tmp.carry
 
 Inc16 = Component(mkInc16)
 
@@ -103,6 +104,8 @@ def mkALU(inputs, outputs):
                         b=And(a=Not(in_=in_[ 1]).out,
                               b=Not(in_=in_[ 0]).out).out).out).out).out
     Zero16 = Component(mkZero16)
+    # !a & !b
+    # not(nand(not(a), not(b))
     
     outputs.out = out
     outputs.zr = Zero16(in_=out).out

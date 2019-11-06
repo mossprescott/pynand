@@ -11,10 +11,10 @@ def test_fullAdder():
     assert gate_count(FullAdder) == 9  # optimal, according to nandgame
 
 def test_inc16():
-    assert gate_count(Inc16) == 80
+    assert gate_count(Inc16) == 76  # ?
 
 def test_add16():
-    assert gate_count(Add16) == 140
+    assert gate_count(Add16) == 140  # ?
 
 def test_alu():
-    assert gate_count(ALU) == 650  # < 608, according to nandgame
+    assert gate_count(ALU) == 560  # ?
