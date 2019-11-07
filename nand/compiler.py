@@ -96,7 +96,7 @@ def component_to_vector(comp):
     # map other component's outputs to nand outputs, transitively
     for r in sorted_nodes(inst):
         if isinstance(r, Instance):
-            print(f"inst: {r}; {r.args}")
+            # print(f"inst: {r}; {r.args}")
             for name, ref in r.args.items():
                 # print(f"  propagate: {(name, ref)}")
                 # propagate a single bit or up to 16 bits, whichever are present:
@@ -109,7 +109,7 @@ def component_to_vector(comp):
             for (name, bit), ref in r.outputs.dict.items(): 
                 all_bits[InputRef(r, name, bit)] = all_bits[ref]
         elif isinstance(r, ForwardInstance):
-            print(f"forward: {r}")
+            # print(f"forward: {r}")
             for f in list(all_bits.keys()):
                 if f.inst == r.ref:
                     all_bits[InputRef(r, f.name, f.bit)] = all_bits[f]
@@ -119,7 +119,7 @@ def component_to_vector(comp):
             #     print(f"  propagate from root: {(name, ref)}")
             # TODO
             pass
-    print(f"all: {all_bits}")
+    # print(f"all: {all_bits}")
     
     # extract output assignments:
     outputs = {}

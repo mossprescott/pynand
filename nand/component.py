@@ -194,7 +194,7 @@ class ForwardInstance:
         self.ref = None
 
     def set(self, ref):
-        print(f"set: {ref}")
+        # print(f"set: {ref}")
         self.ref = ref
 
     def refs(self):
