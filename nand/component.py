@@ -156,16 +156,18 @@ class NandInstance:
         return f"Nand_{self.seq}"
 
 class NandRootInstance:
+    """Instance used when the chip is a single Nand gate. Mostly a hack to get gate_count to work."""
+    
     def __init__(self):
         self.a = InputRef(self, "a")
         self.b = InputRef(self, "b")
         self.outputs = {('out', None): None}
 
     def refs(self):
-        return set([InputRef(self, "a"), InputRef(self, "b")])
+        return set([self.a, self.b])
 
     def __repr__(self):
-        return f"nand"
+        return f"Nand"
 
 
 Nand = NandComponent()
