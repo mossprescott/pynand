@@ -103,7 +103,14 @@ class Instance:
         return set(self.outputs.dict.values())
         
     def __repr__(self):
-        return f"instance{self.seq}"
+        builder_name = self.comp.builder.__name__
+        if builder_name.startswith("<"):  # as in "<lambda>", for example
+            name = "instance"
+        elif builder_name.startswith("mk"):  
+            name = builder_name[2:]
+        else:
+            name = builder_name    
+        return f"{name}_{self.seq}"
 
 class RootInstance:
     def __init__(self, comp):
