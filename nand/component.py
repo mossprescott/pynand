@@ -185,26 +185,37 @@ class Const:
     def __repr__(self):
         return f"const({self.value})"
 
-class Forward:
+class ForwardInstance:
     """A component that just forwards all interactions to a component that is provided later, 
     allowing circular references to be created.
     """
     
     def __init__(self):
-        self.comp = None
+        self.ref = None
 
-    def set(self, comp):
-        self.comp = comp
+    def set(self, ref):
+        print(f"set: {ref}")
+        self.ref = ref
+
+    def refs(self):
+        # FIXME: assumes an Instance, and only single-bit outputs?
+        return set([InputRef(self.ref, name) for name in self.ref.outputs.dict.keys()])
 
     def __getattr__(self, name):
+        """Note: this gets called _before_ ref is assigned, so it has to yield a reference to
+        _this_ instance, even though what we want ultimately is to refer to ref after it's wired.
+        """
         return InputRef(self, name)
+        
+    def __repr__(self):
+        return f"Forward({self.ref})"
 
 def lazy():
     """Syntax for creating late-bound (potentially circular) references."""
-    return Forward()
+    return ForwardInstance()
 
 def gate_count(comp):
-    return sum(1 for n in _sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
+    return sum(1 for n in sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
 
 def delay(self):
     raise NotImplemented()
@@ -222,7 +233,7 @@ def extend_sign(x):
 def unsigned(x):
     return x & 0xffff
 
-def _sorted_nodes(inst):
+def sorted_nodes(inst):
     """List of unique nodes, in topological order (so that evaluating them once 
     from left to right produces the correct result in the absence of cycles.)
     """
