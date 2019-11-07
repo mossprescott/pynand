@@ -153,7 +153,7 @@ class NandInstance:
         return set([self.a, self.b])
 
     def __repr__(self):
-        return f"nand{self.seq}"
+        return f"Nand_{self.seq}"
 
 class NandRootInstance:
     def __init__(self):
