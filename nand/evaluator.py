@@ -82,6 +82,7 @@ def fixed_point(f, x, limit=50):
         tmp = f(x)
         if tmp == x:
             # raise Exception(f"iterations: {i}")
+            # print(f"iterations: {i}")
             return x
         else:
             x = tmp
