@@ -247,14 +247,14 @@ def sorted_nodes(inst):
     """List of unique nodes, in topological order (so that evaluating them once
     from left to right produces the correct result in the absence of cycles.)
     """
-    # Search the node graph:
-    nodes = [inst]
     visited = []  # a set would be more efficient but insertion order matters
-    while nodes:
-        n, nodes = nodes[0], nodes[1:]
-        if n not in visited:
+    stack = []
+    def loop(n):
+        if n not in visited and n not in stack:
+            stack.append(n)
+            for r in n.refs():
+                loop(r.inst)
+            stack.remove(n)
             visited.append(n)
-            # print(f"n: {n}; {n.refs()}")
-            nodes += [r.inst for r in n.refs()]
-    visited.reverse()
+    loop(inst)
     return visited
