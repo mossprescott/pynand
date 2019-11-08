@@ -11,10 +11,10 @@ def test_bit():
     assert gate_count(Bit) == 13  # ?
 
 def test_register():
-    assert gate_count(Register) == -1  # ?
+    assert gate_count(Register) == 208  # ?
 
 def test_ram8():
-    assert gate_count(RAM8) == -1  # ?
+    assert gate_count(RAM8) == 2050  # ?
 
 def test_ram64():
     assert gate_count(RAM64) == -1  # ?
