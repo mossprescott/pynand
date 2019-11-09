@@ -7,17 +7,14 @@ def mkDFF(inputs, outputs):
     # Note: provided as a primitive in the Nand to Tetris simulator, but implementing it
     # from scratch is fun.
 
-    in_ = inputs.in_
-    clock = inputs.clock  # TODO: make `clock` magic, so you don't have to propagate it everywhere?
-    
     def mkLatch(inputs, outputs):
         mux = lazy()
         mux.set(Mux(a=mux.out, b=inputs.in_, sel=inputs.enable))
         outputs.out = mux.out
     Latch = Component(mkLatch)
     
-    l1 = Latch(in_=inputs.in_, enable=inputs.clock)
-    l2 = Latch(in_=l1.out, enable=Not(in_=inputs.clock).out)
+    l1 = Latch(in_=inputs.in_, enable=clock)
+    l2 = Latch(in_=l1.out, enable=Not(in_=clock).out)
     
     outputs.out = l2.out
 
@@ -27,10 +24,9 @@ DFF = Component(mkDFF)
 def mkBit(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
-    clock = inputs.clock  # TODO: make `clock` magic, so you don't have to propagate it everywhere?
     dff = lazy()
     mux = Mux(a=dff.out, b=inputs.in_, sel=inputs.load)
-    dff.set(DFF(in_=mux.out, clock=clock))
+    dff.set(DFF(in_=mux.out))
     outputs.out = dff.out
 
 Bit = Component(mkBit)
