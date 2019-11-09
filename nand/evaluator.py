@@ -58,7 +58,7 @@ class NandVector:
                 ts = nand_bits(in_bits, out_bit, ts)
             return ts
 
-        self.traces = fixed_point(f, self.traces)
+        self.traces = fixed_point(f, self.traces, limit=2)
         
         self.dirty = False
         
