@@ -224,6 +224,26 @@ def lazy():
     """Syntax for creating late-bound (potentially circular) references."""
     return ForwardInstance()
 
+
+class CommonInstance():
+    """Pseudo-instance that forms a namespace for signals which can be referenced from any component.
+    """
+    
+    def __init__(self):
+        pass
+
+    def refs(self):
+        return set()
+        
+    def __repr__(self):
+        return "common"
+    
+clock = InputRef(CommonInstance(), "clock")
+"""Pre-defined signal which gets special treatment: it's available in every component, and special 
+functions are provided to manipulate its state.
+"""
+
+
 def gate_count(comp):
     return sum(1 for n in sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
 

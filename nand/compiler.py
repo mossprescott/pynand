@@ -17,6 +17,18 @@ class NandVectorWrapper:
             if (name, i) in self._vector.inputs:
                 self._vector.set((name, i), bool(value & (1 << i)))
 
+    def tick(self):
+        """Raise the common `clock` signal (and propagate state changes eagerly)."""
+        self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('_clock', None), 1)
+        self._vector._propagate()
+
+    def tock(self):
+        """Lower the common `clock` signal (and propagate state changes eagerly)."""
+        self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('_clock', None), 0)
+        self._vector._propagate()
+
     def __getattr__(self, name):
         """Get the value of a single- or multiple-bit output."""
 
@@ -84,14 +96,17 @@ def component_to_vector(comp):
     # print(f"inputs: {inputs}")
     # print(f"   ...: {internal}")
     
-    # now allocate a bit for the output of each nand gate:
+    # now allocate a bit for the output of each nand gate, and one for the clock if needed:
     for r in sorted_nodes(inst):
         if isinstance(r, (NandInstance, NandRootInstance)):
             # print(f"r: {r}")
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
             all_bits[InputRef(r, 'out')] = next_bit()
-    # print(f"nands: {internal}")
+        for ref in r.refs():
+            if isinstance(ref.inst, CommonInstance) and ref not in all_bits:
+                inputs[('_clock', None)] = all_bits[ref] = next_bit()
+    # print(f"nands: {all_bits}")
 
     # map other component's outputs to nand outputs, transitively
     for r in sorted_nodes(inst):
