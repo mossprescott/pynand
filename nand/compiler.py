@@ -19,14 +19,14 @@ class NandVectorWrapper:
 
     def tick(self):
         """Raise the common `clock` signal (and propagate state changes eagerly)."""
-        self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('_clock', None), 1)
+        # self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('common.clock', None), 1)
         self._vector._propagate()
 
     def tock(self):
         """Lower the common `clock` signal (and propagate state changes eagerly)."""
-        self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('_clock', None), 0)
+        # self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('common.clock', None), 0)
         self._vector._propagate()
 
     def __getattr__(self, name):
@@ -105,7 +105,7 @@ def component_to_vector(comp):
             all_bits[InputRef(r, 'out')] = next_bit()
         for ref in r.refs():
             if isinstance(ref.inst, CommonInstance) and ref not in all_bits:
-                inputs[('_clock', None)] = all_bits[ref] = next_bit()
+                inputs[('common.' + ref.name, ref.bit)] = all_bits[ref] = next_bit()
     # print(f"nands: {all_bits}")
 
     # map other component's outputs to nand outputs, transitively
