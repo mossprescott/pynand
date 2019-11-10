@@ -122,7 +122,14 @@ def component_to_vector(comp):
                     if bit_ref in all_bits:
                         all_bits[InputRef(r, name, i)] = all_bits[bit_ref]
             for (name, bit), ref in r.outputs.dict.items(): 
-                all_bits[InputRef(r, name, bit)] = all_bits[ref]
+                # print(f"  output: {name}[{bit}]; {ref}")
+                if ref in all_bits:
+                    all_bits[InputRef(r, name, bit)] = all_bits[ref]
+                if bit is None:
+                    for i in range(16):
+                        bit_ref = ref[i]
+                        if bit_ref in all_bits:
+                            all_bits[InputRef(r, name, i)] = all_bits[bit_ref]
         elif isinstance(r, ForwardInstance):
             # print(f"forward: {r}")
             for f in list(all_bits.keys()):
