@@ -154,3 +154,30 @@ def test_register():
     reg.load = 1
     reg.tick(); reg.tock()
     assert reg.out == -32123
+
+    reg.load = 0
+    reg.tick(); reg.tock()
+    assert reg.out == -32123
+
+    reg.in_ = -1
+    reg.tick(); reg.tock()
+    assert reg.out == -32123
+
+    # TODO: more of the original test?
+
+
+def test_ram8():
+    ram8 = run(RAM8)
+
+    ram8.load = 1
+    for i in range(8):
+        ram8.in_ = i
+        ram8.address = i
+        ram8.tick(); ram8.tock()
+        assert ram8.out == i
+
+    ram8.in_ = -1
+    ram8.load = 0
+    for i in range(8):
+        ram8.address = i
+        assert ram8.out == i
