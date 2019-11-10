@@ -166,18 +166,44 @@ def test_register():
     # TODO: more of the original test?
 
 
+def ram_test(ram, size):
+    ram.load = 1
+    for i in range(size):
+        ram.in_ = i
+        ram.address = i
+        ram.tick(); ram.tock()
+        assert ram.out == i
+
+    ram.in_ = -1
+    ram.load = 0
+    for i in range(size):
+        ram.address = i
+        assert ram.out == i
+
+
 def test_ram8():
-    ram8 = run(RAM8)
+    ram = run(RAM8)
+    ram_test(ram, 8)
 
-    ram8.load = 1
-    for i in range(8):
-        ram8.in_ = i
-        ram8.address = i
-        ram8.tick(); ram8.tock()
-        assert ram8.out == i
 
-    ram8.in_ = -1
-    ram8.load = 0
-    for i in range(8):
-        ram8.address = i
-        assert ram8.out == i
+def test_ram64():
+    ram = run(RAM64)
+    ram_test(ram, 64)
+
+
+def test_ram512():
+    ram = run(RAM512)
+    ram_test(ram, 512)
+
+
+def test_ram4k():
+    ram = run(RAM4K)
+    ram_test(ram, 4096)
+
+
+def test_ram16K():
+    ram = run(RAM16K)
+    ram_test(ram, 16384)
+
+def test_pc():
+    raise NotImplementedError()
