@@ -17,7 +17,7 @@ def test_ram8():
     assert gate_count(RAM8) == 2050  # ?
 
 def test_ram64():
-    assert gate_count(RAM64) == -1  # ?
+    assert gate_count(RAM64) == 16786  # ?
 
 def test_ram512():
     assert gate_count(RAM512) == -1  # ?
