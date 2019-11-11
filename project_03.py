@@ -63,7 +63,7 @@ def mkRAM64(inputs, outputs):
         outputs.out[2] = inputs.in_[5]
     RShift3 = Component(mkRShift3)
 
-    shifted = RShift3(in_=inputs.in_)
+    shifted = RShift3(in_=inputs.address)
     load = DMux8Way(in_=inputs.load, sel=shifted.out)
     ram0 = RAM8(in_=inputs.in_, load=load.a, address=inputs.address)
     ram1 = RAM8(in_=inputs.in_, load=load.b, address=inputs.address)
