@@ -267,14 +267,20 @@ def sorted_nodes(inst):
     """List of unique nodes, in topological order (so that evaluating them once
     from left to right produces the correct result in the absence of cycles.)
     """
-    visited = []  # a set would be more efficient but insertion order matters
+    # Note: a set for fast tests, and a list to remember the order
+    visited = []
+    visited_set = set()
+    
+    # The stack is never as deep as the full set of nods, so just a list seems to fast enough for now.
     stack = []
+    
     def loop(n):
-        if n not in visited and n not in stack:
+        if n not in visited_set and n not in stack:
             stack.append(n)
             for r in n.refs():
                 loop(r.inst)
             stack.remove(n)
             visited.append(n)
+            visited_set.add(n)
     loop(inst)
     return visited
