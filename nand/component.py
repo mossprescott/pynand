@@ -195,6 +195,7 @@ class Const:
     def __repr__(self):
         return f"const({self.value})"
 
+
 class ForwardInstance:
     """A component that just forwards all interactions to a component that is provided later,
     allowing circular references to be created.
@@ -205,11 +206,18 @@ class ForwardInstance:
 
     def set(self, ref):
         # print(f"set: {ref}")
+        if self.ref is not None:
+            raise Exception(f"Tried to re-assign lazy ref: {self} -> {self.ref} to {ref}")
         self.ref = ref
 
     def refs(self):
-        # FIXME: assumes an Instance, and only single-bit outputs?
-        return set([InputRef(self.ref, name) for name in self.ref.outputs.dict.keys()])
+        # FIXME: other instance types and multi-bit outputs?
+        if isinstance(self.ref, Instance):
+            return set([InputRef(self.ref, name) for name in self.ref.outputs.dict.keys()])
+        elif isinstance(self.ref, DynamicDFFInstance):
+            return set([InputRef(self.ref, "out")])
+        else:
+            raise Exception(f"Unexpected node in lazy reference: {self} -> {self.ref}")
 
     def __getattr__(self, name):
         """Note: this gets called _before_ ref is assigned, so it has to yield a reference to
@@ -246,7 +254,7 @@ functions are provided to manipulate its state.
 
 class DynamicDFFComponent:
     def __call__(self, in_):
-        return DynamicDFFInstance(a, b)
+        return DynamicDFFInstance(in_)
 
     def root(self):
         return DynamicDFFRootInstance()
@@ -280,7 +288,11 @@ DynamicDFF = DynamicDFFComponent()
 
 
 def gate_count(comp):
-    return sum(1 for n in sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
+    nodes = sorted_nodes(comp.root())
+    return {
+        'nands': sum(1 for n in nodes if isinstance(n, (NandInstance, NandRootInstance))),
+        'flip_flops': sum(1 for n in nodes if isinstance(n, (DynamicDFFInstance, DynamicDFFRootInstance))),
+    }
 
 def delay(self):
     raise NotImplemented()
