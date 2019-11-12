@@ -36,13 +36,13 @@ def test_ram8():
 
 def test_ram64():
     assert gate_count(RAM64) == {
-        'nands': 7570,  # ?
+        'nands': 7_570,  # ?
         'flip_flops': 1_024
     }
 
 def test_ram512():
     assert gate_count(RAM512) == {
-        'nands': -1,  # ?
+        'nands': 60_946,  # Uh oh.
         'flip_flops': 8_192
     }
 
