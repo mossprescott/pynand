@@ -73,10 +73,12 @@ def test_dynamic_dff_fine():
     
 
 def test_dff_coarse():
+    # TODO: specify DynamicDFF is prohibited in this test
     dff = run(DFF)
     dff_coarse_test(dff)
 
 def test_dff_fine():
+    # TODO: specify DynamicDFF is prohibited in this test
     dff = run(DFF)
     dff_fine_test(dff)
 

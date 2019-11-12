@@ -26,7 +26,7 @@ def mkBit(inputs, outputs):
     load = inputs.load
     dff = lazy()
     mux = Mux(a=dff.out, b=inputs.in_, sel=inputs.load)
-    dff.set(DFF(in_=mux.out))
+    dff.set(DynamicDFF(in_=mux.out))
     outputs.out = dff.out
 
 Bit = Component(mkBit)
