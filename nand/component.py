@@ -225,7 +225,7 @@ def lazy():
     return ForwardInstance()
 
 
-class CommonInstance():
+class CommonInstance:
     """Pseudo-instance that forms a namespace for signals which can be referenced from any component.
     """
     
@@ -242,6 +242,41 @@ clock = InputRef(CommonInstance(), "clock")
 """Pre-defined signal which gets special treatment: it's available in every component, and special 
 functions are provided to manipulate its state.
 """
+
+
+class DynamicDFFComponent:
+    def __call__(self, in_):
+        return DynamicDFFInstance(a, b)
+
+    def root(self):
+        return DynamicDFFRootInstance()
+
+class DynamicDFFInstance:
+    def __init__(self, in_):
+        self.in_ = in_
+        self.out = InputRef(self, 'out')
+        self.seq = NODE_SEQ.next()
+
+    def refs(self):
+        return set([self.in_, clock])
+
+    def __repr__(self):
+        return f"DynamicDFF_{self.seq}"
+
+class DynamicDFFRootInstance:
+    """Instance used when the chip is a single DynamicDFF. Mostly a hack to get gate_count to work."""
+    
+    def __init__(self):
+        self.in_ = InputRef(self, "in_")
+        self.outputs = {('out', None): None}
+
+    def refs(self):
+        return set([self.in_, clock])
+
+    def __repr__(self):
+        return f"DynamicDFF"
+
+DynamicDFF = DynamicDFFComponent()
 
 
 def gate_count(comp):

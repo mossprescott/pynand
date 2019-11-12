@@ -1,10 +1,8 @@
 from project_03 import *
 
-def test_dff_coarse():
+def dff_coarse_test(dff):
     """Test of DFF behavior when inputs are always stable across clock cycles.
     """
-
-    dff = run(DFF)
 
     assert dff.out == 0
 
@@ -21,11 +19,9 @@ def test_dff_coarse():
     assert dff.out == 0
 
 
-def test_dff_fine():
+def dff_fine_test(dff):
     """Test of DFF behavior with varying signal timing.
     """
-
-    dff = run(DFF)
 
     assert dff.out == 0
 
@@ -65,6 +61,24 @@ def test_dff_fine():
     # FIXME: minimally need a way to update the clock that forces values to propagate, so you don't
     # have to inspect values to get the correct behavior. Probably by making clock special (and
     # global), and providing tick() and tock() to cycle it.
+
+
+def test_dynamic_dff_coarse():
+    dff = run(DynamicDFF)
+    dff_coarse_test(dff)
+
+def test_dynamic_dff_fine():
+    dff = run(DynamicDFF)
+    dff_fine_test(dff)
+    
+
+def test_dff_coarse():
+    dff = run(DFF)
+    dff_coarse_test(dff)
+
+def test_dff_fine():
+    dff = run(DFF)
+    dff_fine_test(dff)
 
 
 def test_bit_coarse():
@@ -204,6 +218,7 @@ def test_ram4k():
 def test_ram16K():
     ram = run(RAM16K)
     ram_test(ram, 16384)
+
 
 def test_pc():
     raise NotImplementedError()
