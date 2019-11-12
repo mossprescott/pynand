@@ -8,6 +8,7 @@ def test_wrapper_nand():
     nand_vec = NandVector(
         {('a', None): 0b001, ('b', None): 0b010},
         {('out', None): 0b100},
+        {},
         [(0b011, 0b100)])
     nand = NandVectorWrapper(nand_vec)
     
@@ -33,6 +34,7 @@ def test_wrapper_swap_bits():
     swap_vec = NandVector(
         {('in_', 0): 0b01, ('in_', 1): 0b10},
         {('out', 0): 0b10, ('out', 1): 0b01},
+        {},
         [])
     swap = NandVectorWrapper(swap_vec)
     

@@ -4,6 +4,7 @@ def test_xor():
     xor = NandVector(
         {'a': 0b000001, 'b': 0b000010},
         {'out': 0b100000},
+        {'na': 0b00100, 'nb': 0b01000},
         [ (0b000011, 0b000100),  # Nand(a, b) -> nand
           (0b000101, 0b001000),  # Nand(a, nand) -> na
           (0b000110, 0b010000),  # Nand(b, nand) -> nb
@@ -11,16 +12,17 @@ def test_xor():
         ]
     )
 
-    assert xor.get_output('out') == False
+    assert xor.get('out') == False
 
-    xor.set_input('a', True)
-    assert xor.get_output('out') == True
+    xor.set('a', True)
+    assert xor.get('out') == True
 
-    xor.set_input('b', True)
-    assert xor.get_output('out') == False
+    xor.set('b', True)
+    assert xor.get('out') == False
 
-    xor.set_input('a', False)
-    assert xor.get_output('out') == True
+    xor.set('a', False)
+    assert xor.get('out') == True
 
-    xor.set_input('b', False)
-    assert xor.get_output('out') == False
+    xor.set('b', False)
+    assert xor.get('out') == False
+    assert xor.get_internal('na') and xor.get_internal('nb')

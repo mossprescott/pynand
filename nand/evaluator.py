@@ -6,28 +6,49 @@ class NandVector:
     Each value is represented as a single bit in a vector represented as an `int`.
     
     `inputs` maps the name/id of each input to a bit vector which is the location of the 
-    corresponding bit. `outputs` has the same structure.
+    corresponding bit. `outputs` and `internal` have the same structure. Typically the three
+    sets of bits are disjoint, but that's not strictly required. 
     
     `ops` is a list of tuples (in_bits, out_bit). When any input changes, each op is applied in 
     sequence (via `_nand_bits`), with just three bit-wise operations on the ints. In case there are 
     any out-of-order or circular dependencies, the entire loop is repeated until no more changes are 
-    seen (or, if no fixed-point is found, an exceptions is raised.)
+    seen (or, if no fixed-point is found, an exception is raised.)
     """
     
-    def __init__(self, inputs, outputs, ops):
+    def __init__(self, inputs, outputs, internal, ops):
         self.inputs = inputs
         self.outputs = outputs
+        self.internal = internal
         self.ops = ops
         
         self.traces = 0
         self.dirty = True
         
-    def set_input(self, name, value):
+    def set(self, key, value):
+        """Set the value of an input bit identified by key (found in `inputs`).
+        """
+        
         if value:
-            self.traces |= self.inputs[name]
+            self.traces |= self.inputs[key]
         else:
-            self.traces &= ~self.inputs[name]
+            self.traces &= ~self.inputs[key]
         self.dirty = True
+
+    def get(self, key):
+        """Get the value of an output bit identified by key (found in `outputs`).
+        """
+        
+        self._propagate()
+        
+        return bool(self.traces & self.outputs[key])
+        
+    def get_internal(self, key):
+        """Get the value of an internal bit identified by key (found in `internal`).
+        """
+        
+        self._propagate()
+        
+        return bool(self.traces & self.internal[key])
         
     def _propagate(self):
         if not self.dirty: return
@@ -37,14 +58,9 @@ class NandVector:
                 ts = nand_bits(in_bits, out_bit, ts)
             return ts
 
-        self.traces = fixed_point(f, self.traces)
+        self.traces = fixed_point(f, self.traces, limit=2)
         
         self.dirty = False
-            
-    def get_output(self, name):
-        self._propagate()
-        
-        return bool(self.traces & self.outputs[name])
         
         
 def nand_bits(in_bits, out_bits, traces):
@@ -66,6 +82,7 @@ def fixed_point(f, x, limit=50):
         tmp = f(x)
         if tmp == x:
             # raise Exception(f"iterations: {i}")
+            # print(f"iterations: {i}")
             return x
         else:
             x = tmp
