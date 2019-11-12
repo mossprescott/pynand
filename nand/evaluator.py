@@ -73,6 +73,7 @@ class NandVector:
         
         for in_bit, out_bit in self.flip_flops:
             self.traces = copy_bit(in_bit, out_bit, self.traces)
+        self.dirty = True
 
 
 def nand_bits(in_bits, out_bits, traces):
