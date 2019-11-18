@@ -40,21 +40,26 @@ def test_ram64():
         'flip_flops': 1_024
     }
 
-def test_ram512():
-    assert gate_count(RAM512) == {
-        'nands': 60_946,  # Uh oh.
-        'flip_flops': 8_192
-    }
+# def test_ram512():
+#     assert gate_count(RAM512) == {
+#         'nands': 60_946,  # Uh oh.
+#         'flip_flops': 8_192
+#     }
+#
+# def test_ram4k():
+#     assert gate_count(RAM4K) == {
+#         'nands': -1,  # ?
+#         'flip_flops': 65_536
+#     }
+#
+# def test_ram16k():
+#     assert gate_count(RAM16K) == {
+#         'nands': -1,  # ?
+#         'flip_flops': 262_144
+#     }
 
-def test_ram4k():
-    assert gate_count(RAM4K) == {
-        'nands': -1,  # ?
-        'flip_flops': 65_536
+def test_pc():
+    assert gate_count(PC) == {
+        'nands': 287,
+        'flip_flops': 16
     }
-
-def test_ram16k():
-    assert gate_count(RAM16K) == {
-        'nands': -1,  # ?
-        'flip_flops': 262_144
-    }
-

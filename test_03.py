@@ -183,8 +183,11 @@ def test_register():
 
 
 def ram_test(ram, size):
+    # Distribute test values over the address space, but keep the total count small:
+    addrs = [0] + list(range(1, size, size//33 + 1)) + [size-1]
+    
     ram.load = 1
-    for i in range(size):
+    for i in addrs:
         ram.in_ = i
         ram.address = i
         ram.tick(); ram.tock()
@@ -192,7 +195,7 @@ def ram_test(ram, size):
 
     ram.in_ = -1
     ram.load = 0
-    for i in range(size):
+    for i in addrs:
         ram.address = i
         assert ram.out == i
 
@@ -207,20 +210,84 @@ def test_ram64():
     ram_test(ram, 64)
 
 
-def test_ram512():
-    ram = run(RAM512)
-    ram_test(ram, 512)
+# def test_ram512():
+#     ram = run(RAM512)
+#     ram_test(ram, 512)
+#
+#
+# def test_ram4k():
+#     ram = run(RAM4K)
+#     ram_test(ram, 4096)
+#
+#
+# def test_ram16K():
+#     ram = run(RAM16K)
+#     ram_test(ram, 16384)
 
-
-def test_ram4k():
-    ram = run(RAM4K)
-    ram_test(ram, 4096)
-
-
-def test_ram16K():
-    ram = run(RAM16K)
+def test_memory():
+    ram = run(Memory())
     ram_test(ram, 16384)
 
 
 def test_pc():
-    raise NotImplementedError()
+    pc = run(PC)
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 0; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = -32123
+    pc.tick(); pc.tock()
+    assert pc.out == 2
+
+    pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == -32123
+
+    pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == -32122
+
+    pc.tick(); pc.tock()
+    assert pc.out == -32121
+
+    pc.in_ = 12345; pc.load = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.load = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = 22222; pc.reset = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+

@@ -110,11 +110,26 @@ def mkRAM512(inputs, outputs):
 # RAM512 = Component(mkRAM512)
 
 
-def mkRAM4K(inputs, outputs):
-    pass
+# def mkRAM4K(inputs, outputs):
+#     pass
+#
+# def mkRAM16K(inputs, outputs):
+#     pass
 
-def mkRAM16K(inputs, outputs):
-    pass
 
 def mkPC(inputs, outputs):
-    pass
+    in_ = inputs.in_
+    load = inputs.load
+    inc = inputs.inc
+    reset = inputs.reset
+    
+    reseted = lazy()
+    pc = Register(in_=reseted.out, load=Const(1))
+    
+    inced = Mux16(a=pc.out, b=Inc16(in_=pc.out).out, sel=inc)
+    loaded = Mux16(a=inced.out, b=in_, sel=load)
+    reseted.set(Mux16(a=loaded.out, b=Const(0), sel=reset))
+    
+    outputs.out = pc.out
+
+PC = Component(mkPC)
