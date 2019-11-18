@@ -5,16 +5,16 @@ in using the minimum number of gates and/or making the (theoretically) fastest c
 from project_02 import *
 
 def test_halfAdder():
-    assert gate_count(HalfAdder) == 5  # optimal, according to nandgame
+    assert gate_count(HalfAdder)['nands'] == 5  # optimal, according to nandgame
 
 def test_fullAdder():
-    assert gate_count(FullAdder) == 9  # optimal, according to nandgame
+    assert gate_count(FullAdder)['nands'] == 9  # optimal, according to nandgame
 
 def test_inc16():
-    assert gate_count(Inc16) == 76  # ?
+    assert gate_count(Inc16)['nands'] == 76  # ?
 
 def test_add16():
-    assert gate_count(Add16) == 140  # ?
+    assert gate_count(Add16)['nands'] == 140  # ?
 
 def test_alu():
-    assert gate_count(ALU) == 560  # ?
+    assert gate_count(ALU)['nands'] == 560  # ?
