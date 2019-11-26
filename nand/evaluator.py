@@ -15,12 +15,11 @@ class NandVector:
     seen (or, if no fixed-point is found, an exception is raised.)
     """
 
-    def __init__(self, inputs, outputs, internal, ops, flip_flops):
+    def __init__(self, inputs, outputs, internal, ops):
         self.inputs = inputs
         self.outputs = outputs
         self.internal = internal
         self.ops = ops
-        self.flip_flops = flip_flops
 
         self.traces = 0
         self.dirty = True
@@ -55,8 +54,8 @@ class NandVector:
         if not self.dirty: return
 
         def f(ts):
-            for (in_bits, out_bit) in self.ops:
-                ts = nand_bits(in_bits, out_bit, ts)
+            for op in self.ops:
+                ts = op.propagate(ts)
             return ts
 
         self.traces = fixed_point(f, self.traces, limit=2)
@@ -71,34 +70,62 @@ class NandVector:
         
         self._propagate()
         
-        for in_bit, out_bit in self.flip_flops:
-            self.traces = copy_bit(in_bit, out_bit, self.traces)
+        for op in self.ops:
+            self.traces = op.flop(self.traces)
         self.dirty = True
 
+class VectorOp:
+    # TODO: common code around addressing bits?
 
-def nand_bits(in_bits, out_bits, traces):
-    """Apply NAND to the bits identified in `in_bits`, and store the result in the bit(s) identified
-    in `out_bits`.
+    def propagate(self, traces):
+        """Update output bits based on the current values of input bits, taking a complete set of 
+        traces and returning a new set of values for all traces.
+        """
+        return traces
 
-    If _all_ of the bits which are 1 in `in_bits` are also 1 in `traces`, then the result is `traces`,
-    modified so that all the bits of `out_bits` are cleared (i.e. "not-and"). Otherwise, those same
-    bits are set.
+    def flop(self, traces):
+        """Update output bits which respond to the falling edge of the clock signal, taking a 
+        complete set of traces and returning a new set of values for all traces.
+        """
+        return traces
+
+
+class NandOp(VectorOp):
+    """Implements the simplest component: a Nand gate. The single output is updated from inputs,
+    and 
     """
-    if (traces & in_bits) == in_bits:
-        return traces & ~out_bits
-    else:
-        return traces | out_bits
+
+    def __init__(self, in_bits, out_bit):
+        self.in_bits = in_bits
+        self.out_bit = out_bit
+
+    def propagate(self, traces):
+        """Apply NAND to the bits identified in `in_bits`, and store the result in the bit(s)
+        identified in `out_bits`.
+
+        If _all_ of the bits which are 1 in `in_bits` are also 1 in `traces`, then the result
+        is `traces`, modified so that all the bits of `out_bits` are cleared (i.e. "not-and").
+        Otherwise, those same bits are set.
+        """
+        if (traces & self.in_bits) == self.in_bits:
+            return traces & ~self.out_bit
+        else:
+            return traces | self.out_bit
 
 
-def copy_bit(in_bit, out_bit, traces):
-    """Copy a single bit located at in_bit to out_bit. Actually, this is complementary to nand_bits (i.e. 
-    and_bits), but here it's used in a different way.
-    """
-    if traces & in_bit == in_bit:
-        return traces | out_bit
-    else:
-        return traces & ~out_bit
-    
+class DynamicDFFOp(VectorOp):
+    def __init__(self, in_bit, out_bit):
+        self.in_bit = in_bit
+        self.out_bit = out_bit
+        
+    def flop(self, traces):
+        """Copy a single bit located at in_bit to out_bit. Called on the falling edge of the clock.
+        """
+        if traces & self.in_bit == self.in_bit:
+            return traces | self.out_bit
+        else:
+            return traces & ~self.out_bit
+
 
 def fixed_point(f, x, limit=50):
     for i in range(limit):
