@@ -1,7 +1,7 @@
 """A compiler from components to the form that can be efficiently evaluated."""
 
 from nand.component import *
-from nand.evaluator import NandVector
+from nand.evaluator import NandVector, NandOp, DynamicDFFOp
 
 class NandVectorWrapper:
     def __init__(self, vector):
@@ -139,7 +139,7 @@ def component_to_vector(comp):
             for f in list(all_bits.keys()):
                 if f.inst == r.ref:
                     all_bits[InputRef(r, f.name, f.bit)] = all_bits[f]
-        elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
+        elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, Const, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
             # print(f"other: {r}")
             pass
         else:
@@ -166,7 +166,6 @@ def component_to_vector(comp):
     
     # finally, construct an op for each nand, and one for each dynamic flip flop:
     ops = []
-    flip_flops = []
     for r in sorted_nodes(inst):
         if isinstance(r, (NandInstance, NandRootInstance)):
             # print(f"r: {r}")
@@ -181,11 +180,11 @@ def component_to_vector(comp):
                     else: return all_bits[ref]
                 in_bits = to_bits(r.a) | to_bits(r.b)
             out_bit = all_bits[InputRef(r, "out")]
-            ops.append((in_bits, out_bit))
+            ops.append(NandOp(in_bits, out_bit))
         elif isinstance(r, (DynamicDFFInstance, DynamicDFFRootInstance)):
             in_bit = all_bits[r.in_]
             out_bit = all_bits[InputRef(r, "out")]
-            flip_flops.append((in_bit, out_bit))
+            ops.append(DynamicDFFOp(in_bit, out_bit))
     # print(f"ops: {ops}")
     # print(f"flip flops: {flip_flops}")
     
@@ -194,7 +193,7 @@ def component_to_vector(comp):
                  if isinstance(ref.inst, Instance)
                }
     
-    return NandVector(inputs, outputs, internal, ops, flip_flops)
+    return NandVector(inputs, outputs, internal, ops)
     
 def run(comp, **args):
     """Evaluate a component, accepting input values and returning a wrapper which:

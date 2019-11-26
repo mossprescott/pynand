@@ -9,8 +9,7 @@ def test_wrapper_nand():
         {('a', None): 0b001, ('b', None): 0b010},
         {('out', None): 0b100},
         {},
-        [(0b011, 0b100)],
-        [])
+        [NandOp(0b011, 0b100)])
     nand = NandVectorWrapper(nand_vec)
     
     nand.a = nand.b = 0
@@ -36,7 +35,6 @@ def test_wrapper_swap_bits():
         {('in_', 0): 0b01, ('in_', 1): 0b10},
         {('out', 0): 0b10, ('out', 1): 0b01},
         {},
-        [],
         [])
     swap = NandVectorWrapper(swap_vec)
     
@@ -64,8 +62,7 @@ def test_compile_nand():
 
     assert nand_vec.outputs == {('out', None): 0b1000}
 
-    assert nand_vec.ops == [(0b0110, 0b1000)]
-    assert nand_vec.flip_flops == []
+    assert nand_vec.ops == [NandOp(0b0110, 0b1000)]
 
 
 def test_compile_not():
@@ -78,8 +75,7 @@ def test_compile_not():
 
     assert nand_vec.inputs == {('a', None): 0b010}
     assert nand_vec.outputs == {('out', None): 0b100}
-    assert nand_vec.ops == [(0b010, 0b100)]
-    assert nand_vec.flip_flops == []
+    assert nand_vec.ops == [NandOp(0b010, 0b100)]
 
 
 def test_compile_multibit_nand():
@@ -96,8 +92,7 @@ def test_compile_multibit_nand():
 
     assert nand_vec.outputs == {('out', 2): 0b1000}
 
-    assert nand_vec.ops == [(0b0110, 0b1000)]
-    assert nand_vec.flip_flops == []
+    assert nand_vec.ops == [NandOp(0b0110, 0b1000)]
      
         
 def test_compile_dynamic_dff():
@@ -107,5 +102,6 @@ def test_compile_dynamic_dff():
     
     assert dff_vec.outputs.keys() == {('out', None)}
     
-    assert dff_vec.ops == []
-    assert dff_vec.flip_flops == [(dff_vec.inputs[('in_', None)], dff_vec.outputs[('out', None)])]
+    assert dff_vec.ops == [
+        DynamicDFFOp(dff_vec.inputs[('in_', None)], dff_vec.outputs[('out', None)])
+    ]

@@ -111,7 +111,12 @@ class NandOp(VectorOp):
             return traces & ~self.out_bit
         else:
             return traces | self.out_bit
+            
+    def __eq__(self, other):
+        return isinstance(other, NandOp) and self.in_bits == other.in_bits and self.out_bit == other.out_bit
 
+    def __repr__(self):
+        return f"NandOp({self.in_bits}, {self.out_bit})"
 
 class DynamicDFFOp(VectorOp):
     def __init__(self, in_bit, out_bit):
@@ -125,6 +130,12 @@ class DynamicDFFOp(VectorOp):
             return traces | self.out_bit
         else:
             return traces & ~self.out_bit
+
+    def __eq__(self, other):
+        return isinstance(other, DynamicDFFOp) and self.in_bit == other.in_bit and self.out_bit == other.out_bit
+
+    def __repr__(self):
+        return f"DynamicDFFOp({self.in_bit}, {self.out_bit})"
 
 
 def fixed_point(f, x, limit=50):
