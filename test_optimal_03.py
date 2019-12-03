@@ -7,12 +7,10 @@ from project_03 import *
 def test_dff():
     assert gate_count(DFF) == {
         'nands': 9,  # ?
-        'flip_flops': 0
     }
 
 def test_dynamic_dff():
     assert gate_count(DynamicDFF) == {
-        'nands': 0,
         'flip_flops': 1
     }
 
@@ -51,12 +49,16 @@ def test_ram64():
 #         'nands': -1,  # ?
 #         'flip_flops': 65_536
 #     }
-#
-# def test_ram16k():
-#     assert gate_count(RAM16K) == {
-#         'nands': -1,  # ?
-#         'flip_flops': 262_144
-#     }
+
+def test_ram16k():
+    assert gate_count(RAM16K) == {
+        'memories': 1
+    }
+
+def test_memory():
+    assert gate_count(Memory) == {
+        'memories': 1
+    }
 
 def test_pc():
     assert gate_count(PC) == {

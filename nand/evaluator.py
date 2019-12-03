@@ -138,6 +138,69 @@ class DynamicDFFOp(VectorOp):
         return f"DynamicDFFOp({self.in_bit}, {self.out_bit})"
 
 
+class MemoryOp(VectorOp):
+    """Manages the memory's storage and also implements its update ops. Terrible idea?
+    """
+    
+    def __init__(self, in_bit_array, load_bit, address_bit_array, out_bit_array):
+        self.in_bit_array = in_bit_array
+        self.load_bit = load_bit
+        self.address_bit_array = address_bit_array
+        self.out_bit_array = out_bit_array
+
+        self.storage = [0] * (2**len(address_bit_array))
+    
+    def propagate(self, traces):
+        """Retrieve the appropriate value from off-chip and update the `out` traces.
+        """
+        addr = self._from_bits(self.address_bit_array, traces)
+        return self._update_bits(self.out_bit_array, traces, self.storage[addr])
+        
+    def flop(self, traces):
+        """Update the state held in this object, if the `load` trace is asserted.
+        No changes are made to the chip's traces.
+        """
+        
+        if traces & self.load_bit != 0:
+            addr = self._from_bits(self.address_bit_array, traces)
+            in_ = self._from_bits(self.in_bit_array, traces)
+            self.storage[addr] = in_
+
+        return traces
+            
+    def _from_bits(self, bits, traces):
+        """Extract a multiple-bit value from traces, where each bit is identified by the mask 
+        in the corresponding position in bits.
+        """
+        
+        val = 0
+        for bit in reversed(bits):
+            val <<= 1
+            if traces & bit != 0:
+                val |= 0b1
+        return val
+
+    def _update_bits(self, bits, traces, val):
+        """Update the traces """
+        for bit in bits:
+            if val & 0b1 == 0:
+                traces &= ~bit
+            else:
+                traces |= bit
+            val >>= 1
+        return traces
+
+    def __eq__(self, other):
+        return (isinstance(other, MemoryOp) 
+            and self.in_bit_array == other.in_bit_array 
+            and self.load_bit == other.load_bit
+            and self.address_bit_array == other.address_bit_array
+            and self.out_bit_array == other.out_bit_array)
+
+    def __repr__(self):
+        return f"MemoryOp(in: {self.in_bit_array}, load: {self.load_bit}, address: {self.address_bit_array}, out: {self.out_bit_array})"
+
+
 def fixed_point(f, x, limit=50):
     for i in range(limit):
         tmp = f(x)

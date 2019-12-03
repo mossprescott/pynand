@@ -205,28 +205,33 @@ def test_ram8():
     ram_test(ram, 8)
 
 
-def test_ram64():
-    ram = run(RAM64)
-    ram_test(ram, 64)
-
-
+# This one works, but it's annoyingly slow:
+# def test_ram64():
+#     ram = run(RAM64)
+#     ram_test(ram, 64)
+#
+# This one's implementation is commented out:
 # def test_ram512():
 #     ram = run(RAM512)
 #     ram_test(ram, 512)
 #
 #
+# This one I never even tried:
 # def test_ram4k():
 #     ram = run(RAM4K)
 #     ram_test(ram, 4096)
-#
-#
-# def test_ram16K():
-#     ram = run(RAM16K)
-#     ram_test(ram, 16384)
 
-def test_memory():
-    ram = run(Memory())
+
+def test_ram16K():
+    # This large RAM has to be implemented as a wrapper around a Memory:
+    ram = run(RAM16K)
     ram_test(ram, 16384)
+
+# FIXME: deal with wiring for this case, which is only useful for demonstration purposes anyway.
+# def test_memory():
+#     # Same behavior as RAM16K. This just shows that it can be used as the root as well.
+#     ram = run(Memory)
+#     ram_test(ram, 16384)
 
 
 def test_pc():

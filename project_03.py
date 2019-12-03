@@ -112,9 +112,20 @@ def mkRAM512(inputs, outputs):
 
 # def mkRAM4K(inputs, outputs):
 #     pass
-#
-# def mkRAM16K(inputs, outputs):
-#     pass
+
+def mkRAM16K(inputs, outputs):
+    # This just wraps a Memory, making the inouts and outputs visible.
+    # This chip can't be implemented with Nands or DFFs; it's just too slow to simulate.
+    
+    in_ = inputs.in_
+    load = inputs.load
+    address = inputs.address
+    
+    mem = Memory(14, in_=in_, load=load, address=address)
+    
+    outputs.out = mem.out
+
+RAM16K = Component(mkRAM16K)
 
 
 def mkPC(inputs, outputs):
