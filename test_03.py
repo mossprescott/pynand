@@ -72,13 +72,15 @@ def test_dynamic_dff_fine():
     dff_fine_test(dff)
     
 
+def test_dff_legit():
+    """The challenge is to implement DFF with only Nand gates."""
+    assert list(gate_count(DFF).keys()) == ['nands']
+
 def test_dff_coarse():
-    # TODO: specify DynamicDFF is prohibited in this test
     dff = run(DFF)
     dff_coarse_test(dff)
 
 def test_dff_fine():
-    # TODO: specify DynamicDFF is prohibited in this test
     dff = run(DFF)
     dff_fine_test(dff)
 
@@ -144,6 +146,10 @@ def test_bit_fine():
     assert bit.out == 0  # Now you can see the new value
 
 
+def test_register_legit():
+    """The challenge is to implement Register from Nand and DynamicDFF."""
+    assert 'memories' not in gate_count(Register)
+
 def test_register():
     reg = run(Register)
 
@@ -199,6 +205,10 @@ def ram_test(ram, size):
         ram.address = i
         assert ram.out == i
 
+
+def test_ram8_legit():
+    """The challenge is to implement RAM8 from Registers."""
+    assert 'memories' not in gate_count(RAM8)    
 
 def test_ram8():
     ram = run(RAM8)

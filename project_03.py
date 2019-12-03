@@ -22,6 +22,8 @@ DFF = Component(mkDFF)
 
 
 def mkBit(inputs, outputs):
+    # OK to use DynamicDFF here, for the most efficient result.
+    
     in_ = inputs.in_
     load = inputs.load
     dff = lazy()
