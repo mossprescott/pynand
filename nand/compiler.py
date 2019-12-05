@@ -178,7 +178,7 @@ def component_to_vector(comp):
         outputs[("out", None)] = all_bits[InputRef(inst, "out")]
     # print(f"outputs: {outputs}")
     
-    # finally, construct an op for each nand, and one for each dynamic flip flop:
+    # finally, construct an op for each nand, dff, and memory:
     ops = []
     for r in sorted_nodes(inst):
         if isinstance(r, (NandInstance, NandRootInstance)):
