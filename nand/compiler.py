@@ -1,7 +1,7 @@
 """A compiler from components to the form that can be efficiently evaluated."""
 
 from nand.component import *
-from nand.evaluator import NandVector
+from nand.evaluator import NandVector, NandOp, DynamicDFFOp, MemoryOp
 
 class NandVectorWrapper:
     def __init__(self, vector):
@@ -20,14 +20,14 @@ class NandVectorWrapper:
     def tick(self):
         """Raise the common `clock` signal (and propagate state changes eagerly)."""
         # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', None), 1)
+        self._vector.set(('common.clock', None), 1)  # TODO: first check that it was low
         self._vector._propagate()
 
     def tock(self):
         """Lower the common `clock` signal (and propagate state changes eagerly)."""
         # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', None), 0)
-        self._vector._propagate()
+        self._vector.set(('common.clock', None), 0)  # TODO: first check that it was high
+        self._vector._flop()
 
     def __getattr__(self, name):
         """Get the value of a single- or multiple-bit output."""
@@ -96,19 +96,33 @@ def component_to_vector(comp):
     # print(f"inputs: {inputs}")
     # print(f"   ...: {internal}")
     
-    # now allocate a bit for the output of each nand gate, and one for the clock if needed:
+    # now allocate bits for components:
+    # - one for the output of each nand gate 
+    # - one for each dynamic flip flop to store the state (which is also its output)
+    # - one for the clock if any component refers to it
     for r in sorted_nodes(inst):
-        if isinstance(r, (NandInstance, NandRootInstance)):
+        if isinstance(r, (NandInstance, NandRootInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
             # print(f"r: {r}")
             # print(f"  a: {r.a}")
             # print(f"  b: {r.b}")
             all_bits[InputRef(r, 'out')] = next_bit()
+        elif isinstance(r, (MemoryInstance, MemoryRootInstance)):
+            for i in range(16):
+                all_bits[InputRef(r, 'out', i)] = next_bit()
+        elif isinstance(r, (Instance, RootInstance, Const, CommonInstance, ForwardInstance)):
+            # print(f"other: {r}")
+            pass
+        else:
+            raise Exception(f"Unexpected instance: {r} ({r.__class__})")
+            
         for ref in r.refs():
+            # print(f"ref: {ref}")
             if isinstance(ref.inst, CommonInstance) and ref not in all_bits:
                 inputs[('common.' + ref.name, ref.bit)] = all_bits[ref] = next_bit()
     # print(f"nands: {all_bits}")
 
     # map other component's outputs to nand outputs, transitively
+    # TODO: replace this with recursive lookups that don't bloat all_bits (see the other branch)
     for r in sorted_nodes(inst):
         if isinstance(r, Instance):
             # print(f"inst: {r}; {r.args}")
@@ -135,12 +149,17 @@ def component_to_vector(comp):
             for f in list(all_bits.keys()):
                 if f.inst == r.ref:
                     all_bits[InputRef(r, f.name, f.bit)] = all_bits[f]
-        elif isinstance(r, RootInstance):
-            # print(f"root: {r}")
-            # for name, ref in r.args.items():
-            #     print(f"  propagate from root: {(name, ref)}")
-            # TODO
+        elif isinstance(r, (MemoryInstance, MemoryRootInstance)):
+            for i in range(16):
+                all_bits[InputRef(r, "in_", i)] = all_bits[r.in_[i]]
+            all_bits[InputRef(r, "load")] = all_bits[r.load]
+            for i in range(r.address_bits):
+                all_bits[InputRef(r, "address", i)] = all_bits[r.address[i]]
+        elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, Const, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
+            # print(f"other: {r}")
             pass
+        else:
+            raise Exception(f"Unexpected instance: {r} ({r.__class__})")
     # print(f"all: {all_bits}")
     
     # extract output assignments:
@@ -155,11 +174,11 @@ def component_to_vector(comp):
                     bit_ref = pred_ref[i]
                     if bit_ref in all_bits:
                         outputs[(pred_name, i)] = all_bits[bit_ref]
-    elif isinstance(inst, NandRootInstance):
+    elif isinstance(inst, (NandRootInstance, DynamicDFFRootInstance, MemoryRootInstance)):
         outputs[("out", None)] = all_bits[InputRef(inst, "out")]
     # print(f"outputs: {outputs}")
     
-    # finally, construct an op for each nand:
+    # finally, construct an op for each nand, dff, and memory:
     ops = []
     for r in sorted_nodes(inst):
         if isinstance(r, (NandInstance, NandRootInstance)):
@@ -175,8 +194,19 @@ def component_to_vector(comp):
                     else: return all_bits[ref]
                 in_bits = to_bits(r.a) | to_bits(r.b)
             out_bit = all_bits[InputRef(r, "out")]
-            ops.append((in_bits, out_bit))
+            ops.append(NandOp(in_bits, out_bit))
+        elif isinstance(r, (DynamicDFFInstance, DynamicDFFRootInstance)):
+            in_bit = all_bits[r.in_]
+            out_bit = all_bits[InputRef(r, "out")]
+            ops.append(DynamicDFFOp(in_bit, out_bit))
+        elif isinstance(r, (MemoryInstance, MemoryRootInstance)):
+            in_bit_array = [all_bits[InputRef(r, "in_", i)] for i in range(16)]
+            load_bit = all_bits[InputRef(r, "load")]
+            address_bit_array = [all_bits[InputRef(r, "address", i)] for i in range(r.address_bits)]
+            out_bit_array = [all_bits[InputRef(r, "out", i)] for i in range(16)]
+            ops.append(MemoryOp(in_bit_array, load_bit, address_bit_array, out_bit_array))
     # print(f"ops: {ops}")
+    # print(f"flip flops: {flip_flops}")
     
     internal = { (f"{ref.inst}.{ref.name}", ref.bit): bit 
                  for (ref, bit) in all_bits.items() 
@@ -186,9 +216,9 @@ def component_to_vector(comp):
     return NandVector(inputs, outputs, internal, ops)
     
 def run(comp, **args):
-    """Evaluate a component, accepting input values and returning a wrapper which can be used to .
-    
-    
+    """Evaluate a component, accepting input values and returning a wrapper which:
+    - exposes the outputs as attributes
+    - can be retained to interact with the component in a stateful way
     """
     
     nv = component_to_vector(comp)

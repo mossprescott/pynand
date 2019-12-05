@@ -195,6 +195,7 @@ class Const:
     def __repr__(self):
         return f"const({self.value})"
 
+
 class ForwardInstance:
     """A component that just forwards all interactions to a component that is provided later,
     allowing circular references to be created.
@@ -205,11 +206,18 @@ class ForwardInstance:
 
     def set(self, ref):
         # print(f"set: {ref}")
+        if self.ref is not None:
+            raise Exception(f"Tried to re-assign lazy ref: {self} -> {self.ref} to {ref}")
         self.ref = ref
 
     def refs(self):
-        # FIXME: assumes an Instance, and only single-bit outputs?
-        return set([InputRef(self.ref, name) for name in self.ref.outputs.dict.keys()])
+        # FIXME: other instance types and multi-bit outputs?
+        if isinstance(self.ref, Instance):
+            return set([InputRef(self.ref, name) for name in self.ref.outputs.dict.keys()])
+        elif isinstance(self.ref, DynamicDFFInstance):
+            return set([InputRef(self.ref, "out")])
+        else:
+            raise Exception(f"Unexpected node in lazy reference: {self} -> {self.ref}")
 
     def __getattr__(self, name):
         """Note: this gets called _before_ ref is assigned, so it has to yield a reference to
@@ -225,7 +233,7 @@ def lazy():
     return ForwardInstance()
 
 
-class CommonInstance():
+class CommonInstance:
     """Pseudo-instance that forms a namespace for signals which can be referenced from any component.
     """
     
@@ -244,8 +252,114 @@ functions are provided to manipulate its state.
 """
 
 
+class DynamicDFFComponent:
+    def __call__(self, in_):
+        return DynamicDFFInstance(in_)
+
+    def root(self):
+        return DynamicDFFRootInstance()
+
+class DynamicDFFInstance:
+    def __init__(self, in_):
+        self.in_ = in_
+        self.out = InputRef(self, 'out')
+        self.seq = NODE_SEQ.next()
+
+    def refs(self):
+        return set([self.in_, clock])
+
+    def __repr__(self):
+        return f"DynamicDFF_{self.seq}"
+
+class DynamicDFFRootInstance:
+    """Instance used when the chip is a single DynamicDFF. Mostly a hack to get gate_count to work."""
+    
+    def __init__(self):
+        self.in_ = InputRef(self, "in_")
+        self.outputs = {('out', None): None}
+
+    def refs(self):
+        return set([self.in_, clock])
+
+    def __repr__(self):
+        return f"DynamicDFF"
+
+DynamicDFF = DynamicDFFComponent()
+
+
+class MemoryComponent:
+    def __call__(self, address_bits, in_, load, address):
+        """A component which provides a memory as a peripheral, costing zero gates, but adding 
+        a fixed overhead of about 48 traces.
+
+        address_bits: the number of traces allocated to address bits, e.g. 14 bits for 16K cells.
+        
+        TODO: support using one as a ROM: make in_ and load optional, and allow the contents
+        to be initialized when it's constructed.
+        """
+
+        return MemoryInstance(address_bits, in_, load, address)
+
+    def root(self):
+        """When used as the root component, the memory is treated as having 14 address bits.
+        """
+        
+        return MemoryRootInstance()
+
+class MemoryInstance:
+    def __init__(self, address_bits, in_, load, address):
+        self.address_bits = address_bits
+        
+        self.in_ = in_
+        self.load = load
+        self.address = address
+        
+        self.out = InputRef(self, 'out')
+        self.seq = NODE_SEQ.next()
+
+    def refs(self):
+        return set(
+            [self.in_[i] for i in range(16)]
+            + [self.load]
+            + [self.address[i] for i in range(self.address_bits)]
+            + [clock])
+
+    def __repr__(self):
+        return f"Memory({self.address_bits})_{self.seq}"
+
+class MemoryRootInstance:
+    def __init__(self):
+        self.address_bits = 14
+        
+        self.in_ = InputRef(self, "in_")
+        self.load = InputRef(self, "load")
+        self.address = InputRef(self, "address")
+        
+        self.outputs = {('out', None): None}
+
+    def refs(self):
+        return set(
+            [self.in_[i] for i in range(16)]
+            + [self.load]
+            + [self.address[i] for i in range(14)]
+            + [clock])
+
+    def __repr__(self):
+        return f"Memory"
+
+Memory = MemoryComponent()
+
+
 def gate_count(comp):
-    return sum(1 for n in sorted_nodes(comp.root()) if isinstance(n, (NandInstance, NandRootInstance)))
+    nodes = sorted_nodes(comp.root())
+    return { k: v 
+        for (k, v) in [
+            ('nands', sum(1 for n in nodes if isinstance(n, (NandInstance, NandRootInstance)))),
+            ('flip_flops', sum(1 for n in nodes if isinstance(n, (DynamicDFFInstance, DynamicDFFRootInstance)))),
+            ('memories', sum(1 for n in nodes if isinstance(n, (MemoryInstance, MemoryRootInstance)))),
+        ] 
+        if v > 0
+    }
 
 def delay(self):
     raise NotImplemented()

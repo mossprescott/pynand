@@ -22,11 +22,13 @@ DFF = Component(mkDFF)
 
 
 def mkBit(inputs, outputs):
+    # OK to use DynamicDFF here, for the most efficient result.
+    
     in_ = inputs.in_
     load = inputs.load
     dff = lazy()
     mux = Mux(a=dff.out, b=inputs.in_, sel=inputs.load)
-    dff.set(DFF(in_=mux.out))
+    dff.set(DynamicDFF(in_=mux.out))
     outputs.out = dff.out
 
 Bit = Component(mkBit)
@@ -82,12 +84,65 @@ RAM64 = Component(mkRAM64)
 
 def mkRAM512(inputs, outputs):
     pass
+    
+    # This is just too slow
+#     def mkRShift3(inputs, outputs):
+#         outputs.out[0] = inputs.in_[3]
+#         outputs.out[1] = inputs.in_[4]
+#         outputs.out[2] = inputs.in_[5]
+#         outputs.out[3] = inputs.in_[6]
+#         outputs.out[4] = inputs.in_[7]
+#         outputs.out[5] = inputs.in_[8]
+#     RShift3 = Component(mkRShift3)
+#
+#     shifted = RShift3(in_=inputs.address)
+#     load = DMux8Way(in_=inputs.load, sel=shifted.out)
+#     ram0 = RAM64(in_=inputs.in_, load=load.a, address=inputs.address)
+#     ram1 = RAM64(in_=inputs.in_, load=load.b, address=inputs.address)
+#     ram2 = RAM64(in_=inputs.in_, load=load.c, address=inputs.address)
+#     ram3 = RAM64(in_=inputs.in_, load=load.d, address=inputs.address)
+#     ram4 = RAM64(in_=inputs.in_, load=load.e, address=inputs.address)
+#     ram5 = RAM64(in_=inputs.in_, load=load.f, address=inputs.address)
+#     ram6 = RAM64(in_=inputs.in_, load=load.g, address=inputs.address)
+#     ram7 = RAM64(in_=inputs.in_, load=load.h, address=inputs.address)
+#     outputs.out = Mux8Way16(a=ram0.out, b=ram1.out, c=ram2.out, d=ram3.out,
+#                             e=ram4.out, f=ram5.out, g=ram6.out, h=ram7.out,
+#                             sel=shifted.out).out
+#
+# RAM512 = Component(mkRAM512)
 
-def mkRAM4K(inputs, outputs):
-    pass
+
+# def mkRAM4K(inputs, outputs):
+#     pass
 
 def mkRAM16K(inputs, outputs):
-    pass
+    # This just wraps a Memory, making the inouts and outputs visible.
+    # This chip can't be implemented with Nands or DFFs; it's just too slow to simulate.
+    
+    in_ = inputs.in_
+    load = inputs.load
+    address = inputs.address
+    
+    mem = Memory(14, in_=in_, load=load, address=address)
+    
+    outputs.out = mem.out
+
+RAM16K = Component(mkRAM16K)
+
 
 def mkPC(inputs, outputs):
-    pass
+    in_ = inputs.in_
+    load = inputs.load
+    inc = inputs.inc
+    reset = inputs.reset
+    
+    reseted = lazy()
+    pc = Register(in_=reseted.out, load=Const(1))
+    
+    inced = Mux16(a=pc.out, b=Inc16(in_=pc.out).out, sel=inc)
+    loaded = Mux16(a=inced.out, b=in_, sel=load)
+    reseted.set(Mux16(a=loaded.out, b=Const(0), sel=reset))
+    
+    outputs.out = pc.out
+
+PC = Component(mkPC)
