@@ -153,7 +153,7 @@ def component_to_vector(comp):
             for i in range(16):
                 all_bits[InputRef(r, "in_", i)] = all_bits[r.in_[i]]
             all_bits[InputRef(r, "load")] = all_bits[r.load]
-            for i in range(r.address_bits):  # TODO: infer for root instance
+            for i in range(r.address_bits):
                 all_bits[InputRef(r, "address", i)] = all_bits[r.address[i]]
         elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, Const, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
             # print(f"other: {r}")
