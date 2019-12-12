@@ -64,7 +64,7 @@ def test_memory_system():
     mem.tick(); mem.tock()
     assert mem.out == 1234
 
-    # Did not also write to lower RAM or Screen
+    # Did not also write to upper RAM or Screen
     mem.address = 0x2234
     assert mem.out == 0
     mem.address = 0x6234
