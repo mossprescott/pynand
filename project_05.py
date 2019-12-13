@@ -1,6 +1,7 @@
-from nand import Component
+from nand import Component, lazy
 from project_01 import *
 from project_02 import *
+from project_03 import *
 
 def mkMemorySystem(inputs, outputs):
     in_ = inputs.in_
@@ -39,8 +40,31 @@ MemorySystem = Component(mkMemorySystem)
 
     
 def mkCPU(inputs, outputs):
-    pass
+    inM = inputs.inM                 # M value input (M = contents of RAM[A])
+    instruction = inputs.instruction # Instruction for execution
+    reset = inputs.reset             # Signals whether to re-start the current
+                                     # program (reset==1) or continue executing
+                                     # the current program (reset==0).
+    
+    i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, j2, j1, j0 = [instruction[j] for j in reversed(range(16))]
 
+    not_i = Not(in_=i).out
+    
+    alu = lazy()
+    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
+    d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
+    pc = PC(in_=Const(0), load=Const(0), inc=Const(1), reset=reset)
+    alu.set(ALU(x=d_reg.out, y=a_reg.out,
+                zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
+    
+
+    outputs.outM = alu.out                   # M value output
+    outputs.writeM = And(a=dm, b=i).out      # Write to M?
+    outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
+    outputs.pc = pc.out                      # address of next instruction (latched)
+    
+
+CPU = Component(mkCPU)
     
 def mkComputer(inputs, outputs):
     pass
