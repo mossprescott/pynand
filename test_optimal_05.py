@@ -14,6 +14,5 @@ def test_cpu():
     assert gate_count(CPU) == {
         'nands': -1,  # ?
         'flip_flops': 48,  # 3 registers
-        'memories': 2,
     }
 
