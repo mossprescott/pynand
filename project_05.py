@@ -46,15 +46,22 @@ def mkCPU(inputs, outputs):
                                      # program (reset==1) or continue executing
                                      # the current program (reset==0).
     
-    i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, j2, j1, j0 = [instruction[j] for j in reversed(range(16))]
+    i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
 
     not_i = Not(in_=i).out
     
     alu = lazy()
     a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
     d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
-    pc = PC(in_=Const(0), load=Const(0), inc=Const(1), reset=reset)
-    alu.set(ALU(x=d_reg.out, y=a_reg.out,
+    jump = And(a=i,
+               b=Or(a=     And(a=alu.ng, b=jlt).out,                      # lt
+                    b=Or(a=And(a=alu.zr, b=jeq).out,                      # eq
+                         b=And(a=And(a=Not(in_=alu.ng).out, b=Not(in_=alu.zr).out).out, b=jgt).out  # gt
+                         ).out
+                    ).out
+              ).out
+    pc = PC(in_=a_reg.out, load=jump, inc=Const(1), reset=reset)
+    alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
     
 

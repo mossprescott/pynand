@@ -152,115 +152,148 @@ def test_cpu():
     cpu.inM = 11111
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 10 # and DRegister == -1
-    # TODO: assert on D?
     
     cpu.instruction = 0b0000000000001110  # @14
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 11 # and DRegister == -1
    
-    # cpu.instruction = 0b1110001100000100  # D;jlt
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b0000001111100111  # @999
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110110111100000  # A=A+1
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100001000  # M=D
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b0000000000010101  # @21
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110011111000010  # D+1;jeq
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b0000000000000010  # @2
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110000010010000  # D=D+A
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b0000001111101000  # @1000
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110111010010000  # D=-1
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000001  # D;JGT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000010  # D;JEQ
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000011  # D;JGE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000100  # D;JLT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000101  # D;JNE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000110  # D;JLE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000111  # D;JMP
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110101010010000  # D=0
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000001  # D;JGT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000010  # D;JEQ
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000011  # D;JGE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000100  # D;JLT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000101  # D;JNE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000110  # D;JLE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000111  # D;JMP
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110111111010000  # D=1
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000001  # D;JGT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000010  # D;JEQ
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000011  # D;JGE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000100  # D;JLT
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000101  # D;JNE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000110  # D;JLE
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b1110001100000111  # D;JMP
-    # cpu.tick(); cpu.tock()
-    #
-    # set reset 1;
-    # cpu.tick(); cpu.tock()
-    #
-    # cpu.instruction = 0b0111111111111111  # @32767
-    # set reset 0;
-    # cpu.tick(); cpu.tock()
-    #
+    cpu.instruction = 0b1110001100000100  # D;jlt
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 14 # and DRegister == -1
+
+    cpu.instruction = 0b0000001111100111  # @999
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 999 and cpu.pc == 15 # and DRegister == -1
+
+    cpu.instruction = 0b1110110111100000  # A=A+1
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 16 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100001000  # M=D
+    cpu.tick(); cpu.tock()
+    assert cpu.outM == -1 and cpu.writeM == 1 and cpu.addressM == 1000 and cpu.pc == 17 # and DRegister == -1
+
+    cpu.instruction = 0b0000000000010101  # @21
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 21 and cpu.pc == 18 # and DRegister == -1
+
+    cpu.instruction = 0b1110011111000010  # D+1;jeq
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 21 and cpu.pc == 21 # and DRegister == -1
+
+    cpu.instruction = 0b0000000000000010  # @2
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 22 # and DRegister == -1
+
+    cpu.instruction = 0b1110000010010000  # D=D+A
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 23 # and DRegister == 1
+
+    cpu.instruction = 0b0000001111101000  # @1000
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 24 # and DRegister == -1
+
+    cpu.instruction = 0b1110111010010000  # D=-1
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 25 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 26 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 27 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 28 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110101010010000  # D=0
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110111111010000  # D=1
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.reset = 1
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 0 # and DRegister == 1
+
+    cpu.instruction = 0b0111111111111111  # @32767
+    cpu.reset = 0
+    cpu.tick(); cpu.tock()
+    assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
