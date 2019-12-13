@@ -2,7 +2,7 @@ from project_05 import *
 
 def test_memory_system():
     mem = run(MemorySystem)
-    
+
     # set RAM[0] = -1
     mem.in_ = -1
     mem.load = 1
@@ -14,7 +14,7 @@ def test_memory_system():
     mem.load = 0
     mem.tick(); mem.tock()
     assert mem.out == -1
-    
+
     # Did not also write to upper RAM or Screen
     mem.address = 0x2000
     assert mem.out == 0
@@ -27,13 +27,13 @@ def test_memory_system():
     mem.address = 0x2000
     mem.tick(); mem.tock()
     assert mem.out == 2222
-    
+
     # RAM[2000] holds value
     mem.in_ = 9999
     mem.load = 0
     mem.tick(); mem.tock()
     assert mem.out == 2222
-    
+
     # Did not also write to lower RAM or Screen
     mem.address = 0
     assert mem.out == -1
@@ -85,7 +85,7 @@ def test_memory_system():
 
 
     ### Keyboard test
-    
+
     mem.address = 0x6000
     # TODO: simulate 'k' key pressed
     # assert mem.out == 75
@@ -93,7 +93,7 @@ def test_memory_system():
 
 
     ### Screen test
-    
+
     mem.load = 1
     mem.in_ = -1
     mem.address = 0x4fcf
@@ -107,7 +107,7 @@ def test_memory_system():
 
 def test_cpu():
     cpu = run(CPU)
-    
+
     cpu.instruction = 0b0011000000111001  # @12345
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 12345 and cpu.pc == 1 # and DRegister == 0
@@ -147,16 +147,16 @@ def test_cpu():
     cpu.instruction = 0b0000001111101000  # @1000
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 9 # and DRegister == 11110
-   
+
     cpu.instruction = 0b1111010011010000  # D=D-M
     cpu.inM = 11111
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 10 # and DRegister == -1
-    
+
     cpu.instruction = 0b0000000000001110  # @14
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 11 # and DRegister == -1
-   
+
     cpu.instruction = 0b1110001100000100  # D;jlt
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 14 # and DRegister == -1

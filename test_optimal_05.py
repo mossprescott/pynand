@@ -22,4 +22,3 @@ def test_computer():
         'flip_flops': 48,  # 3 registers
         'memories': 2,
     }
-    
