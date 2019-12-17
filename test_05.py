@@ -342,12 +342,73 @@ def test_computer_add():
     assert peek(computer, 0) == 5        
 
 
+MAX_PROGRAM = [
+    0b0000000000000000,  #  0: @0
+    0b1111110000010000,  #  1: D=M
+    0b0000000000000001,  #  2: @1
+    0b1111010011010000,  #  3: D=D-M  ; D = mem[0] - mem[1]
+    0b0000000000001010,  #  4: @10
+    0b1110001100000001,  #  5: D; JGT
+    0b0000000000000001,  #  6: @1
+    0b1111110000010000,  #  7: D=M    ; D = mem[1]
+    0b0000000000001100,  #  8: @12
+    0b1110101010000111,  #  9: JMP
+    0b0000000000000000,  # 10: @0
+    0b1111110000010000,  # 11: D=M    ; D = mem[0]
+    0b0000000000000010,  # 12: @2
+    0b1110001100001000,  # 13: M=D    ; mem[2] = max
+    0b0000000000001110,  # 14: @14
+    0b1110101010000111,  # 15: JMP    ; infinite loop
+]
+
+def test_computer_max():
+    computer = run(Computer)
+
+    init_rom(computer, MAX_PROGRAM)
+
+    # first run: compute max(3,5)
+    poke(computer, 0, 3)
+    poke(computer, 1, 5)
+    for _ in range(14):
+        computer.tick(); computer.tock()    
+    assert peek(computer, 2) == 5
+
+    # second run: compute max(23456,12345)
+    reset_program(computer)
+    poke(computer, 0, 23456)
+    poke(computer, 1, 12345)
+    # The run on these inputs needs less cycles (different branching)
+    for _ in range(10):
+        computer.tick(); computer.tock()    
+    assert peek(computer, 2) == 23456
+
+ 
+
 def run_program(computer, instructions):
-    """Install and run a sequence of instructions, """
+    """Install and run a sequence of instructions, stopping when pc runs off the end."""
+    
     init_rom(computer, instructions)
 
     while computer.pc <= len(instructions):
         computer.tick(); computer.tock()    
+
+def reset_program(computer):
+    """Reset pc so the program will run again from the top."""
+    
+    computer.reset = 1
+    computer.tick(); computer.tock()
+
+    computer.reset = 0
+    
+
+# def run_fully(computer):
+#     reset_program(computer)
+#
+#     # TODO: what is a safe termination condition? How to detect infinite loop vs other tight loop?
+#     # For example, something like this might be useful: MD=D-1; A-D; JLT
+#     while ?:
+#       computer.tick(); computer.tock()
+
 
 def peek(computer, address):
     """Read a single word from the Computer's memory."""
@@ -377,7 +438,7 @@ def init_rom(computer, instructions):
     size = len(instructions)
     if size+2 <= 2**15:
         rom.storage[size] = size  # @size (which is the address of this instruction)
-        rom.storage[size+1] = 0b111_0_000000_000_111  # A; JMP
+        rom.storage[size+1] = 0b111_0_000000_000_111  # JMP
 
 def get_memory(computer, address_bits):
     """Find one of the memories from inside the computer by matching the number of address bits.
