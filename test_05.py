@@ -297,3 +297,12 @@ def test_cpu():
     cpu.reset = 0
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
+
+
+def test_computer_no_program():
+    computer = run(Computer)
+    
+    for _ in range(100):
+        computer.tick(); computer.tock()
+    
+    assert computer.pc == 100

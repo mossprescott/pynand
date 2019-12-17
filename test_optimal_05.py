@@ -18,7 +18,9 @@ def test_cpu():
 
 def test_computer():
     assert gate_count(Computer) == {
-        'nands': -1,  # ?
+        'nands': 1270,  # ?
         'flip_flops': 48,  # 3 registers
-        'memories': 2,
+        'memories': 3,
+        # 'keyboards': 1,
+        # 'roms': 1,
     }

@@ -70,10 +70,23 @@ def mkCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-
 CPU = Component(mkCPU)
 
 
 def mkComputer(inputs, outputs):
-    pass
+    reset = inputs.reset
+    
+    cpu = lazy()
 
+    # TODO: a write-only variant?
+    rom = Memory(15, in_=Const(0), load=Const(0), address=cpu.pc)
+
+    mem = MemorySystem(in_=cpu.outM, load=cpu.writeM, address=cpu.addressM)
+
+    cpu.set(CPU(inM=mem.out, instruction=rom.out, reset=reset))
+
+    # HACK: need some dependency to force the whole thing to be synthesized.
+    # Exposing the PC also makes it easy to observe what's happening in a dumb way.
+    outputs.pc = cpu.pc
+
+Computer = Component(mkComputer)
