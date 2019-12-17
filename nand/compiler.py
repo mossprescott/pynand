@@ -57,6 +57,11 @@ class NandVectorWrapper:
 
     def internal(self):
         return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
+        
+    def components(self, types):
+        """List of internal components (i.e MemoryOps).
+        """
+        return [op for op in self._vector.ops if isinstance(op, types)]
 
     def __repr__(self):
         return str(self.outputs())

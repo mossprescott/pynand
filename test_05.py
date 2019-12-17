@@ -1,4 +1,5 @@
 from project_05 import *
+from nand.evaluator import MemoryOp  # FIXME: export a cleaner abstraction
 
 def test_memory_system():
     mem = run(MemorySystem)
@@ -306,3 +307,80 @@ def test_computer_no_program():
         computer.tick(); computer.tock()
     
     assert computer.pc == 100
+
+
+# Add.hack:
+ADD_PROGRAM = [
+    0b0000000000000010,  # @2
+    0b1110110000010000,  # D=A
+    0b0000000000000011,  # @3
+    0b1110000010010000,  # D=D+A
+    0b0000000000000000,  # @0
+    0b1110001100001000,  # M=D
+]
+
+def test_computer_add():
+    computer = run(Computer)
+    
+    # First run (at the beginning PC=0)
+    run_program(computer, ADD_PROGRAM)
+    
+    assert peek(computer, 0) == 5
+    
+
+    # Reset the PC
+    computer.reset = 1
+    computer.tick(); computer.tock()
+    assert computer.pc == 0
+    
+    # Second run, to check that the PC was reset correctly.
+    poke(computer, 0, 12345)
+    computer.reset = 0    
+    while computer.pc < len(ADD_PROGRAM):
+        computer.tick(); computer.tock()
+
+    assert peek(computer, 0) == 5        
+
+
+def run_program(computer, instructions):
+    """Install and run a sequence of instructions, """
+    init_rom(computer, instructions)
+
+    while computer.pc <= len(instructions):
+        computer.tick(); computer.tock()    
+
+def peek(computer, address):
+    """Read a single word from the Computer's memory."""
+    
+    mem = get_memory(computer, address_bits=14)
+    return mem.storage[address]
+
+
+def poke(computer, address, value):
+    """Write a single word to the Computer's memory."""
+    
+    mem = get_memory(computer, address_bits=14)
+    mem.storage[address] = value
+
+
+def init_rom(computer, instructions):
+    """Overwrite the top of the ROM with a sequence of instructions.
+    
+    If there's any space left over, an two-instruction infinite loop is written immediately
+    after the program, which could in theory be used to detect termination.
+    """
+    
+    rom = get_memory(computer, address_bits=15)
+    for i, instr in enumerate(instructions):
+        rom.storage[i] = instr
+        
+    size = len(instructions)
+    if size+2 <= 2**15:
+        rom.storage[size] = size  # @size (which is the address of this instruction)
+        rom.storage[size+1] = 0b111_0_000000_000_111  # A; JMP
+
+def get_memory(computer, address_bits):
+    """Find one of the memories from inside the computer by matching the number of address bits.
+    """
+    # HACK!
+    return [mem for mem in computer.components(MemoryOp) if len(mem.address_bit_array) == address_bits][0]
