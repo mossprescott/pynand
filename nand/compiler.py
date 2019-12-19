@@ -57,6 +57,11 @@ class NandVectorWrapper:
 
     def internal(self):
         return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
+        
+    def components(self, types):
+        """List of internal components (i.e MemoryOps).
+        """
+        return [op for op in self._vector.ops if isinstance(op, types)]
 
     def __repr__(self):
         return str(self.outputs())
@@ -99,6 +104,7 @@ def component_to_vector(comp):
     # now allocate bits for components:
     # - one for the output of each nand gate 
     # - one for each dynamic flip flop to store the state (which is also its output)
+    # - 16 for the output of each memory
     # - one for the clock if any component refers to it
     for r in sorted_nodes(inst):
         if isinstance(r, (NandInstance, NandRootInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
@@ -123,43 +129,52 @@ def component_to_vector(comp):
 
     # map other component's outputs to nand outputs, transitively
     # TODO: replace this with recursive lookups that don't bloat all_bits (see the other branch)
-    for r in sorted_nodes(inst):
-        if isinstance(r, Instance):
-            # print(f"inst: {r}; {r.args}")
-            for name, ref in r.args.items():
-                # print(f"  propagate: {(name, ref)}")
-                # propagate a single bit or up to 16 bits, whichever are present:
-                if ref in all_bits:
-                    all_bits[InputRef(r, name)] = all_bits[ref]
-                for i in range(16):
-                    bit_ref = ref[i]
-                    if bit_ref in all_bits:
-                        all_bits[InputRef(r, name, i)] = all_bits[bit_ref]
-            for (name, bit), ref in r.outputs.dict.items(): 
-                # print(f"  output: {name}[{bit}]; {ref}")
-                if ref in all_bits:
-                    all_bits[InputRef(r, name, bit)] = all_bits[ref]
-                if bit is None:
+    for _ in range(2):  # HACK: need multiple passes to wire forwarded bits
+        for r in sorted_nodes(inst):
+            if isinstance(r, Instance):
+                # print(f"inst: {r}; {r.args}")
+                for name, ref in r.args.items():
+                    # print(f"  propagate: {(name, ref)}")
+                    # propagate a single bit or up to 16 bits, whichever are present:
+                    if ref in all_bits:
+                        all_bits[InputRef(r, name)] = all_bits[ref]
                     for i in range(16):
                         bit_ref = ref[i]
                         if bit_ref in all_bits:
                             all_bits[InputRef(r, name, i)] = all_bits[bit_ref]
-        elif isinstance(r, ForwardInstance):
-            # print(f"forward: {r}")
-            for f in list(all_bits.keys()):
-                if f.inst == r.ref:
-                    all_bits[InputRef(r, f.name, f.bit)] = all_bits[f]
-        elif isinstance(r, (MemoryInstance, MemoryRootInstance)):
-            for i in range(16):
-                all_bits[InputRef(r, "in_", i)] = all_bits[r.in_[i]]
-            all_bits[InputRef(r, "load")] = all_bits[r.load]
-            for i in range(r.address_bits):
-                all_bits[InputRef(r, "address", i)] = all_bits[r.address[i]]
-        elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, Const, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
-            # print(f"other: {r}")
-            pass
-        else:
-            raise Exception(f"Unexpected instance: {r} ({r.__class__})")
+                for (name, bit), ref in r.outputs.dict.items(): 
+                    # print(f"  output: {name}[{bit}]; {ref}")
+                    if ref in all_bits:
+                        all_bits[InputRef(r, name, bit)] = all_bits[ref]
+                    if bit is None:
+                        for i in range(16):
+                            bit_ref = ref[i]
+                            if bit_ref in all_bits:
+                                all_bits[InputRef(r, name, i)] = all_bits[bit_ref]
+            elif isinstance(r, ForwardInstance):
+                # print(f"forward: {r}")
+                for f in list(all_bits.keys()):
+                    if f.inst == r.ref:
+                        # print(f"propagate: {InputRef(r, f.name, f.bit)} -> {f}")
+                        all_bits[InputRef(r, f.name, f.bit)] = all_bits[f]
+            elif isinstance(r, (MemoryInstance, MemoryRootInstance)):
+                # print(f"mem: {r}; {r.in_, r.load, r.address}")
+                # print(f"all: {all_bits}")
+                for i in range(16):
+                    if r.in_[i] == Const(0):
+                        all_bits[InputRef(r, "in_", i)] = 0b1
+                    else:
+                        if r.in_[i] in all_bits:
+                            all_bits[InputRef(r, "in_", i)] = all_bits[r.in_[i]]
+                all_bits[InputRef(r, "load")] = all_bits[r.load] if r.load != Const(0) else 0b1
+                for i in range(r.address_bits):
+                    if r.address[i] in all_bits:
+                        all_bits[InputRef(r, "address", i)] = all_bits[r.address[i]]
+            elif isinstance(r, (RootInstance, NandInstance, NandRootInstance, Const, CommonInstance, DynamicDFFInstance, DynamicDFFRootInstance)):
+                # print(f"other: {r}")
+                pass
+            else:
+                raise Exception(f"Unexpected instance: {r} ({r.__class__})")
     # print(f"all: {all_bits}")
     
     # extract output assignments:

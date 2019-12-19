@@ -58,7 +58,7 @@ class NandVector:
                 ts = op.propagate(ts)
             return ts
 
-        self.traces = fixed_point(f, self.traces, limit=2)
+        self.traces = fixed_point(f, self.traces, limit=3)  # HACK: 2 just checks the first pass was stable. 
 
         self.dirty = False
 
