@@ -2,14 +2,22 @@
 """
 
 class Component:
-    """Defines the interface for a component."""
+    """Defines the interface for a component, including what traces it reads and writes, and when."""
     
-    # def refs(self):
-    #     """Set of components """
+    def inputs(self):
+        """Dictionary of named input signals, and the number of bits for each.
+        
+        Note: the keys must be distinct from the keys of outputs().
+        """
+        raise NotImplementedError
     
     def outputs(self):
-        """Set of Refs for the component's output traces."""
-        raise NotImplementedError()
+        """Dictionary of named output signals, and the number of bits for each. A trace will be 
+        allocated for each bit.
+        
+        Note: the keys must be distinct from the keys of inputs().
+        """
+        raise NotImplementedError
     
     # def wire(self, trace_map):
     #     """Stage 1: connect traces for static logic (connecting components).
@@ -19,7 +27,7 @@ class Component:
     #
     #     return {}
     
-    def combine(self, trace_map):
+    def combine(self, **trace_map):
         """Stage 2: define combinational logic, as operations which are performed on the chip's traces
         to propagate signals.
         
@@ -29,7 +37,7 @@ class Component:
         
         return []
 
-    def sequence(self, trace_map):
+    def sequence(self, **trace_map):
         """Stage 3: define sequential logic, as operations which are performed on the chip's traces 
         at the falling edge of the clock signal.
         
@@ -43,50 +51,51 @@ class Component:
     #     """Set of one InputRef for a named output."""
     #     return set([Ref(self, name, 0)])
         
-    def _ref16(self, name):
-        """Set of 16 InputRefs, one for each bit of a single named output."""
-        return set([Ref(self, "out", i) for i in range(16)])
+    # def _ref16(self, name):
+    #     """Set of 16 InputRefs, one for each bit of a single named output."""
+    #     return set([Ref(self, "out", i) for i in range(16)])
 
+def tst_trace(mask, traces):
+    return traces & mask != 0
 
-class Ref:
-    def __init__(self, comp, name, bit):
-        self.comp = comp
-        self.name = name
-        self.bit = bit
+def set_trace(mask, value, traces):
+    if value:
+        return traces | mask
+    else:
+        return traces & ~mask
 
-    def __repr__(self):
-        return f"Ref({self.comp}, {self.name}, {self.bit})"
+# class Ref:
+#     def __init__(self, comp, name, bit=0):
+#         self.comp = comp
+#         self.name = name
+#         self.bit = bit
+#
+#     def __repr__(self):
+#         return f"Ref({self.comp}, {self.name}, {self.bit})"
+#
+#     def __eq__(self, other):
+#         return (isinstance(other, Ref)
+#             and self.comp == other.comp and self.name == other.name and self.bit == other.bit)
+#
+#     def __hash__(self):
+#         return hash((self.comp, self.name, self.bit))
 
-    def __eq__(self, other):
-        return (isinstance(other, Ref)
-            and self.comp == other.comp and self.name == other.name and self.bit == other.bit)
-
-    def __hash__(self):
-        return hash((self.comp, self.name, self.bit))
-
-        
 class Nand(Component):
-    """A single nand gate, which has two inputs and a single output named 'out'"""
+    """A single nand gate, which has two inputs and a single output named 'out'."""
     
-    def __init__(self, a_ref, b_ref):
-        self.a_ref = a_ref
-        self.b_ref = b_ref
-        self.out_ref = Ref(self, "out", 0)
+    def inputs(self):
+        return {"a": 1, "b": 1}
 
     def outputs(self):
-        return set([self.out_ref])
+        return {"out": 1}
 
-    def combine(self, trace_map):
-        a_mask = trace_map[self.a_ref]
-        b_mask = trace_map[self.b_ref]
-        out_mask = trace_map[self.out_ref]
+    def combine(self, a, b, out):
+        assert len(a) == 1 and len(b) == 1 and len(out) == 1
         def nand(traces):
-            a = traces & a_mask != 0
-            b = traces & b_mask != 0
-            if not (a and b):
-                return traces | out_mask
-            else:
-                return traces & ~out_mask
+            a_val = tst_trace(a[0], traces)
+            b_val = tst_trace(b[0], traces)
+            out_val = not (a_val and b_val)
+            return set_trace(out[0], out_val, traces)
         return [nand]
 
 
@@ -111,49 +120,58 @@ class DFF(Component):
     during the next clock cycle.
     """
     
-    def __init__(self, in_ref):
-        self.in_ref = in_ref
-        self.out_ref = Ref(self, "out", 0)
+    def inputs(self):
+        return {"in_": 1}
     
     def outputs(self):
-        return set([self.out_ref])
+        return {"out": 1}
     
-    def sequence(self, trace_map):
-        in_mask = trace_map[self.in_ref]
-        out_mask = trace_map[self.out_ref]
+    def sequence(self, in_, out):
+        assert len(in_) == 1 and len(out) == 1
         def flop(traces):
-            in_ = traces & in_mask != 0
-            if in_:
-                return traces | out_mask
-            else:
-                return traces & ~out_mask
+            val = tst_trace(in_[0], traces)
+            return set_trace(out[0], val, traces)
         return [flop]
-        
 
 
 class ROM(Component):
-    """Read-only memory containing 2^n words which can be read but not written by the chip.
-    
+    """Read-only memory containing 2^address_bits words (16 bits each) which can be read but 
+    not written by the chip.
+
     The entire contents can be over-written from outside when initializing the assembled chip
     (so, really it's an EEPROM.)
     """
-    
-    def __init__(self, address_ref):
+
+    def __init__(self, address_bits):
+        self.address_bits = address_bits
         self.storage = []
-        
+
     def program(self, words):
         """Replace the contents of the ROM with the provided words. Any leftover address space is 
         effectively filled with zero values."""
         self.storage = list(words)
-        
-    def outputs(self):
-        return self._ref16("out")
 
-    def op(self):
-        # TODO: args are the bit masks for each input and output
-        # result is the propagate op
-        pass
-    
+    def inputs(self):
+        return {"address": self.address_bits}
+
+    def outputs(self):
+        return {"out": 16}
+
+    def combine(self, address, out):
+        assert len(address) == self.address_bits and len(out) == 16
+        def read(traces):
+            address_val = 0
+            for bit in reversed(address):
+                address_val = (address_val << 1) | int(tst_trace(bit, traces))
+            if address_val < len(self.storage):
+                out_val = self.storage[address_val]  
+            else:
+                out_val = 0
+            for bit in out:
+                traces = set_trace(bit, out_val & 0b1, traces)
+                out_val >>= 1
+            return traces
+        return [read]
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip.
@@ -196,5 +214,7 @@ class Input(Component):
         # TODO: args are the bit masks for each input and output
         # result is the propagate op
         pass
-    
+
+
+# TODO: Output, (potentially) accepting one word of output on each clock cycle?
     
