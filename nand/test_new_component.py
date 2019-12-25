@@ -97,3 +97,19 @@ def test_ram():
         op(addr | load | in_)
         assert ram.get(i) == 12345 + i
     
+def test_input():
+    inpt = Input()
+    
+    assert inpt.inputs() == {}
+    assert inpt.outputs() == {"out": 16}
+
+    traces = { "out": [0b1 << i for i in range(16)]}
+    
+    op, = inpt.combine(**traces)
+    
+    assert op(0) == 0
+    
+    inpt.set(12345)
+    assert op(0) == 12345
+    
+    assert inpt.sequence(**traces) == []

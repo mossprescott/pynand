@@ -192,7 +192,11 @@ class RAM(Component):
         return self.storage[address]
         
     def set(self, address, value):
-        """Poke a value into a single cell."""
+        """Poke a value into a single cell.
+        
+        TODO: keep track of which cells are updated, for efficient updates when used as the 
+        screen buffer?
+        """
         self.storage[address] = value
         
     def inputs(self):
@@ -206,7 +210,7 @@ class RAM(Component):
         assert len(address) == self.address_bits and len(out) == 16
         def read(traces):
             address_val = get_multiple_traces(address, traces)
-            out_val = self.storage[address_val]
+            out_val = self.get(address_val)
             return set_multiple_traces(out, out_val, traces)
         return [read]
     
@@ -218,7 +222,7 @@ class RAM(Component):
             if load_val:
                 in_val = get_multiple_traces(in_, traces)
                 address_val = get_multiple_traces(address, traces)
-                self.storage[address_val] = in_val
+                self.set(address_val, in_val)
         return [write]
     
 
@@ -230,16 +234,20 @@ class Input(Component):
         self.value = 0
         
     def set(self, value):
-        """Provide the value that will appear at the output"""
+        """Provide the value that will appear at the output."""
         self.value = value
         
+    def inputs(self):
+        return {}
+
     def outputs(self):
-        return self._ref16("out")
+        return {"out": 16}
         
-    def op(self):
-        # TODO: args are the bit masks for each input and output
-        # result is the propagate op
-        pass
+    def combine(self, out):
+        assert len(out) == 16
+        def read(traces):
+            return set_multiple_traces(out, self.value, traces)
+        return [read]
 
 
 # TODO: Output, (potentially) accepting one word of output on each clock cycle?
