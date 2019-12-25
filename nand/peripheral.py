@@ -64,6 +64,18 @@ def set_trace(mask, value, traces):
     else:
         return traces & ~mask
 
+def get_multiple_traces(masks, traces):
+    val = 0
+    for bit in reversed(masks):
+        val = (val << 1) | int(tst_trace(bit, traces))
+    return val
+
+def set_multiple_traces(masks, value, traces):
+    for bit in masks:
+        traces = set_trace(bit, value & 0b1, traces)
+        value >>= 1
+    return traces
+
 # class Ref:
 #     def __init__(self, comp, name, bit=0):
 #         self.comp = comp
@@ -160,23 +172,19 @@ class ROM(Component):
     def combine(self, address, out):
         assert len(address) == self.address_bits and len(out) == 16
         def read(traces):
-            address_val = 0
-            for bit in reversed(address):
-                address_val = (address_val << 1) | int(tst_trace(bit, traces))
+            address_val = get_multiple_traces(address, traces)
             if address_val < len(self.storage):
                 out_val = self.storage[address_val]  
             else:
                 out_val = 0
-            for bit in out:
-                traces = set_trace(bit, out_val & 0b1, traces)
-                out_val >>= 1
-            return traces
+            return set_multiple_traces(out, out_val, traces)
         return [read]
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip.
     """
-    def __init__(self, address):
+    def __init__(self, address_bits):
+        self.address_bits = address_bits
         self.storage = [0]*(2**self.address_bits)
         
     def get(self, address):
@@ -187,13 +195,31 @@ class RAM(Component):
         """Poke a value into a single cell."""
         self.storage[address] = value
         
-    def outputs(self):
-        return self._ref16("out")
+    def inputs(self):
+        return {"in_": 16, "load": 1, "address": self.address_bits}
 
-    def op(self):
-        # TODO: args are the bit masks for each input and output
-        # result is the propagate and flop ops
-        pass
+    def outputs(self):
+        return {"out": 16}
+
+    def combine(self, address, out, **_unused):
+        """Note: only using one of the inputs."""
+        assert len(address) == self.address_bits and len(out) == 16
+        def read(traces):
+            address_val = get_multiple_traces(address, traces)
+            out_val = self.storage[address_val]
+            return set_multiple_traces(out, out_val, traces)
+        return [read]
+    
+    def sequence(self, in_, load, address, **_unused):
+        """Note: not using `out`."""
+        assert len(in_) == 16 and len(load) == 1 and len(address) == self.address_bits
+        def write(traces):
+            load_val = tst_trace(load[0], traces)
+            if load_val:
+                in_val = get_multiple_traces(in_, traces)
+                address_val = get_multiple_traces(address, traces)
+                self.storage[address_val] = in_val
+        return [write]
     
 
 class Input(Component):
