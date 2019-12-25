@@ -1,4 +1,4 @@
-from nand.peripheral import *
+from nand_new.component import *
 
 
 def test_nand():
