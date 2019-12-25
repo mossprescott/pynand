@@ -46,21 +46,21 @@ def test_rom():
 
     assert rom.inputs() == {"address": 4}
     assert rom.outputs() == {"out": 16}
-    
-    traces = { 
+
+    traces = {
         "address": [0b0001 << i for i in range(4)],
         "out": [0b10000 << i for i in range(16)]
     }
-    
+
     op, = rom.combine(**traces)
-    
+
     rom.program([1, 2, 3, 4, 5])
     for i in range(16):
         if i < 5:
             assert op(i) == ((i+1) << 4) | i
         else:
             assert op(i) == 0x00 | i
-    
+
     assert rom.sequence(**traces) == []
 
 
@@ -69,8 +69,8 @@ def test_ram():
 
     assert ram.inputs() == {"in_": 16, "load": 1, "address": 4}
     assert ram.outputs() == {"out": 16}
-    
-    traces = { 
+
+    traces = {
         "in_": [0b1 << i for i in range(16)],
         "load": [0b1 << 16],
         "address": [0b1 << (i+17) for i in range(4)],
@@ -86,7 +86,7 @@ def test_ram():
         addr = i << 17
         out = i << 21
         assert op(addr) == out | addr
-        
+
 
     op, = ram.sequence(**traces)
 
@@ -96,20 +96,21 @@ def test_ram():
         addr = i << 17
         op(addr | load | in_)
         assert ram.get(i) == 12345 + i
-    
+
+
 def test_input():
     inpt = Input()
-    
+
     assert inpt.inputs() == {}
     assert inpt.outputs() == {"out": 16}
 
     traces = { "out": [0b1 << i for i in range(16)]}
-    
+
     op, = inpt.combine(**traces)
-    
+
     assert op(0) == 0
-    
+
     inpt.set(12345)
     assert op(0) == 12345
-    
+
     assert inpt.sequence(**traces) == []

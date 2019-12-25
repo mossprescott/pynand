@@ -3,22 +3,22 @@
 
 class Component:
     """Defines the interface for a component, including what traces it reads and writes, and when."""
-    
+
     def inputs(self):
         """Dictionary of named input signals, and the number of bits for each.
-        
+
         Note: the keys must be distinct from the keys of outputs().
         """
         raise NotImplementedError
-    
+
     def outputs(self):
-        """Dictionary of named output signals, and the number of bits for each. A trace will be 
+        """Dictionary of named output signals, and the number of bits for each. A trace will be
         allocated for each bit.
-        
+
         Note: the keys must be distinct from the keys of inputs().
         """
         raise NotImplementedError
-    
+
     # def wire(self, trace_map):
     #     """Stage 1: connect traces for static logic (connecting components).
     #
@@ -26,31 +26,31 @@ class Component:
     #     """
     #
     #     return {}
-    
+
     def combine(self, **trace_map):
         """Stage 2: define combinational logic, as operations which are performed on the chip's traces
         to propagate signals.
-        
-        Given a map of input and output refs to traces, return a list of operations which update 
+
+        Given a map of input and output refs to traces, return a list of operations which update
         the output traces.
         """
-        
+
         return []
 
     def sequence(self, **trace_map):
-        """Stage 3: define sequential logic, as operations which are performed on the chip's traces 
+        """Stage 3: define sequential logic, as operations which are performed on the chip's traces
         at the falling edge of the clock signal.
-        
-        Given a map of input and output refs to traces, return a list of operations which update 
+
+        Given a map of input and output refs to traces, return a list of operations which update
         the output traces.
         """
-        
+
         return []
-        
+
     # def _ref(self, name):
     #     """Set of one InputRef for a named output."""
     #     return set([Ref(self, name, 0)])
-        
+
     # def _ref16(self, name):
     #     """Set of 16 InputRefs, one for each bit of a single named output."""
     #     return set([Ref(self, "out", i) for i in range(16)])
@@ -94,7 +94,7 @@ def set_multiple_traces(masks, value, traces):
 
 class Nand(Component):
     """A single nand gate, which has two inputs and a single output named 'out'."""
-    
+
     def inputs(self):
         return {"a": 1, "b": 1}
 
@@ -128,16 +128,16 @@ class Nand(Component):
 
 
 class DFF(Component):
-    """Single-bit "dynamic" flip-flop, which latches its input, presenting it on the output 
+    """Single-bit "dynamic" flip-flop, which latches its input, presenting it on the output
     during the next clock cycle.
     """
-    
+
     def inputs(self):
         return {"in_": 1}
-    
+
     def outputs(self):
         return {"out": 1}
-    
+
     def sequence(self, in_, out):
         assert len(in_) == 1 and len(out) == 1
         def flop(traces):
@@ -147,7 +147,7 @@ class DFF(Component):
 
 
 class ROM(Component):
-    """Read-only memory containing 2^address_bits words (16 bits each) which can be read but 
+    """Read-only memory containing 2^address_bits words (16 bits each) which can be read but
     not written by the chip.
 
     The entire contents can be over-written from outside when initializing the assembled chip
@@ -159,7 +159,7 @@ class ROM(Component):
         self.storage = []
 
     def program(self, words):
-        """Replace the contents of the ROM with the provided words. Any leftover address space is 
+        """Replace the contents of the ROM with the provided words. Any leftover address space is
         effectively filled with zero values."""
         self.storage = list(words)
 
@@ -174,7 +174,7 @@ class ROM(Component):
         def read(traces):
             address_val = get_multiple_traces(address, traces)
             if address_val < len(self.storage):
-                out_val = self.storage[address_val]  
+                out_val = self.storage[address_val]
             else:
                 out_val = 0
             return set_multiple_traces(out, out_val, traces)
@@ -186,19 +186,19 @@ class RAM(Component):
     def __init__(self, address_bits):
         self.address_bits = address_bits
         self.storage = [0]*(2**self.address_bits)
-        
+
     def get(self, address):
         """Peek at the value in a single cell."""
         return self.storage[address]
-        
+
     def set(self, address, value):
         """Poke a value into a single cell.
-        
-        TODO: keep track of which cells are updated, for efficient updates when used as the 
+
+        TODO: keep track of which cells are updated, for efficient updates when used as the
         screen buffer?
         """
         self.storage[address] = value
-        
+
     def inputs(self):
         return {"in_": 16, "load": 1, "address": self.address_bits}
 
@@ -213,7 +213,7 @@ class RAM(Component):
             out_val = self.get(address_val)
             return set_multiple_traces(out, out_val, traces)
         return [read]
-    
+
     def sequence(self, in_, load, address, **_unused):
         """Note: not using `out`."""
         assert len(in_) == 16 and len(load) == 1 and len(address) == self.address_bits
@@ -224,25 +224,25 @@ class RAM(Component):
                 address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
         return [write]
-    
+
 
 class Input(Component):
     """Single-word device which presents some input from outside the computer.
     """
-    
+
     def __init__(self):
         self.value = 0
-        
+
     def set(self, value):
         """Provide the value that will appear at the output."""
         self.value = value
-        
+
     def inputs(self):
         return {}
 
     def outputs(self):
         return {"out": 16}
-        
+
     def combine(self, out):
         assert len(out) == 16
         def read(traces):
@@ -251,4 +251,3 @@ class Input(Component):
 
 
 # TODO: Output, (potentially) accepting one word of output on each clock cycle?
-    
