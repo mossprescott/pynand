@@ -6,5 +6,7 @@ This module just re-exports the definitions that are most often needed from wher
 implemented (in the `eval` sub-dir.)
 """
 
-from nand.component import Component, Const, Nand, DynamicDFF, Memory, clock, lazy, gate_count, unsigned
-from nand.compiler import run
+# from nand.component import Component, Const, Nand, DynamicDFF, Memory, clock, lazy, gate_count, unsigned
+# from nand.compiler import run
+
+from nand_new.syntax import Nand, build, run

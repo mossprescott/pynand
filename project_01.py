@@ -1,4 +1,4 @@
-from nand import *
+from nand_new import *
 
 
 def mkNot(inputs, outputs):
@@ -6,7 +6,7 @@ def mkNot(inputs, outputs):
     n = Nand(a=in_, b=in_)
     outputs.out = n.out
 
-Not = Component(mkNot)
+Not = build(mkNot)
 
 
 def mkOr(inputs, outputs):

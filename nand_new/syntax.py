@@ -15,10 +15,6 @@ class Chip:
 
         return Instance(comp, args)
 
-    def run(self):
-        """Construct a complete IC, synthesize it, and wrap it for easy access."""
-        return NandVectorWrapper(self.constr().synthesize())
-
         
 class Ref:
     """Names a single- or multiple-bit signal."""
@@ -81,11 +77,17 @@ def build(builder):
             for name, ref2 in ref.inst.args.items():
                 ic.wire(Connection(ref2.inst.ic.root, ref2.name, ref.bit or 0), Connection(ref.inst.ic, name, 0))
 
-
         return ic
     
     return Chip(constr)
 
-        
+def run(chip, **args):
+    """Construct a complete IC, synthesize it, and wrap it for easy access."""
+    w = NandVectorWrapper(chip.constr().synthesize())
+    for name, value in args.items():
+        w.__setattr__(name, value)
+    return w
+
+
 Nand = Chip(nand_new.component.Nand)
         
