@@ -22,10 +22,10 @@ class IC:
 
     def inputs(self):
         return self._inputs
-    
+
     def outputs(self):
         return self._outputs
-        
+
     def wire(self, from_output, to_input):
         """Connect a single trace from an output of one component to an input of another.
 
@@ -69,21 +69,21 @@ class IC:
                 return f"{comp.label}_{num}"
             else:
                 return f"{comp.__class__.__name__}_{num}"
-            
+
     def _connection_label(self, conn):
         comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp)}."
-        bit = "" if conn.bit == 0 else f"[{conn.bit}]"  # TODO: include bit if other bits exist
+        bit = "" if conn.bit == 0 else f"[{conn.bit}]"  # TODO: include [0] if other bits exist for same name
         return f"{comp}{conn.name}{bit}"
 
     def flatten(self):
         """Construct a new IC which has the same structure as this one, but no nested ICs.
         That is, the wiring of all child ICs has been "inlined" into a single flat assembly.
         """
-        
+
         ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
-        
+
         flat_children = {}
-        
+
         # Add all the internal wiring of child ICs:
         for comp in self.components:
             if isinstance(comp, IC):
@@ -94,24 +94,15 @@ class IC:
                         ic.wire(from_output, to_input)
 
         for to_input, from_output in self.wires.items():
-            # print(f"from_output: {self._connection_label(from_output)}")
             if from_output.comp == self.root:
                 from_output = from_output._replace(comp=ic.root)
-                # print(f"  rewritten: {self._connection_label(from_output)}")
-            # print(f"to_input: {self._connection_label(to_input)}")
             if to_input.comp == self.root:
                 to_input = to_input._replace(comp=ic.root)
-                # print(f"  rewritten: {self._connection_label(to_input)}")
 
-            # elif from_output in rewritten:
-            #     from_output = rewritten[from_output]
-            #     print(f"  rewritten: {self._connection_label(from_output)}")
-            
             # If "from" is a child's output, just rewrite it to the actual component:
             if from_output.comp in flat_children:
                 flat = flat_children[from_output.comp]
                 from_output = flat.wires[from_output._replace(comp=flat.root)]
-                # print(f"  rewritten from child output: {self._connection_label(from_output)}")
 
             # If "to" is a child's input, it may need to be connected to more than one actual component:
             if to_input.comp in flat_children:
@@ -119,13 +110,9 @@ class IC:
                 conn = to_input._replace(comp=flat.root)
                 for child_in, child_out in flat.wires.items():
                     if child_out == conn:
-                        # print(f"  rewritten from child input: {self._connection_label(child_out)}")
                         ic.wire(from_output, child_in)
             else:
                 ic.wire(from_output, to_input)
-
-        # print("wires:")
-        # pprint(ic.wires)
 
         return ic
 
@@ -135,7 +122,7 @@ class IC:
         Returns a NandVector.
         """
         return self.flatten()._synthesize()
-        
+
     def _synthesize(self):
         # check for missing wires?
         # check for unused components?
@@ -146,8 +133,6 @@ class IC:
         for conn in set(self.wires.values()): # TODO: sort by the order the components were added?
             all_bits[conn] = next_bit
             next_bit += 1
-        # print("all_bits:")
-        # pprint(all_bits)
 
         # Construct map of IC inputs, directly from all_bits:
         inputs = {
@@ -155,7 +140,6 @@ class IC:
             for name, bits in self._inputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
-        # print(f"inputs: {inputs}")
 
         # Construct map of IC ouputs, mapped to all_bits via wires:
         outputs = {
@@ -163,7 +147,6 @@ class IC:
             for name, bits in self._outputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
-        # print(f"outputs: {outputs}")
 
         internal = {}  # TODO
 
@@ -183,7 +166,7 @@ class IC:
                 def __init__(self):
                     self.cops = cops
                     self.sops = sops
-                    
+
                 def propagate(self, traces):
                     for f in self.cops:
                         traces = f(traces)
@@ -201,10 +184,10 @@ class IC:
         # HACK
         return '\n'.join(
             [self.label] +
-            [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}" 
+            [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}"
               for to_input, from_output in self.wires.items()
             ])
-    
+
     def __repr__(self):
         # HACK
         return self.label
@@ -228,5 +211,4 @@ Connection = collections.namedtuple('Connection', ('comp', 'name', 'bit'))
 
 
 class WiringError(Exception):
-    def __init__(self, msg):
-        Exception(msg)
+    pass
