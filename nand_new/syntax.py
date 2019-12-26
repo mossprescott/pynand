@@ -23,6 +23,10 @@ class Ref:
         self.inst = inst
         self.name = name
         self.bit = bit
+        
+    def __repr__(self):
+        bit_str = f"[{self.bit}]" if self.bit is not None else "" 
+        return f"{self.inst.ic}.{self.name}{bit_str}"
 
 
 class Instance:
@@ -56,13 +60,14 @@ def build(builder):
             self.dict[name] = value
     
     def constr():
-        # Tricky: inputs/outputs aren't known yet
         builder_name = builder.__name__
         if builder_name.startswith("mk"):
             name = builder_name[2:]
         else:
             name = builder_name
         
+        # Tricky: inputs/outputs aren't known yet, but need the IC to be initialized so we can refer 
+        # to it via an Instance
         ic = IC(name, {}, {})
         inst = Instance(ic, {})
         input_coll = InputCollector(inst)
@@ -74,8 +79,21 @@ def build(builder):
         
         for name, ref in output_coll.dict.items():
             ic.wire(Connection(ref.inst.ic, ref.name, ref.bit or 0), Connection(ic.root, name, 0))
-            for name, ref2 in ref.inst.args.items():
-                ic.wire(Connection(ref2.inst.ic.root, ref2.name, ref.bit or 0), Connection(ref.inst.ic, name, 0))
+            for name2, ref2 in ref.inst.args.items():
+                # name2 = a (of the Nand)
+                # ref2 = Root.in_
+                # target = Not
+                print(f"  {name2}; {repr(str(ref2))}")
+                print(f"is root: {ref2.inst.ic == ic}")
+                if ref2.inst.ic == ic:
+                    source_comp = ref2.inst.ic.root
+                else:
+                    source_comp = ref2.inst.ic
+                child_input = Connection(source_comp, ref2.name, ref2.bit or 0)
+                target = Connection(ref.inst.ic, name2, 0)
+                print(f"    child_input: {child_input}")
+                print(f"    target: {target}")
+                ic.wire(child_input, target)
 
         return ic
     
