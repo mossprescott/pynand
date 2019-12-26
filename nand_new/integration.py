@@ -1,7 +1,7 @@
 import collections
 from pprint import pprint  # HACK
 
-from nand.evaluator import NandVector
+from nand_new.evaluator import NandVector
 from nand_new.component import Component
 
 class IC:
@@ -152,32 +152,18 @@ class IC:
 
         # Construct a map of the traces for each single component, and ask it for its ops:
         # TODO: sort components topologically based on wires, starting with Root?
-        ops = []
+        combine_ops = []
+        sequence_ops = []
         for comp in self.components:
             traces = {}
             for name, bits in comp.inputs().items():
                 traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]
             for name, bits in comp.outputs().items():
                 traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
-            cops = comp.combine(**traces)
-            sops = comp.sequence(**traces)
-            # TEMP: need to refactor NandVector a little
-            class Op:
-                def __init__(self):
-                    self.cops = cops
-                    self.sops = sops
+            combine_ops += comp.combine(**traces)
+            sequence_ops += comp.sequence(**traces)
 
-                def propagate(self, traces):
-                    for f in self.cops:
-                        traces = f(traces)
-                    return traces
-                def flop(self, traces):
-                    for f in self.sops:
-                        traces = f(traces)
-                    return traces
-            ops.append(Op())
-
-        return NandVector(inputs, outputs, internal, ops)
+        return NandVector(inputs, outputs, internal, combine_ops, sequence_ops)
 
 
     def __str__(self):
