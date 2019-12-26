@@ -47,13 +47,6 @@ class Component:
 
         return []
 
-    # def _ref(self, name):
-    #     """Set of one InputRef for a named output."""
-    #     return set([Ref(self, name, 0)])
-
-    # def _ref16(self, name):
-    #     """Set of 16 InputRefs, one for each bit of a single named output."""
-    #     return set([Ref(self, "out", i) for i in range(16)])
 
 def tst_trace(mask, traces):
     return traces & mask != 0
@@ -76,21 +69,6 @@ def set_multiple_traces(masks, value, traces):
         value >>= 1
     return traces
 
-# class Ref:
-#     def __init__(self, comp, name, bit=0):
-#         self.comp = comp
-#         self.name = name
-#         self.bit = bit
-#
-#     def __repr__(self):
-#         return f"Ref({self.comp}, {self.name}, {self.bit})"
-#
-#     def __eq__(self, other):
-#         return (isinstance(other, Ref)
-#             and self.comp == other.comp and self.name == other.name and self.bit == other.bit)
-#
-#     def __hash__(self):
-#         return hash((self.comp, self.name, self.bit))
 
 class Nand(Component):
     """A single nand gate, which has two inputs and a single output named 'out'."""
@@ -109,22 +87,6 @@ class Nand(Component):
             out_val = not (a_val and b_val)
             return set_trace(out[0], out_val, traces)
         return [nand]
-
-
-# class Integrated(Component):
-#     """'Composite' component which assembles one or more other components, connecting their inputs
-#     and outputs.
-#     """
-#
-#     def __init__(self):
-#         pass # TODO
-#
-#     def outputs(self):
-#         """An integrated component has no outputs of its own."""
-#         return set()
-#
-#     def wire(self, trace_map):
-#         pass
 
 
 class DFF(Component):
