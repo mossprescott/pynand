@@ -1,5 +1,5 @@
 import collections
-# import itertools
+from pprint import pprint  # HACK
 
 from nand.evaluator import NandVector
 from nand_new.component import Component
@@ -12,13 +12,20 @@ class IC:
     larger chip.
     """
 
-    def __init__(self, inputs, outputs):
-        self.inputs = inputs
-        self.outputs = outputs
+    def __init__(self, label, inputs, outputs):
+        self.label = label
+        self._inputs = inputs
+        self._outputs = outputs
         self.root = Root(self)
         self.components = {}
         self.wires = {}
 
+    def inputs(self):
+        return self._inputs
+    
+    def outputs(self):
+        return self._outputs
+        
     def wire(self, from_output, to_input):
         """Connect a single trace from an output of one component to an input of another.
 
@@ -57,23 +64,79 @@ class IC:
         if comp == self.root:
             return "Root"
         else:
-            return f"{comp.__class__.__name__}_{self.components[comp]}"
+            num = self.components.get(comp, "unknown")
+            if isinstance(comp, IC):
+                return f"{comp.label}_{num}"
+            else:
+                return f"{comp.__class__.__name__}_{num}"
+            
+    def _connection_label(self, conn):
+        comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp)}."
+        bit = "" if conn.bit == 0 else f"[{conn.bit}]"  # TODO: include bit if other bits exist
+        return f"{comp}{conn.name}{bit}"
 
     def flatten(self):
         """Construct a new IC which has the same structure as this one, but no nested ICs.
         That is, the wiring of all child ICs has been "inlined" into a single flat assembly.
         """
-        # TODO
-        return self
+        
+        ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
+        
+        flat_children = {}
+        
+        # Add all the internal wiring of child ICs:
+        for comp in self.components:
+            if isinstance(comp, IC):
+                child = comp.flatten()
+                flat_children[comp] = child
+                for to_input, from_output in child.wires.items():
+                    if to_input.comp != child.root and from_output.comp != child.root:
+                        ic.wire(from_output, to_input)
+
+        for to_input, from_output in self.wires.items():
+            # print(f"from_output: {self._connection_label(from_output)}")
+            if from_output.comp == self.root:
+                from_output = from_output._replace(comp=ic.root)
+                # print(f"  rewritten: {self._connection_label(from_output)}")
+            # print(f"to_input: {self._connection_label(to_input)}")
+            if to_input.comp == self.root:
+                to_input = to_input._replace(comp=ic.root)
+                # print(f"  rewritten: {self._connection_label(to_input)}")
+
+            # elif from_output in rewritten:
+            #     from_output = rewritten[from_output]
+            #     print(f"  rewritten: {self._connection_label(from_output)}")
+            
+            # If "from" is a child's output, just rewrite it to the actual component:
+            if from_output.comp in flat_children:
+                flat = flat_children[from_output.comp]
+                from_output = flat.wires[from_output._replace(comp=flat.root)]
+                # print(f"  rewritten from child output: {self._connection_label(from_output)}")
+
+            # If "to" is a child's input, it may need to be connected to more than one actual component:
+            if to_input.comp in flat_children:
+                flat = flat_children[to_input.comp]
+                conn = to_input._replace(comp=flat.root)
+                for child_in, child_out in flat.wires.items():
+                    if child_out == conn:
+                        # print(f"  rewritten from child input: {self._connection_label(child_out)}")
+                        ic.wire(from_output, child_in)
+            else:
+                ic.wire(from_output, to_input)
+
+        # print("wires:")
+        # pprint(ic.wires)
+
+        return ic
 
     def synthesize(self):
         """Compile the chip down to traces and ops for evaluation.
 
         Returns a NandVector.
         """
-
-        flat = self.flatten()
-
+        return self.flatten()._synthesize()
+        
+    def _synthesize(self):
         # check for missing wires?
         # check for unused components?
 
@@ -83,23 +146,24 @@ class IC:
         for conn in set(self.wires.values()): # TODO: sort by the order the components were added?
             all_bits[conn] = next_bit
             next_bit += 1
-        print(f"all_bits: {all_bits}")
+        # print("all_bits:")
+        # pprint(all_bits)
 
         # Construct map of IC inputs, directly from all_bits:
         inputs = {
             (name, bit): 1 << all_bits[Connection(self.root, name, bit)]
-            for name, bits in self.inputs.items()
+            for name, bits in self._inputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
-        print(f"inputs: {inputs}")
+        # print(f"inputs: {inputs}")
 
         # Construct map of IC ouputs, mapped to all_bits via wires:
         outputs = {
             (name, bit): 1 << all_bits[self.wires[Connection(self.root, name, bit)]]
-            for name, bits in self.outputs.items()
+            for name, bits in self._outputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
-        print(f"outputs: {outputs}")
+        # print(f"outputs: {outputs}")
 
         internal = {}  # TODO
 
@@ -116,32 +180,48 @@ class IC:
             sops = comp.sequence(**traces)
             # TEMP: need to refactor NandVector a little
             class Op:
+                def __init__(self):
+                    self.cops = cops
+                    self.sops = sops
+                    
                 def propagate(self, traces):
-                    for f in cops:
+                    for f in self.cops:
                         traces = f(traces)
                     return traces
                 def flop(self, traces):
-                    for f in sops:
+                    for f in self.sops:
                         traces = f(traces)
                     return traces
             ops.append(Op())
 
-
         return NandVector(inputs, outputs, internal, ops)
 
 
+    def __str__(self):
+        # HACK
+        return '\n'.join(
+            [self.label] +
+            [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}" 
+              for to_input, from_output in self.wires.items()
+            ])
+    
+    def __repr__(self):
+        # HACK
+        return self.label
+
+
 class Root:
-    """Pseudo-component providing access to an ICs inputs and outputs (under the opposite names).
+    """Pseudo-component providing access to an IC's inputs and outputs (under the opposite names).
     """
 
     def __init__(self, ic):
         self.ic = ic
 
     def inputs(self):
-        return self.ic.outputs
+        return self.ic.outputs()
 
     def outputs(self):
-        return self.ic.inputs
+        return self.ic.inputs()
 
 
 Connection = collections.namedtuple('Connection', ('comp', 'name', 'bit'))
