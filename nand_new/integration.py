@@ -17,7 +17,6 @@ class IC:
         self._inputs = inputs
         self._outputs = outputs
         self.root = Root(self)
-        self.components = {}
         self.wires = {}
 
     def inputs(self):
@@ -38,12 +37,7 @@ class IC:
         Both components become part of this circuit.
 
         The connection is checked on both ends to ensure that it specifies a valid name and bit.
-        Note: if a WiringError is thrown, both components are nevertheless tracked as being part
-        of the IC. TODO: maybe clean that up after the fact?
         """
-
-        self._add_component(from_output.comp)
-        self._add_component(to_input.comp)
 
         if from_output.name not in from_output.comp.outputs():
             raise WiringError(f"Component {self._comp_label(from_output.comp)} has no output '{from_output.name}'")
@@ -56,24 +50,25 @@ class IC:
 
         self.wires[to_input] = from_output
 
-    def _add_component(self, comp):
-        if comp != self.root and comp not in self.components:
-            self.components[comp] = len(self.components)
-
     def _comp_label(self, comp):
         if comp == self.root:
             return "Root"
         else:
-            num = self.components.get(comp, "unknown")
-            if isinstance(comp, IC):
-                return f"{comp.label}_{num}"
+            all_comps = self.sorted_components()
+            if comp in all_comps:
+                num = f"_{all_comps.index(comp)}"
             else:
-                return f"{comp.__class__.__name__}_{num}"
+                num = ""
+            if isinstance(comp, IC):
+                return f"{comp.label}{num}"
+            else:
+                return f"{comp.__class__.__name__}{num}"
 
     def _connection_label(self, conn):
         comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp)}."
         bit = "" if conn.bit == 0 else f"[{conn.bit}]"  # TODO: include [0] if other bits exist for same name
         return f"{comp}{conn.name}{bit}"
+
 
     def flatten(self):
         """Construct a new IC which has the same structure as this one, but no nested ICs.
@@ -85,7 +80,7 @@ class IC:
         flat_children = {}
 
         # Add all the internal wiring of child ICs:
-        for comp in self.components:
+        for comp in self.sorted_components():
             if isinstance(comp, IC):
                 child = comp.flatten()
                 flat_children[comp] = child
@@ -115,6 +110,30 @@ class IC:
                 ic.wire(from_output, to_input)
 
         return ic
+
+
+    def sorted_components(self):
+        """List of all components (including only direct children), roughly in the order that 
+        signals propagate.
+
+        That is, when component A has an output that feeds an input of component B, A comes before B 
+        in the list. If there are reference cycles, the components are ordered as if one such 
+        reference (chosen in no particular way) was removed.
+        """
+        # TODO: make this search more efficient by not repeatedly searching the list of wires.
+
+        result = []
+        to_search = [self.root]
+        while to_search:
+            comp, to_search = to_search[0], to_search[1:]
+
+            for name, next in sorted([(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == comp and f.comp != self.root]):
+                if next not in result:
+                    result.insert(0, next)
+                    to_search.append(next)
+            
+        return result
+
 
     def synthesize(self):
         """Compile the chip down to traces and ops for evaluation.
@@ -154,7 +173,7 @@ class IC:
         # TODO: sort components topologically based on wires, starting with Root?
         combine_ops = []
         sequence_ops = []
-        for comp in self.components:
+        for comp in self.sorted_components():
             traces = {}
             for name, bits in comp.inputs().items():
                 traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]

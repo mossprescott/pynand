@@ -23,15 +23,15 @@ def test_wiring_errors():
 
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(ic.root, "in_", 0), Connection(nand, "foo", 0))
-    assert str(exc_info.value) == "Component Nand_0 has no input 'foo'"
+    assert str(exc_info.value) == "Component Nand has no input 'foo'"
 
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(ic.root, "in_", 0), Connection(nand, "a", 1))
-    assert str(exc_info.value) == "Tried to connect bit 1 of 1-bit input Nand_0.a"
+    assert str(exc_info.value) == "Tried to connect bit 1 of 1-bit input Nand.a"
 
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(ic.root, "in_", 0), Connection(nand, "a", -1))
-    assert str(exc_info.value) == "Tried to connect bit -1 of 1-bit input Nand_0.a"
+    assert str(exc_info.value) == "Tried to connect bit -1 of 1-bit input Nand.a"
 
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(ic.root, "bar", 0), Connection(nand, "a", 0))
@@ -40,6 +40,33 @@ def test_wiring_errors():
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(ic.root, "in_", 17), Connection(nand, "a", 0))
     assert str(exc_info.value) == "Tried to connect bit 17 of 1-bit output Root.in_"
+
+
+def test_components_simple():
+    ic = IC("Whatevs", {"in_": 1}, {"out": 1})
+    
+    nand1 = Nand()
+    nand2 = Nand()
+    nand3 = Nand()
+    
+    ic.wire(Connection(ic.root, "in_", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(ic.root, "in_", 0), Connection(nand1, "b", 0))
+    
+    ic.wire(Connection(ic.root, "in_", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "b", 0))
+    
+    ic.wire(Connection(nand2, "out", 0), Connection(nand3, "a", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(nand3, "b", 0))
+    
+    ic.wire(Connection(nand3, "out", 0), Connection(ic.root, "out", 0))
+    
+    assert ic.sorted_components() == [nand1, nand2, nand3]
+    
+# TODO: more tests of ordering
+# - ordered by input name?
+# - in the presence of cycles?
+# - accounting for combinational/sequential logic? That is, a DFF can precede the source of its 
+#     value, since it never propagates a signal at combine() time. Too much of a special case?
 
 
 def test_simple_synthesis():
