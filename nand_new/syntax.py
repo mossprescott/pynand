@@ -7,25 +7,25 @@ from nand_new.integration import IC, Connection
 class Chip:
     def __init__(self, constr):
         self.constr = constr
-        
+
     def __call__(self, **args):
         """Construct a sub-component, with inputs specified by `args`."""
-        
+
         comp = self.constr()
 
         return Instance(comp, args)
 
-        
+
 class Ref:
     """Names a single- or multiple-bit signal."""
-    
+
     def __init__(self, inst, name, bit):
         self.inst = inst
         self.name = name
         self.bit = bit
-        
+
     def __repr__(self):
-        bit_str = f"[{self.bit}]" if self.bit is not None else "" 
+        bit_str = f"[{self.bit}]" if self.bit is not None else ""
         return f"{self.inst.ic}.{self.name}{bit_str}"
 
 
@@ -48,56 +48,64 @@ def build(builder):
         def __getattr__(self, name):
             self.dict[name] = None
             return Ref(self.inst, name, None)
-    
+
     class OutputCollector:
         def __init__(self, inst):
             self.inst = inst
             self.dict = {}
-            
+
         def __setattr__(self, name, value):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
             self.dict[name] = value
-    
+
+    def instances(to_search):
+        result = set([])
+        while to_search:
+            inst, to_search = to_search[0], to_search[1:]
+            result.add(inst)
+            for ref in inst.args.values():
+                if ref.inst not in result:
+                    to_search.append(ref.inst)
+        return result
+
     def constr():
         builder_name = builder.__name__
         if builder_name.startswith("mk"):
             name = builder_name[2:]
         else:
             name = builder_name
-        
-        # Tricky: inputs/outputs aren't known yet, but need the IC to be initialized so we can refer 
+
+        # Tricky: inputs/outputs aren't known yet, but need the IC to be initialized so we can refer
         # to it via an Instance
         ic = IC(name, {}, {})
         inst = Instance(ic, {})
         input_coll = InputCollector(inst)
         output_coll = OutputCollector(inst)
         builder(input_coll, output_coll)
-        
+
         ic._inputs = {name: 1 for name in input_coll.dict}
         ic._outputs = {name: 1 for name in output_coll.dict}
-        
+
         for name, ref in output_coll.dict.items():
             ic.wire(Connection(ref.inst.ic, ref.name, ref.bit or 0), Connection(ic.root, name, 0))
-            for name2, ref2 in ref.inst.args.items():
-                # name2 = a (of the Nand)
-                # ref2 = Root.in_
-                # target = Not
-                print(f"  {name2}; {repr(str(ref2))}")
-                print(f"is root: {ref2.inst.ic == ic}")
-                if ref2.inst.ic == ic:
-                    source_comp = ref2.inst.ic.root
+
+        for inst in instances([ref.inst for ref in output_coll.dict.values()]):
+            for name, ref in inst.args.items():
+                if ref.inst.ic == ic:
+                    source_comp = ref.inst.ic.root
                 else:
-                    source_comp = ref2.inst.ic
-                child_input = Connection(source_comp, ref2.name, ref2.bit or 0)
-                target = Connection(ref.inst.ic, name2, 0)
-                print(f"    child_input: {child_input}")
-                print(f"    target: {target}")
-                ic.wire(child_input, target)
+                    source_comp = ref.inst.ic
+                source = Connection(source_comp, ref.name, ref.bit or 0)
+                target = Connection(inst.ic, name, 0)
+                ic.wire(source, target)
+
+        # TODO: check for any un-wired or mis-wired inputs (and outputs?)
 
         return ic
-    
+
     return Chip(constr)
+
 
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
@@ -108,4 +116,4 @@ def run(chip, **args):
 
 
 Nand = Chip(nand_new.component.Nand)
-        
+
