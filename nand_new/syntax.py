@@ -24,6 +24,10 @@ class Ref:
         self.name = name
         self.bit = bit
 
+    def __getitem__(self, key):
+        """Called when the builder asks for a bit slice of an input."""
+        return Ref(self.inst, self.name, key)
+
     def __repr__(self):
         bit_str = f"[{self.bit}]" if self.bit is not None else ""
         return f"{self.inst.ic}.{self.name}{bit_str}"
@@ -46,7 +50,7 @@ def build(builder):
             self.dict = {}
 
         def __getattr__(self, name):
-            self.dict[name] = None
+            self.dict[name] = None  # TODO: not actually used?
             return Ref(self.inst, name, None)
 
     class OutputCollector:
@@ -57,8 +61,23 @@ def build(builder):
         def __setattr__(self, name, value):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
-            self.dict[name] = value
+            self.dict[(name, 0)] = value            
 
+        def __getattr__(self, name):
+            """Called when the builder is going to assign to a bit slice of an output."""
+            return OutputSlice(self, name)
+
+    class OutputSlice:
+        def __init__(self, output_coll, name):
+            self.output_coll = output_coll
+            self.name = name
+
+        def __setitem__(self, key, value):
+            """Value is an int between 0 and 15, or (eventually) a slice object with
+            .start and .step on the same interval.
+            """
+            self.output_coll.dict[(self.name, key)] = value
+        
     def instances(to_search):
         result = set([])
         while to_search:
@@ -84,11 +103,18 @@ def build(builder):
         output_coll = OutputCollector(inst)
         builder(input_coll, output_coll)
 
-        ic._inputs = {name: 1 for name in input_coll.dict}
-        ic._outputs = {name: 1 for name in output_coll.dict}
+        # TODO: max bit number for each input, by looking at all the refs
+        input_name_bit = []
+        for inst in instances([ref.inst for ref in output_coll.dict.values()]):
+            for name, ref in inst.args.items():
+                if ref.inst.ic == ic:
+                    input_name_bit.append((ref.name, ref.bit or 0))
 
-        for name, ref in output_coll.dict.items():
-            ic.wire(Connection(ref.inst.ic, ref.name, ref.bit or 0), Connection(ic.root, name, 0))
+        ic._inputs = {name: bit+1 for (name, bit) in sorted(input_name_bit)}
+        ic._outputs = {name: bit+1 for (name, bit) in sorted(list(output_coll.dict))}
+
+        for (name, bit), ref in output_coll.dict.items():
+            ic.wire(Connection(ref.inst.ic, ref.name, ref.bit or 0), Connection(ic.root, name, bit))
 
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():

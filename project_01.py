@@ -17,7 +17,7 @@ def mkOr(inputs, outputs):
     notNotBoth = Nand(a=notA.out, b=notB.out)
     outputs.out = notNotBoth.out
 
-Or = Component(mkOr)
+Or = build(mkOr)
 
 
 def mkAnd(inputs, outputs):
@@ -26,7 +26,7 @@ def mkAnd(inputs, outputs):
     notAandB = Nand(a=a, b=b).out
     outputs.out = Not(in_=notAandB).out
 
-And = Component(mkAnd)
+And = build(mkAnd)
 
 
 def mkXor(inputs, outputs):
@@ -37,7 +37,7 @@ def mkXor(inputs, outputs):
     nandBNand = Nand(a=nand, b=b).out
     outputs.out = Nand(a=nandANand, b=nandBNand).out
 
-Xor = Component(mkXor)
+Xor = build(mkXor)
 
 
 def mkMux(inputs, outputs):
@@ -48,7 +48,7 @@ def mkMux(inputs, outputs):
     fromBneg = Nand(a=b, b=sel).out
     outputs.out = Nand(a=fromAneg, b=fromBneg).out
 
-Mux = Component(mkMux)
+Mux = build(mkMux)
 
 
 def mkDMux(inputs, outputs):
@@ -57,14 +57,14 @@ def mkDMux(inputs, outputs):
     outputs.a = And(a=in_, b=Not(in_=sel).out).out
     outputs.b = And(a=in_, b=sel).out
 
-DMux = Component(mkDMux)
+DMux = build(mkDMux)
 
 
 def mkDMux4Way(inputs, outputs):
     def mkDMuxPlus(inputs, outputs):
         outputs.a = And(a=inputs.in_, b=inputs.not_sel).out
         outputs.b = And(a=inputs.in_, b=inputs.sel).out
-    DMuxPlus = Component(mkDMuxPlus)
+    DMuxPlus = build(mkDMuxPlus)
 
     # TODO: optimal?
     in_ = inputs.in_
@@ -77,14 +77,14 @@ def mkDMux4Way(inputs, outputs):
     outputs.c = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1).b
     outputs.d = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1).b
     
-DMux4Way = Component(mkDMux4Way)
+DMux4Way = build(mkDMux4Way)
 
 
 def mkDMux8Way(inputs, outputs):
     def mkDMuxPlus(inputs, outputs):
         outputs.a = And(a=inputs.in_, b=inputs.not_sel).out
         outputs.b = And(a=inputs.in_, b=inputs.sel).out
-    DMuxPlus = Component(mkDMuxPlus)
+    DMuxPlus = build(mkDMuxPlus)
 
     # TODO: optimal?
     # TODO: implement bit slice syntax and use DMux4Way?
@@ -106,7 +106,7 @@ def mkDMux8Way(inputs, outputs):
     outputs.g = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2).b
     outputs.h = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2).b
     
-DMux8Way = Component(mkDMux8Way)
+DMux8Way = build(mkDMux8Way)
 
 
 def mkNot16(inputs, outputs):
@@ -114,14 +114,14 @@ def mkNot16(inputs, outputs):
     for i in range(16):
         outputs.out[i] = Not(in_=in_[i]).out
 
-Not16 = Component(mkNot16)
+Not16 = build(mkNot16)
         
 
 def mkAnd16(inputs, outputs):
     for i in range(16):
         outputs.out[i] = And(a=inputs.a[i], b=inputs.b[i]).out
 
-And16 = Component(mkAnd16)
+And16 = build(mkAnd16)
 
 
 def mkMux16(inputs, outputs):
@@ -131,7 +131,7 @@ def mkMux16(inputs, outputs):
         fromBneg = Nand(a=inputs.b[i], b=inputs.sel).out
         outputs.out[i] = Nand(a=fromAneg, b=fromBneg).out
 
-Mux16 = Component(mkMux16)
+Mux16 = build(mkMux16)
 
 
 def mkMux4Way16(inputs, outputs):
@@ -141,14 +141,14 @@ def mkMux4Way16(inputs, outputs):
             fromAneg = Nand(a=inputs.a[i], b=inputs.not_sel).out
             fromBneg = Nand(a=inputs.b[i], b=inputs.sel).out
             outputs.out[i] = Nand(a=fromAneg, b=fromBneg).out
-    Mux16Plus = Component(mkMux16Plus)
+    Mux16Plus = build(mkMux16Plus)
 
     not_sel0 = Not(in_=inputs.sel[0]).out
     ab = Mux16Plus(a=inputs.a, b=inputs.b, not_sel=not_sel0, sel=inputs.sel[0]).out
     cd = Mux16Plus(a=inputs.c, b=inputs.d, not_sel=not_sel0, sel=inputs.sel[0]).out
     outputs.out = Mux16(a=ab, b=cd, sel=inputs.sel[1]).out    
 
-Mux4Way16 = Component(mkMux4Way16)
+Mux4Way16 = build(mkMux4Way16)
 
 
 def mkMux8Way16(inputs, outputs):
@@ -158,7 +158,7 @@ def mkMux8Way16(inputs, outputs):
             fromAneg = Nand(a=inputs.a[i], b=inputs.not_sel).out
             fromBneg = Nand(a=inputs.b[i], b=inputs.sel).out
             outputs.out[i] = Nand(a=fromAneg, b=fromBneg).out
-    Mux16Plus = Component(mkMux16Plus)
+    Mux16Plus = build(mkMux16Plus)
 
     not_sel0 = Not(in_=inputs.sel[0]).out
     ab = Mux16Plus(a=inputs.a, b=inputs.b, not_sel=not_sel0, sel=inputs.sel[0]).out
@@ -170,4 +170,4 @@ def mkMux8Way16(inputs, outputs):
     efgh = Mux16Plus(a=ef, b=gh, not_sel=not_sel1, sel=inputs.sel[1]).out
     outputs.out = Mux16(a=abcd, b=efgh, sel=inputs.sel[2]).out
             
-Mux8Way16 = Component(mkMux8Way16)
+Mux8Way16 = build(mkMux8Way16)
