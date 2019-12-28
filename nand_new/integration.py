@@ -202,7 +202,7 @@ class IC:
         ins = ', '.join(f"{name}[{bits}]" for name, bits in self.inputs().items())
         outs = ', '.join(f"{name}[{bits}]" for name, bits in self.outputs().items())
         return '\n'.join(
-            [f"{self.label}: {ins} -> {outs}"] +
+            [f"{self.label}({ins}; {outs}):"] +
             [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}"
               for to_input, from_output in sorted(self.wires.items(), key=by_component)
             ])
