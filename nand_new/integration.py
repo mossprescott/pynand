@@ -65,8 +65,9 @@ class IC:
                 return f"{comp.__class__.__name__}{num}"
 
     def _connection_label(self, conn):
+        multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
         comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp)}."
-        bit = "" if conn.bit == 0 else f"[{conn.bit}]"  # TODO: include [0] if other bits exist for same name
+        bit = f"[{conn.bit}]" if multi_bit else ""
         return f"{comp}{conn.name}{bit}"
 
 
@@ -187,11 +188,23 @@ class IC:
 
 
     def __str__(self):
-        # HACK
+        """A multi-line summary of all the wiring."""
+        # Sort wires by topological order of the "from" component, then name, then the "to" component and name.
+        all_comps = self.sorted_components()
+        def to_index(c, root):
+            if c == self.root:
+                return root
+            else:
+                return all_comps.index(c)
+        def by_component(t):
+            return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
+            
+        ins = ', '.join(f"{name}[{bits}]" for name, bits in self.inputs().items())
+        outs = ', '.join(f"{name}[{bits}]" for name, bits in self.outputs().items())
         return '\n'.join(
-            [self.label] +
+            [f"{self.label}: {ins} -> {outs}"] +
             [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}"
-              for to_input, from_output in self.wires.items()
+              for to_input, from_output in sorted(self.wires.items(), key=by_component)
             ])
 
     def __repr__(self):
