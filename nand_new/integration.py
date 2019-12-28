@@ -127,7 +127,8 @@ class IC:
         while to_search:
             comp, to_search = to_search[0], to_search[1:]
 
-            for name, next in sorted([(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == comp and f.comp != self.root]):
+            name_comp = [(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == comp and f.comp != self.root]
+            for name, next in sorted(name_comp, key=lambda t: t[0]):
                 if next not in result:
                     result.insert(0, next)
                     to_search.append(next)
