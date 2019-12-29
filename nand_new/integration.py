@@ -206,8 +206,8 @@ class IC:
                 # HACK: this can happen due to a flattening error (e.g. ALU), but the wire is 
                 # unconnected so synthesize still works.
                 # FIXME: find that bug and remove this case
-                print(f"missing: {c}")
-                return root
+                # print(f"missing: {c}")
+                return root*2  # even before/after inputs/outputs
             else:
                 return all_comps.index(c)
         def by_component(t):
