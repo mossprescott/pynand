@@ -1,4 +1,3 @@
-from nand.component import unsigned
 from project_01 import *
 
 def test_nand():

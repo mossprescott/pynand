@@ -9,4 +9,5 @@ implemented (in the `eval` sub-dir.)
 # from nand.component import Component, Const, Nand, DynamicDFF, Memory, clock, lazy, gate_count, unsigned
 # from nand.compiler import run
 
+from nand.component import unsigned
 from nand_new.syntax import Nand, build, run
