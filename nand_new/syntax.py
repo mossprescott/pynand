@@ -199,10 +199,27 @@ def run(chip, **args):
 
 
 def gate_count(chip):
+    """Count the base Components of each type in all the ICs of a chip.
+    
+    Note: components that are constructed by the builder but don't actually affect any output
+    are not included (since they don't actually appear in the constructed IC).
+    
+    Note: it would be simpler to count after flattening, but at present flatten() is actually
+    removing some gates, and the intended use here is to verify the implementation is as
+    expected, before any "optimization" we might be able to do.
+    
+    TODO: have some variants/options for counting the ICs as well as counting components before
+    and after flattening.
+    """
     counts = {}
-    for c in _constr(chip).flatten().sorted_components():
-        key = c.label.lower() + "s"  # e.g. "Nand" -> "nands"
-        counts[key] = counts.get(key, 0) + 1
+    def loop(ic):
+        for c in ic.sorted_components():
+            if isinstance(c, IC):
+                loop(c)
+            else:
+                key = c.label.lower() + "s"  # e.g. "Nand" -> "nands"
+                counts[key] = counts.get(key, 0) + 1
+    loop(_constr(chip))
     return counts
 
 
