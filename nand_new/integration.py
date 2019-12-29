@@ -40,21 +40,22 @@ class IC:
         """
 
         if from_output.name not in from_output.comp.outputs():
-            raise WiringError(f"Component {self._comp_label(from_output.comp)} has no output '{from_output.name}'")
+            raise WiringError(f"Component {self._comp_label(from_output.comp, self.sorted_components())} has no output '{from_output.name}'")
         elif from_output.bit < 0 or from_output.bit >= from_output.comp.outputs()[from_output.name]:
-            raise WiringError(f"Tried to connect bit {from_output.bit} of {from_output.comp.outputs()[from_output.name]}-bit output {self._comp_label(from_output.comp)}.{from_output.name}")
+            raise WiringError(f"Tried to connect bit {from_output.bit} of {from_output.comp.outputs()[from_output.name]}-bit output {self._comp_label(from_output.comp, self.sorted_components())}.{from_output.name}")
         elif to_input.name not in to_input.comp.inputs():
-            raise WiringError(f"Component {self._comp_label(to_input.comp)} has no input '{to_input.name}'")
+            raise WiringError(f"Component {self._comp_label(to_input.comp, self.sorted_components())} has no input '{to_input.name}'")
         elif to_input.bit < 0 or to_input.bit >= to_input.comp.inputs()[to_input.name]:
-            raise WiringError(f"Tried to connect bit {to_input.bit} of {to_input.comp.inputs()[to_input.name]}-bit input {self._comp_label(to_input.comp)}.{to_input.name}")
+            raise WiringError(f"Tried to connect bit {to_input.bit} of {to_input.comp.inputs()[to_input.name]}-bit input {self._comp_label(to_input.comp, self.sorted_components())}.{to_input.name}")
 
         self.wires[to_input] = from_output
 
-    def _comp_label(self, comp):
+    def _comp_label(self, comp, all_comps):
+        """Note: """
         if comp == self.root:
             return "Root"
         else:
-            all_comps = self.sorted_components()
+            # all_comps = self.sorted_components()
             if comp in all_comps:
                 num = f"_{all_comps.index(comp)}"
             else:
@@ -64,9 +65,9 @@ class IC:
             else:
                 return f"{comp.__class__.__name__}{num}"
 
-    def _connection_label(self, conn):
+    def _connection_label(self, conn, all_comps):
         multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
-        comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp)}."
+        comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp, all_comps)}."
         bit = f"[{conn.bit}]" if multi_bit else ""
         return f"{comp}{conn.name}{bit}"
 
@@ -201,6 +202,12 @@ class IC:
         def to_index(c, root):
             if c == self.root:
                 return root
+            elif c not in all_comps:
+                # HACK: this can happen due to a flattening error (e.g. ALU), but the wire is 
+                # unconnected so synthesize still works.
+                # FIXME: find that bug and remove this case
+                print(f"missing: {c}")
+                return root
             else:
                 return all_comps.index(c)
         def by_component(t):
@@ -210,7 +217,7 @@ class IC:
         outs = ', '.join(f"{name}[{bits}]" for name, bits in self.outputs().items())
         return '\n'.join(
             [f"{self.label}({ins}; {outs}):"] +
-            [ f"  {self._connection_label(from_output)} -> {self._connection_label(to_input)}"
+            [ f"  {self._connection_label(from_output, all_comps)} -> {self._connection_label(to_input, all_comps)}"
               for to_input, from_output in sorted(self.wires.items(), key=by_component)
             ])
 
