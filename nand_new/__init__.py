@@ -10,4 +10,4 @@ implemented (in the `eval` sub-dir.)
 # from nand.compiler import run
 
 from nand.component import unsigned
-from nand_new.syntax import Nand, build, run
+from nand_new.syntax import Nand, build, run, gate_count

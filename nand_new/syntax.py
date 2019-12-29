@@ -198,5 +198,14 @@ def run(chip, **args):
     return w
 
 
+def gate_count(chip):
+    ic = chip.constr()
+    counts = {}
+    for c in ic.flatten().sorted_components():
+        key = c.__class__.__name__.lower() + "s"  # e.g. "Nand" -> "nands"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 Nand = Chip(nand_new.component.Nand)
 
