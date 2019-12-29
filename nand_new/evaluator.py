@@ -15,14 +15,14 @@ class NandVector:
     seen (or, if no fixed-point is found, an exception is raised.)
     """
 
-    def __init__(self, inputs, outputs, internal, combine_ops, sequence_ops):
+    def __init__(self, inputs, outputs, internal, combine_ops, sequence_ops, start=0):
         self.inputs = inputs
         self.outputs = outputs
         self.internal = internal
         self.combine_ops = combine_ops
         self.sequence_ops = sequence_ops
 
-        self.traces = 0
+        self.traces = start
         self.dirty = True
 
     def set(self, key, value):
