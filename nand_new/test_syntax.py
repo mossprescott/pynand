@@ -1,3 +1,5 @@
+import pytest
+
 from nand_new.syntax import Nand, build, run
 
 def test_trivial():
@@ -102,16 +104,66 @@ def test_simple_const_input():
     def mkBounce(inputs, outputs):
         outputs.out = inputs.in_
     Bounce = build(mkBounce)
-    
+
     def mkZeroOne(inputs, outputs):
         outputs.zero = Bounce(in_=0).out
         outputs.one = Bounce(in_=1).out
     ZeroOne = build(mkZeroOne)
-    
+
     chip = ZeroOne.constr()
-    
-    print(chip)
-    print(chip.flatten())
-    
+
     assert run(ZeroOne).zero == False
     assert run(ZeroOne).one == True
+
+
+def test_multibit_const_input():
+    def mkBounce16(inputs, outputs):
+        for i in range(16):
+            outputs.out[i] = inputs.in_[i]
+    Bounce16 = build(mkBounce16)
+
+    def mkConstants(inputs, outputs):
+        outputs.zero = Bounce16(in_=0).out
+        outputs.one = Bounce16(in_=1).out
+        outputs.onetofive = Bounce16(in_=12345).out
+    Constants = build(mkConstants)
+
+    chip = Constants.constr()
+
+    assert run(Constants).zero == 0
+    assert run(Constants).one == 1
+    assert run(Constants).onetofive == 12345
+
+
+# TODO: const output? For consistency only; probably not sensible.
+
+
+def test_error_unexpected_arg():
+    def mkErr(inputs, outputs):
+        Nand(a=0, b=0, c=0)    
+    Err = build(mkErr)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        Err.constr()
+    assert str(exc_info.value) == "Unexpected argument: c"
+
+
+def test_error_ref_expected_for_input():
+    def mkErr(inputs, outputs):
+        Nand(a=Nand(a=0, b=1),  # missing ".out"
+             b=0)
+    Err = build(mkErr)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        Err.constr()
+    assert str(exc_info.value) == "Expected a reference for input 'a', got Nand(...)"
+
+
+def test_error_ref_expected_for_output():
+    def mkErr(inputs, outputs):
+        outputs.out = Nand(a=0, b=1)  # missing ".out"
+    Err = build(mkErr)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        Err.constr()
+    assert str(exc_info.value) == "Expected a reference for output 'out', got Nand(...)"

@@ -37,20 +37,24 @@ class Instance:
     def __init__(self, ic, args):
         self.ic = ic
         def to_ref(name, val):
+            if name not in ic.inputs():
+                raise SyntaxError(f"Unexpected argument: {name}")
+
             if isinstance(val, Ref):
                 return val
             elif isinstance(val, int):
-                # TODO: multi-bit
-                return Ref(Instance(nand_new.component.Const(val), {}), "out", 0)
+                return Ref(Instance(nand_new.component.Const(ic.inputs()[name], val), {}), "out", None)
             else:
-                raise SyntaxError(f"Expected a reference for input {name}, got {val}")
-                
+                raise SyntaxError(f"Expected a reference for input '{name}', got {val}")
+
         self.args = {name: to_ref(name, val) for (name, val) in args.items()}
 
     def __getattr__(self, name):
         # TODO: check ic's outputs
         return Ref(self, name, None)
 
+    def __str__(self):
+        return f"{self.ic}"
 
 def build(builder):
     class InputCollector:
@@ -70,8 +74,10 @@ def build(builder):
         def __setattr__(self, name, value):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
-            # TODO: Const?
-            # TODO: SyntaxError if value not a valid Ref
+
+            if not isinstance(value, Ref):
+                raise SyntaxError(f"Expected a reference for output '{name}', got {value}")
+                
             self.dict[(name, None)] = value
 
         def __getattr__(self, name):

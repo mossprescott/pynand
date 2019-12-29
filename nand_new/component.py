@@ -69,19 +69,20 @@ class Const(Component):
     """Mostly fictional component which just supplies a constant value. No runtime cost. 
     """
     
-    def __init__(self, value):
+    def __init__(self, bits, value):
+        self.bits = bits
         self.value = value
     
     def inputs(self):
         return {}
         
     def outputs(self):
-        return {"out": 1}
+        return {"out": self.bits}
     
     def initialize(self, out):
-        assert len(out) == 1
+        assert len(out) == self.bits
         def f(traces):
-            return set_trace(out[0], self.value, traces)
+            return set_multiple_traces(out, self.value, traces)
         return [f]
 
     
