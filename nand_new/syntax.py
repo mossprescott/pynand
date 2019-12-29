@@ -36,7 +36,16 @@ class Ref:
 class Instance:
     def __init__(self, ic, args):
         self.ic = ic
-        self.args = args
+        def to_ref(name, val):
+            if isinstance(val, Ref):
+                return val
+            elif isinstance(val, int):
+                # TODO: multi-bit
+                return Ref(Instance(nand_new.component.Const(val), {}), "out", 0)
+            else:
+                raise SyntaxError(f"Expected a reference for input {name}, got {val}")
+                
+        self.args = {name: to_ref(name, val) for (name, val) in args.items()}
 
     def __getattr__(self, name):
         # TODO: check ic's outputs
@@ -61,6 +70,8 @@ def build(builder):
         def __setattr__(self, name, value):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
+            # TODO: Const?
+            # TODO: SyntaxError if value not a valid Ref
             self.dict[(name, None)] = value
 
         def __getattr__(self, name):

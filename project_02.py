@@ -70,8 +70,8 @@ def mkALU(inputs, outputs):
     f  = inputs.f
     no = inputs.no
     
-    x_zeroed = Mux16(a=x, b=Const(0), sel=zx).out
-    y_zeroed = Mux16(a=y, b=Const(0), sel=zy).out
+    x_zeroed = Mux16(a=x, b=0, sel=zx).out
+    y_zeroed = Mux16(a=y, b=0, sel=zy).out
 
     x_inverted = Mux16(a=x_zeroed, b=Not16(in_=x_zeroed).out, sel=nx).out
     y_inverted = Mux16(a=y_zeroed, b=Not16(in_=y_zeroed).out, sel=ny).out
@@ -104,8 +104,6 @@ def mkALU(inputs, outputs):
                         b=And(a=Not(in_=in_[ 1]).out,
                               b=Not(in_=in_[ 0]).out).out).out).out).out
     Zero16 = build(mkZero16)
-    # !a & !b
-    # not(nand(not(a), not(b))
     
     outputs.out = out
     outputs.zr = Zero16(in_=out).out

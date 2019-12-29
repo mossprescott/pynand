@@ -96,3 +96,22 @@ def test_implicit_multibit_in():
     assert run(Wrap, in_=1).out == True
     assert run(Wrap, in_=2).out == True
     assert run(Wrap, in_=3).out == False
+
+
+def test_simple_const_input():
+    def mkBounce(inputs, outputs):
+        outputs.out = inputs.in_
+    Bounce = build(mkBounce)
+    
+    def mkZeroOne(inputs, outputs):
+        outputs.zero = Bounce(in_=0).out
+        outputs.one = Bounce(in_=1).out
+    ZeroOne = build(mkZeroOne)
+    
+    chip = ZeroOne.constr()
+    
+    print(chip)
+    print(chip.flatten())
+    
+    assert run(ZeroOne).zero == False
+    assert run(ZeroOne).one == True

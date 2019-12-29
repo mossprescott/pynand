@@ -19,14 +19,11 @@ class Component:
         """
         raise NotImplementedError
 
-    # def wire(self, trace_map):
-    #     """Stage 1: connect traces for static logic (connecting components).
-    #
-    #     Given a map of input refs to traces, return additional mapping of output refs to the same traces.
-    #     """
-    #
-    #     return {}
-
+    def initialize(self, **trace_map):
+        """Stage 1: set non-zero initial values.
+        """
+        return []
+        
     def combine(self, **trace_map):
         """Stage 2: define combinational logic, as operations which are performed on the chip's traces
         to propagate signals.
@@ -34,7 +31,6 @@ class Component:
         Given a map of input and output refs to traces, return a list of operations which update
         the output traces.
         """
-
         return []
 
     def sequence(self, **trace_map):
@@ -44,7 +40,6 @@ class Component:
         Given a map of input and output refs to traces, return a list of operations which update
         the output traces.
         """
-
         return []
 
 
@@ -70,6 +65,26 @@ def set_multiple_traces(masks, value, traces):
     return traces
 
 
+class Const(Component):
+    """Mostly fictional component which just supplies a constant value. No runtime cost. 
+    """
+    
+    def __init__(self, value):
+        self.value = value
+    
+    def inputs(self):
+        return {}
+        
+    def outputs(self):
+        return {"out": 1}
+    
+    def initialize(self, out):
+        assert len(out) == 1
+        def f(traces):
+            return set_trace(out[0], self.value, traces)
+        return [f]
+
+    
 class Nand(Component):
     """A single nand gate, which has two inputs and a single output named 'out'."""
 
