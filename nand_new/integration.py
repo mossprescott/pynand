@@ -80,36 +80,34 @@ class IC:
 
         flat_children = {}
 
-        # Add all the internal wiring of child ICs:
+        all_wires = {}
+        
         for comp in self.sorted_components():
             if isinstance(comp, IC):
                 child = comp.flatten()
                 flat_children[comp] = child
                 for to_input, from_output in child.wires.items():
-                    if to_input.comp != child.root and from_output.comp != child.root:
-                        ic.wire(from_output, to_input)
+                    if from_output.comp == child.root:
+                        from_output = from_output._replace(comp=child)
+                    if to_input.comp == child.root:
+                        to_input = to_input._replace(comp=child)
+                    all_wires[to_input] = from_output
 
         for to_input, from_output in self.wires.items():
-            if from_output.comp == self.root:
+            if from_output.comp in flat_children:
+                from_output = from_output._replace(comp=flat_children[from_output.comp])
+            elif from_output.comp == self.root:
                 from_output = from_output._replace(comp=ic.root)
-            if to_input.comp == self.root:
+
+            if to_input.comp in flat_children:
+                to_input = to_input._replace(comp=flat_children[to_input.comp])
+            elif to_input.comp == self.root:
                 to_input = to_input._replace(comp=ic.root)
 
-            # If "from" is a child's output, just rewrite it to the actual component:
-            if from_output.comp in flat_children:
-                flat = flat_children[from_output.comp]
-                from_output = flat.wires[from_output._replace(comp=flat.root)]
+            all_wires[to_input] = from_output
 
-            # If "to" is a child's input, it may need to be connected to more than one actual component:
-            if to_input.comp in flat_children:
-                flat = flat_children[to_input.comp]
-                conn = to_input._replace(comp=flat.root)
-                for child_in, child_out in flat.wires.items():
-                    if child_out == conn:
-                        ic.wire(from_output, child_in)
-            else:
-                ic.wire(from_output, to_input)
-
+        ic.wires = collapse_internal(all_wires)
+        
         return ic
 
 
@@ -210,6 +208,27 @@ class IC:
     def __repr__(self):
         # HACK
         return self.label
+
+
+def collapse_internal(graph):
+    """Collapse _all_ paths, removing _every_ internal node.
+    """
+    
+    result = graph.copy()
+    
+    to_delete = []
+    for src, dst in graph.items():
+        while dst in result:
+            previous_dst = result[dst]
+            result[src] = previous_dst
+            to_delete.append(dst)
+            dst = previous_dst
+            
+    for node in to_delete:
+        if node in result:
+            del result[node]
+
+    return result
 
 
 class Root:

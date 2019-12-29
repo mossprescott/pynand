@@ -1,7 +1,7 @@
 import pytest
 
 from nand_new.component import Nand
-from nand_new.integration import IC, Connection, WiringError
+from nand_new.integration import *
 
 def test_simple_wiring():
     ic = IC("?", {"in_": 1}, {"out": 1})
@@ -133,3 +133,51 @@ def test_nested_synthesis():
 
     nv.set(("a", 0), False)
     assert nv.get(("out", 0)) == True
+
+
+def test_collapse_internal_none():
+    graph = { 
+        1: 2,
+        3: 4,
+        5: 6
+    }
+    assert collapse_internal(graph) == graph
+
+def test_collapse_internal_simple():
+    graph = { 
+        1: 2,
+        2: 3,
+        4: 5,
+    }
+    collapsed = {
+        1: 3,
+        4: 5,
+    }
+    assert collapse_internal(graph) == collapsed
+
+def test_collapse_internal_two_steps():
+    graph = { 
+        1: 2,
+        2: 3,
+        3: 4,
+        5: 6,
+    }
+    collapsed = {
+        1: 4,
+        5: 6,
+    }
+    assert collapse_internal(graph) == collapsed
+
+def test_collapse_internal_two_edges():
+    graph = { 
+        1: 3,
+        2: 3,
+        3: 4,
+        5: 6,
+    }
+    collapsed = {
+        1: 4,
+        2: 4,
+        5: 6,
+    }
+    assert collapse_internal(graph) == collapsed

@@ -61,7 +61,7 @@ def build(builder):
         def __setattr__(self, name, value):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
-            self.dict[(name, 0)] = value            
+            self.dict[(name, None)] = value
 
         def __getattr__(self, name):
             """Called when the builder is going to assign to a bit slice of an output."""
@@ -103,18 +103,46 @@ def build(builder):
         output_coll = OutputCollector(inst)
         builder(input_coll, output_coll)
 
-        # TODO: max bit number for each input, by looking at all the refs
+        # Now set up inputs and outputs, before doing any wiring:
         input_name_bit = []
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
                 if ref.inst.ic == ic:
-                    input_name_bit.append((ref.name, ref.bit or 0))
-
+                    if ref.bit is not None:
+                        input_name_bit.append((ref.name, ref.bit))
+                    else:
+                        input_name_bit.append((ref.name, inst.ic.inputs()[name]-1))
+        for (name, bit), ref in sorted(list(output_coll.dict.items())):
+            if ref.inst.ic == ic:
+                # FIXME: dup from above
+                if ref.bit is not None:
+                    input_name_bit.append((ref.name, ref.bit))
+                else:
+                    # Note: we don't infer bit widths from outside, so just assume bit 0 when
+                    # an input is copied directly to an output.
+                    input_name_bit.append((ref.name, 0))
         ic._inputs = {name: bit+1 for (name, bit) in sorted(input_name_bit)}
-        ic._outputs = {name: bit+1 for (name, bit) in sorted(list(output_coll.dict))}
+        
+        output_name_bit = []
+        for (name, bit), ref in output_coll.dict.items():
+            if bit is not None:
+                output_name_bit.append((name, bit))
+            elif ref.inst.ic == ic:
+                # Note: we don't infer bit widths from outside, so just assume bit 0 when
+                # an input is copied directly to an output.
+                output_name_bit.append((name, 0))
+            else:
+                output_name_bit.append((name, ref.inst.ic.outputs()[ref.name]-1))
+        ic._outputs = {name: bit+1 for (name, bit) in sorted(output_name_bit)}
+
 
         for (name, bit), ref in output_coll.dict.items():
-            ic.wire(Connection(ref.inst.ic, ref.name, ref.bit or 0), Connection(ic.root, name, bit))
+            from_comp = ic.root if ref.inst.ic == ic else ref.inst.ic
+            if bit is None and ref.bit is None:
+                for i in range(from_comp.outputs()[ref.name]):
+                    ic.wire(Connection(from_comp, ref.name, i), Connection(ic.root, name, i))
+            else:
+                ic.wire(Connection(from_comp, ref.name, ref.bit or 0), Connection(ic.root, name, bit or 0))
 
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
@@ -122,9 +150,17 @@ def build(builder):
                     source_comp = ref.inst.ic.root
                 else:
                     source_comp = ref.inst.ic
-                source = Connection(source_comp, ref.name, ref.bit or 0)
-                target = Connection(inst.ic, name, 0)
-                ic.wire(source, target)
+                if ref.bit is None:
+                    target_bits = inst.ic.inputs()[name]
+                    for i in range(target_bits):
+                        source = Connection(source_comp, ref.name, i)
+                        target = Connection(inst.ic, name, i)
+                        ic.wire(source, target)
+                else:
+                    source = Connection(source_comp, ref.name, ref.bit)
+                    target = Connection(inst.ic, name, 0)
+                    ic.wire(source, target)
+                        
 
         # TODO: check for any un-wired or mis-wired inputs (and outputs?)
 
