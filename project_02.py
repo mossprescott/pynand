@@ -1,4 +1,4 @@
-from nand import *
+from nand_new import *
 from project_01 import And, And16, Or, Mux16, Not, Not16, Xor
 
 def mkHalfAdder(inputs, outputs):
@@ -15,7 +15,7 @@ def mkHalfAdder(inputs, outputs):
     # And(a, b):
     outputs.carry = Not(in_=nand).out
 
-HalfAdder = Component(mkHalfAdder)
+HalfAdder = build(mkHalfAdder)
 
 
 def mkFullAdder(inputs, outputs):
@@ -26,14 +26,14 @@ def mkFullAdder(inputs, outputs):
         nandBNand = Nand(a=nand, b=inputs.b).out
         outputs.sum = Nand(a=nandANand, b=nandBNand).out
         outputs.not_carry = nand
-    HalfAdderNot = Component(mkHalfAdderNot)
+    HalfAdderNot = build(mkHalfAdderNot)
 
     ab = HalfAdderNot(a=inputs.a, b=inputs.b)
     abc = HalfAdderNot(a=ab.sum, b=inputs.c)
-    outputs.carry = Nand(ab.not_carry, abc.not_carry).out
+    outputs.carry = Nand(a=ab.not_carry, b=abc.not_carry).out
     outputs.sum = abc.sum
 
-FullAdder = Component(mkFullAdder)
+FullAdder = build(mkFullAdder)
 
 
 def mkInc16(inputs, outputs):
@@ -45,7 +45,7 @@ def mkInc16(inputs, outputs):
         outputs.out[i] = tmp.sum
         carry = tmp.carry
 
-Inc16 = Component(mkInc16)
+Inc16 = build(mkInc16)
 
 
 def mkAdd16(inputs, outputs):
@@ -56,7 +56,7 @@ def mkAdd16(inputs, outputs):
         outputs.out[i] = tmp.sum
         a = tmp
 
-Add16 = Component(mkAdd16)
+Add16 = build(mkAdd16)
 
 
 def mkALU(inputs, outputs):
@@ -103,7 +103,7 @@ def mkALU(inputs, outputs):
                               b=Not(in_=in_[ 2]).out).out,
                         b=And(a=Not(in_=in_[ 1]).out,
                               b=Not(in_=in_[ 0]).out).out).out).out).out
-    Zero16 = Component(mkZero16)
+    Zero16 = build(mkZero16)
     # !a & !b
     # not(nand(not(a), not(b))
     
@@ -111,4 +111,4 @@ def mkALU(inputs, outputs):
     outputs.zr = Zero16(in_=out).out
     outputs.ng = out[15]
     
-ALU = Component(mkALU)
+ALU = build(mkALU)
