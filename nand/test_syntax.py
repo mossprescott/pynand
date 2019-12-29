@@ -1,6 +1,6 @@
 import pytest
 
-from nand_new.syntax import Nand, build, run
+from nand.syntax import Nand, build, run
 
 def test_trivial():
     def mkBuffer(inputs, outputs):

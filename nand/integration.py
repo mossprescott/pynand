@@ -1,8 +1,8 @@
 import collections
 from pprint import pprint  # HACK
 
-from nand_new.evaluator import NandVector
-from nand_new.component import Component
+from nand.evaluator import NandVector
+from nand.component import Component
 
 class IC:
     """An integrated circuit assembles one or more components by recording how their

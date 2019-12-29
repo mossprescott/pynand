@@ -1,7 +1,7 @@
 import pytest
 
-from nand_new.component import Nand
-from nand_new.integration import *
+from nand.component import Nand
+from nand.integration import *
 
 def test_simple_wiring():
     ic = IC("?", {"in_": 1}, {"out": 1})

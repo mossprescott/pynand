@@ -1,8 +1,8 @@
 """Wrappers around IC and NandVector providing a more compact way of constructing and interacting with chips.
 """
-from nand.compiler import NandVectorWrapper  # HACK
-import nand_new.component
-from nand_new.integration import IC, Connection
+import nand.component
+from nand.integration import IC, Connection
+from nand.evaluator import extend_sign
 
 class Chip:
     def __init__(self, constr):
@@ -43,7 +43,7 @@ class Instance:
             if isinstance(val, Ref):
                 return val
             elif isinstance(val, int):
-                return Ref(Instance(nand_new.component.Const(ic.inputs()[name], val), {}), "out", None)
+                return Ref(Instance(nand.component.Const(ic.inputs()[name], val), {}), "out", None)
             else:
                 raise SyntaxError(f"Expected a reference for input '{name}', got {val}")
 
@@ -190,6 +190,73 @@ def build(builder):
     return Chip(constr)
 
 
+class NandVectorWrapper:
+    """Convenient syntax around a NandVector. You get one of these from run(chip).
+    """
+    
+    def __init__(self, vector):
+        self._vector = vector
+        
+    def __setattr__(self, name, value):
+        """Set the value of a single- or multiple-bit input."""
+        if name == '_vector': return object.__setattr__(self, name, value)
+        
+        if (name, None) in self._vector.inputs:
+            self._vector.set((name, None), value)
+        for i in range(16):
+            if (name, i) in self._vector.inputs:
+                self._vector.set((name, i), bool(value & (1 << i)))
+
+    def tick(self):
+        """Raise the common `clock` signal (and propagate state changes eagerly)."""
+        # self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('common.clock', None), 1)  # TODO: first check that it was low
+        self._vector._propagate()
+
+    def tock(self):
+        """Lower the common `clock` signal (and propagate state changes eagerly)."""
+        # self._vector._propagate()  # TODO: overkill?
+        self._vector.set(('common.clock', None), 0)  # TODO: first check that it was high
+        self._vector._flop()
+
+    def __getattr__(self, name):
+        """Get the value of a single- or multiple-bit output."""
+
+        if (name, None) in self._vector.outputs:
+            return extend_sign(self._vector.get((name, None)))
+        else:
+            tmp = 0
+            for i in range(16):
+                if (name, i) in self._vector.outputs and self._vector.get((name, i)):
+                    tmp |= 1 << i
+            return extend_sign(tmp)
+
+    def get_internal(self, name):
+        """Get the value of a single- or multiple-bit signal which is internal to the component."""
+        if (name, None) in self._vector.internal:
+            return extend_sign(self._vector.get_internal((name, None)))
+        else:
+            tmp = 0
+            for i in range(16):
+                if (name, i) in self._vector.internal and self._vector.get_internal((name, i)):
+                    tmp |= 1 << i
+            return extend_sign(tmp)
+
+    def outputs(self):
+        return dict([(name, self.__getattr__(name)) for (name, _) in self._vector.outputs.keys()])
+
+    def internal(self):
+        return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
+        
+    def components(self, types):
+        """List of internal components (i.e MemoryOps).
+        """
+        return [op for op in self._vector.ops if isinstance(op, types)]
+
+    def __repr__(self):
+        return str(self.outputs())
+
+
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
     w = NandVectorWrapper(_constr(chip).synthesize())
@@ -242,4 +309,4 @@ def _constr(chip):
     return ic
 
 
-Nand = Chip(nand_new.component.Nand)
+Nand = Chip(nand.component.Nand)
