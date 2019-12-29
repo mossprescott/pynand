@@ -143,13 +143,17 @@ def build(builder):
         output_name_bit = []
         for (name, bit), ref in output_coll.dict.items():
             if bit is not None:
-                output_name_bit.append((name, bit))
+                max_bit = bit
             elif ref.inst.ic == ic:
                 # Note: we don't infer bit widths from outside, so just assume bit 0 when
                 # an input is copied directly to an output.
-                output_name_bit.append((name, 0))
+                max_bit = 0
+            elif ref.bit is not None:
+                # referencing a particular bit makes this a single-bit
+                max_bit = 0
             else:
-                output_name_bit.append((name, ref.inst.ic.outputs()[ref.name]-1))
+                max_bit = ref.inst.ic.outputs()[ref.name]-1
+            output_name_bit.append((name, max_bit))
         ic._outputs = {name: bit+1 for (name, bit) in sorted(output_name_bit)}
 
 
