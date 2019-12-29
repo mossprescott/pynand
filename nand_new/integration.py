@@ -125,7 +125,7 @@ class IC:
         visited = []
         visited_set = set()
     
-        # The stack is never as deep as the full set of nods, so just a list seems to fast enough for now.
+        # The stack is never as deep as the full set of nodes, so just a list seems fast enough for now.
         stack = []
     
         def loop(n):
