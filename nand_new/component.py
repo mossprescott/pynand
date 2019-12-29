@@ -3,6 +3,9 @@
 
 class Component:
     """Defines the interface for a component, including what traces it reads and writes, and when."""
+    
+    def __init__(self):
+        self.label = self.__class__.__name__
 
     def inputs(self):
         """Dictionary of named input signals, and the number of bits for each.

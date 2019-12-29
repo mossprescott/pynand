@@ -192,20 +192,37 @@ def build(builder):
 
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    w = NandVectorWrapper(chip.constr().synthesize())
+    w = NandVectorWrapper(_constr(chip).synthesize())
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
 
 
 def gate_count(chip):
-    ic = chip.constr()
     counts = {}
-    for c in ic.flatten().sorted_components():
-        key = c.__class__.__name__.lower() + "s"  # e.g. "Nand" -> "nands"
+    for c in _constr(chip).flatten().sorted_components():
+        key = c.label.lower() + "s"  # e.g. "Nand" -> "nands"
         counts[key] = counts.get(key, 0) + 1
     return counts
 
 
-Nand = Chip(nand_new.component.Nand)
+def _constr(chip):
+    """Construct an IC. If the Chip wraps a Component, a trivial IC is constructed around it so
+    we can treat everything the same.
+    """
+    
+    comp = chip.constr()
+    if isinstance(comp, IC):
+        ic = comp
+    else:
+        ic = IC(comp.label, comp.inputs(), comp.outputs())
+        for name, bits in comp.inputs().items():
+            for i in range(bits):
+                ic.wire(Connection(ic.root, name, i), Connection(comp, name, i))
+        for name, bits in comp.outputs().items():
+            for i in range(bits):
+                ic.wire(Connection(comp, name, i), Connection(ic.root, name, i))
+    return ic
 
+
+Nand = Chip(nand_new.component.Nand)
