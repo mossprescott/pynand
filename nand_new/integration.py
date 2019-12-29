@@ -121,18 +121,24 @@ class IC:
         """
         # TODO: make this search more efficient by not repeatedly searching the list of wires.
 
-        result = []
-        to_search = [self.root]
-        while to_search:
-            comp, to_search = to_search[0], to_search[1:]
-
-            name_comp = [(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == comp and f.comp != self.root]
-            for name, next in sorted(name_comp, key=lambda t: t[0]):
-                if next not in result:
-                    result.insert(0, next)
-                    to_search.append(next)
-            
-        return result
+        # Note: a set for fast tests, and a list to remember the order
+        visited = []
+        visited_set = set()
+    
+        # The stack is never as deep as the full set of nods, so just a list seems to fast enough for now.
+        stack = []
+    
+        def loop(n):
+            if n not in visited_set and n not in stack:
+                stack.append(n)
+                name_comp = [(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == n and f.comp != self.root]
+                for name, next in sorted(name_comp, key=lambda t: t[0]):
+                    loop(next)
+                stack.remove(n)
+                visited.append(n)
+                visited_set.add(n)
+        loop(self.root)
+        return visited[:-1]  # remove the root
 
 
     def synthesize(self):
