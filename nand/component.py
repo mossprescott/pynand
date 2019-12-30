@@ -59,6 +59,11 @@ def nand_trace(a_mask, b_mask, out_mask):
     """Combine two tests into one mask/compare operation for the common case of Nand."""
     in_mask = a_mask | b_mask
     def nand(traces):
+        """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
+        Probably could make it even cheaper by returning just the masks and letting the 
+        evaluator's loop do the work itself instead of dispatching to a separate function
+        for each op.
+        """
         if traces & in_mask == in_mask:
             return traces & ~out_mask
         else:
