@@ -120,7 +120,12 @@ class IC:
         in the list. If there are reference cycles, the components are ordered as if one such 
         reference (chosen in no particular way) was removed.
         """
-        # TODO: make this search more efficient by not repeatedly searching the list of wires.
+        
+        # Pre-compute wires _into_ each component:
+        wires_by_target_comp = {}  # {target comp: (target name, source comp)}
+        for t, f in self.wires.items():
+            if f.comp != self.root and f.comp != common:
+                wires_by_target_comp.setdefault(t.comp, []).append((t.name, f.comp))
 
         # Note: a set for fast tests, and a list to remember the order
         visited = []
@@ -132,13 +137,9 @@ class IC:
         def loop(n):
             if n not in visited_set and n not in stack:
                 stack.append(n)
-                name_comp = [
-                    (t.name, f.comp) 
-                    for (t, f) in self.wires.items() 
-                    if t.comp == n and f.comp != self.root and f.comp != common
-                ]
-                for name, next in sorted(name_comp, key=lambda t: t[0]):
-                    loop(next)
+                name_comp = wires_by_target_comp.get(n, [])
+                for _, nxt in sorted(name_comp, key=lambda t: t[0]):
+                    loop(nxt)
                 stack.remove(n)
                 visited.append(n)
                 visited_set.add(n)
