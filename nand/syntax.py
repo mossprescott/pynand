@@ -342,7 +342,7 @@ def gate_count(chip):
         for c in ic.sorted_components():
             if isinstance(c, IC):
                 loop(c)
-            elif c != common:
+            elif not isinstance(c, (nand.component.Const, nand.integration.Common)):
                 key = c.label.lower() + "s"  # e.g. "Nand" -> "nands"
                 counts[key] = counts.get(key, 0) + 1
     loop(_constr(chip))

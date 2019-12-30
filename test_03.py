@@ -148,8 +148,8 @@ def test_bit_fine():
 
 
 def test_register_legit():
-    """The challenge is to implement Register from Nand and DynamicDFF."""
-    assert 'memories' not in gate_count(Register)
+    """The challenge is to implement Register from Nand and DFF."""
+    assert gate_count(Register).keys() == set(['nands', 'dffs'])
 
 def test_register():
     reg = run(Register)
@@ -209,14 +209,14 @@ def ram_test(ram, size):
 
 def test_ram8_legit():
     """The challenge is to implement RAM8 from Registers."""
-    assert 'memories' not in gate_count(RAM8)    
+    assert gate_count(RAM8).keys() == set(['nands', 'dffs'])
 
 def test_ram8():
     ram = run(RAM8)
     ram_test(ram, 8)
 
 
-# This one works, but it's annoyingly slow:
+# This one works, but it's annoyingly slow (~20s):
 # def test_ram64():
 #     ram = run(RAM64)
 #     ram_test(ram, 64)
@@ -225,7 +225,6 @@ def test_ram8():
 # def test_ram512():
 #     ram = run(RAM512)
 #     ram_test(ram, 512)
-#
 #
 # This one I never even tried:
 # def test_ram4k():
@@ -237,12 +236,6 @@ def test_ram16K():
     # This large RAM has to be implemented as a wrapper around a Memory:
     ram = run(RAM16K)
     ram_test(ram, 16384)
-
-# FIXME: deal with wiring for this case, which is only useful for demonstration purposes anyway.
-# def test_memory():
-#     # Same behavior as RAM16K. This just shows that it can be used as the root as well.
-#     ram = run(Memory)
-#     ram_test(ram, 16384)
 
 
 def test_pc():
