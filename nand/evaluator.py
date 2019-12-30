@@ -59,7 +59,11 @@ class NandVector:
                 ts = f(ts)
             return ts
 
-        self.traces = fixed_point(f, self.traces, limit=3)  # HACK: 2 just checks the first pass was stable. 
+        # FIXME: the number of repeats here increased to 3 for the full CPU with the first 
+        # runtime, then increased to 5 when it was re-implemented. That suggests that the
+        # sorting of components is not quite right. If anything, now that all the gates are
+        # flattened the sort should be more effective.
+        self.traces = fixed_point(f, self.traces, limit=5)
 
         self.dirty = False
 

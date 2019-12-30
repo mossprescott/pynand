@@ -253,12 +253,13 @@ class NandVectorWrapper:
     """Convenient syntax around a NandVector. You get one of these from run(chip).
     """
     
-    def __init__(self, vector):
+    def __init__(self, vector, components):
         self._vector = vector
+        self._components = components
         
     def __setattr__(self, name, value):
         """Set the value of a single- or multiple-bit input."""
-        if name == '_vector': return object.__setattr__(self, name, value)
+        if name in ('_vector', '_components'): return object.__setattr__(self, name, value)
         
         if (name, None) in self._vector.inputs:
             self._vector.set((name, None), value)
@@ -308,9 +309,12 @@ class NandVectorWrapper:
         return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
         
     def components(self, types):
-        """List of internal components (i.e MemoryOps).
+        """List of internal components (e.g. RAM, ROM).
+        
+        Note: types in one or more of the types defined in nand.component, not the wrappers
+        with the same names defined in this module.
         """
-        return [op for op in self._vector.ops if isinstance(op, types)]
+        return [c for c in self._components if isinstance(c, types)]
 
     def __repr__(self):
         return str(self.outputs())
@@ -318,7 +322,8 @@ class NandVectorWrapper:
 
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    w = NandVectorWrapper(_constr(chip).synthesize())
+    flat = _constr(chip).flatten()
+    w = NandVectorWrapper(flat.synthesize(), flat.sorted_components())
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
