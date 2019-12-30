@@ -1,4 +1,4 @@
-from nand import Component, lazy
+from nand import RAM, ROM, Input, build, lazy
 from project_01 import *
 from project_02 import *
 from project_03 import *
@@ -11,32 +11,32 @@ def mkMemorySystem(inputs, outputs):
     def mkShift13(inputs, outputs):
         outputs.out[0] = inputs.in_[13]
         outputs.out[1] = inputs.in_[14]
-    Shift13 = Component(mkShift13)
+    Shift13 = build(mkShift13)
 
     def mkMask14(inputs, outputs):
         for i in range(14):
             outputs.out[i] = inputs.in_[i]
-    Mask14 = Component(mkMask14)
+    Mask14 = build(mkMask14)
 
     bank = Shift13(in_=address).out
     load_bank = DMux4Way(in_=load, sel=bank)
     address14 = Mask14(in_=address).out
 
     # addresses 0x0000 to 0x3FFF
-    ram = Memory(14, in_=in_, load=Or(a=load_bank.a, b=load_bank.b).out, address=address14)
+    ram = RAM(14)(in_=in_, load=Or(a=load_bank.a, b=load_bank.b).out, address=address14)
 
     # addresses 0x4000 to 0x5FFFF
     # TODO: connect to pygame display
     # note: bit 13 is definitely zero, so address[0..13] == address[0..12]
-    screen = Memory(13, in_=in_, load=load_bank.c, address=address14)
+    screen = RAM(13)(in_=in_, load=load_bank.c, address=address14)
 
     # address 0x6000
     # TODO: keyboard = Keyboard()
-    keyboard = Const(0)
+    keyboard = Input()
 
-    outputs.out = Mux4Way16(a=ram.out, b=ram.out, c=screen.out, d=keyboard, sel=bank).out
+    outputs.out = Mux4Way16(a=ram.out, b=ram.out, c=screen.out, d=keyboard.out, sel=bank).out
 
-MemorySystem = Component(mkMemorySystem)
+MemorySystem = build(mkMemorySystem)
 
 
 def mkCPU(inputs, outputs):
@@ -60,7 +60,7 @@ def mkCPU(inputs, outputs):
                          ).out
                     ).out
               ).out
-    pc = PC(in_=a_reg.out, load=jump, inc=Const(1), reset=reset)
+    pc = PC(in_=a_reg.out, load=jump, inc=1, reset=reset)
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
@@ -70,7 +70,7 @@ def mkCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-CPU = Component(mkCPU)
+CPU = build(mkCPU)
 
 
 def mkComputer(inputs, outputs):
@@ -78,8 +78,7 @@ def mkComputer(inputs, outputs):
     
     cpu = lazy()
 
-    # TODO: a write-only variant?
-    rom = Memory(15, in_=Const(0), load=Const(0), address=cpu.pc)
+    rom = ROM(15)(address=cpu.pc)
 
     mem = MemorySystem(in_=cpu.outM, load=cpu.writeM, address=cpu.addressM)
 
@@ -89,4 +88,4 @@ def mkComputer(inputs, outputs):
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
 
-Computer = Component(mkComputer)
+Computer = build(mkComputer)

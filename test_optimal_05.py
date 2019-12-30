@@ -7,20 +7,21 @@ from project_05 import *
 def test_memory_system():
     assert gate_count(MemorySystem) == {
         'nands': 171,  # ?
-        'memories': 2,
+        'rams': 2,
+        'inputs': 1,
     }
 
 def test_cpu():
     assert gate_count(CPU) == {
         'nands': 1099,  # ?
-        'flip_flops': 48,  # 3 registers
+        'dffs': 48,  # 3 registers
     }
 
 def test_computer():
     assert gate_count(Computer) == {
         'nands': 1270,  # ?
-        'flip_flops': 48,  # 3 registers
-        'memories': 3,
-        # 'keyboards': 1,
-        # 'roms': 1,
+        'dffs': 48,  # 3 registers
+        'roms': 1,
+        'rams': 2,
+        'inputs': 1,
     }

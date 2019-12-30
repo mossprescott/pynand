@@ -1,5 +1,6 @@
 from project_05 import *
-from nand.evaluator import MemoryOp  # FIXME: export a cleaner abstraction
+import nand.component
+
 
 def test_memory_system():
     mem = run(MemorySystem)
@@ -413,14 +414,14 @@ def reset_program(computer):
 def peek(computer, address):
     """Read a single word from the Computer's memory."""
     
-    mem = get_memory(computer, address_bits=14)
+    mem = get_ram(computer, address_bits=14)
     return mem.storage[address]
 
 
 def poke(computer, address, value):
     """Write a single word to the Computer's memory."""
     
-    mem = get_memory(computer, address_bits=14)
+    mem = get_ram(computer, address_bits=14)
     mem.storage[address] = value
 
 
@@ -431,17 +432,17 @@ def init_rom(computer, instructions):
     after the program, which could in theory be used to detect termination.
     """
     
-    rom = get_memory(computer, address_bits=15)
-    for i, instr in enumerate(instructions):
-        rom.storage[i] = instr
-        
     size = len(instructions)
-    if size+2 <= 2**15:
-        rom.storage[size] = size  # @size (which is the address of this instruction)
-        rom.storage[size+1] = 0b111_0_000000_000_111  # JMP
+    prg = instructions + [
+        size,  # @size (which is the address of this instruction)
+        0b111_0_000000_000_111,  # JMP
+    ]
+    rom, = computer.components(nand.component.ROM)
+    rom.program(prg)
 
-def get_memory(computer, address_bits):
+
+def get_ram(computer, address_bits):
     """Find one of the memories from inside the computer by matching the number of address bits.
     """
     # HACK!
-    return [mem for mem in computer.components(MemoryOp) if len(mem.address_bit_array) == address_bits][0]
+    return [mem for mem in computer.components(nand.component.RAM) if mem.address_bits == address_bits][0]
