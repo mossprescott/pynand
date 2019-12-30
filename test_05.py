@@ -384,6 +384,37 @@ def test_computer_max():
     assert peek(computer, 2) == 23456
 
  
+def cycles_per_second():
+    """Estimate the speed of 
+    """
+    
+    import random
+    import timeit
+    
+    computer = run(Computer)
+
+    init_rom(computer, MAX_PROGRAM)
+
+    def once():
+        x = random.randint(0, 0x7FFF)
+        y = random.randint(0, 0x7FFF)
+        reset_program(computer)
+        poke(computer, 0, x)
+        poke(computer, 1, y)
+        for _ in range(14):
+            computer.tick(); computer.tock()
+        assert peek(computer, 2) == max(x, y)
+
+    count, time = timeit.Timer(once).autorange()
+
+    return count*14/time
+
+
+def test_speed():
+    cps = cycles_per_second()
+    print(f"Measured speed: {cps} cycles/s")
+    assert cps > 100
+ 
 
 def run_program(computer, instructions):
     """Install and run a sequence of instructions, stopping when pc runs off the end."""
