@@ -1,9 +1,9 @@
-from nand import Component, lazy
+from nand import build
 from project_01 import *
 from project_02 import *
 
 
-def mkDFF(inputs, outputs):
+def mkMyDFF(inputs, outputs):
     # Note: provided as a primitive in the Nand to Tetris simulator, but implementing it
     # from scratch is fun.
 
@@ -11,14 +11,14 @@ def mkDFF(inputs, outputs):
         mux = lazy()
         mux.set(Mux(a=mux.out, b=inputs.in_, sel=inputs.enable))
         outputs.out = mux.out
-    Latch = Component(mkLatch)
+    Latch = build(mkLatch)
     
     l1 = Latch(in_=inputs.in_, enable=clock)
     l2 = Latch(in_=l1.out, enable=Not(in_=clock).out)
     
     outputs.out = l2.out
 
-DFF = Component(mkDFF)
+MyDFF = build(mkMyDFF)
 
 
 def mkBit(inputs, outputs):
@@ -28,17 +28,17 @@ def mkBit(inputs, outputs):
     load = inputs.load
     dff = lazy()
     mux = Mux(a=dff.out, b=inputs.in_, sel=inputs.load)
-    dff.set(DynamicDFF(in_=mux.out))
+    dff.set(DFF(in_=mux.out))
     outputs.out = dff.out
 
-Bit = Component(mkBit)
+Bit = build(mkBit)
 
 
 def mkRegister(inputs, outputs):
     for i in range(16):
         outputs.out[i] = Bit(in_=inputs.in_[i], load=inputs.load).out
         
-Register = Component(mkRegister)
+Register = build(mkRegister)
 
 
 def mkRAM8(inputs, outputs):
@@ -55,7 +55,7 @@ def mkRAM8(inputs, outputs):
                             e=reg4.out, f=reg5.out, g=reg6.out, h=reg7.out,
                             sel=inputs.address).out
     
-RAM8 = Component(mkRAM8)
+RAM8 = build(mkRAM8)
 
 
 def mkRAM64(inputs, outputs):
@@ -63,7 +63,7 @@ def mkRAM64(inputs, outputs):
         outputs.out[0] = inputs.in_[3]
         outputs.out[1] = inputs.in_[4]
         outputs.out[2] = inputs.in_[5]
-    RShift3 = Component(mkRShift3)
+    RShift3 = build(mkRShift3)
 
     shifted = RShift3(in_=inputs.address)
     load = DMux8Way(in_=inputs.load, sel=shifted.out)
@@ -79,7 +79,7 @@ def mkRAM64(inputs, outputs):
                             e=ram4.out, f=ram5.out, g=ram6.out, h=ram7.out,
                             sel=shifted.out).out
 
-RAM64 = Component(mkRAM64)
+RAM64 = build(mkRAM64)
 
 
 def mkRAM512(inputs, outputs):
@@ -93,7 +93,7 @@ def mkRAM512(inputs, outputs):
 #         outputs.out[3] = inputs.in_[6]
 #         outputs.out[4] = inputs.in_[7]
 #         outputs.out[5] = inputs.in_[8]
-#     RShift3 = Component(mkRShift3)
+#     RShift3 = build(mkRShift3)
 #
 #     shifted = RShift3(in_=inputs.address)
 #     load = DMux8Way(in_=inputs.load, sel=shifted.out)
@@ -109,7 +109,7 @@ def mkRAM512(inputs, outputs):
 #                             e=ram4.out, f=ram5.out, g=ram6.out, h=ram7.out,
 #                             sel=shifted.out).out
 #
-# RAM512 = Component(mkRAM512)
+# RAM512 = build(mkRAM512)
 
 
 # def mkRAM4K(inputs, outputs):
@@ -123,11 +123,11 @@ def mkRAM16K(inputs, outputs):
     load = inputs.load
     address = inputs.address
     
-    mem = Memory(14, in_=in_, load=load, address=address)
+    mem = RAM(14)(in_=in_, load=load, address=address)
     
     outputs.out = mem.out
 
-RAM16K = Component(mkRAM16K)
+RAM16K = build(mkRAM16K)
 
 
 def mkPC(inputs, outputs):
@@ -137,12 +137,12 @@ def mkPC(inputs, outputs):
     reset = inputs.reset
     
     reseted = lazy()
-    pc = Register(in_=reseted.out, load=Const(1))
+    pc = Register(in_=reseted.out, load=1)
     
     inced = Mux16(a=pc.out, b=Inc16(in_=pc.out).out, sel=inc)
     loaded = Mux16(a=inced.out, b=in_, sel=load)
-    reseted.set(Mux16(a=loaded.out, b=Const(0), sel=reset))
+    reseted.set(Mux16(a=loaded.out, b=0, sel=reset))
     
     outputs.out = pc.out
 
-PC = Component(mkPC)
+PC = build(mkPC)

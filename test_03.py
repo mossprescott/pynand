@@ -63,18 +63,18 @@ def dff_fine_test(dff):
     # global), and providing tick() and tock() to cycle it.
 
 
-def test_dynamic_dff_coarse():
-    dff = run(DynamicDFF)
-    dff_coarse_test(dff)
-
-def test_dynamic_dff_fine():
-    dff = run(DynamicDFF)
-    dff_fine_test(dff)
-    
-
 def test_dff_legit():
     """The challenge is to implement DFF with only Nand gates."""
-    assert list(gate_count(DFF).keys()) == ['nands']
+    assert list(gate_count(MyDFF).keys()) == ['nands']
+
+def test_my_dff_coarse():
+    dff = run(MyDFF)
+    dff_coarse_test(dff)
+
+def test_my_dff_fine():
+    dff = run(MyDFF)
+    dff_fine_test(dff)
+
 
 def test_dff_coarse():
     dff = run(DFF)
@@ -83,6 +83,7 @@ def test_dff_coarse():
 def test_dff_fine():
     dff = run(DFF)
     dff_fine_test(dff)
+
 
 
 def test_bit_coarse():
