@@ -15,14 +15,18 @@ class NandVector:
     seen (or, if no fixed-point is found, an exception is raised.)
     """
 
-    def __init__(self, inputs, outputs, internal, combine_ops, sequence_ops, start=0):
+    def __init__(self, inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops):
         self.inputs = inputs
         self.outputs = outputs
         self.internal = internal
         self.combine_ops = combine_ops
         self.sequence_ops = sequence_ops
 
-        self.traces = start
+        traces = 0
+        for op in initialize_ops:
+            traces = run_op(op, traces)
+        self.traces = traces
+        
         self.dirty = True
 
     def set(self, key, value):
@@ -55,8 +59,20 @@ class NandVector:
         if not self.dirty: return
 
         def f(ts):
-            for f in self.combine_ops:
-                ts = f(ts)
+            for op in self.combine_ops:
+                # ts = run_op(op, ts)
+
+                # Warning: this is just 'run_op', inlined into the loop here to avoid a function
+                # call and to make use of possibly more efficient "in-place" operations. Not much
+                # more efficient, surely, but maybe saving a few opcodes.
+                if op[0] is None:
+                    ts = op[1](ts)
+                else:
+                    in_mask, out_mask = op
+                    if ts & in_mask == in_mask:
+                        ts &= ~out_mask
+                    else:
+                        ts |= out_mask
             return ts
 
         # FIXME: the number of repeats here increased to 3 for the full CPU with the first 
@@ -70,13 +86,14 @@ class NandVector:
 
     # TODO: unify this with the state of the clock (not otherwise known here at present)
     def _flop(self):
-        """Simulate advancing the clock, by copying the input of each flip-flop to its output.
+        """Simulate advancing the clock, by copying the input of each flip-flop to its output,
+        or whatever else the component needs to make happen.
         """
         
         self._propagate()
         
-        for f in self.sequence_ops:
-            self.traces = f(self.traces)
+        for op in self.sequence_ops:
+            self.traces = run_op(op, self.traces)
 
         self.dirty = True
 
@@ -129,22 +146,42 @@ def set_multiple_traces(masks, value, traces):
     return traces
 
 
-def nand_op(a_mask, b_mask, out_mask):
-    """Combine two tests into one mask/compare operation for the common case of Nand."""
-    in_mask = a_mask | b_mask
-    def nand(traces):
-        """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
-        Probably could make it even cheaper by returning just the masks and letting the
-        evaluator's loop do the work itself instead of dispatching to a separate function
-        for each op.
-        """
+def run_op(op, traces):
+    """Execute an op, which was constructed by either nand_op or custom_op, to update traces."""
+    if op[0] is None:
+        return op[1](traces)
+    else:
+        in_mask, out_mask = op
         if traces & in_mask == in_mask:
             return traces & ~out_mask
         else:
             return traces | out_mask
-    return nand
+
+
+def nand_op(a_mask, b_mask, out_mask):
+    """Combine two tests into one mask/compare operation for the common case of Nand."""
+
+    # in_mask = a_mask | b_mask
+    # def nand(traces):
+    #     """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
+    #     Probably could make it even cheaper by returning just the masks and letting the
+    #     evaluator's loop do the work itself instead of dispatching to a separate function
+    #     for each op.
+    #     """
+    #     if traces & in_mask == in_mask:
+    #         return traces & ~out_mask
+    #     else:
+    #         return traces | out_mask
+    # return nand
+
+    # Just wrap up the two masks
+    return (a_mask | b_mask, out_mask)
 
 
 def custom_op(f):
     """Wrap a non-Nand op to be executed during simulation."""
-    return f
+
+    # return f
+
+    # Wrap the function with a semaphor value to indicate it's not Nand
+    return (None, f)
