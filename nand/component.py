@@ -54,6 +54,16 @@ def set_trace(mask, value, traces):
         return traces | mask
     else:
         return traces & ~mask
+        
+def nand_trace(a_mask, b_mask, out_mask):
+    """Combine two tests into one mask/compare operation for the common case of Nand."""
+    in_mask = a_mask | b_mask
+    def nand(traces):
+        if traces & in_mask == in_mask:
+            return traces & ~out_mask
+        else:
+            return traces | out_mask
+    return nand
 
 def get_multiple_traces(masks, traces):
     val = 0
@@ -101,12 +111,7 @@ class Nand(Component):
 
     def combine(self, a, b, out):
         assert len(a) == 1 and len(b) == 1 and len(out) == 1
-        def nand(traces):
-            a_val = tst_trace(a[0], traces)
-            b_val = tst_trace(b[0], traces)
-            out_val = not (a_val and b_val)
-            return set_trace(out[0], out_val, traces)
-        return [nand]
+        return [nand_trace(a[0], b[0], out[0])]
 
 
 class DFF(Component):
