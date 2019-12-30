@@ -106,3 +106,45 @@ def unsigned(x):
     """
     return x & 0xffff
 
+
+def tst_trace(mask, traces):
+    return traces & mask != 0
+
+def set_trace(mask, value, traces):
+    if value:
+        return traces | mask
+    else:
+        return traces & ~mask
+
+def get_multiple_traces(masks, traces):
+    val = 0
+    for bit in reversed(masks):
+        val = (val << 1) | int(tst_trace(bit, traces))
+    return val
+
+def set_multiple_traces(masks, value, traces):
+    for bit in masks:
+        traces = set_trace(bit, value & 0b1, traces)
+        value >>= 1
+    return traces
+
+
+def nand_op(a_mask, b_mask, out_mask):
+    """Combine two tests into one mask/compare operation for the common case of Nand."""
+    in_mask = a_mask | b_mask
+    def nand(traces):
+        """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
+        Probably could make it even cheaper by returning just the masks and letting the
+        evaluator's loop do the work itself instead of dispatching to a separate function
+        for each op.
+        """
+        if traces & in_mask == in_mask:
+            return traces & ~out_mask
+        else:
+            return traces | out_mask
+    return nand
+
+
+def custom_op(f):
+    """Wrap a non-Nand op to be executed during simulation."""
+    return f

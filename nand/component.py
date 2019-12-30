@@ -1,5 +1,6 @@
 """Components which can be combined into a graph to define a complete chip.
 """
+from nand.evaluator import nand_op, custom_op, tst_trace, set_trace, get_multiple_traces, set_multiple_traces
 
 class Component:
     """Defines the interface for a component, including what traces it reads and writes, and when."""
@@ -46,43 +47,6 @@ class Component:
         return []
 
 
-def tst_trace(mask, traces):
-    return traces & mask != 0
-
-def set_trace(mask, value, traces):
-    if value:
-        return traces | mask
-    else:
-        return traces & ~mask
-        
-def nand_trace(a_mask, b_mask, out_mask):
-    """Combine two tests into one mask/compare operation for the common case of Nand."""
-    in_mask = a_mask | b_mask
-    def nand(traces):
-        """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
-        Probably could make it even cheaper by returning just the masks and letting the 
-        evaluator's loop do the work itself instead of dispatching to a separate function
-        for each op.
-        """
-        if traces & in_mask == in_mask:
-            return traces & ~out_mask
-        else:
-            return traces | out_mask
-    return nand
-
-def get_multiple_traces(masks, traces):
-    val = 0
-    for bit in reversed(masks):
-        val = (val << 1) | int(tst_trace(bit, traces))
-    return val
-
-def set_multiple_traces(masks, value, traces):
-    for bit in masks:
-        traces = set_trace(bit, value & 0b1, traces)
-        value >>= 1
-    return traces
-
-
 class Const(Component):
     """Mostly fictional component which just supplies a constant value. No runtime cost. 
     """
@@ -102,7 +66,7 @@ class Const(Component):
         assert len(out) == self.bits
         def f(traces):
             return set_multiple_traces(out, self.value, traces)
-        return [f]
+        return [custom_op(f)]
 
     
 class Nand(Component):
@@ -116,7 +80,7 @@ class Nand(Component):
 
     def combine(self, a, b, out):
         assert len(a) == 1 and len(b) == 1 and len(out) == 1
-        return [nand_trace(a[0], b[0], out[0])]
+        return [nand_op(a[0], b[0], out[0])]
 
 
 class DFF(Component):
@@ -135,7 +99,7 @@ class DFF(Component):
         def flop(traces):
             val = tst_trace(in_[0], traces)
             return set_trace(out[0], val, traces)
-        return [flop]
+        return [custom_op(flop)]
 
 
 class ROM(Component):
@@ -171,7 +135,7 @@ class ROM(Component):
             else:
                 out_val = 0
             return set_multiple_traces(out, out_val, traces)
-        return [read]
+        return [custom_op(read)]
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip.
@@ -206,7 +170,7 @@ class RAM(Component):
             address_val = get_multiple_traces(address, traces)
             out_val = self.get(address_val)
             return set_multiple_traces(out, out_val, traces)
-        return [read]
+        return [custom_op(read)]
 
     def sequence(self, in_, load, address, **_unused):
         """Note: not using `out`."""
@@ -218,7 +182,7 @@ class RAM(Component):
                 address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
             return traces
-        return [write]
+        return [custom_op(write)]
 
 
 class Input(Component):
@@ -243,7 +207,7 @@ class Input(Component):
         assert len(out) == 16
         def read(traces):
             return set_multiple_traces(out, self.value, traces)
-        return [read]
+        return [custom_op(read)]
 
 
 # TODO: Output, (potentially) accepting one word of output on each clock cycle?

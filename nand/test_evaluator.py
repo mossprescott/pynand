@@ -1,13 +1,5 @@
 from nand.component import set_trace, tst_trace
-from nand.evaluator import NandVector
-
-def nand_op(a, b, out):
-    def nand(traces):
-        a_val = tst_trace(a, traces)
-        b_val = tst_trace(b, traces)
-        out_val = not (a_val and b_val)
-        return set_trace(out, out_val, traces)
-    return nand
+from nand.evaluator import NandVector, nand_op
 
 def dff_op(in_, out):
     def dff(traces):
