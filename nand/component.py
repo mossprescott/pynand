@@ -77,9 +77,6 @@ class Const(Component):
         self.bits = bits
         self.value = value
     
-    def inputs(self):
-        return {}
-        
     def outputs(self):
         return {"out": self.bits}
     
@@ -207,6 +204,7 @@ class RAM(Component):
                 in_val = get_multiple_traces(in_, traces)
                 address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
+            return traces
         return [write]
 
 
