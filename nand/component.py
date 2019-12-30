@@ -77,6 +77,9 @@ class Const(Component):
         self.bits = bits
         self.value = value
     
+    def inputs(self):
+        return {}
+    
     def outputs(self):
         return {"out": self.bits}
     
