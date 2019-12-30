@@ -7,4 +7,4 @@ implemented (in the `eval` sub-dir.)
 """
 
 from nand.evaluator import unsigned
-from nand.syntax import Nand, DFF, ROM, RAM, Input, clock, lazy, build, run, gate_count
+from nand.syntax import Nand, DFF, ROM, RAM, Input, lazy, clock, build, run, gate_count

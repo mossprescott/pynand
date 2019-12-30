@@ -1,7 +1,7 @@
 """Wrappers around IC and NandVector providing a more compact way of constructing and interacting with chips.
 """
 import nand.component
-from nand.integration import IC, Connection
+from nand.integration import IC, Connection, common
 from nand.evaluator import extend_sign
 
 class Chip:
@@ -29,13 +29,19 @@ class Ref:
         return Ref(self.inst, self.name, key)
 
     def __repr__(self):
+        if self.inst == common:
+            inst_str = "common"
+        elif isinstance(self.inst, Lazy) and self.inst.inst is None:
+            inst_str = "<lazy>"
+        else:
+            inst_str = self.inst._ic
         bit_str = f"[{self.bit}]" if self.bit is not None else ""
-        return f"{self.inst.ic}.{self.name}{bit_str}"
+        return f"{inst_str}.{self.name}{bit_str}"
 
 
 class Instance:
     def __init__(self, ic, args):
-        self.ic = ic
+        self._ic = ic
         def to_ref(name, val):
             if name not in ic.inputs():
                 raise SyntaxError(f"Unexpected argument: {name}")
@@ -51,10 +57,45 @@ class Instance:
 
     def __getattr__(self, name):
         # TODO: check ic's outputs
+        if name == "ic": raise Exception("Probably you want '_ic'")  # TEMP
         return Ref(self, name, None)
 
     def __str__(self):
-        return f"{self.ic}"
+        return f"{self._ic}"
+
+
+class Lazy:
+    """Placeholder instance that allows inputs and outputs to be defined before the actual 
+    implementation is provided, allowing circular references to be created.
+    
+    >>> def mkCircular(inputs, outputs):
+    ...     thing = lazy()
+    ...     foo = Not(in_=thing.out)
+    ...     thing.set(Not(foo.out))
+    ...     outputs.out = thing.out
+    
+    # TODO: better example?
+    """
+
+    def __init__(self):
+        self.inst = None
+
+    def set(self, inst):
+        if isinstance(inst, Instance):
+            # TODO: checks that are possible only after the instance is resolved?
+            self.inst = inst
+        else:
+            raise SyntaxError(f"Expected an instance, got {inst}")
+        
+    @property
+    def _ic(self):
+        if not self.inst:
+            raise SyntaxError("Unresolved lazy reference")
+        return self.inst._ic
+
+    def __getattr__(self, name):
+        return Ref(self, name, None)
+
 
 def build(builder):
     class InputCollector:
@@ -99,10 +140,17 @@ def build(builder):
         result = set([])
         while to_search:
             inst, to_search = to_search[0], to_search[1:]
-            result.add(inst)
-            for ref in inst.args.values():
-                if ref.inst not in result:
-                    to_search.append(ref.inst)
+
+            if isinstance(inst, Lazy):
+                # Explicitly exclude these refs from the search
+                if inst.inst is not None and inst.inst not in result:
+                    to_search.append(inst.inst)
+            elif inst != common:
+                result.add(inst)
+                for ref in inst.args.values():
+                    if ref.inst not in result:
+                        to_search.append(ref.inst)
+                
         return result
 
     def constr():
@@ -124,13 +172,13 @@ def build(builder):
         input_name_bit = []
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
-                if ref.inst.ic == ic:
+                if ref.inst != common and ref.inst._ic == ic:
                     if ref.bit is not None:
                         input_name_bit.append((ref.name, ref.bit))
                     else:
-                        input_name_bit.append((ref.name, inst.ic.inputs()[name]-1))
+                        input_name_bit.append((ref.name, inst._ic.inputs()[name]-1))
         for (name, bit), ref in sorted(list(output_coll.dict.items())):
-            if ref.inst.ic == ic:
+            if ref.inst != common and ref.inst._ic == ic:
                 # FIXME: dup from above
                 if ref.bit is not None:
                     input_name_bit.append((ref.name, ref.bit))
@@ -144,7 +192,9 @@ def build(builder):
         for (name, bit), ref in output_coll.dict.items():
             if bit is not None:
                 max_bit = bit
-            elif ref.inst.ic == ic:
+            elif ref == clock:
+                max_bit = 0
+            elif ref.inst._ic == ic:
                 # Note: we don't infer bit widths from outside, so just assume bit 0 when
                 # an input is copied directly to an output.
                 max_bit = 0
@@ -152,13 +202,19 @@ def build(builder):
                 # referencing a particular bit makes this a single-bit
                 max_bit = 0
             else:
-                max_bit = ref.inst.ic.outputs()[ref.name]-1
+                max_bit = ref.inst._ic.outputs()[ref.name]-1
             output_name_bit.append((name, max_bit))
         ic._outputs = {name: bit+1 for (name, bit) in sorted(output_name_bit)}
 
 
         for (name, bit), ref in output_coll.dict.items():
-            from_comp = ic.root if ref.inst.ic == ic else ref.inst.ic
+            if ref.inst == common:
+                from_comp = common  # HACK
+            elif ref.inst._ic == ic:
+                from_comp = ic.root
+            else: 
+                from_comp = ref.inst._ic
+            
             if bit is None and ref.bit is None:
                 for i in range(from_comp.outputs()[ref.name]):
                     ic.wire(Connection(from_comp, ref.name, i), Connection(ic.root, name, i))
@@ -167,19 +223,22 @@ def build(builder):
 
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
-                if ref.inst.ic == ic:
-                    source_comp = ref.inst.ic.root
+                if ref.inst == common:
+                    source_comp = common  # HACK
+                elif ref.inst._ic == ic:
+                    source_comp = ref.inst._ic.root
                 else:
-                    source_comp = ref.inst.ic
+                    source_comp = ref.inst._ic
+
                 if ref.bit is None:
-                    target_bits = inst.ic.inputs()[name]
+                    target_bits = inst._ic.inputs()[name]
                     for i in range(target_bits):
                         source = Connection(source_comp, ref.name, i)
-                        target = Connection(inst.ic, name, i)
+                        target = Connection(inst._ic, name, i)
                         ic.wire(source, target)
                 else:
                     source = Connection(source_comp, ref.name, ref.bit)
-                    target = Connection(inst.ic, name, 0)
+                    target = Connection(inst._ic, name, 0)
                     ic.wire(source, target)
                         
 
@@ -210,13 +269,13 @@ class NandVectorWrapper:
     def tick(self):
         """Raise the common `clock` signal (and propagate state changes eagerly)."""
         # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', None), 1)  # TODO: first check that it was low
+        self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
         self._vector._propagate()
 
     def tock(self):
         """Lower the common `clock` signal (and propagate state changes eagerly)."""
         # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', None), 0)  # TODO: first check that it was high
+        self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
         self._vector._flop()
 
     def __getattr__(self, name):
@@ -283,7 +342,7 @@ def gate_count(chip):
         for c in ic.sorted_components():
             if isinstance(c, IC):
                 loop(c)
-            else:
+            elif c != common:
                 key = c.label.lower() + "s"  # e.g. "Nand" -> "nands"
                 counts[key] = counts.get(key, 0) + 1
     loop(_constr(chip))
@@ -309,4 +368,15 @@ def _constr(chip):
     return ic
 
 
+lazy = Lazy
+"""Backward compatibility. Lower case maybe feels more like syntax and less like a kind of component?"""
+
+clock = Ref(common, "clock", None)
+
 Nand = Chip(nand.component.Nand)
+DFF = Chip(nand.component.DFF)
+def ROM(address_bits):
+    return Chip(lambda: nand.component.ROM(address_bits))
+def RAM(address_bits):
+    return Chip(lambda: nand.component.RAM(address_bits))
+Input = Chip(nand.component.Input)

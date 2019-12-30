@@ -1,6 +1,6 @@
 import pytest
 
-from nand.syntax import Nand, build, run
+from nand.syntax import Nand, build, run, lazy, clock
 
 def test_trivial():
     def mkBuffer(inputs, outputs):
@@ -88,7 +88,6 @@ def test_implicit_multibit_in():
     Wrap = build(mkWrap)
 
     chip = Wrap.constr()
-    
     assert chip.inputs() == {"in_": 2}
     assert chip.outputs() == {"out": 1}
 
@@ -110,8 +109,6 @@ def test_simple_const_input():
         outputs.one = Bounce(in_=1).out
     ZeroOne = build(mkZeroOne)
 
-    chip = ZeroOne.constr()
-
     assert run(ZeroOne).zero == False
     assert run(ZeroOne).one == True
 
@@ -128,14 +125,71 @@ def test_multibit_const_input():
         outputs.onetofive = Bounce16(in_=12345).out
     Constants = build(mkConstants)
 
-    chip = Constants.constr()
-
     assert run(Constants).zero == 0
     assert run(Constants).one == 1
     assert run(Constants).onetofive == 12345
 
-
 # TODO: const output? For consistency only; probably not sensible.
+
+
+def test_lazy_simple():
+    def mkAnd(inputs, outputs):
+        # Just declare them in the wrong order for no good reason:
+        nand1 = lazy()
+        nand2 = Nand(a=nand1.out, b=nand1.out)
+        nand1.set(Nand(a=inputs.a, b=inputs.b))
+        outputs.out = nand2.out
+    And = build(mkAnd)
+    
+    chip = And.constr()
+    assert chip.inputs() == {"a": 1, "b": 1}
+    assert chip.outputs() == {"out": 1}
+    assert len(chip.wires) == 5  # TODO: how to assert on the structure?
+    
+    assert run(And, a=False, b=False).out == False
+    assert run(And, a=False, b=True).out == False
+    assert run(And, a=True, b=False).out == False
+    assert run(And, a=True, b=True).out == True
+
+
+def test_clocked_simple():
+    def mkClockLow(inputs, outputs):
+        outputs.out = Nand(a=clock, b=clock).out
+    ClockLow = build(mkClockLow)
+
+    ch = run(ClockLow)
+    
+    assert ch.out == True
+
+    ch.tick()
+    assert ch.out == False
+
+    ch.tock()
+    assert ch.out == True
+
+
+# skip for now:
+# def test_clocked_to_output():
+#     """An edge case: clock copied directly to an output.
+#     """
+#
+#     def mkClockHigh(inputs, outputs):
+#         outputs.out = clock
+#     ClockHigh = build(mkClockHigh)
+#
+#     print(ClockHigh.constr())
+#
+#     ch = run(ClockHigh)
+#     print(ch._vector.combine_ops)
+#     print(ch._vector.sequence_ops)
+#
+#     assert ch.out == False
+#
+#     ch.tick()
+#     assert ch.out == True
+#
+#     ch.tock()
+#     assert ch.out == False
 
 
 def test_error_unexpected_arg():
@@ -156,7 +210,7 @@ def test_error_ref_expected_for_input():
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
-    assert str(exc_info.value) == "Expected a reference for input 'a', got Nand(...)"
+    assert str(exc_info.value).startswith("Expected a reference for input 'a', got ")
 
 
 def test_error_ref_expected_for_output():
@@ -166,4 +220,4 @@ def test_error_ref_expected_for_output():
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
-    assert str(exc_info.value) == "Expected a reference for output 'out', got Nand(...)"
+    assert str(exc_info.value).startswith("Expected a reference for output 'out', got ")

@@ -132,7 +132,11 @@ class IC:
         def loop(n):
             if n not in visited_set and n not in stack:
                 stack.append(n)
-                name_comp = [(t.name, f.comp) for (t, f) in self.wires.items() if t.comp == n and f.comp != self.root]
+                name_comp = [
+                    (t.name, f.comp) 
+                    for (t, f) in self.wires.items() 
+                    if t.comp == n and f.comp != self.root and f.comp != common
+                ]
                 for name, next in sorted(name_comp, key=lambda t: t[0]):
                     loop(next)
                 stack.remove(n)
@@ -154,18 +158,22 @@ class IC:
         # check for unused components?
 
         # Assign a bit for each output connection:
-        next_bit = 0
         all_bits = {}
+        all_bits[clock] = 0  # TODO: only if it's used somewhere?
+        next_bit = 1
         for conn in set(self.wires.values()): # TODO: sort by the order the components were added?
-            all_bits[conn] = next_bit
-            next_bit += 1
-
+            if conn != clock:
+                all_bits[conn] = next_bit
+                next_bit += 1
+        
         # Construct map of IC inputs, directly from all_bits:
         inputs = {
             (name, bit): 1 << all_bits[Connection(self.root, name, bit)]
             for name, bits in self._inputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
+        
+        inputs[("common.clock", 0)] = 1 << all_bits[clock]  # HACK
 
         # Construct map of IC ouputs, mapped to all_bits via wires:
         outputs = {
@@ -177,7 +185,6 @@ class IC:
         internal = {}  # TODO
 
         # Construct a map of the traces for each single component, and ask it for its ops:
-        # TODO: sort components topologically based on wires, starting with Root?
         start = 0
         combine_ops = []
         sequence_ops = []
@@ -261,8 +268,27 @@ class Root:
         return self.ic.inputs()
 
 
+class Common:
+    """Pseudo-component to which globally-available signals are attached. Namely, 'clock'.
+    """
+    def __init__(self):
+        self.label = "common"
+
+    def inputs(self):
+        return {}
+
+    def outputs(self):
+        return {"clock": 1}
+
+common = Common()
+"""A single instance of Common which should be the only instance ever."""
+
 Connection = collections.namedtuple('Connection', ('comp', 'name', 'bit'))
 
+clock = Connection(common, "clock", 0)
+"""'Output' connection from which the current value of the clock signal can be read.
+This signal is available to all components, and updated externally.
+"""
 
 class WiringError(Exception):
     pass
