@@ -186,7 +186,7 @@ class IC:
         internal = {}  # TODO
 
         # Construct a map of the traces for each single component, and ask it for its ops:
-        start = 0
+        initialize_ops = []
         combine_ops = []
         sequence_ops = []
         for comp in self.sorted_components():
@@ -195,12 +195,11 @@ class IC:
                 traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]
             for name, bits in comp.outputs().items():
                 traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
-            for f in comp.initialize(**traces):
-                start = f(start)
+            initialize_ops += comp.initialize(**traces)
             combine_ops += comp.combine(**traces)
             sequence_ops += comp.sequence(**traces)
 
-        return NandVector(inputs, outputs, internal, combine_ops, sequence_ops, start)
+        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops)
 
 
     def __str__(self):
