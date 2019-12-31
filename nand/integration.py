@@ -267,7 +267,9 @@ class IC:
         def back_edge_label(from_comp, to_comp):
             if from_comp not in all_comps or to_comp not in all_comps:
                 return ""
-            elif not isinstance(from_comp, Const) and not from_comp.has_combine_ops():
+            elif isinstance(from_comp, Const):
+                return ""
+            elif not from_comp.has_combine_ops():
                 return " (latched)"
             elif all_comps.index(from_comp) > all_comps.index(to_comp):
                 return " (back-edge)"
