@@ -11,7 +11,7 @@ def test_asm_ops_add():
         "M=D",
     ]
     for string, word in zip(ADD_ASM, ADD_PROGRAM):
-        assert asm_op(string) == word
+        assert parse_op(string) == word
 
 
 def test_asm_ops_max():
@@ -34,4 +34,19 @@ def test_asm_ops_max():
         "0;JMP",
     ]
     for string, word in zip(MAX_ASM, MAX_PROGRAM):
-        assert asm_op(string) == word
+        assert parse_op(string) == word
+
+
+def test_load_add():
+    with open("project_06/Add.asm") as f:
+        assert load_file(f) == ADD_PROGRAM
+
+
+def test_load_max_no_symbols():
+    with open("project_06/MaxL.asm") as f:
+        assert load_file(f) == MAX_PROGRAM
+
+
+def test_load_max():
+    with open("project_06/Max.asm") as f:
+        assert load_file(f) == MAX_PROGRAM
