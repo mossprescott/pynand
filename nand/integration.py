@@ -2,7 +2,7 @@ import collections
 from pprint import pprint  # HACK
 
 from nand.evaluator import NandVector
-from nand.component import Component
+from nand.component import Component, Const
 
 class IC:
     """An integrated circuit assembles one or more components by recording how their
@@ -57,11 +57,9 @@ class IC:
         self.wires[to_input] = from_output
 
     def _comp_label(self, comp, all_comps):
-        """Note: """
         if comp == self.root:
             return "Root"
         else:
-            # all_comps = self.sorted_components()
             if comp in all_comps:
                 num = f"_{all_comps.index(comp)}"
             else:
@@ -72,10 +70,13 @@ class IC:
                 return f"{comp.__class__.__name__}{num}"
 
     def _connection_label(self, conn, all_comps):
-        multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
-        comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp, all_comps)}."
-        bit = f"[{conn.bit}]" if multi_bit else ""
-        return f"{comp}{conn.name}{bit}"
+        if isinstance(conn.comp, Const):
+            return str(int(conn.comp.value & (1 << conn.bit)))
+        else:
+            multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
+            comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp, all_comps)}."
+            bit = f"[{conn.bit}]" if multi_bit else ""
+            return f"{comp}{conn.name}{bit}"
 
 
     def flatten(self):
@@ -250,6 +251,9 @@ class IC:
     def __str__(self):
         """A multi-line summary of all the wiring."""
         # Sort wires by topological order of the "from" component, then name, then the "to" component and name.
+        
+        # TODO: render components in order, one per line, with neatly summarized inputs and outputs.
+        
         all_comps = self.sorted_components()
         def to_index(c, root):
             if c == self.root:
@@ -263,13 +267,24 @@ class IC:
             else:
                 return all_comps.index(c)
         def by_component(t):
-            return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
-            
+            # Sometimes it's interesting to see the wires by source:
+            # return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
+            return (to_index(t[0].comp, 1000), t[0].name, to_index(t[1].comp, -1), t[1].name)
+        def back_edge_label(from_comp, to_comp):
+            if from_comp not in all_comps or to_comp not in all_comps:
+                return ""
+            elif not isinstance(from_comp, Const) and not from_comp.has_combine_ops():
+                return " (latched)"
+            elif all_comps.index(from_comp) > all_comps.index(to_comp):
+                return " (back-edge)"
+            else:
+                return ""
+
         ins = ', '.join(f"{name}[{bits}]" for name, bits in self.inputs().items())
         outs = ', '.join(f"{name}[{bits}]" for name, bits in self.outputs().items())
         return '\n'.join(
             [f"{self.label}({ins}; {outs}):"] +
-            [ f"  {self._connection_label(from_output, all_comps)} -> {self._connection_label(to_input, all_comps)}"
+            [ f"  {self._connection_label(from_output, all_comps):16s} -> {self._connection_label(to_input, all_comps):16s}{back_edge_label(from_output.comp, to_input.comp)}"
               for to_input, from_output in sorted(self.wires.items(), key=by_component)
             ])
 
