@@ -79,7 +79,7 @@ class NandVector:
         # runtime, then increased to 5 when it was re-implemented. That suggests that the
         # sorting of components is not quite right. If anything, now that all the gates are
         # flattened the sort should be more effective.
-        self.traces = fixed_point(f, self.traces, limit=5)
+        self.traces = fixed_point(f, self.traces, limit=4)
 
         self.dirty = False
 

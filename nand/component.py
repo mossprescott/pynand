@@ -1,5 +1,8 @@
 """Components which can be combined into a graph to define a complete chip.
 """
+
+import itertools
+
 from nand.evaluator import nand_op, custom_op, tst_trace, set_trace, get_multiple_traces, set_multiple_traces
 
 class Component:
@@ -45,6 +48,27 @@ class Component:
         the output traces.
         """
         return []
+
+    def has_combine_ops(self):
+        """True if the component _ever_ updates any output in combinational fashion (as most do).
+        False only for components which only ever latch inputs and update their outputs during 
+        flop/sequence.
+        
+        This is useful for determining evaluation order: non-combinational components can be evaluated
+        later, which can help to break cycles (the same cycles that these components tend to 
+        participate in.)
+        
+        Current theory is that this only really needs to work for DFFs. Note that RAM, despite 
+        having both combinational and sequential behavior, actually treats its one output as 
+        combinational. However, if someone decides to implement a 16-bit Register with a purely
+        latched output, this will handle that.
+        """
+
+        trace_map = {
+            name: [0]*bits 
+            for (name, bits) in itertools.chain(self.inputs().items(), self.outputs().items())
+        }
+        return len(self.combine(**trace_map)) > 0
 
 
 class Const(Component):
@@ -136,6 +160,7 @@ class ROM(Component):
                 out_val = 0
             return set_multiple_traces(out, out_val, traces)
         return [custom_op(read)]
+
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip.

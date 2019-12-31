@@ -25,6 +25,12 @@ class IC:
     def outputs(self):
         return self._outputs
 
+    def has_combine_ops(self):
+        """Just return True, because that's virtually always the case and the answer only becomes
+        interesting after flattening, when no child ICs are left anyway.
+        """
+        return True
+
     def wire(self, from_output, to_input):
         """Connect a single trace from an output of one component to an input of another.
 
@@ -127,33 +133,64 @@ class IC:
         That is, when component A has an output that feeds an input of component B, A comes before B 
         in the list. If there are reference cycles, the components are ordered as if one such 
         reference (chosen in no particular way) was removed.
+        
+        DFFs (and other components that have _only_ sequential logic) get special treatment: 
+        they appear last in the result no matter what, which allows their inputs to be evaluated 
+        later as well.
         """
         
+        # DFF output never changes based on upstream combinational logic
+        # So stop the DFS at a DFF (or other sequential-only output)
+        # Still need to update the _inputs_ of any such component each time, but
+        #   can wait to do it at the end.
+        # 1) find all reachable components, including through DFFs.
+        # 2) add all the DFFs to the list of "roots"
+        # 3) run another search, _not_ traversing the DFF inputs
+        # How to apply this thinking to RAM? Can it be separated?
+    
         # Pre-compute wires _into_ each component:
         wires_by_target_comp = {}  # {target comp: (target name, source comp)}
         for t, f in self.wires.items():
             if f.comp != self.root and f.comp != common:
                 wires_by_target_comp.setdefault(t.comp, []).append((t.name, f.comp))
 
-        # Note: a set for fast tests, and a list to remember the order
-        visited = []
-        visited_set = set()
-    
-        # The stack is never as deep as the full set of nodes, so just a list seems fast enough for now.
-        stack = []
-    
-        def loop(n):
-            if n not in visited_set and n not in stack:
-                stack.append(n)
-                name_comp = wires_by_target_comp.get(n, [])
-                for _, nxt in sorted(name_comp, key=lambda t: t[0]):
-                    loop(nxt)
-                stack.remove(n)
-                visited.append(n)
-                visited_set.add(n)
-        loop(self.root)
-        return visited[:-1]  # remove the root
+        def dfs(roots, ignore_dffs):
+            # Note: a set for fast tests, and a list to remember the order
+            visited = []
+            visited_set = set()
 
+            # The stack is never as deep as the full set of nodes, so just a list seems fast enough for now.
+            stack = []
+
+            def loop(n):
+                if n not in visited_set and n not in stack:
+                    stack.append(n)
+                    name_comp = wires_by_target_comp.get(n, [])
+                    for _, nxt in sorted(name_comp, key=lambda t: t[0]):
+                        if not (ignore_dffs and not nxt.has_combine_ops()):
+                            loop(nxt)
+                    stack.remove(n)
+                    visited.append(n)
+                    visited_set.add(n)
+            to_search = roots
+            while to_search:
+                n, to_search = to_search[0], to_search[1:]
+                loop(n)
+            return visited
+
+        reachable = dfs([self.root], False)
+        reachable.remove(self.root)
+        
+        # print(f"reachable: {reachable}")
+        
+        dffs = [n for n in reachable if not n.has_combine_ops()]
+        # print(f"dffs: {dffs}")
+        result = dfs([self.root] + dffs, True)
+        result.remove(self.root)
+        # print(f"result: {result}")
+
+        return result
+        
 
     def synthesize(self):
         """Compile the chip down to traces and ops for evaluation.

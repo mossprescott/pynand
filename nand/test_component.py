@@ -115,3 +115,11 @@ def test_input():
     assert run_op(op, 0) == 12345
 
     assert inpt.sequence(**traces) == []
+
+
+def test_has_combine_ops():
+    assert Nand().has_combine_ops() == True
+    assert DFF().has_combine_ops() == False
+    assert ROM(1).has_combine_ops() == True
+    assert RAM(1).has_combine_ops() == True
+    assert Input().has_combine_ops() == True

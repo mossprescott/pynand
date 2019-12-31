@@ -1,6 +1,6 @@
 import pytest
 
-from nand.component import Nand
+from nand.component import Nand, DFF
 from nand.integration import *
 
 def test_simple_wiring():
@@ -67,6 +67,25 @@ def test_components_simple():
 # - in the presence of cycles?
 # - accounting for combinational/sequential logic? That is, a DFF can precede the source of its 
 #     value, since it never propagates a signal at combine() time. Too much of a special case?
+
+def test_components_dff_sorting():
+    """DFFs can be evaluated last because their outputs won't update until the next clock cycle,
+    and therefore aren't needed for 'downstream' evaluation.
+    """
+    
+    ic = IC("Mixed", {"in": 1}, {"out": 1})
+    nand1 = Nand()
+    dff1 = DFF()
+    nand2 = Nand()
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "b", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(dff1, "in_", 0))
+    ic.wire(Connection(dff1, "out", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(dff1, "out", 0), Connection(nand2, "b", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(ic.root, "out", 0))
+
+    # Note: relative order of the Nands doesn't really matter here
+    assert ic.flatten().sorted_components() == [nand2, nand1, dff1]
 
 
 def test_flatten_prune():
