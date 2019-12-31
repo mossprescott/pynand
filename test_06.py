@@ -1,5 +1,6 @@
+from nand import run
 from project_06 import *
-from test_05 import ADD_PROGRAM, MAX_PROGRAM
+from test_05 import CPU, ADD_PROGRAM, MAX_PROGRAM
 
 def test_asm_ops_add():
     ADD_ASM = [
@@ -35,6 +36,28 @@ def test_asm_ops_max():
     ]
     for string, word in zip(MAX_ASM, MAX_PROGRAM):
         assert parse_op(string) == word
+
+
+def test_ops():
+    """Test generated opcodes against the actual simulated CPU."""
+    
+    cpu = run(CPU)
+    
+    cpu.instruction = parse_op("@100")
+    cpu.tick(); cpu.tock()
+    assert cpu.addressM == 100
+
+    cpu.instruction = parse_op("D=1")
+    cpu.tick(); cpu.tock()
+    cpu.instruction = parse_op("M=D")
+    assert cpu.writeM == True and cpu.outM == 1
+    
+    cpu.instruction = parse_op("0;JMP")
+    cpu.tick(); cpu.tock()
+    assert cpu.pc == 100
+
+    # TODO: cover all the opcodes that don't appear in ADD and MAX?
+    # TODO: make this a lot easier by factoring out instruction decode as in nandgame?
 
 
 def test_load_add():
