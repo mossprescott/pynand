@@ -28,13 +28,13 @@ def test_register():
 
 def test_ram8():
     assert gate_count(RAM8) == {
-        'nands': 898,  # ?
+        'nands': 882,  # ?
         'dffs': 128
     }
 
 def test_ram64():
     assert gate_count(RAM64) == {
-        'nands': 7_570,  # ?
+        'nands': 7_426,  # ?
         'dffs': 1_024
     }
 
