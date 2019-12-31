@@ -42,52 +42,44 @@ BUILTIN_SYMBOLS = {
         "SCREEN":   0x4000,
         "KEYBOARD": 0x6000,
     },
-    **{ f"R{i}": i for i in range(15)}
+    **{ f"R{i}": i for i in range(16)}
 }
 
 
-def parse_op(string, symbols=BUILTIN_SYMBOLS):
+def parse_op(string):
     m = re.match(r"@(\d+)", string)
     if m:
         return int(m.group(1))
     else:
-        m = re.match(r"@(.*)", string)
+        m = re.match(r"(?:([ADM]+)=)?([^;]+)(?:;J(..))?", string)
         if m:
-            symbol_str = m.group(1)
-            if symbol_str in symbols:
-                return symbols[symbol_str]
+            dest_str = m.group(1) or ""
+            dest = 0
+            if 'A' in dest_str:
+                dest |= 0b100
+            if 'D' in dest_str:
+                dest |= 0b010
+            if 'M' in dest_str:
+                dest |= 0b001
+        
+            alu_str = m.group(2).replace('M', 'A')
+            if alu_str in ALU_CONTROL:
+                alu = ALU_CONTROL[alu_str]
+                m_for_a = int('M' in m.group(2))
             else:
-                raise Exception(f"symbol not found: {symbol_str}")
+                raise Exception(f"unrecognized alu op: {m.group(2)}")
+            
+            jmp_str = m.group(3)
+            if jmp_str is None:
+                jmp = 0
+            elif jmp_str in JMP_CONTROL:
+                jmp = JMP_CONTROL[jmp_str]
+            else:
+                raise Exception(f"unrecognized jump: J{m.group(3)}")
+        
+            return (0b111 << 13) | (m_for_a << 12) | (alu << 6) | (dest << 3) | jmp
         else:
-            m = re.match(r"(?:([ADM]+)=)?([^;]+)(?:;J(..))?", string)
-            if m:
-                dest_str = m.group(1) or ""
-                dest = 0
-                if 'A' in dest_str:
-                    dest |= 0b100
-                if 'D' in dest_str:
-                    dest |= 0b010
-                if 'M' in dest_str:
-                    dest |= 0b001
-            
-                alu_str = m.group(2).replace('M', 'A')
-                if alu_str in ALU_CONTROL:
-                    alu = ALU_CONTROL[alu_str]
-                    m_for_a = int('M' in m.group(2))
-                else:
-                    raise Exception(f"unrecognized alu op: {m.group(2)}")
-                
-                jmp_str = m.group(3)
-                if jmp_str is None:
-                    jmp = 0
-                elif jmp_str in JMP_CONTROL:
-                    jmp = JMP_CONTROL[jmp_str]
-                else:
-                    raise Exception(f"unrecognized jump: J{m.group(3)}")
-            
-                return (0b111 << 13) | (m_for_a << 12) | (alu << 6) | (dest << 3) | jmp
-            else:
-                raise Exception(f"unrecognized: {line}")
+            raise Exception(f"unrecognized: {line}")
 
 
 def load_file(f):
@@ -112,7 +104,16 @@ def load_file(f):
             loc += 1
         
     ops = []
+    next_variable = 16
     for line in code_lines:
         if "(" not in line:
-            ops.append(parse_op(line, symbols))
+            m = re.match(r"@(\D.*)", line)
+            if m:
+                symbol_str = m.group(1)
+                if symbol_str not in symbols:
+                    symbols[symbol_str] = next_variable
+                    next_variable += 1
+                ops.append(symbols[symbol_str])
+            else:
+                ops.append(parse_op(line))
     return ops
