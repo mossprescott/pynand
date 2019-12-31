@@ -68,6 +68,7 @@ def test_components_simple():
 # - accounting for combinational/sequential logic? That is, a DFF can precede the source of its 
 #     value, since it never propagates a signal at combine() time. Too much of a special case?
 
+
 def test_components_dff_sorting():
     """DFFs can be evaluated last because their outputs won't update until the next clock cycle,
     and therefore aren't needed for 'downstream' evaluation.
@@ -110,16 +111,59 @@ def test_flatten_prune():
     assert no.flatten().sorted_components() == [nand1]
 
 
+def test_simplify_constant_one():
+    """Nand(1, x) == Nand(x, 1) => Nand(x, x).
+    """
+    
+    ic = IC("WeirdNot", {"in": 1}, {"out": 1})
+    nand1 = Nand()
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(Const(1, 1), "out", 0), Connection(nand1, "b", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(ic.root, "out", 0))
+    
+    simple = ic.simplify()
+    
+    simple_nand = simple.sorted_components()[0]
+    assert simple.wires == {
+        Connection(simple_nand, "a", 0): Connection(simple.root, "in", 0),
+        Connection(simple_nand, "b", 0): Connection(simple.root, "in", 0),
+        Connection(simple.root, "out", 0): Connection(simple_nand, "out", 0),
+    }
+
+
+def test_simplify_constant_zero():
+    ic = IC("Perverse1", {"in": 1}, {"out": 1})
+    nand1 = Nand()
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(Const(1, 0), "out", 0), Connection(nand1, "b", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(ic.root, "out", 0))
+    
+    simple = ic.simplify()
+    
+    assert simple.wires == {Connection(simple.root, "out", 0): Connection(Const(1, 1), "out", 0)}
+
+
+def test_simplify_double_negative():
+    ic = IC("PerverseBuffer", {"in": 1}, {"out": 1})
+    nand1 = Nand()
+    nand2 = Nand()
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(ic.root, "in", 0), Connection(nand1, "b", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "b", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(ic.root, "out", 0))
+    
+    simple = ic.simplify()
+    
+    assert simple.wires == {Connection(simple.root, "out", 0): Connection(simple.root, "in", 0)}
+
+
 def test_simple_synthesis():
     ic = IC("JustNand", {"a": 1, "b": 1}, {"out": 1})
     nand = Nand()
     ic.wire(Connection(ic.root, "a", 0), Connection(nand, "a", 0))
     ic.wire(Connection(ic.root, "b", 0), Connection(nand, "b", 0))
     ic.wire(Connection(nand, "out", 0), Connection(ic.root, "out", 0))
-
-    # print(ic)
-    # print(ic.flatten())
-    # assert False
 
     nv = ic.synthesize()
 
