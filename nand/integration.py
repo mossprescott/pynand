@@ -109,6 +109,14 @@ class IC:
 
         ic.wires = collapse_internal(all_wires)
         
+        # Now prune wires that don't connect to any reachable compononent:
+        reachable = set(ic.sorted_components() + [common, ic.root])
+        ic.wires = {
+            t: f 
+            for (t, f) in ic.wires.items() 
+            if f.comp in reachable and t.comp in reachable
+        }
+        
         return ic
 
 

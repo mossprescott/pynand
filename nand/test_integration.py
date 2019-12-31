@@ -69,6 +69,28 @@ def test_components_simple():
 #     value, since it never propagates a signal at combine() time. Too much of a special case?
 
 
+def test_flatten_prune():
+    yn = IC("YesAndNo", {"in": 1}, {"out": 1, "not_out": 1})
+    nand1 = Nand()
+    yn.wire(Connection(yn.root, "in", 0), Connection(yn.root, "out", 0))
+    yn.wire(Connection(yn.root, "in", 0), Connection(nand1, "a", 0))
+    yn.wire(Connection(yn.root, "in", 0), Connection(nand1, "b", 0))
+    yn.wire(Connection(nand1, "out", 0), Connection(yn.root, "not_out", 0))
+    
+    yes = IC("Yes", {"in": 1}, {"out": 1})
+    yes.wire(Connection(yes.root, "in", 0), Connection(yn, "in", 0))
+    yes.wire(Connection(yn, "out", 0), Connection(yes.root, "out", 0))
+    
+    no = IC("No", {"in": 1}, {"out": 1})
+    no.wire(Connection(no.root, "in", 0), Connection(yn, "in", 0))
+    no.wire(Connection(yn, "not_out", 0), Connection(no.root, "out", 0))
+    
+    assert len(yes.flatten().wires) == 1
+    assert len(no.flatten().wires) == 3
+    assert yes.flatten().sorted_components() == []
+    assert no.flatten().sorted_components() == [nand1]
+
+
 def test_simple_synthesis():
     ic = IC("JustNand", {"a": 1, "b": 1}, {"out": 1})
     nand = Nand()
