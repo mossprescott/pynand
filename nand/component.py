@@ -91,8 +91,17 @@ class Const(Component):
         def f(traces):
             return set_multiple_traces(out, self.value, traces)
         return [custom_op(f)]
+        
+    def __repr__(self):
+        return f"Const({self.bits}, {self.value})"
 
-    
+    def __eq__(self, other):
+        return isinstance(other, Const) and self.bits == other.bits and self.value == other.value
+
+    def __hash__(self):
+        return hash((self.bits, self.value))
+
+
 class Nand(Component):
     """A single nand gate, which has two inputs and a single output named 'out'."""
 
