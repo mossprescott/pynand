@@ -71,7 +71,7 @@ class IC:
 
     def _connection_label(self, conn, all_comps):
         if isinstance(conn.comp, Const):
-            return str(int(conn.comp.value & (1 << conn.bit)))
+            return str(int(conn.comp.value & (1 << conn.bit) != 0))
         else:
             multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
             comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp, all_comps)}."
