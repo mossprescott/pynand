@@ -1,3 +1,6 @@
+# Disclaimer: this implementation was written quickly and seems to work, but those are the only good
+# things that can be said about it.
+
 import re
 
 ALU_CONTROL = {
@@ -47,6 +50,12 @@ BUILTIN_SYMBOLS = {
 
 
 def parse_op(string):
+    """Parse a single assembly op directly to the corresponding Hack instruction word.
+    
+    The op may be a (numeric) symbol (and A-command) or a C-command, but not a reference
+    to a symbol or variable.
+    """
+    
     m = re.match(r"@(\d+)", string)
     if m:
         return int(m.group(1))
@@ -83,6 +92,14 @@ def parse_op(string):
 
 
 def load_file(f):
+    """Load the lines of file and parse them as assembly commands, accounting for
+    builtin symbols, labels, and variables.
+    
+    "//" denotes a comment and is ignored, along with the remainder of the line.
+    Leading and trailing white space on each line is ignored.
+    After comments and white space are stripped, blank lines are ignored.
+    """
+    
     code_lines = []
     for line in f:
         m = re.match(r"([^/]*)(?://.*)?", line)
