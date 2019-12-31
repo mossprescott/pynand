@@ -72,10 +72,12 @@ def mkDMux4Way(inputs, outputs):
     lo = DMux(in_=in_, sel=sel[0])
     sel1 = sel[1]
     not_sel1 = Not(in_=sel1).out
-    outputs.a = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1).a
-    outputs.b = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1).a
-    outputs.c = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1).b
-    outputs.d = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1).b
+    dmux1 = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1)
+    dmux2 = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1)
+    outputs.a = dmux1.a
+    outputs.b = dmux2.a
+    outputs.c = dmux1.b
+    outputs.d = dmux2.b
     
 DMux4Way = build(mkDMux4Way)
 
@@ -97,14 +99,18 @@ def mkDMux8Way(inputs, outputs):
     lo = DMux(in_=in_, sel=sel[0])
     lo0 = DMuxPlus(in_=lo.a, not_sel=not_sel1, sel=sel1)
     lo1 = DMuxPlus(in_=lo.b, not_sel=not_sel1, sel=sel1)
-    outputs.a = DMuxPlus(in_=lo0.a, not_sel=not_sel2, sel=sel2).a
-    outputs.b = DMuxPlus(in_=lo1.a, not_sel=not_sel2, sel=sel2).a
-    outputs.c = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2).a
-    outputs.d = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2).a
-    outputs.e = DMuxPlus(in_=lo0.a, not_sel=not_sel2, sel=sel2).b
-    outputs.f = DMuxPlus(in_=lo1.a, not_sel=not_sel2, sel=sel2).b
-    outputs.g = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2).b
-    outputs.h = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2).b
+    dmux1 = DMuxPlus(in_=lo0.a, not_sel=not_sel2, sel=sel2)
+    dmux2 = DMuxPlus(in_=lo1.a, not_sel=not_sel2, sel=sel2)
+    dmux3 = DMuxPlus(in_=lo0.b, not_sel=not_sel2, sel=sel2)
+    dmux4 = DMuxPlus(in_=lo1.b, not_sel=not_sel2, sel=sel2)
+    outputs.a = dmux1.a
+    outputs.b = dmux2.a
+    outputs.c = dmux3.a
+    outputs.d = dmux4.a
+    outputs.e = dmux1.b
+    outputs.f = dmux2.b
+    outputs.g = dmux3.b
+    outputs.h = dmux4.b
     
 DMux8Way = build(mkDMux8Way)
 

@@ -6,7 +6,7 @@ from project_05 import *
 
 def test_memory_system():
     assert gate_count(MemorySystem) == {
-        'nands': 171,  # ?
+        'nands': 163,  # ?
         'rams': 2,
         'inputs': 1,
     }
@@ -19,7 +19,7 @@ def test_cpu():
 
 def test_computer():
     assert gate_count(Computer) == {
-        'nands': 1270,  # ?
+        'nands': 1262,  # ?
         'dffs': 48,  # 3 registers
         'roms': 1,
         'rams': 2,
