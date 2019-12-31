@@ -182,13 +182,9 @@ class IC:
         reachable = dfs([self.root], False)
         reachable.remove(self.root)
         
-        # print(f"reachable: {reachable}")
-        
         dffs = [n for n in reachable if not n.has_combine_ops()]
-        # print(f"dffs: {dffs}")
         result = dfs([self.root] + dffs, True)
         result.remove(self.root)
-        # print(f"result: {result}")
 
         return result
         
@@ -259,10 +255,8 @@ class IC:
             if c == self.root:
                 return root
             elif c not in all_comps:
-                # HACK: this can happen due to a flattening error (e.g. ALU), but the wire is 
-                # unconnected so synthesize still works.
-                # FIXME: find that bug and remove this case
-                # print(f"missing: {c}")
+                # Note: this can happen due to, say, a bug in flattening, and it's easier to debug if
+                # str() stillworks in that case.
                 return root*2  # even before/after inputs/outputs
             else:
                 return all_comps.index(c)
