@@ -15,13 +15,18 @@ class NandVector:
     seen (or, if no fixed-point is found, an exception is raised.)
     """
 
-    def __init__(self, inputs, outputs, internal, ops):
+    def __init__(self, inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops):
         self.inputs = inputs
         self.outputs = outputs
         self.internal = internal
-        self.ops = ops
+        self.combine_ops = combine_ops
+        self.sequence_ops = sequence_ops
 
-        self.traces = 0
+        traces = 0
+        for op in initialize_ops:
+            traces = run_op(op, traces)
+        self.traces = traces
+        
         self.dirty = True
 
     def set(self, key, value):
@@ -54,159 +59,49 @@ class NandVector:
         if not self.dirty: return
 
         def f(ts):
-            for op in self.ops:
-                ts = op.propagate(ts)
+            for op in self.combine_ops:
+                # ts = run_op(op, ts)
+
+                # Warning: this is just 'run_op', inlined into the loop here to avoid a function
+                # call and to make use of possibly more efficient "in-place" operations. Eliminating
+                # that function call is good for ~20% speedup.
+                if op[0] is None:
+                    ts = op[1](ts)
+                else:
+                    in_mask, out_mask = op
+                    if ts & in_mask == in_mask:
+                        ts &= ~out_mask
+                    else:
+                        ts |= out_mask
             return ts
 
-        self.traces = fixed_point(f, self.traces, limit=3)  # HACK: 2 just checks the first pass was stable. 
+        # FIXME: the number of repeats here increased to 3 for the full CPU with the first 
+        # runtime, then increased to 5 when it was re-implemented. That suggests that the
+        # sorting of components is not quite right. If anything, now that all the gates are
+        # flattened the sort should be more effective.
+        self.traces = fixed_point(f, self.traces, limit=4)
 
         self.dirty = False
 
 
     # TODO: unify this with the state of the clock (not otherwise known here at present)
     def _flop(self):
-        """Simulate advancing the clock, by copying the input of each flip-flop to its output.
+        """Simulate advancing the clock, by copying the input of each flip-flop to its output,
+        or whatever else the component needs to make happen.
         """
         
         self._propagate()
         
-        for op in self.ops:
-            self.traces = op.flop(self.traces)
+        for op in self.sequence_ops:
+            self.traces = run_op(op, self.traces)
+
         self.dirty = True
-
-class VectorOp:
-    # TODO: common code around addressing bits?
-
-    def propagate(self, traces):
-        """Update output bits based on the current values of input bits, taking a complete set of 
-        traces and returning a new set of values for all traces.
-        """
-        return traces
-
-    def flop(self, traces):
-        """Update output bits which respond to the falling edge of the clock signal, taking a 
-        complete set of traces and returning a new set of values for all traces.
-        """
-        return traces
-
-
-class NandOp(VectorOp):
-    """Implements the simplest component: a Nand gate. The single output is updated from inputs,
-    and 
-    """
-
-    def __init__(self, in_bits, out_bit):
-        self.in_bits = in_bits
-        self.out_bit = out_bit
-
-    def propagate(self, traces):
-        """Apply NAND to the bits identified in `in_bits`, and store the result in the bit(s)
-        identified in `out_bits`.
-
-        If _all_ of the bits which are 1 in `in_bits` are also 1 in `traces`, then the result
-        is `traces`, modified so that all the bits of `out_bits` are cleared (i.e. "not-and").
-        Otherwise, those same bits are set.
-        """
-        if (traces & self.in_bits) == self.in_bits:
-            return traces & ~self.out_bit
-        else:
-            return traces | self.out_bit
-            
-    def __eq__(self, other):
-        return isinstance(other, NandOp) and self.in_bits == other.in_bits and self.out_bit == other.out_bit
-
-    def __repr__(self):
-        return f"NandOp({self.in_bits}, {self.out_bit})"
-
-class DynamicDFFOp(VectorOp):
-    def __init__(self, in_bit, out_bit):
-        self.in_bit = in_bit
-        self.out_bit = out_bit
-        
-    def flop(self, traces):
-        """Copy a single bit located at in_bit to out_bit. Called on the falling edge of the clock.
-        """
-        if traces & self.in_bit == self.in_bit:
-            return traces | self.out_bit
-        else:
-            return traces & ~self.out_bit
-
-    def __eq__(self, other):
-        return isinstance(other, DynamicDFFOp) and self.in_bit == other.in_bit and self.out_bit == other.out_bit
-
-    def __repr__(self):
-        return f"DynamicDFFOp({self.in_bit}, {self.out_bit})"
-
-
-class MemoryOp(VectorOp):
-    """Manages the memory's storage and also implements its update ops. Terrible idea?
-    """
-    
-    def __init__(self, in_bit_array, load_bit, address_bit_array, out_bit_array):
-        self.in_bit_array = in_bit_array
-        self.load_bit = load_bit
-        self.address_bit_array = address_bit_array
-        self.out_bit_array = out_bit_array
-
-        self.storage = [0] * (2**len(address_bit_array))
-    
-    def propagate(self, traces):
-        """Retrieve the appropriate value from off-chip and update the `out` traces.
-        """
-        addr = self._from_bits(self.address_bit_array, traces)
-        return self._update_bits(self.out_bit_array, traces, self.storage[addr])
-        
-    def flop(self, traces):
-        """Update the state held in this object, if the `load` trace is asserted.
-        No changes are made to the chip's traces.
-        """
-        
-        if traces & self.load_bit != 0:
-            addr = self._from_bits(self.address_bit_array, traces)
-            in_ = self._from_bits(self.in_bit_array, traces)
-            self.storage[addr] = in_
-
-        return traces
-            
-    def _from_bits(self, bits, traces):
-        """Extract a multiple-bit value from traces, where each bit is identified by the mask 
-        in the corresponding position in bits.
-        """
-        
-        val = 0
-        for bit in reversed(bits):
-            val <<= 1
-            if traces & bit != 0:
-                val |= 0b1
-        return val
-
-    def _update_bits(self, bits, traces, val):
-        """Update the traces """
-        for bit in bits:
-            if val & 0b1 == 0:
-                traces &= ~bit
-            else:
-                traces |= bit
-            val >>= 1
-        return traces
-
-    def __eq__(self, other):
-        return (isinstance(other, MemoryOp) 
-            and self.in_bit_array == other.in_bit_array 
-            and self.load_bit == other.load_bit
-            and self.address_bit_array == other.address_bit_array
-            and self.out_bit_array == other.out_bit_array)
-
-    def __repr__(self):
-        return f"MemoryOp(in: {self.in_bit_array}, load: {self.load_bit}, address: {self.address_bit_array}, out: {self.out_bit_array})"
 
 
 def fixed_point(f, x, limit=50):
     for i in range(limit):
         tmp = f(x)
         if tmp == x:
-            # raise Exception(f"iterations: {i}")
-            # print(f"iterations: {i}")
             return x
         else:
             x = tmp
@@ -214,3 +109,79 @@ def fixed_point(f, x, limit=50):
         raise Exception(f"state did not settle after {limit} loops")
 
 
+def extend_sign(x):
+    """Extend the sign of the low-16 bits of a value to the full width.
+    """
+    if x & 0x8000 != 0:
+        return (-1 & ~0xffff) | x
+    else:
+        return x
+
+
+def unsigned(x):
+    """Extend the low 16-bits of an unsigned value to the full width, without sign extension.
+    """
+    return x & 0xffff
+
+
+def tst_trace(mask, traces):
+    return traces & mask != 0
+
+def set_trace(mask, value, traces):
+    if value:
+        return traces | mask
+    else:
+        return traces & ~mask
+
+def get_multiple_traces(masks, traces):
+    val = 0
+    for bit in reversed(masks):
+        val = (val << 1) | int(tst_trace(bit, traces))
+    return val
+
+def set_multiple_traces(masks, value, traces):
+    for bit in masks:
+        traces = set_trace(bit, value & 0b1, traces)
+        value >>= 1
+    return traces
+
+
+def run_op(op, traces):
+    """Execute an op, which was constructed by either nand_op or custom_op, to update traces."""
+    if op[0] is None:
+        return op[1](traces)
+    else:
+        in_mask, out_mask = op
+        if traces & in_mask == in_mask:
+            return traces & ~out_mask
+        else:
+            return traces | out_mask
+
+
+def nand_op(a_mask, b_mask, out_mask):
+    """Combine two tests into one mask/compare operation for the common case of Nand."""
+
+    # in_mask = a_mask | b_mask
+    # def nand(traces):
+    #     """Note: this is _the_ hot function, taking ~2/3 of the time during simulation.
+    #     Probably could make it even cheaper by returning just the masks and letting the
+    #     evaluator's loop do the work itself instead of dispatching to a separate function
+    #     for each op.
+    #     """
+    #     if traces & in_mask == in_mask:
+    #         return traces & ~out_mask
+    #     else:
+    #         return traces | out_mask
+    # return nand
+
+    # Just wrap up the two masks
+    return (a_mask | b_mask, out_mask)
+
+
+def custom_op(f):
+    """Wrap a non-Nand op to be executed during simulation."""
+
+    # return f
+
+    # Wrap the function with a semaphor value to indicate it's not Nand
+    return (None, f)

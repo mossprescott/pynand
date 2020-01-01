@@ -5,37 +5,37 @@ in using the minimum number of gates and/or making the (theoretically) fastest c
 from project_03 import *
 
 def test_dff():
-    assert gate_count(DFF) == {
+    assert gate_count(MyDFF) == {
         'nands': 9,  # ?
     }
 
 def test_dynamic_dff():
-    assert gate_count(DynamicDFF) == {
-        'flip_flops': 1
+    assert gate_count(DFF) == {
+        'dffs': 1
     }
 
 def test_bit():
     assert gate_count(Bit) == {
         'nands': 4,  # ?
-        'flip_flops': 1
+        'dffs': 1
     }
 
 def test_register():
     assert gate_count(Register) == {
         'nands': 64,  # ?
-        'flip_flops': 16
+        'dffs': 16
     }
 
 def test_ram8():
     assert gate_count(RAM8) == {
-        'nands': 898,  # ?
-        'flip_flops': 128
+        'nands': 882,  # ?
+        'dffs': 128
     }
 
 def test_ram64():
     assert gate_count(RAM64) == {
-        'nands': 7_570,  # ?
-        'flip_flops': 1_024
+        'nands': 7_426,  # ?
+        'dffs': 1_024
     }
 
 # def test_ram512():
@@ -52,16 +52,11 @@ def test_ram64():
 
 def test_ram16k():
     assert gate_count(RAM16K) == {
-        'memories': 1
-    }
-
-def test_memory():
-    assert gate_count(Memory) == {
-        'memories': 1
+        'rams': 1
     }
 
 def test_pc():
     assert gate_count(PC) == {
         'nands': 287,
-        'flip_flops': 16
+        'dffs': 16
     }

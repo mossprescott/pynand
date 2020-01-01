@@ -1,16 +1,24 @@
-from nand.evaluator import NandVector, NandOp, DynamicDFFOp
+from nand.component import set_trace, tst_trace
+from nand.evaluator import NandVector, nand_op, custom_op
 
+def dff_op(in_, out):
+    def dff(traces):
+        in_val = tst_trace(in_, traces)
+        return set_trace(out, in_val, traces)
+    return custom_op(dff)
+    
 def test_xor():
     xor = NandVector(
-        {'a': 0b000001, 'b': 0b000010},
-        {'out': 0b100000},
-        {'na': 0b00100, 'nb': 0b01000},
-        [ NandOp(0b000011, 0b000100),  # Nand(a, b) -> nand
-          NandOp(0b000101, 0b001000),  # Nand(a, nand) -> na
-          NandOp(0b000110, 0b010000),  # Nand(b, nand) -> nb
-          NandOp(0b011000, 0b100000)   # Nand(na, na) -> out
-        ]
-    )
+        {'a': 1 << 0, 'b': 1 << 1},
+        {'out': 1 << 5},
+        {'na': 1 << 4, 'nb': 1 << 3},
+        [],
+        [ nand_op(1 << 0, 1 << 1, 1 << 2),  # Nand(a, b) -> nand
+          nand_op(1 << 0, 1 << 2, 1 << 3),  # Nand(a, nand) -> na
+          nand_op(1 << 1, 1 << 2, 1 << 4),  # Nand(b, nand) -> nb
+          nand_op(1 << 3, 1 << 4, 1 << 5),  # Nand(na, na) -> out
+        ],
+        [])
 
     assert xor.get('out') == False
 
@@ -33,13 +41,15 @@ def test_flop():
         {'in_': 0b01},
         {'out': 0b10},
         {},
-        [DynamicDFFOp(0b01, 0b10)])
+        [],
+        [],
+        [dff_op(0b01, 0b10)])
     
-    assert ff.get('out') == 0
+    assert ff.get('out') == False
     
-    ff.set('in_', 1)
-    assert ff.get('out') == 0
+    ff.set('in_', True)
+    assert ff.get('out') == False
     
     ff._flop()
-    assert ff.get('out') == 1
+    assert ff.get('out') == True
     
