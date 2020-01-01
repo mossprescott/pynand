@@ -47,17 +47,38 @@ def test_ops():
     cpu.tick(); cpu.tock()
     assert cpu.addressM == 100
 
-    cpu.instruction = parse_op("D=1")
-    cpu.tick(); cpu.tock()
-    cpu.instruction = parse_op("M=D")
-    assert cpu.writeM == True and cpu.outM == 1
-    
     cpu.instruction = parse_op("0;JMP")
     cpu.tick(); cpu.tock()
     assert cpu.pc == 100
 
-    # TODO: cover all the opcodes that don't appear in ADD and MAX?
-    # TODO: make this a lot easier by factoring out instruction decode as in nandgame?
+    def compute(expr, d, a):
+        cpu.instruction = parse_op(f"@{d}")
+        cpu.tick(); cpu.tock()
+        cpu.instruction = parse_op(f"D=A")
+        cpu.tick(); cpu.tock()
+        cpu.instruction = parse_op(f"@{a}")
+        cpu.tick(); cpu.tock()
+        cpu.instruction = parse_op(f"M={expr}")
+        return cpu.outM
+    
+    assert compute("0", 12345, 23456) == 0
+    assert compute("1", 12345, 23456) == 1
+    assert compute("-1", 12345, 23456) == -1
+    assert compute("D", 12345, 23456) == 12345
+    assert compute("A", 12345, 23456) == 23456
+    assert compute("!D", 12345, 23456) == -12346
+    assert compute("!A", 12345, 23456) == -23457
+    assert compute("-D", 12345, 23456) == -12345
+    assert compute("-A", 12345, 23456) == -23456
+    assert compute("D+1", 12345, 23456) == 12346
+    assert compute("A+1", 12345, 23456) == 23457
+    assert compute("D-1", 12345, 23456) == 12344
+    assert compute("A-1", 12345, 23456) == 23455
+    assert compute("D-A", 12345, 23456) == -11111
+    assert compute("A-D", 12345, 23456) == 11111
+    assert compute("D+A", 12345, 23456) == -29735
+    assert compute("D&A", 0b0011, 0b0101) == 0b0001
+    assert compute("D|A", 0b0011, 0b0101) == 0b0111
 
 
 def test_load_add():
