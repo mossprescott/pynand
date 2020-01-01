@@ -293,11 +293,21 @@ class IC:
         # check for missing wires?
         # check for unused components?
 
+        all_comps = self.sorted_components()
+        def by_component(conn):
+            if conn.comp == self.root:
+                num = -1  # inputs first 
+            elif conn.comp in all_comps:
+                num = all_comps.index(conn.comp)
+            else:
+                num = -2
+            return (num, conn.name, conn.bit)                
+
         # Assign a bit for each output connection:
         all_bits = {}
         all_bits[clock] = 0  # TODO: only if it's used somewhere?
         next_bit = 1
-        for conn in set(self.wires.values()): # TODO: sort by the order the components were added?
+        for conn in sorted(set(self.wires.values()), key=by_component):
             if conn != clock:
                 all_bits[conn] = next_bit
                 next_bit += 1
