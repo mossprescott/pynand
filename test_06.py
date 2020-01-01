@@ -61,21 +61,21 @@ def test_ops():
         cpu.instruction = parse_op(f"M={expr}")
         return cpu.outM
     
-    assert compute("0", 12345, 23456) == 0
-    assert compute("1", 12345, 23456) == 1
-    assert compute("-1", 12345, 23456) == -1
-    assert compute("D", 12345, 23456) == 12345
-    assert compute("A", 12345, 23456) == 23456
-    assert compute("!D", 12345, 23456) == -12346
-    assert compute("!A", 12345, 23456) == -23457
-    assert compute("-D", 12345, 23456) == -12345
-    assert compute("-A", 12345, 23456) == -23456
-    assert compute("D+1", 12345, 23456) == 12346
-    assert compute("A+1", 12345, 23456) == 23457
-    assert compute("D-1", 12345, 23456) == 12344
-    assert compute("A-1", 12345, 23456) == 23455
+    assert compute("0",   12345, 23456) ==      0
+    assert compute("1",   12345, 23456) ==      1
+    assert compute("-1",  12345, 23456) ==     -1
+    assert compute("D",   12345, 23456) ==  12345
+    assert compute("A",   12345, 23456) ==  23456
+    assert compute("!D",  12345, 23456) == -12346
+    assert compute("!A",  12345, 23456) == -23457
+    assert compute("-D",  12345, 23456) == -12345
+    assert compute("-A",  12345, 23456) == -23456
+    assert compute("D+1", 12345, 23456) ==  12346
+    assert compute("A+1", 12345, 23456) ==  23457
+    assert compute("D-1", 12345, 23456) ==  12344
+    assert compute("A-1", 12345, 23456) ==  23455
     assert compute("D-A", 12345, 23456) == -11111
-    assert compute("A-D", 12345, 23456) == 11111
+    assert compute("A-D", 12345, 23456) ==  11111
     assert compute("D+A", 12345, 23456) == -29735
     assert compute("D&A", 0b0011, 0b0101) == 0b0001
     assert compute("D|A", 0b0011, 0b0101) == 0b0111
