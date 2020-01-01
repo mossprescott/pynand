@@ -1,4 +1,5 @@
 from nand.component import *
+from nand.evaluator import run_op
 
 
 def test_nand():
@@ -12,14 +13,14 @@ def test_nand():
     traces = {"a": [0b001], "b": [0b010], "out": [0b100]}
 
     op, = nand.combine(**traces)
-    assert op(0b000) == 0b100
-    assert op(0b001) == 0b101
-    assert op(0b010) == 0b110
-    assert op(0b011) == 0b011
-    assert op(0b100) == 0b100
-    assert op(0b101) == 0b101
-    assert op(0b110) == 0b110
-    assert op(0b111) == 0b011
+    assert run_op(op, 0b000) == 0b100
+    assert run_op(op, 0b001) == 0b101
+    assert run_op(op, 0b010) == 0b110
+    assert run_op(op, 0b011) == 0b011
+    assert run_op(op, 0b100) == 0b100
+    assert run_op(op, 0b101) == 0b101
+    assert run_op(op, 0b110) == 0b110
+    assert run_op(op, 0b111) == 0b011
 
     assert nand.sequence(**traces) == []
 
@@ -35,10 +36,10 @@ def test_dff():
     assert dff.combine(**traces) == []
 
     op, = dff.sequence(**traces)
-    assert op(0b00) == 0b00
-    assert op(0b01) == 0b11
-    assert op(0b10) == 0b00
-    assert op(0b11) == 0b11
+    assert run_op(op, 0b00) == 0b00
+    assert run_op(op, 0b01) == 0b11
+    assert run_op(op, 0b10) == 0b00
+    assert run_op(op, 0b11) == 0b11
 
 
 def test_rom():
@@ -57,9 +58,9 @@ def test_rom():
     rom.program([1, 2, 3, 4, 5])
     for i in range(16):
         if i < 5:
-            assert op(i) == ((i+1) << 4) | i
+            assert run_op(op, i) == ((i+1) << 4) | i
         else:
-            assert op(i) == 0x00 | i
+            assert run_op(op, i) == 0x00 | i
 
     assert rom.sequence(**traces) == []
 
@@ -85,7 +86,7 @@ def test_ram():
     for i in range(16):
         addr = i << 17
         out = i << 21
-        assert op(addr) == out | addr
+        assert run_op(op, addr) == out | addr
 
 
     op, = ram.sequence(**traces)
@@ -94,7 +95,7 @@ def test_ram():
         in_ = 12345 + i
         load = 0b1 << 16
         addr = i << 17
-        op(addr | load | in_)
+        run_op(op, addr | load | in_)
         assert ram.get(i) == 12345 + i
 
 
@@ -108,9 +109,17 @@ def test_input():
 
     op, = inpt.combine(**traces)
 
-    assert op(0) == 0
+    assert run_op(op, 0) == 0
 
     inpt.set(12345)
-    assert op(0) == 12345
+    assert run_op(op, 0) == 12345
 
     assert inpt.sequence(**traces) == []
+
+
+def test_has_combine_ops():
+    assert Nand().has_combine_ops() == True
+    assert DFF().has_combine_ops() == False
+    assert ROM(1).has_combine_ops() == True
+    assert RAM(1).has_combine_ops() == True
+    assert Input().has_combine_ops() == True

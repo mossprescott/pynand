@@ -1,5 +1,8 @@
 """Components which can be combined into a graph to define a complete chip.
 """
+
+import itertools
+
 from nand.evaluator import nand_op, custom_op, tst_trace, set_trace, get_multiple_traces, set_multiple_traces
 
 class Component:
@@ -46,6 +49,27 @@ class Component:
         """
         return []
 
+    def has_combine_ops(self):
+        """True if the component _ever_ updates any output in combinational fashion (as most do).
+        False only for components which only ever latch inputs and update their outputs during 
+        flop/sequence.
+        
+        This is useful for determining evaluation order: non-combinational components can be evaluated
+        later, which can help to break cycles (the same cycles that these components tend to 
+        participate in.)
+        
+        Current theory is that this only really needs to work for DFFs. Note that RAM, despite 
+        having both combinational and sequential behavior, actually treats its one output as 
+        combinational. However, if someone decides to implement a 16-bit Register with a purely
+        latched output, this will handle that.
+        """
+
+        trace_map = {
+            name: [0]*bits 
+            for (name, bits) in itertools.chain(self.inputs().items(), self.outputs().items())
+        }
+        return len(self.combine(**trace_map)) > 0
+
 
 class Const(Component):
     """Mostly fictional component which just supplies a constant value. No runtime cost. 
@@ -67,8 +91,17 @@ class Const(Component):
         def f(traces):
             return set_multiple_traces(out, self.value, traces)
         return [custom_op(f)]
+        
+    def __repr__(self):
+        return f"Const({self.bits}, {self.value})"
 
-    
+    def __eq__(self, other):
+        return isinstance(other, Const) and self.bits == other.bits and self.value == other.value
+
+    def __hash__(self):
+        return hash((self.bits, self.value))
+
+
 class Nand(Component):
     """A single nand gate, which has two inputs and a single output named 'out'."""
 
@@ -136,6 +169,7 @@ class ROM(Component):
                 out_val = 0
             return set_multiple_traces(out, out_val, traces)
         return [custom_op(read)]
+
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip.

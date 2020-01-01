@@ -1,17 +1,18 @@
 from nand.component import set_trace, tst_trace
-from nand.evaluator import NandVector, nand_op
+from nand.evaluator import NandVector, nand_op, custom_op
 
 def dff_op(in_, out):
     def dff(traces):
         in_val = tst_trace(in_, traces)
         return set_trace(out, in_val, traces)
-    return dff
+    return custom_op(dff)
     
 def test_xor():
     xor = NandVector(
         {'a': 1 << 0, 'b': 1 << 1},
         {'out': 1 << 5},
         {'na': 1 << 4, 'nb': 1 << 3},
+        [],
         [ nand_op(1 << 0, 1 << 1, 1 << 2),  # Nand(a, b) -> nand
           nand_op(1 << 0, 1 << 2, 1 << 3),  # Nand(a, nand) -> na
           nand_op(1 << 1, 1 << 2, 1 << 4),  # Nand(b, nand) -> nb
@@ -40,6 +41,7 @@ def test_flop():
         {'in_': 0b01},
         {'out': 0b10},
         {},
+        [],
         [],
         [dff_op(0b01, 0b10)])
     
