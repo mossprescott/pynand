@@ -4,12 +4,14 @@
 import re
 
 ALU_CONTROL = {
+    # These match the bit patterns used in Add and Max:
     "0":   0b101010,
     "A":   0b110000,
     "D":   0b001100,
     "D-A": 0b010011,
     "D+A": 0b000010,
-    # unconfirmed:
+    # These are confirmed to produce the correct results, but may not match where more than
+    # one equivalent exists:
     "1":   0b111111,
     "-1":  0b101001,
     "D&A": 0b000000,
@@ -52,7 +54,7 @@ BUILTIN_SYMBOLS = {
 def parse_op(string):
     """Parse a single assembly op directly to the corresponding Hack instruction word.
     
-    The op may be a (numeric) symbol (and A-command) or a C-command, but not a reference
+    The op may be a numeric symbol (an A-command) or a C-command, but not a reference
     to a symbol or variable.
     """
     
