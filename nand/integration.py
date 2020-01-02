@@ -366,7 +366,10 @@ class IC:
         def by_component(t):
             # Sometimes it's interesting to see the wires by source:
             # return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
-            return (to_index(t[0].comp, 1000), t[0].name, to_index(t[1].comp, -1), t[1].name)
+            return (
+                to_index(t[0].comp, 1000), t[0].name, t[0].bit,
+                to_index(t[1].comp,   -1), t[1].name, t[1].bit
+            )
         def back_edge_label(from_comp, to_comp):
             if from_comp not in all_comps or to_comp not in all_comps:
                 return ""
