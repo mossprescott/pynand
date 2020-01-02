@@ -3,6 +3,8 @@
 import nand.component
 from nand.integration import IC, Connection, common
 from nand.evaluator import extend_sign
+from nand.optimize import simplify
+
 
 class Chip:
     def __init__(self, constr):
@@ -311,7 +313,7 @@ class NandVectorWrapper:
     def components(self, types):
         """List of internal components (e.g. RAM, ROM).
         
-        Note: types in one or more of the types defined in nand.component, not the wrappers
+        Note: types should be one or more of the types defined in nand.component, not the wrappers
         with the same names defined in this module.
         """
         return [c for c in self._components if isinstance(c, types)]
@@ -322,7 +324,7 @@ class NandVectorWrapper:
 
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    flat = _constr(chip).flatten().simplify()
+    flat = simplify(_constr(chip).flatten())
     w = NandVectorWrapper(flat.synthesize(), flat.sorted_components())
     for name, value in args.items():
         w.__setattr__(name, value)
