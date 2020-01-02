@@ -1,7 +1,7 @@
 """Wrappers around IC and NandVector providing a more compact way of constructing and interacting with chips.
 """
 import nand.component
-from nand.integration import IC, Connection, common
+from nand.integration import IC, Connection, root, common
 from nand.evaluator import extend_sign
 from nand.optimize import simplify
 
@@ -212,23 +212,26 @@ def build(builder):
         for (name, bit), ref in output_coll.dict.items():
             if ref.inst == common:
                 from_comp = common  # HACK
+                from_outputs = common.outputs()
             elif ref.inst._ic == ic:
-                from_comp = ic.root
+                from_comp = root
+                from_outputs = ic.inputs()
             else: 
                 from_comp = ref.inst._ic
+                from_outputs = from_comp.outputs()
             
             if bit is None and ref.bit is None:
-                for i in range(from_comp.outputs()[ref.name]):
-                    ic.wire(Connection(from_comp, ref.name, i), Connection(ic.root, name, i))
+                for i in range(from_outputs[ref.name]):
+                    ic.wire(Connection(from_comp, ref.name, i), Connection(root, name, i))
             else:
-                ic.wire(Connection(from_comp, ref.name, ref.bit or 0), Connection(ic.root, name, bit or 0))
+                ic.wire(Connection(from_comp, ref.name, ref.bit or 0), Connection(root, name, bit or 0))
 
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
                 if ref.inst == common:
                     source_comp = common  # HACK
                 elif ref.inst._ic == ic:
-                    source_comp = ref.inst._ic.root
+                    source_comp = root
                 else:
                     source_comp = ref.inst._ic
 
@@ -368,10 +371,10 @@ def _constr(chip):
         ic = IC(comp.label, comp.inputs(), comp.outputs())
         for name, bits in comp.inputs().items():
             for i in range(bits):
-                ic.wire(Connection(ic.root, name, i), Connection(comp, name, i))
+                ic.wire(Connection(root, name, i), Connection(comp, name, i))
         for name, bits in comp.outputs().items():
             for i in range(bits):
-                ic.wire(Connection(comp, name, i), Connection(ic.root, name, i))
+                ic.wire(Connection(comp, name, i), Connection(root, name, i))
     return ic
 
 
