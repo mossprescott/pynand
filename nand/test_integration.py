@@ -12,7 +12,12 @@ def test_simple_wiring():
     ic.wire(Connection(root, "in_", 0), Connection(nand, "b", 0))
     ic.wire(Connection(nand, "out", 0), Connection(root, "out", 0))
 
-    # No errors == OK
+    assert str(ic) == '\n'.join([
+        "JustNand(in_[1]; out[1]):",
+        "  in_              -> Nand_0.a        ",
+        "  in_              -> Nand_0.b        ",
+        "  Nand_0.out       -> out             ",
+    ])
 
 
 def test_wiring_errors():

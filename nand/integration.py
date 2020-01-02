@@ -83,7 +83,12 @@ class IC:
         if isinstance(conn.comp, Const):
             return str(int(conn.comp.value & (1 << conn.bit) != 0))
         else:
-            multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
+            if conn.comp == root:
+                # Not really a typo; the dicts are actually reversed, although it doesn't really matter here.
+                inputs, outputs = self.outputs(), self.inputs()
+            else:
+                inputs, outputs = conn.comp.inputs(), conn.comp.outputs()
+            multi_bit = inputs.get(conn.name, 0) > 1 or outputs.get(conn.name, 0) > 1
             comp = "" if conn.comp == root else f"{self._comp_label(conn.comp, all_comps)}."
             bit = f"[{conn.bit}]" if multi_bit else ""
             return f"{comp}{conn.name}{bit}"
