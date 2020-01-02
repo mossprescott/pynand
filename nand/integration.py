@@ -127,7 +127,7 @@ class IC:
         return ic
 
 
-    def sorted_components(self):
+    def sorted_components(self, wires=None):
         """List of all components (including only direct children), roughly in the order that 
         signals propagate.
 
@@ -148,6 +148,9 @@ class IC:
         # 2) add all the DFFs to the list of "roots"
         # 3) run another search, _not_ traversing the DFF inputs
         # How to apply this thinking to RAM? Can it be separated?
+
+        if wires is None:
+            wires = self.wires
     
         # Pre-compute wires _into_ each component:
         wires_by_target_comp = {}  # {target comp: (target name, source comp)}
@@ -199,6 +202,9 @@ class IC:
         
         When a series of two Nands negate and then re-negate the same single value, the second Nand 
         is always removed, and the first may be as well if it's otherwise unused.
+        
+        When more than one Nand has the same two inputs, each such set is replaced with a single 
+        Nand.
         """
 
         # Note: it feels dirty having any special-casing for specific components here.
@@ -277,23 +283,41 @@ class IC:
                                 # TODO: remove a_src.comp if not referenced?
                                 done = False
 
+            # Find and collapse sets of Nands with the same inputs:
+
+            print("pass")
+            # Construct the sort function once, since it has to search the graph:
+            by_component = ic._connections_sort_key(new_wires)
+            nands_by_input_pair = {}
+            for conn in new_wires:
+                comp = conn.comp
+                if isinstance(comp, Nand):
+                    t = tuple(sorted([
+                        new_wires[Connection(comp, "a", 0)],
+                        new_wires[Connection(comp, "b", 0)]
+                    ], key=by_component))
+                    nands_by_input_pair.setdefault(t, set()).add(comp)
+            for _, nands_set in nands_by_input_pair.items():
+                if len(nands_set) > 1:
+                    # TODO: pick which Nand to keep? earliest? latest?
+                    nands = list(nands_set)
+                    keep_nand = nands[0]
+                    for n in nands[1:]:
+                        # print(f"replace: {n}; a={new_wires[Connection(n, 'b', 0)]}; b={new_wires[Connection(n, 'b', 0)]}")
+                        # print(f"with:    {n}; a={new_wires[Connection(keep_nand, 'b', 0)]}; b={new_wires[Connection(keep_nand, 'b', 0)]}")
+                        del new_wires[Connection(n, "a", 0)]
+                        del new_wires[Connection(n, "b", 0)]
+                        rewrite(Connection(n, "out", 0), Connection(keep_nand, "out", 0))
+                        done = False
+                        # TODO: only collapse one, then start over?
+            
         ic.wires = new_wires
 
         return ic.flatten()  # HACK: a cheap way to remove dangling wires
 
 
-    def synthesize(self):
-        """Compile the chip down to traces and ops for evaluation.
-
-        Returns a NandVector.
-        """
-        return self.flatten().simplify()._synthesize()
-
-    def _synthesize(self):
-        # check for missing wires?
-        # check for unused components?
-
-        all_comps = self.sorted_components()
+    def _connections_sort_key(self, wires=None):
+        all_comps = self.sorted_components(wires)
         def by_component(conn):
             if conn.comp == self.root:
                 num = -1  # inputs first 
@@ -301,13 +325,28 @@ class IC:
                 num = all_comps.index(conn.comp)
             else:
                 num = -2
-            return (num, conn.name, conn.bit)                
+            return (num, conn.name, conn.bit)
+        return by_component
+
+
+    def synthesize(self):
+        """Compile the chip down to traces and ops for evaluation.
+
+        Returns a NandVector.
+        """
+        return self.flatten()._synthesize()
+
+    def _synthesize(self):
+        # check for missing wires?
+        # check for unused components?
+
+        # TODO: tell NandVector about the back-edges. Use that to decide when to re-evaluate.
 
         # Assign a bit for each output connection:
         all_bits = {}
         all_bits[clock] = 0  # TODO: only if it's used somewhere?
         next_bit = 1
-        for conn in sorted(set(self.wires.values()), key=by_component):
+        for conn in sorted(set(self.wires.values()), key=self._connections_sort_key()):
             if conn != clock:
                 all_bits[conn] = next_bit
                 next_bit += 1

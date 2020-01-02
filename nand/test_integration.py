@@ -158,6 +158,31 @@ def test_simplify_double_negative():
     assert simple.wires == {Connection(simple.root, "out", 0): Connection(simple.root, "in", 0)}
 
 
+def test_simplify_duplicate():
+    ic = IC("2Nands", {"in1": 1, "in2": 1}, {"out1": 1, "out2": 1})
+    nand1 = Nand()
+    nand2 = Nand()
+    ic.wire(Connection(ic.root, "in1", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(ic.root, "in2", 0), Connection(nand1, "b", 0))
+    ic.wire(Connection(ic.root, "in2", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(ic.root, "in1", 0), Connection(nand2, "b", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(ic.root, "out1", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(ic.root, "out2", 0))
+    
+    simple = ic.simplify()
+    
+    simple_nand = simple.sorted_components()[0]
+    # Note: in1 and in2 connected to a and b randomly
+    assert simple.wires.keys() == set([
+        Connection(simple_nand, "a", 0),
+        Connection(simple_nand, "b", 0),
+        Connection(simple.root, "out1", 0),
+        Connection(simple.root, "out2", 0),
+    ])
+    assert simple.wires[Connection(simple.root, "out1", 0)] == Connection(simple_nand, "out", 0)
+    assert simple.wires[Connection(simple.root, "out2", 0)] == Connection(simple_nand, "out", 0)
+    
+    
 def test_simple_synthesis():
     ic = IC("JustNand", {"a": 1, "b": 1}, {"out": 1})
     nand = Nand()

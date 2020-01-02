@@ -322,7 +322,7 @@ class NandVectorWrapper:
 
 def run(chip, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    flat = _constr(chip).flatten()
+    flat = _constr(chip).flatten().simplify()
     w = NandVectorWrapper(flat.synthesize(), flat.sorted_components())
     for name, value in args.items():
         w.__setattr__(name, value)
