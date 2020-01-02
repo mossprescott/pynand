@@ -183,5 +183,5 @@ def custom_op(f):
 
     # return f
 
-    # Wrap the function with a semaphor value to indicate it's not Nand
+    # Wrap the function with a semaphore value to indicate it's not Nand
     return (None, f)
