@@ -80,11 +80,10 @@ def simplify(orig):
                             # TODO: remove a_src.comp if not referenced?
                             done = False
 
-        # Find and collapse sets of Nands with the same inputs:
-
-        print("pass")
         # Construct the sort function once, since it has to search the graph:
         by_component = ic._connections_sort_key(ic.wires)
+
+        # Find and collapse sets of Nands with the same inputs:
         nands_by_input_pair = {}
         for conn in list(ic.wires):
             comp = conn.comp
@@ -96,16 +95,12 @@ def simplify(orig):
                 nands_by_input_pair.setdefault(t, set()).add(comp)
         for _, nands_set in nands_by_input_pair.items():
             if len(nands_set) > 1:
-                # TODO: pick which Nand to keep? earliest? latest?
                 nands = list(nands_set)
                 keep_nand = nands[0]
                 for n in nands[1:]:
-                    # print(f"replace: {n}; a={ic.wires[Connection(n, 'b', 0)]}; b={ic.wires[Connection(n, 'b', 0)]}")
-                    # print(f"with:    {n}; a={ic.wires[Connection(keep_nand, 'b', 0)]}; b={ic.wires[Connection(keep_nand, 'b', 0)]}")
                     del ic.wires[Connection(n, "a", 0)]
                     del ic.wires[Connection(n, "b", 0)]
                     rewrite(Connection(n, "out", 0), Connection(keep_nand, "out", 0))
                     done = False
-                    # TODO: only collapse one, then start over?
         
     return ic.flatten()  # HACK: a cheap way to remove dangling wires

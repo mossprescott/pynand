@@ -325,10 +325,12 @@ class NandVectorWrapper:
         return str(self.outputs())
 
 
-def run(chip, **args):
+def run(chip, optimize=True, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    flat = simplify(_constr(chip).flatten())
-    w = NandVectorWrapper(flat.synthesize(), flat.sorted_components())
+    ic = _constr(chip).flatten()
+    if optimize:
+        ic = simplify(ic)
+    w = NandVectorWrapper(ic.synthesize(), ic.sorted_components())
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
