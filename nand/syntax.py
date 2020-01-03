@@ -274,14 +274,15 @@ class NandVectorWrapper:
 
     def tick(self):
         """Raise the common `clock` signal (and propagate state changes eagerly)."""
-        # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
-        self._vector._propagate()
+        if ('common.clock', 0) in self._vector.inputs:
+            self._vector._propagate()
+            self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
 
     def tock(self):
         """Lower the common `clock` signal (and propagate state changes eagerly)."""
-        # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
+        if ('common.clock', 0) in self._vector.inputs:
+            self._vector._propagate()
+            self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
         self._vector._flop()
 
     def __getattr__(self, name):

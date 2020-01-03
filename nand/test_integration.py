@@ -173,6 +173,32 @@ def test_nested_synthesis():
     assert nv.get(("out", 0)) == True
 
 
+def test_back_edges_none():
+    ic = IC("Nonsense", {"reset": 1}, {"out": 1})
+    nand1 = Nand()
+    dff = DFF()
+    ic.wire(Connection(root, "reset", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(dff, "out", 0), Connection(nand1, "b", 0))  # not a back-edge, because it's a latched output
+    ic.wire(Connection(nand1, "out", 0), Connection(dff, "in_", 0))
+    ic.wire(Connection(dff, "out", 0), Connection(root, "out", 0))
+    
+    nv = ic.synthesize()
+    assert nv.non_back_edge_mask == 0b111  # i.e. every bit, which is one Nand, one DFF, and reset
+
+def test_back_edges_goofy():
+    ic = IC("Nonsense", {"reset": 1}, {"out": 1})
+    nand1 = Nand()
+    nand2 = Nand()
+    ic.wire(Connection(root, "reset", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(nand1, "b", 0))  # back-edge here
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "b", 0))
+    ic.wire(Connection(nand2, "out", 0), Connection(root, "out", 0))
+    
+    nv = ic.synthesize()
+    assert nv.non_back_edge_mask == 0b011  # i.e. not nand2, yes nand1 and reset
+
+
 def test_collapse_internal_none():
     graph = { 
         1: 2,

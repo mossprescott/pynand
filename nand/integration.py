@@ -89,7 +89,7 @@ class IC:
             else:
                 inputs, outputs = conn.comp.inputs(), conn.comp.outputs()
             multi_bit = inputs.get(conn.name, 0) > 1 or outputs.get(conn.name, 0) > 1
-            comp = "" if conn.comp == root else f"{self._comp_label(conn.comp, all_comps)}."
+            comp = "" if conn.comp == root or conn == clock else f"{self._comp_label(conn.comp, all_comps)}."
             bit = f"[{conn.bit}]" if multi_bit else ""
             return f"{comp}{conn.name}{bit}"
 
@@ -236,12 +236,15 @@ class IC:
         # check for missing wires?
         # check for unused components?
 
-        # TODO: tell NandVector about the back-edges. Use that to decide when to re-evaluate.
+        any_clock_references = any([True for conn in self.wires.values() if conn == clock])
 
         # Assign a bit for each output connection:
         all_bits = {}
-        all_bits[clock] = 0  # TODO: only if it's used somewhere?
-        next_bit = 1
+        next_bit = 0
+        if any_clock_references:
+            all_bits[clock] = next_bit
+            next_bit += 1
+            
         for conn in sorted(set(self.wires.values()), key=self._connections_sort_key()):
             if conn != clock:
                 all_bits[conn] = next_bit
@@ -254,7 +257,8 @@ class IC:
             for bit in range(bits)  # TODO: None if single bit?
         }
         
-        inputs[("common.clock", 0)] = 1 << all_bits[clock]  # HACK
+        if any_clock_references:
+            inputs[("common.clock", 0)] = 1 << all_bits[clock]
 
         # Construct map of IC ouputs, mapped to all_bits via wires:
         outputs = {
@@ -265,11 +269,13 @@ class IC:
 
         internal = {}  # TODO
 
-        # Construct a map of the traces for each single component, and ask it for its ops:
+        sorted_comps = self.sorted_components()
+
+        # For each component, construct a map of its traces' bit masks, and ask the component for its ops:
         initialize_ops = []
         combine_ops = []
         sequence_ops = []
-        for comp in self.sorted_components():
+        for comp in sorted_comps:
             traces = {}
             for name, bits in comp.inputs().items():
                 traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]
@@ -279,7 +285,20 @@ class IC:
             combine_ops += comp.combine(**traces)
             sequence_ops += comp.sequence(**traces)
 
-        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops)
+        back_edge_from_components = set()
+        for to_input, from_output in self.wires.items():
+            if (not isinstance(from_output.comp, Const)
+                and from_output.comp in sorted_comps
+                and to_input.comp in sorted_comps
+                and from_output.comp.has_combine_ops()
+                and sorted_comps.index(from_output.comp) > sorted_comps.index(to_input.comp)):
+                back_edge_from_components.add(from_output.comp)
+        non_back_edge_mask = 0
+        for conn, bit in all_bits.items():
+            if conn.comp not in back_edge_from_components:
+                non_back_edge_mask |= 1 << bit
+
+        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask)
 
 
     def __str__(self):
