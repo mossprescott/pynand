@@ -147,7 +147,7 @@ class IC:
         return ic
 
 
-    def sorted_components(self, wires=None):
+    def sorted_components(self):
         """List of all components (including only direct children), roughly in the order that 
         signals propagate.
 
@@ -169,9 +169,6 @@ class IC:
         # 3) run another search, _not_ traversing the DFF inputs
         # How to apply this thinking to RAM? Can it be separated?
 
-        if wires is None:
-            wires = self.wires
-    
         # Pre-compute wires _into_ each component:
         wires_by_target_comp = {}  # {target comp: (target name, source comp)}
         for t, f in self.wires.items():
@@ -212,8 +209,8 @@ class IC:
         return result
 
 
-    def _connections_sort_key(self, wires=None):
-        all_comps = self.sorted_components(wires)
+    def _connections_sort_key(self):
+        all_comps = self.sorted_components()
         def by_component(conn):
             if conn.comp == root:
                 num = -1  # inputs first 

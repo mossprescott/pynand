@@ -81,7 +81,7 @@ def simplify(orig):
                             done = False
 
         # Construct the sort function once, since it has to search the graph:
-        by_component = ic._connections_sort_key(ic.wires)
+        by_component = ic._connections_sort_key()
 
         # Find and collapse sets of Nands with the same inputs:
         nands_by_input_pair = {}
