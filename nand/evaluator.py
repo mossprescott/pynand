@@ -13,14 +13,22 @@ class NandVector:
     sequence (via `_nand_bits`), with just three bit-wise operations on the ints. In case there are
     any out-of-order or circular dependencies, the entire loop is repeated until no more changes are
     seen (or, if no fixed-point is found, an exception is raised.)
+    
+    `non_back_edge_mask` identifies bits which are known to be consumed only by "normal" references, 
+    for which all updates are always seen in a single evaluation pass. If an evaluation pass only 
+    changes bits which are in this mask, then evaluation is complete. If not, need to do another pass
+    to propagate changes for reference cycles. The default, 0, is never wrong, but using it means 
+    an extra evaluation pass each time to check for any change, with the last pass always making 
+    no change (and therefore, just a waste.)
     """
 
-    def __init__(self, inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops):
+    def __init__(self, inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask=0):
         self.inputs = inputs
         self.outputs = outputs
         self.internal = internal
         self.combine_ops = combine_ops
         self.sequence_ops = sequence_ops
+        self.non_back_edge_mask = non_back_edge_mask
 
         traces = 0
         for op in initialize_ops:
@@ -79,7 +87,17 @@ class NandVector:
         # runtime, then increased to 5 when it was re-implemented. That suggests that the
         # sorting of components is not quite right. If anything, now that all the gates are
         # flattened the sort should be more effective.
-        self.traces = fixed_point(f, self.traces, limit=4)
+        limit = 4
+        for i in range(limit):
+            previous = self.traces
+            self.traces = f(self.traces)
+            if self.traces == previous:
+                break
+            changed = self.traces ^ previous
+            if changed & ~self.non_back_edge_mask == 0:
+                break
+        else:
+            raise Exception(f"state did not settle after {limit} loops")
 
         self.dirty = False
 
@@ -96,17 +114,6 @@ class NandVector:
             self.traces = run_op(op, self.traces)
 
         self.dirty = True
-
-
-def fixed_point(f, x, limit=50):
-    for i in range(limit):
-        tmp = f(x)
-        if tmp == x:
-            return x
-        else:
-            x = tmp
-    else:
-        raise Exception(f"state did not settle after {limit} loops")
 
 
 def extend_sign(x):
@@ -183,5 +190,5 @@ def custom_op(f):
 
     # return f
 
-    # Wrap the function with a semaphor value to indicate it's not Nand
+    # Wrap the function with a semaphore value to indicate it's not Nand
     return (None, f)

@@ -16,7 +16,6 @@ class IC:
         self.label = label
         self._inputs = inputs
         self._outputs = outputs
-        self.root = Root(self)
         self.wires = {}
 
     def inputs(self):
@@ -45,19 +44,30 @@ class IC:
         The connection is checked on both ends to ensure that it specifies a valid name and bit.
         """
 
-        if from_output.name not in from_output.comp.outputs():
+        if from_output.comp == root:
+            relevant_outputs = self.inputs()
+        else:
+            relevant_outputs = from_output.comp.outputs()
+
+        if to_input.comp == root:
+            relevant_inputs = self.outputs()
+        else:
+            relevant_inputs = to_input.comp.inputs()
+
+        if from_output.name not in relevant_outputs:
             raise WiringError(f"Component {self._comp_label(from_output.comp, self.sorted_components())} has no output '{from_output.name}'")
-        elif from_output.bit < 0 or from_output.bit >= from_output.comp.outputs()[from_output.name]:
-            raise WiringError(f"Tried to connect bit {from_output.bit} of {from_output.comp.outputs()[from_output.name]}-bit output {self._comp_label(from_output.comp, self.sorted_components())}.{from_output.name}")
-        elif to_input.name not in to_input.comp.inputs():
+        elif from_output.bit < 0 or from_output.bit >= relevant_outputs[from_output.name]:
+            raise WiringError(f"Tried to connect bit {from_output.bit} of {relevant_outputs[from_output.name]}-bit output {self._comp_label(from_output.comp, self.sorted_components())}.{from_output.name}")
+        elif to_input.name not in relevant_inputs:
             raise WiringError(f"Component {self._comp_label(to_input.comp, self.sorted_components())} has no input '{to_input.name}'")
-        elif to_input.bit < 0 or to_input.bit >= to_input.comp.inputs()[to_input.name]:
-            raise WiringError(f"Tried to connect bit {to_input.bit} of {to_input.comp.inputs()[to_input.name]}-bit input {self._comp_label(to_input.comp, self.sorted_components())}.{to_input.name}")
+        elif to_input.bit < 0 or to_input.bit >= relevant_inputs[to_input.name]:
+            raise WiringError(f"Tried to connect bit {to_input.bit} of {relevant_inputs[to_input.name]}-bit input {self._comp_label(to_input.comp, self.sorted_components())}.{to_input.name}")
 
         self.wires[to_input] = from_output
 
+
     def _comp_label(self, comp, all_comps):
-        if comp == self.root:
+        if comp == root:
             return "Root"
         else:
             if comp in all_comps:
@@ -73,18 +83,31 @@ class IC:
         if isinstance(conn.comp, Const):
             return str(int(conn.comp.value & (1 << conn.bit) != 0))
         else:
-            multi_bit = conn.comp.inputs().get(conn.name, 0) > 1 or conn.comp.outputs().get(conn.name, 0) > 1
-            comp = "" if conn.comp == self.root else f"{self._comp_label(conn.comp, all_comps)}."
+            if conn.comp == root:
+                # Not really a typo; the dicts are actually reversed, although it doesn't really matter here.
+                inputs, outputs = self.outputs(), self.inputs()
+            else:
+                inputs, outputs = conn.comp.inputs(), conn.comp.outputs()
+            multi_bit = inputs.get(conn.name, 0) > 1 or outputs.get(conn.name, 0) > 1
+            comp = "" if conn.comp == root or conn == clock else f"{self._comp_label(conn.comp, all_comps)}."
             bit = f"[{conn.bit}]" if multi_bit else ""
             return f"{comp}{conn.name}{bit}"
+
+
+    def copy(self):
+        """Construct a new IC with all the same components and wiring. Note: this is a shallow copy,
+        containing the same child components. Therefore, changes to the wiring of the new IC do not 
+        affect the original, but changes to the wiring of child components do.
+        """
+        ic = IC(f"{self.label}", self._inputs, self._outputs)
+        ic.wires = self.wires.copy()
+        return ic
 
 
     def flatten(self):
         """Construct a new IC which has the same structure as this one, but no nested ICs.
         That is, the wiring of all child ICs has been "inlined" into a single flat assembly.
         """
-
-        ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
 
         flat_children = {}
 
@@ -95,29 +118,26 @@ class IC:
                 child = comp.flatten()
                 flat_children[comp] = child
                 for to_input, from_output in child.wires.items():
-                    if from_output.comp == child.root:
+                    if from_output.comp == root:
                         from_output = from_output._replace(comp=child)
-                    if to_input.comp == child.root:
+                    if to_input.comp == root:
                         to_input = to_input._replace(comp=child)
                     all_wires[to_input] = from_output
 
         for to_input, from_output in self.wires.items():
             if from_output.comp in flat_children:
                 from_output = from_output._replace(comp=flat_children[from_output.comp])
-            elif from_output.comp == self.root:
-                from_output = from_output._replace(comp=ic.root)
 
             if to_input.comp in flat_children:
                 to_input = to_input._replace(comp=flat_children[to_input.comp])
-            elif to_input.comp == self.root:
-                to_input = to_input._replace(comp=ic.root)
 
             all_wires[to_input] = from_output
 
+        ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
         ic.wires = collapse_internal(all_wires)
         
         # Now prune wires that don't connect to any reachable compononent:
-        reachable = set(ic.sorted_components() + [common, ic.root])
+        reachable = set(ic.sorted_components() + [common, root])
         ic.wires = {
             t: f 
             for (t, f) in ic.wires.items() 
@@ -148,11 +168,11 @@ class IC:
         # 2) add all the DFFs to the list of "roots"
         # 3) run another search, _not_ traversing the DFF inputs
         # How to apply this thinking to RAM? Can it be separated?
-    
+
         # Pre-compute wires _into_ each component:
         wires_by_target_comp = {}  # {target comp: (target name, source comp)}
         for t, f in self.wires.items():
-            if f.comp != self.root and f.comp != common:
+            if f.comp != root and f.comp != common:
                 wires_by_target_comp.setdefault(t.comp, []).append((t.name, f.comp))
 
         def dfs(roots, ignore_dffs):
@@ -179,107 +199,27 @@ class IC:
                 loop(n)
             return visited
 
-        reachable = dfs([self.root], False)
-        reachable.remove(self.root)
+        reachable = dfs([root], False)
+        reachable.remove(root)
         
         dffs = [n for n in reachable if not n.has_combine_ops()]
-        result = dfs([self.root] + dffs, True)
-        result.remove(self.root)
+        result = dfs([root] + dffs, True)
+        result.remove(root)
 
         return result
 
 
-    def simplify(self):
-        """Construct a new chip which is logically identical to this one, but may be smaller
-        and more efficient by the removal of certain recognized patterns. More effective after 
-        flatten().
-        
-        When a constant is the input of a Nand, that gate is replaced with either a constant or the 
-        other input: Nand(a, 0) = 1; Nand(a, 1) = Not(a)
-        
-        When a series of two Nands negate and then re-negate the same single value, the second Nand 
-        is always removed, and the first may be as well if it's otherwise unused.
-        """
-
-        # Note: it feels dirty having any special-casing for specific components here.
-        # Maybe this function belongs in a separate "optimize" module.
-        from nand.component import Nand
-
-        ic = IC(f"{self.label}[simple]", self._inputs, self._outputs)
-
-        new_wires = {}
-        for to_input, from_output in self.wires.items():
-            if from_output.comp == self.root:
-                from_output = from_output._replace(comp=ic.root)
-
-            if to_input.comp == self.root:
-                to_input = to_input._replace(comp=ic.root)
-
-            new_wires[to_input] = from_output
-
-        def const_value(conn):
-            if isinstance(conn.comp, Const):
-                return conn.comp.value & (1 << conn.bit) != 0
+    def _connections_sort_key(self):
+        all_comps = self.sorted_components()
+        def by_component(conn):
+            if conn.comp == root:
+                num = -1  # inputs first 
+            elif conn.comp in all_comps:
+                num = all_comps.index(conn.comp)
             else:
-                return None
-
-        def rewrite(old_conn, new_conn):
-            for t, f in list(new_wires.items()):
-                if f == old_conn:
-                    new_wires[t] = new_conn
-
-        done = False
-        while not done:
-            done = True
-            for comp in set([c.comp for c in new_wires.keys()] + [c.comp for c in new_wires.values()]):
-                if isinstance(comp, Nand):
-                    a_src = new_wires[Connection(comp, "a", 0)]
-                    b_src = new_wires[Connection(comp, "b", 0)]
-
-                    a_val = const_value(a_src)
-                    b_val = const_value(b_src)
-
-                    if a_val == False or b_val == False:
-                        # Remove this Nand and rewrite its output as Const(1):
-                        del new_wires[Connection(comp, "a", 0)]
-                        del new_wires[Connection(comp, "b", 0)]
-                        old_conn = Connection(comp, "out", 0)
-                        new_conn = Connection(Const(1, 1), "out", 0)
-                        rewrite(old_conn, new_conn)
-                        done = False
-                    elif a_val == True and b_val == True:
-                        # Remove this Nand and rewrite its output as Const(0):
-                        del new_wires[Connection(comp, "a", 0)]
-                        del new_wires[Connection(comp, "b", 0)]
-                        old_conn = Connection(comp, "out", 0)
-                        new_conn = Connection(Const(1, 0), "out", 0)
-                        rewrite(old_conn, new_conn)
-                        done = False
-                    elif a_val == True:
-                        # Rewite to eliminate the Const:
-                        new_wires[Connection(comp, "a", 0)] = b_src
-                        done = False
-                    elif b_val == True:
-                        # Rewite to eliminate the Const:
-                        new_wires[Connection(comp, "b", 0)] = a_src
-                        done = False
-                    elif a_src == b_src:
-                        if isinstance(a_src.comp, Nand):
-                            src_a_src = new_wires[Connection(a_src.comp, "a", 0)]
-                            src_b_src = new_wires[Connection(a_src.comp, "b", 0)]
-                            if src_a_src == src_b_src:
-                                # Remove this Nand and rewrite its output as src's src:
-                                del new_wires[Connection(comp, "a", 0)]
-                                del new_wires[Connection(comp, "b", 0)]
-                                old_conn = Connection(comp, "out", 0)
-                                new_conn = src_a_src
-                                rewrite(old_conn, new_conn)
-                                # TODO: remove a_src.comp if not referenced?
-                                done = False
-
-        ic.wires = new_wires
-
-        return ic.flatten()  # HACK: a cheap way to remove dangling wires
+                num = -2
+            return (num, conn.name, conn.bit)
+        return by_component
 
 
     def synthesize(self):
@@ -287,54 +227,52 @@ class IC:
 
         Returns a NandVector.
         """
-        return self.flatten().simplify()._synthesize()
+        return self.flatten()._synthesize()
 
     def _synthesize(self):
         # check for missing wires?
         # check for unused components?
 
-        all_comps = self.sorted_components()
-        def by_component(conn):
-            if conn.comp == self.root:
-                num = -1  # inputs first 
-            elif conn.comp in all_comps:
-                num = all_comps.index(conn.comp)
-            else:
-                num = -2
-            return (num, conn.name, conn.bit)                
+        any_clock_references = any([True for conn in self.wires.values() if conn == clock])
 
         # Assign a bit for each output connection:
         all_bits = {}
-        all_bits[clock] = 0  # TODO: only if it's used somewhere?
-        next_bit = 1
-        for conn in sorted(set(self.wires.values()), key=by_component):
+        next_bit = 0
+        if any_clock_references:
+            all_bits[clock] = next_bit
+            next_bit += 1
+            
+        for conn in sorted(set(self.wires.values()), key=self._connections_sort_key()):
             if conn != clock:
                 all_bits[conn] = next_bit
                 next_bit += 1
         
         # Construct map of IC inputs, directly from all_bits:
         inputs = {
-            (name, bit): 1 << all_bits[Connection(self.root, name, bit)]
+            (name, bit): 1 << all_bits[Connection(root, name, bit)]
             for name, bits in self._inputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
         
-        inputs[("common.clock", 0)] = 1 << all_bits[clock]  # HACK
+        if any_clock_references:
+            inputs[("common.clock", 0)] = 1 << all_bits[clock]
 
         # Construct map of IC ouputs, mapped to all_bits via wires:
         outputs = {
-            (name, bit): 1 << all_bits[self.wires[Connection(self.root, name, bit)]]
+            (name, bit): 1 << all_bits[self.wires[Connection(root, name, bit)]]
             for name, bits in self._outputs.items()
             for bit in range(bits)  # TODO: None if single bit?
         }
 
         internal = {}  # TODO
 
-        # Construct a map of the traces for each single component, and ask it for its ops:
+        sorted_comps = self.sorted_components()
+
+        # For each component, construct a map of its traces' bit masks, and ask the component for its ops:
         initialize_ops = []
         combine_ops = []
         sequence_ops = []
-        for comp in self.sorted_components():
+        for comp in sorted_comps:
             traces = {}
             for name, bits in comp.inputs().items():
                 traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]
@@ -344,7 +282,20 @@ class IC:
             combine_ops += comp.combine(**traces)
             sequence_ops += comp.sequence(**traces)
 
-        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops)
+        back_edge_from_components = set()
+        for to_input, from_output in self.wires.items():
+            if (not isinstance(from_output.comp, Const)
+                and from_output.comp in sorted_comps
+                and to_input.comp in sorted_comps
+                and from_output.comp.has_combine_ops()
+                and sorted_comps.index(from_output.comp) > sorted_comps.index(to_input.comp)):
+                back_edge_from_components.add(from_output.comp)
+        non_back_edge_mask = 0
+        for conn, bit in all_bits.items():
+            if conn.comp not in back_edge_from_components:
+                non_back_edge_mask |= 1 << bit
+
+        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask)
 
 
     def __str__(self):
@@ -354,19 +305,22 @@ class IC:
         # TODO: render components in order, one per line, with neatly summarized inputs and outputs.
         
         all_comps = self.sorted_components()
-        def to_index(c, root):
-            if c == self.root:
-                return root
+        def to_index(c, root_val):
+            if c == root:
+                return root_val
             elif c not in all_comps:
                 # Note: this can happen due to, say, a bug in flattening, and it's easier to debug if
                 # str() stillworks in that case.
-                return root*2  # even before/after inputs/outputs
+                return root_val*2  # even before/after inputs/outputs
             else:
                 return all_comps.index(c)
         def by_component(t):
             # Sometimes it's interesting to see the wires by source:
             # return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
-            return (to_index(t[0].comp, 1000), t[0].name, to_index(t[1].comp, -1), t[1].name)
+            return (
+                to_index(t[0].comp, 1000), t[0].name, t[0].bit,
+                to_index(t[1].comp,   -1), t[1].name, t[1].bit
+            )
         def back_edge_label(from_comp, to_comp):
             if from_comp not in all_comps or to_comp not in all_comps:
                 return ""
@@ -414,17 +368,25 @@ def collapse_internal(graph):
 
 
 class Root:
-    """Pseudo-component providing access to an IC's inputs and outputs (under the opposite names).
+    """Pseudo-component which stands in for the IC itself in connections. There is exactly one instance
+    this class, `root`, which is used by every IC. Doing it that way makes it trivial to make a copy 
+    of an IC: just make a shallow copy of the `wires` dictionary.
+    
+    Note: inputs() and outputs() not defined here, because te result would be wrong. Anyone interested in
+    inputs and outputs needs to special case the root and look at the IC itself.
     """
 
-    def __init__(self, ic):
-        self.ic = ic
+    def __init__(self):
+        self.label = 'root'
 
     def inputs(self):
-        return self.ic.outputs()
+        raise NotImplementedError("Not a true component. Input and outputs are available from the IC.")
 
     def outputs(self):
-        return self.ic.inputs()
+        raise NotImplementedError("Not a true component. Input and outputs are available from the IC.")
+        
+root = Root()
+"""A single instance of Root which should be the only instance ever."""
 
 
 class Common:

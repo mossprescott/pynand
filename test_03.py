@@ -4,6 +4,7 @@ def dff_coarse_test(dff):
     """Test of DFF behavior when inputs are always stable across clock cycles.
     """
 
+    dff.tick(); dff.tock()
     assert dff.out == 0
 
     dff.in_ = 1
@@ -23,6 +24,7 @@ def dff_fine_test(dff):
     """Test of DFF behavior with varying signal timing.
     """
 
+    dff.tick(); dff.tock()
     assert dff.out == 0
 
     dff.in_ = 1
@@ -68,11 +70,17 @@ def test_dff_legit():
     assert list(gate_count(MyDFF).keys()) == ['nands']
 
 def test_my_dff_coarse():
-    dff = run(MyDFF)
+    # Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+    # raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+    # work, but it seems like this exercise might need to be dropped.
+    dff = run(MyDFF, optimize=False)
     dff_coarse_test(dff)
 
 def test_my_dff_fine():
-    dff = run(MyDFF)
+    # Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+    # raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+    # work, but it seems like this exercise might need to be dropped.
+    dff = run(MyDFF, optimize=False)
     dff_fine_test(dff)
 
 

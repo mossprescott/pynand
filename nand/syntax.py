@@ -1,8 +1,10 @@
 """Wrappers around IC and NandVector providing a more compact way of constructing and interacting with chips.
 """
 import nand.component
-from nand.integration import IC, Connection, common
+from nand.integration import IC, Connection, root, common
 from nand.evaluator import extend_sign
+from nand.optimize import simplify
+
 
 class Chip:
     def __init__(self, constr):
@@ -210,23 +212,26 @@ def build(builder):
         for (name, bit), ref in output_coll.dict.items():
             if ref.inst == common:
                 from_comp = common  # HACK
+                from_outputs = common.outputs()
             elif ref.inst._ic == ic:
-                from_comp = ic.root
+                from_comp = root
+                from_outputs = ic.inputs()
             else: 
                 from_comp = ref.inst._ic
+                from_outputs = from_comp.outputs()
             
             if bit is None and ref.bit is None:
-                for i in range(from_comp.outputs()[ref.name]):
-                    ic.wire(Connection(from_comp, ref.name, i), Connection(ic.root, name, i))
+                for i in range(from_outputs[ref.name]):
+                    ic.wire(Connection(from_comp, ref.name, i), Connection(root, name, i))
             else:
-                ic.wire(Connection(from_comp, ref.name, ref.bit or 0), Connection(ic.root, name, bit or 0))
+                ic.wire(Connection(from_comp, ref.name, ref.bit or 0), Connection(root, name, bit or 0))
 
         for inst in instances([ref.inst for ref in output_coll.dict.values()]):
             for name, ref in inst.args.items():
                 if ref.inst == common:
                     source_comp = common  # HACK
                 elif ref.inst._ic == ic:
-                    source_comp = ref.inst._ic.root
+                    source_comp = root
                 else:
                     source_comp = ref.inst._ic
 
@@ -269,14 +274,15 @@ class NandVectorWrapper:
 
     def tick(self):
         """Raise the common `clock` signal (and propagate state changes eagerly)."""
-        # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
-        self._vector._propagate()
+        if ('common.clock', 0) in self._vector.inputs:
+            self._vector._propagate()
+            self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
 
     def tock(self):
         """Lower the common `clock` signal (and propagate state changes eagerly)."""
-        # self._vector._propagate()  # TODO: overkill?
-        self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
+        if ('common.clock', 0) in self._vector.inputs:
+            self._vector._propagate()
+            self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
         self._vector._flop()
 
     def __getattr__(self, name):
@@ -311,7 +317,7 @@ class NandVectorWrapper:
     def components(self, types):
         """List of internal components (e.g. RAM, ROM).
         
-        Note: types in one or more of the types defined in nand.component, not the wrappers
+        Note: types should be one or more of the types defined in nand.component, not the wrappers
         with the same names defined in this module.
         """
         return [c for c in self._components if isinstance(c, types)]
@@ -320,10 +326,12 @@ class NandVectorWrapper:
         return str(self.outputs())
 
 
-def run(chip, **args):
+def run(chip, optimize=True, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    flat = _constr(chip).flatten()
-    w = NandVectorWrapper(flat.synthesize(), flat.sorted_components())
+    ic = _constr(chip).flatten()
+    if optimize:
+        ic = simplify(ic)
+    w = NandVectorWrapper(ic.synthesize(), ic.sorted_components())
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
@@ -366,10 +374,10 @@ def _constr(chip):
         ic = IC(comp.label, comp.inputs(), comp.outputs())
         for name, bits in comp.inputs().items():
             for i in range(bits):
-                ic.wire(Connection(ic.root, name, i), Connection(comp, name, i))
+                ic.wire(Connection(root, name, i), Connection(comp, name, i))
         for name, bits in comp.outputs().items():
             for i in range(bits):
-                ic.wire(Connection(comp, name, i), Connection(ic.root, name, i))
+                ic.wire(Connection(comp, name, i), Connection(root, name, i))
     return ic
 
 
