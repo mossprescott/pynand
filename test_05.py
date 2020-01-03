@@ -385,7 +385,7 @@ def test_computer_max():
 
  
 def cycles_per_second():
-    """Estimate the speed of 
+    """Estimate the speed of CPU simulation by running Max repeatedly with random input.
     """
     
     import random
