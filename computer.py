@@ -76,12 +76,9 @@ class KVM:
         for y in range(self.height):
             for w in range(row_words):
                 word = pixels[y*row_words + w]
-                if y == 1 and w == 0:
-                    print(f"word: {hex(word)}")
                 for i in range(16):
                     if word & 0b1:
                         x = w*16 + i
-                        print(f"set pixel: {(x, y)}")
                         self.screen.set_at((x, y), COLORS[1])
                     word >>= 1
 
