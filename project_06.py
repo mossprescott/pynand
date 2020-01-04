@@ -13,12 +13,12 @@ ALU_CONTROL = {
     # These are confirmed to produce the correct results, but may not match where more than
     # one equivalent exists:
     "1":   0b111111,
-    "-1":  0b101001,
+    "-1":  0b111010, # 0b101001,
     "D&A": 0b000000,
     "D|A": 0b010101,
     "A-D": 0b000111,
     "!D":  0b001011,
-    "!A":  0b100011,
+    "!A":  0b110001, # 0b100011,
     "D+1": 0b011111,
     "A+1": 0b110111,
     "D-1": 0b001110,
