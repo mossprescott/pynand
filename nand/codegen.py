@@ -27,7 +27,11 @@ def translate(ic):
         elif isinstance(conn.comp, Const):
             return conn.comp.value
         else:
-            return f"_{all_comps.index(conn.comp)}_{conn.name}"
+            local_name = f"_{all_comps.index(conn.comp)}_{conn.name}"
+            if conn.bit != 0:
+                return f"{local_name} & (1 << {conn.bit}) != 0"
+            else:
+                return local_name
 
     class_name = f"{ic.label}_gen"
     l(0, f"class {class_name}(Chip):")
