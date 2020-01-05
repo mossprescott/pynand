@@ -1,5 +1,5 @@
 import collections
-from pprint import pprint  # HACK
+import itertools
 
 from nand.evaluator import NandVector
 from nand.component import Component, Const
@@ -82,20 +82,6 @@ class IC:
                 return f"{comp.label}{num}"
             else:
                 return f"{comp.__class__.__name__}{num}"
-
-    def _connection_label(self, conn, all_comps):
-        if isinstance(conn.comp, Const):
-            return str(int(conn.comp.value & (1 << conn.bit) != 0))
-        else:
-            if conn.comp == root:
-                # Not really a typo; the dicts are actually reversed, although it doesn't really matter here.
-                inputs, outputs = self.outputs(), self.inputs()
-            else:
-                inputs, outputs = conn.comp.inputs(), conn.comp.outputs()
-            multi_bit = inputs.get(conn.name, 0) > 1 or outputs.get(conn.name, 0) > 1
-            comp = "" if conn.comp == root or conn == clock else f"{self._comp_label(conn.comp, all_comps)}."
-            bit = f"[{conn.bit}]" if multi_bit else ""
-            return f"{comp}{conn.name}{bit}"
 
 
     def copy(self):
@@ -319,11 +305,12 @@ class IC:
             else:
                 return all_comps.index(c)
         def by_component(t):
+            ((fc, fn), (tc, tn)), _ = t
             # Sometimes it's interesting to see the wires by source:
-            # return (to_index(t[1].comp, -1), t[1].name, to_index(t[0].comp, 1000), t[0].name)
+            # return (to_index(fc, -1), fn, to_index(tc, 1000), tn)
             return (
-                to_index(t[0].comp, 1000), t[0].name, t[0].bit,
-                to_index(t[1].comp,   -1), t[1].name, t[1].bit
+                to_index(tc, 1000), tn,
+                to_index(fc,   -1), fn
             )
         def back_edge_label(from_comp, to_comp):
             if from_comp not in all_comps or to_comp not in all_comps:
@@ -337,13 +324,60 @@ class IC:
             else:
                 return ""
 
+        def wires(key, bit_pairs):
+            (fc, fn), (tc, tn) = key
+            def line(l, r, x): 
+                return f"  {l:21s} -> {r:21s}{x}"
+            def comp_name_label(comp, name):
+                if isinstance(comp, Const):
+                    return hex(comp.value)
+                elif comp == root or (comp == clock.comp and name == clock.name):
+                    return name 
+                else:
+                    return f"{self._comp_label(comp, all_comps)}.{name}"
+            def conn_label(comp, name, bit):
+                if isinstance(comp, Const):
+                    return str(int(comp.value & (1 << bit) != 0))
+                else:
+                    if comp == root:
+                        # Not really a typo; the dicts are actually reversed, although it doesn't really matter here.
+                        inputs, outputs = self.outputs(), self.inputs()
+                    else:
+                        inputs, outputs = comp.inputs(), comp.outputs()
+                    multibit = inputs.get(name, 0) > 1 or outputs.get(name, 0) > 1
+                    bit_label = f"[{bit}]" if multibit else ""
+                    return comp_name_label(comp, name) + bit_label
+
+            # detect only the common case of all the bits wired in parallel:
+            num_bits = len(bit_pairs)
+            if num_bits > 1 and bit_pairs == set([(i, i) for i in range(num_bits)]):
+                return [
+                    line(f"{comp_name_label(fc, fn)}[0..{num_bits-1}]",
+                         f"{comp_name_label(tc, tn)}[0..{num_bits-1}]",
+                         back_edge_label(fc, tc))
+                ]
+            else:
+                return [
+                    line(conn_label(fc, fn, fb), 
+                         conn_label(tc, tn, tb), 
+                         back_edge_label(fc, tc))
+                    for fb, tb in sorted(bit_pairs)
+                    ]
+
+        # Dictionary of ((from component, from name), (to_component, to_name)) -> set([(from_bit, to_bit)])
+        component_name_pairs = {}
+        for to_input, from_output in self.wires.items():
+            key = ((from_output.comp, from_output.name), (to_input.comp, to_input.name))
+            value = (from_output.bit, to_input.bit)
+            component_name_pairs.setdefault(key, set()).add(value)
+
         ins = ', '.join(f"{name}[{bits}]" for name, bits in self.inputs().items())
         outs = ', '.join(f"{name}[{bits}]" for name, bits in self.outputs().items())
-        return '\n'.join(
-            [f"{self.label}({ins}; {outs}):"] +
-            [ f"  {self._connection_label(from_output, all_comps):16s} -> {self._connection_label(to_input, all_comps):16s}{back_edge_label(from_output.comp, to_input.comp)}"
-              for to_input, from_output in sorted(self.wires.items(), key=by_component)
-            ])
+        return '\n'.join(itertools.chain(
+                [f"{self.label}({ins}; {outs}):"],
+                *[wires(*args) for args in sorted(component_name_pairs.items(), key=by_component)]
+            ))
+
 
     def __repr__(self):
         # HACK

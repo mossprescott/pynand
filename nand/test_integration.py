@@ -12,12 +12,34 @@ def test_simple_wiring():
     ic.wire(Connection(root, "in_", 0), Connection(nand, "b", 0))
     ic.wire(Connection(nand, "out", 0), Connection(root, "out", 0))
 
-    assert str(ic) == '\n'.join([
+    assert str(ic).split(sep='\n') ==[
         "JustNand(in_[1]; out[1]):",
-        "  in_              -> Nand_0.a        ",
-        "  in_              -> Nand_0.b        ",
-        "  Nand_0.out       -> out             ",
-    ])
+        "  in_                   -> Nand_0.a             ",
+        "  in_                   -> Nand_0.b             ",
+        "  Nand_0.out            -> out                  ",
+    ]
+
+
+def test_multibit_wiring():
+    nand16 = IC("Nand16", {"a": 16, "b": 16}, {"out": 16})
+    for i in range(16):
+        nand = Nand()
+        nand16.wire(Connection(root, "a", i), Connection(nand, "a", 0))
+        nand16.wire(Connection(root, "b", i), Connection(nand, "b", 0))
+        nand16.wire(Connection(nand, "out", 0), Connection(root, "out", i))
+    
+    ic = IC("JustNand16", {"in_": 16}, {"out": 16})
+    for i in range(16):
+        ic.wire(Connection(root, "in_", i), Connection(nand16, "a", i))
+        ic.wire(Connection(root, "in_", i), Connection(nand16, "b", i))
+        ic.wire(Connection(nand16, "out", i), Connection(root, "out", i))
+    
+    assert str(ic).split(sep='\n') ==[
+        "JustNand16(in_[16]; out[16]):",
+        "  in_[0..15]            -> Nand16_0.a[0..15]    ",
+        "  in_[0..15]            -> Nand16_0.b[0..15]    ",
+        "  Nand16_0.out[0..15]   -> out[0..15]           ",
+    ]
 
 
 def test_wiring_errors():
