@@ -1,15 +1,19 @@
-from nand.component import Nand
+from nand.component import Nand, Const
 from nand.integration import Connection, root
 from nand.optimize import simplify
 
 PRIMITIVES = set([
-    "Nand"
+    "Nand",
+    "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
+    # "Not", "And", "Or", "Xor",
 ])
 
 def translate(ic):
     """Given an IC, generate the Python source of a class which implements the chip, as a sequence of lines."""
 
-    flat = simplify(ic.flatten(primitives=PRIMITIVES))
+    # flat = simplify(ic.flatten(primitives=PRIMITIVES))  # TODO: don't flatten everything in simplify
+    flat = ic.flatten(primitives=PRIMITIVES)
+    print(flat)
     all_comps = flat.sorted_components()
 
     lines = []
@@ -20,6 +24,8 @@ def translate(ic):
         # TODO: deal with lots of cases
         if conn.comp == root:
             return f"self._{conn.name}"
+        elif isinstance(conn.comp, Const):
+            return conn.comp.value
         else:
             return f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -34,13 +40,45 @@ def translate(ic):
     l(0, "")
     
     l(1, f"def _combine(self):"),
+    l(2, "def extend_sign(x):")
+    l(3, "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
         if isinstance(comp, Nand):
             a_conn = ic.wires[Connection(comp, "a", 0)]
             b_conn = ic.wires[Connection(comp, "b", 0)]
             l(2, f"_{all_comps.index(comp)}_out = not ({src(a_conn)} and {src(b_conn)})")
+        elif isinstance(comp, Const):
+            pass
+        elif comp.label == 'Not16':
+            # TODO: check for parallel wiring; deal with it if not
+            in_conn = ic.wires[Connection(comp, "in_", 0)]  # HACK
+            l(2, f"_{all_comps.index(comp)}_out = ~{src(in_conn)}")
+        elif comp.label == 'And16':
+            # TODO: check for parallel wiring; deal with it if not
+            a_conn = ic.wires[Connection(comp, "a", 0)]  # HACK
+            b_conn = ic.wires[Connection(comp, "b", 0)]  # HACK
+            l(2, f"_{all_comps.index(comp)}_out = {src(a_conn)} & {src(b_conn)}")
+        elif comp.label == 'Add16':
+            # TODO: check for parallel wiring; deal with it if not
+            a_conn = ic.wires[Connection(comp, "a", 0)]  # HACK
+            b_conn = ic.wires[Connection(comp, "b", 0)]  # HACK
+            l(2, f"_{all_comps.index(comp)}_out = extend_sign({src(a_conn)} + {src(b_conn)})")
+        elif comp.label == 'Mux16':
+            # TODO: check for parallel wiring; deal with it if not
+            a_conn = ic.wires[Connection(comp, "a", 0)]  # HACK
+            b_conn = ic.wires[Connection(comp, "b", 0)]  # HACK
+            sel_conn = ic.wires[Connection(comp, "sel", 0)]
+            l(2, f"_{all_comps.index(comp)}_out = {src(b_conn)} if {src(sel_conn)} else {src(a_conn)}")
+        elif comp.label == 'Zero16':
+            # TODO: check for parallel wiring; deal with it if not
+            in_conn = ic.wires[Connection(comp, "in_", 0)]  # HACK
+            l(2, f"_{all_comps.index(comp)}_out = {src(in_conn)} == 0")
         else:
+            # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
+        # DEBUG;
+        if not isinstance(comp, Const):
+            l(2, f"print('_{all_comps.index(comp)}_out: ' + str(_{all_comps.index(comp)}_out))")
     for name, bits in flat.outputs().items():
         # TODO: handle bits > 1
         conn = flat.wires[Connection(root, name, 0)]
@@ -51,8 +89,8 @@ def translate(ic):
         # TODO
     l(2, f"pass")
     
-    print(flat)
-    print('\n'.join(lines))
+    # print(flat)
+    # print('\n'.join(lines))
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
