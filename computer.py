@@ -107,11 +107,11 @@ def main():
             key = kvm.process_events()
             keyboard.set(key or 0)
 
-        if cycles % 100 == 0:
+        if cycles % 500 == 0:
             kvm.update_display(screen_mem.storage)
 
-        if cycles % 5000 == 0:
-            print(f"cycles: {cycles}; pc: {computer.pc}")
+        if cycles % 10000 == 0:
+            print(f"cycles: {cycles/1000:0.0f}k; pc: {computer.pc}")
             print(f"mem@00:   {', '.join(hex(main_mem.storage[i])[2:].rjust(4, '0') for i in range(16))}")
             print(f"mem@16:   {', '.join(hex(main_mem.storage[i+16])[2:].rjust(4, '0') for i in range(16))}")
 
