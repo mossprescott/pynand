@@ -94,18 +94,21 @@ class IC:
         return ic
 
 
-    def flatten(self):
-        """Construct a new IC which has the same structure as this one, but no nested ICs.
+    def flatten(self, primitives=None):
+        """Construct a new IC which has the same structure as this one, but no nested ICs,
+        except those whose labels are in `primitives`.
         That is, the wiring of all child ICs has been "inlined" into a single flat assembly.
         """
+        if not primitives:
+            primitives = set()
 
         flat_children = {}
 
         all_wires = {}
         
         for comp in self.sorted_components():
-            if isinstance(comp, IC):
-                child = comp.flatten()
+            if isinstance(comp, IC) and comp.label not in primitives:
+                child = comp.flatten(primitives)
                 flat_children[comp] = child
                 for to_input, from_output in child.wires.items():
                     if from_output.comp == root:
