@@ -54,7 +54,11 @@ class IC:
         else:
             relevant_inputs = to_input.comp.inputs()
 
-        if from_output.name not in relevant_outputs:
+        if from_output.comp == self:
+            raise WiringError("Tried to connect input to self; use `root` instead")
+        elif to_input.comp == self:
+            raise WiringError("Tried to connect output to self; use `root` instead")
+        elif from_output.name not in relevant_outputs:
             raise WiringError(f"Component {self._comp_label(from_output.comp, self.sorted_components())} has no output '{from_output.name}'")
         elif from_output.bit < 0 or from_output.bit >= relevant_outputs[from_output.name]:
             raise WiringError(f"Tried to connect bit {from_output.bit} of {relevant_outputs[from_output.name]}-bit output {self._comp_label(from_output.comp, self.sorted_components())}.{from_output.name}")

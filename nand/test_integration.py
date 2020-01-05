@@ -43,7 +43,15 @@ def test_wiring_errors():
 
     with pytest.raises(WiringError) as exc_info:
         ic.wire(Connection(root, "in_", 17), Connection(nand, "a", 0))
-    assert str(exc_info.value) == "Tried to connect bit 17 of 1-bit output Root.in_"
+    assert str(exc_info.value) == "Tried to connect bit 17 of 1-bit output Root.in_"  # TODO: msg could be better
+
+    with pytest.raises(WiringError) as exc_info:
+        ic.wire(Connection(ic, "in_", 0), Connection(nand, "a", 0))
+    assert str(exc_info.value) == "Tried to connect input to self; use `root` instead"
+
+    with pytest.raises(WiringError) as exc_info:
+        ic.wire(Connection(nand, "out", 0), Connection(ic, "out", 0))
+    assert str(exc_info.value) == "Tried to connect output to self; use `root` instead"
 
 
 def test_components_simple():
