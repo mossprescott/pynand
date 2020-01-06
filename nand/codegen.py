@@ -1,3 +1,33 @@
+"""A faster evaluator, which assumes that certain components are defined in the usual way.
+
+This is meant to be flexible enough to implement new ALUs, new ISAs, and other variations, and yet
+fast enough to run interactive programs.
+
+The following components are assumed to have the conventional behavior, and are implemented
+directly in Python:
+- Nand, of course
+- common 1-bit functions: Not, And, Or
+- common 16-bit functions: Not16, And16, Add16, Inc16, Mux16
+- one oddball: Zero16 (which could be generalized to Eq16)
+- Register
+- ROM: there should no more than one ROM present
+- MemorySystem: there should be no more than one MemorySystem present
+
+Any other ICs that appear are flattened to combinations of these. The downside is that it a 
+moderate amount of flattening will have a significant impact on simulation speed. For example,
+the entire Computer amounts to 35 components; it's basically just decoding the instruction, 
+the ALU function, and a little wiring. That's why this is fast.
+
+If a new design can benefit from some additional components (e.g. ShiftR16), they're not very hard 
+to add, but they should be limited to operations that:
+- are generally useful (i.e. not design-specific logic)
+- are already implemented with Nand, DFF, etc., and shown to be practical
+
+That's right, the entire MemorySystem (mapping main memory, screen memory, and keyboard input into 
+a flat address space) is all implemented with fixed logic. The rationale for that is that changing 
+the memory layout also entails constructing a new UI harness, which is beside the point.
+"""
+
 from nand.component import Nand, Const, ROM
 from nand.integration import IC, Connection, root
 from nand.optimize import simplify
