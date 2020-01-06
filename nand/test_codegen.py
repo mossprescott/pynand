@@ -3,7 +3,8 @@ from nand.codegen import translate
 from nand.component import Nand
 from nand.integration import IC, Connection, root
 import nand.syntax
-from project_02 import ALU
+import project_02
+import project_03
 
 
 def test_nand():
@@ -54,7 +55,7 @@ def test_and3():
 
 
 def test_alu():
-    alu = translate(ALU.constr())()
+    alu = translate(project_02.ALU.constr())()
     
     # HACK: copied verbatim from test_02
     
@@ -172,3 +173,69 @@ def test_alu():
 
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
     assert alu.out == 19 and alu.zr == 0 and alu.ng == 0
+
+
+def test_pc():
+    pc = translate(project_03.PC.constr())()
+
+    # HACK: copied verbatim from test_02
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 0; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = -32123
+    pc.tick(); pc.tock()
+    assert pc.out == 2
+
+    pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == -32123
+
+    pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == -32122
+
+    pc.tick(); pc.tock()
+    assert pc.out == -32121
+
+    pc.in_ = 12345; pc.load = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.load = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = 22222; pc.reset = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
