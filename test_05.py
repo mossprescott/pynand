@@ -412,8 +412,8 @@ def cycles_per_second():
 
 def test_speed():
     cps = cycles_per_second()
-    print(f"Measured speed: {cps:0.1f} cycles/s")
-    assert cps > 100
+    print(f"Measured speed: {cps:0,.1f} cycles/s")
+    assert cps > 1000
  
 
 def run_program(computer, instructions):
