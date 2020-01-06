@@ -60,41 +60,7 @@ def translate(ic):
             l(2, f"self._{all_comps.index(comp)}_out = 0  # register")
     l(0, "")
     
-    l(1, f"def _combine(self):"),
-    l(2, "def extend_sign(x):")
-    l(3, "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
-    for comp in all_comps:
-        if isinstance(comp, Nand):
-            a_conn = ic.wires[Connection(comp, "a", 0)]
-            b_conn = ic.wires[Connection(comp, "b", 0)]
-            l(2, f"_{all_comps.index(comp)}_out = not ({src(a_conn)} and {src(b_conn)})")
-        elif isinstance(comp, Const):
-            pass
-        elif comp.label == 'Not16':
-            unary16(comp, "~{}")
-        elif comp.label == 'And16':
-            binary16(comp, "{} & {}")
-        elif comp.label == 'Add16':
-            binary16(comp, "extend_sign({} + {})")
-        elif comp.label == 'Mux16':
-            sel_conn = ic.wires[Connection(comp, "sel", 0)]
-            binary16(comp, f"{{}} if not {src(sel_conn)} else {{}}")
-        elif comp.label == 'Zero16':
-            unary16(comp, "{} == 0")
-        elif comp.label == 'Inc16':
-            unary16(comp, "extend_sign({} + 1)")
-        elif comp.label == "Register":
-            pass  # nothing to do here
-        else:
-            # print(f"TODO: {comp.label}")
-            raise Exception(f"Unrecognized primitive: {comp}")
-    for name, bits in flat.outputs().items():
-        # TODO: handle bits > 1
-        conn = flat.wires[Connection(root, name, 0)]
-        l(2, f"self._{name} = {src(conn)}")
-    l(0, "")
-    
-    l(1, f"def _sequence(self):")
+    l(1, f"def _eval(self, update_state):")
     l(2,   "def extend_sign(x):")
     l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
@@ -122,7 +88,14 @@ def translate(ic):
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
-    l(2, "# Now update state:")
+
+    for name, bits in flat.outputs().items():
+        # TODO: handle bits > 1
+        conn = flat.wires[Connection(root, name, 0)]
+        l(2, f"self._{name} = {src(conn)}")
+
+    l(2, "if update_state:")
+    l(3,   "pass")
     for comp in all_comps:
         if not isinstance(comp, IC):
             pass
@@ -130,8 +103,8 @@ def translate(ic):
             # TODO: check for parallel wiring; deal with it if not
             in_conn = ic.wires[Connection(comp, "in_", 0)]
             load_conn = ic.wires[Connection(comp, "load", 0)]
-            l(2, f"if {src(load_conn)}:")
-            l(3,   f"self._{all_comps.index(comp)}_out = {src(in_conn)}")
+            l(3, f"if {src(load_conn)}:")
+            l(4,   f"self._{all_comps.index(comp)}_out = {src(in_conn)}")
         elif comp.label in ('Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
             pass
         else:
@@ -171,13 +144,11 @@ class Chip:
             raise Exception(f"No such output: {name}")
 
         if self.__dirty:
-            self._combine()
+            self._eval(False)
         return object.__getattribute__(self, f"_{name}")
 
     def tick(self):
         pass
 
     def tock(self):
-        if self.__dirty:
-            self._combine()
-        self._sequence()
+        self._eval(True)
