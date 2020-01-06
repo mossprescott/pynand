@@ -6,6 +6,7 @@ import nand.syntax
 import project_02
 import project_03
 import project_05
+import test_05
 
 
 def test_nand():
@@ -435,3 +436,135 @@ def test_cpu():
     cpu.reset = 0
     cpu.tick(); cpu.tock()
     assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
+
+
+def test_computer_add():
+    computer = translate(project_05.Computer.constr())()
+    
+    # First run (at the beginning PC=0)
+    run_program(computer, test_05.ADD_PROGRAM)
+    
+    assert peek(computer, 0) == 5
+    
+
+    # Reset the PC
+    computer.reset = 1
+    computer.tick(); computer.tock()
+    assert computer.pc == 0
+    
+    # Second run, to check that the PC was reset correctly.
+    poke(computer, 0, 12345)
+    computer.reset = 0    
+    while computer.pc < len(test_05.ADD_PROGRAM):
+        computer.tick(); computer.tock()
+
+    assert peek(computer, 0) == 5        
+
+
+def test_computer_max():
+    computer = translate(project_05.Computer.constr())()
+
+    init_rom(computer, test_05.MAX_PROGRAM)
+
+    # first run: compute max(3,5)
+    poke(computer, 0, 3)
+    poke(computer, 1, 5)
+    for _ in range(14):
+        computer.tick(); computer.tock()    
+    assert peek(computer, 2) == 5
+
+    # second run: compute max(23456,12345)
+    reset_program(computer)
+    poke(computer, 0, 23456)
+    poke(computer, 1, 12345)
+    # The run on these inputs needs less cycles (different branching)
+    for _ in range(10):
+        computer.tick(); computer.tock()    
+    assert peek(computer, 2) == 23456
+
+
+def cycles_per_second():
+    """Estimate the speed of CPU simulation by running Max repeatedly with random input.
+    """
+    
+    import random
+    import timeit
+    
+    computer = translate(project_05.Computer.constr())()
+
+    init_rom(computer, test_05.MAX_PROGRAM)
+
+    def once():
+        x = random.randint(0, 0x7FFF)
+        y = random.randint(0, 0x7FFF)
+        reset_program(computer)
+        poke(computer, 0, x)
+        poke(computer, 1, y)
+        for _ in range(14):
+            computer.tick(); computer.tock()
+        assert peek(computer, 2) == max(x, y)
+
+    count, time = timeit.Timer(once).autorange()
+
+    return count*14/time
+
+
+def test_speed():
+    cps = cycles_per_second()
+    print(f"Measured speed: {cps:0,.1f} cycles/s")
+    assert cps > 100000
+
+
+# TODO: put all of this behind a common interface
+
+def run_program(computer, instructions):
+    """Install and run a sequence of instructions, stopping when pc runs off the end."""
+    
+    init_rom(computer, instructions)
+
+    while computer.pc <= len(instructions):
+        computer.tick(); computer.tock()    
+
+def reset_program(computer):
+    """Reset pc so the program will run again from the top."""
+    
+    computer.reset = 1
+    computer.tick(); computer.tock()
+
+    computer.reset = 0
+    
+
+# def run_fully(computer):
+#     reset_program(computer)
+#
+#     # TODO: what is a safe termination condition? How to detect infinite loop vs other tight loop?
+#     # For example, something like this might be useful: MD=D-1; A-D; JLT
+#     while ?:
+#       computer.tick(); computer.tock()
+
+
+def peek(computer, address):
+    """Read a single word from the Computer's memory."""
+    
+    return computer._ram[address]
+
+
+def poke(computer, address, value):
+    """Write a single word to the Computer's memory."""
+    
+    computer._ram[address] = value
+
+
+def init_rom(computer, instructions):
+    """Overwrite the top of the ROM with a sequence of instructions.
+    
+    If there's any space left over, an two-instruction infinite loop is written immediately
+    after the program, which could in theory be used to detect termination.
+    """
+    
+    size = len(instructions)
+    prg = instructions + [
+        size,  # @size (which is the address of this instruction)
+        0b111_0_000000_000_111,  # JMP
+    ]
+    computer._rom = prg

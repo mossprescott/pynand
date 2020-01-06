@@ -1,4 +1,4 @@
-from nand.component import Nand, Const
+from nand.component import Nand, Const, ROM
 from nand.integration import IC, Connection, root
 from nand.optimize import simplify
 
@@ -8,6 +8,7 @@ PRIMITIVES = set([
     "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
+    "MemorySystem",  # Needed for Computer
 ])
 
 
@@ -45,7 +46,7 @@ def generate_python(ic):
         # print(f"> {l}")
         lines.append(l)
 
-    def src1(comp, name):
+    def src_one(comp, name):
         conn = ic.wires[Connection(comp, name, 0)]
         
         # TODO: deal with lots of cases
@@ -63,14 +64,17 @@ def generate_python(ic):
         else:
             return f"({value} & 0b1 != 0)" 
 
-    def src16(comp, name):
+    def src_many(comp, name, bits=None):
+        if bits is None:
+            bits = 16
+
         conn0 = ic.wires[Connection(comp, name, 0)]
         if conn0.bit != 0:
-            raise Exception("TODO: unexpected wiring for 16-bit component")
-        for i in range(1, 16):
+            raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
+        for i in range(1, bits):
             conn_i = ic.wires[Connection(comp, name, i)]
             if conn_i.comp != conn0.comp or conn_i.name != conn0.name or conn_i.bit != i:
-                raise Exception("TODO: unexpected wiring for 16-bit component")
+                raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
         
         conn = conn0
         
@@ -89,16 +93,16 @@ def generate_python(ic):
             return name
 
     def unary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src1(comp, 'in_'))}")
+        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'in_'))}")
 
     def binary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src1(comp, 'a'), src1(comp, 'b'))}")
+        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'a'), src_one(comp, 'b'))}")
 
-    def unary16(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src16(comp, 'in_'))}")
+    def unary16(comp, template, bits=None):
+        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'in_', bits))}")
         
     def binary16(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src16(comp, 'a'), src16(comp, 'b'))}")
+        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
 
     l(0, f"class {class_name}(Chip):")
     l(1,   f"def __init__(self):")
@@ -110,6 +114,12 @@ def generate_python(ic):
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
             l(2, f"self._{all_comps.index(comp)}_out = 0  # register")
+        elif isinstance(comp, IC) and comp.label == "MemorySystem":
+            l(2, f"self._rom = []  # memory system")
+            l(2, f"self._ram = [0]*(1 << 14)  # memory system")
+            l(2, f"self._screen = [0]*(1 << 13)  # memory system")
+            l(2, f"self._keyboard = 0  # memory system")
+            
     l(0, "")
     
     l(1, f"def _eval(self, update_state):")
@@ -133,22 +143,42 @@ def generate_python(ic):
         elif comp.label == 'Add16':
             binary16(comp, "extend_sign({} + {})")
         elif comp.label == 'Mux16':
-            binary16(comp, f"{{}} if not {src1(comp, 'sel')} else {{}}")
+            binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
         elif comp.label == 'Zero16':
             unary16(comp, "{} == 0")
         elif comp.label == 'Inc16':
             unary16(comp, "extend_sign({} + 1)")
         elif comp.label == "Register":
-            l(2, f"# _{all_comps.index(comp)}_out is a Register; updated later")
+            l(2, f"# _{all_comps.index(comp)} is a Register; updated later")
+        elif isinstance(comp, ROM):
+            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
+            l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
+            l(3,   f"_{all_comps.index(comp)}_out = self._rom[_{all_comps.index(comp)}_address]")
+            l(2, f"else:")
+            l(3,   f"_{all_comps.index(comp)}_out = 0")
+        # elif isinstance(comp, RAM):
+        #     l(2, f"_{all_comps.index(comp)}_out = self.{all_comps.index(comp)}[{src_many(comp, 'address', comp.address_bits)}]")
+        # elif isinstance(comp, Input):
+        #     l(2, f"# _{all_comps.index(comp)} is a Input: self._{all_comps.index(comp)} is used")
+        elif comp.label == "MemorySystem":
+            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")  # TODO: 15?
+            l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
+            l(3,   f"_{all_comps.index(comp)}_out = self._ram[_{all_comps.index(comp)}_address]")
+            l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
+            l(3,   f"_{all_comps.index(comp)}_out = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
+            l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
+            l(3,   f"_{all_comps.index(comp)}_out = self._keyboard")
+            l(2, f"else:")
+            l(3,   f"_{all_comps.index(comp)}_out = 0")
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
         if bits == 1:
-            l(2, f"self._{name} = {src1(root, name)}")
+            l(2, f"self._{name} = {src_one(root, name)}")
         else:
-            l(2, f"self._{name} = {src16(root, name)}")
+            l(2, f"self._{name} = {src_many(root, name)}")
 
     l(2, "if update_state:")
     l(3,   "pass")
@@ -158,9 +188,16 @@ def generate_python(ic):
             pass
         elif comp.label == "Register":
             # l(3, f"print('register: {all_comps.index(comp)}')")  # HACK
-            l(3, f"if {src1(comp, 'load')}:")
-            l(4,   f"self._{all_comps.index(comp)}_out = {src16(comp, 'in_')}")
-            # l(4,   f"print('  loaded: ' + str({src16(comp, 'in_')}))")  # HACK
+            l(3, f"if {src_one(comp, 'load')}:")
+            l(4,   f"self._{all_comps.index(comp)}_out = {src_many(comp, 'in_')}")
+            # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+        elif comp.label == "MemorySystem":
+            l(3, f"if {src_one(comp, 'load')}:")
+            l(4,   f"_{all_comps.index(comp)}_in = {src_many(comp, 'in_')}")
+            l(4,   f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
+            l(5,     f"self._ram[_{all_comps.index(comp)}_address] = _{all_comps.index(comp)}_in")
+            l(4,   f"elif _{all_comps.index(comp)}_address < 0x6000:")
+            l(5,     f"self._screen[_{all_comps.index(comp)}_address & 0x1fff] = _{all_comps.index(comp)}_in")
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
