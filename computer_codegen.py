@@ -1,3 +1,7 @@
+# HACK: this is a copy of computer.py, modified to use the codegen simulator.
+# TODO: put a common interface around both simulated computers, and make the choice of simulation
+# an option to this script.
+
 # Note: install updated pygame with Mojave fix: 
 # pip3 install pygame==2.0.0dev6
 
