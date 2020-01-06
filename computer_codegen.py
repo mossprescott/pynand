@@ -9,8 +9,9 @@ import nand.component
 from nand.syntax import run
 import project_05
 import project_06
-import test_05
-
+# import test_05
+from nand import test_codegen
+from nand.codegen import translate
 
 COLORS = [0xFFFFFF, 0x000000]
 """0: White, 1: Black, as it was meant to be."""
@@ -85,18 +86,18 @@ class KVM:
         pygame.display.flip()
 
 
-CPS = 1000
+CPS = 100_000
 
 def main():
     with open(sys.argv[1]) as f:
         prg = project_06.load_file(f)
 
-    computer = run(project_05.Computer)
-    test_05.init_rom(computer, prg)
+    computer = translate(project_05.Computer.constr())()
+    test_codegen.init_rom(computer, prg)
     
-    main_mem = test_05.get_ram(computer, address_bits=14)
-    screen_mem = test_05.get_ram(computer, address_bits=13)
-    keyboard, = computer.components(nand.component.Input)
+    # main_mem = test_05.get_ram(computer, address_bits=14)
+    # screen_mem = test_05.get_ram(computer, address_bits=13)
+    # keyboard, = computer.components(nand.component.Input)
 
     kvm = KVM(sys.argv[1], 512, 256)
 
@@ -107,15 +108,17 @@ def main():
         # A few times per second, process events and update the display:
         if cycles % (CPS//30) == 0:
             key = kvm.process_events()
-            keyboard.set(key or 0)
+            # keyboard.set(key or 0)
+            computer._keyboard = key or 0
 
         if cycles % (CPS//15) == 0:
-            kvm.update_display(screen_mem.storage)
+            # kvm.update_display(screen_mem.storage)
+            kvm.update_display(computer._screen)
 
         if cycles % (CPS*5) == 0:
             print(f"cycles: {cycles/1000:0,.0f}k; pc: {computer.pc}")
-            print(f"mem@00:   {', '.join(hex(main_mem.storage[i])[2:].rjust(4, '0') for i in range(16))}")
-            print(f"mem@16:   {', '.join(hex(main_mem.storage[i+16])[2:].rjust(4, '0') for i in range(16))}")
+            # print(f"mem@00:   {', '.join(hex(main_mem.storage[i])[2:].rjust(4, '0') for i in range(16))}")
+            # print(f"mem@16:   {', '.join(hex(main_mem.storage[i+16])[2:].rjust(4, '0') for i in range(16))}")
 
 
 if __name__ == "__main__":
