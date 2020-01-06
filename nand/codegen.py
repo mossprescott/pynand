@@ -2,6 +2,7 @@ from nand.component import Nand, Const
 from nand.integration import IC, Connection, root
 from nand.optimize import simplify
 
+
 PRIMITIVES = set([
     "Nand",
     "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
@@ -9,7 +10,25 @@ PRIMITIVES = set([
     "Inc16", "Register"  # Needed for PC
 ])
 
+
 def translate(ic):
+    """Generate a Python class implementing the IC, and providing the same interface as you get
+    from nand.syntax.run().
+    """
+    
+    class_name, lines = generate_python(ic)
+    
+    # print(flat)
+    print_lines(lines)
+
+    eval(compile('\n'.join(lines),
+            filename="<generated>",
+            mode='single'))
+    
+    return locals()[class_name]
+
+
+def generate_python(ic):
     """Given an IC, generate the Python source of a class which implements the chip, as a sequence of lines."""
 
     # flat = simplify(ic.flatten(primitives=PRIMITIVES))  # TODO: don't flatten everything in simplify
@@ -111,16 +130,14 @@ def translate(ic):
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
     l(0, "")
-
-
-    # print(flat)
-    print('\n'.join(f"{str(i+1).rjust(3)}: {l}" for (i, l) in enumerate(lines)))
-
-    eval(compile('\n'.join(lines),
-            filename="<generated>",
-            mode='single'))
     
-    return locals()[class_name]
+    return class_name, lines
+
+
+def print_lines(lines):
+    """Print numbered source lines."""
+    for i, l in enumerate(lines):
+        print(f"{str(i+1).rjust(3)}: {l}")
 
 
 class Chip:
