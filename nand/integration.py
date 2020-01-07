@@ -107,6 +107,7 @@ class IC:
         
         for comp in self.sorted_components():
             if isinstance(comp, IC) and comp.label not in primitives:
+                # print(f"flatten: {comp.label}")
                 child = comp.flatten(primitives)
                 flat_children[comp] = child
                 for to_input, from_output in child.wires.items():

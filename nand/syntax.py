@@ -268,7 +268,7 @@ def run(chip, optimize=True, simulator='vector', **args):
     if simulator == 'codegen':
         w = nand.codegen.run(ic)
     else:
-        w = nand.evaluator.run(ic, optimize)
+        w = nand.vector.run(ic, optimize)
 
     for name, value in args.items():
         w.__setattr__(name, value)

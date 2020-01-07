@@ -1,5 +1,5 @@
 from nand.component import Nand, DFF
-from nand.evaluator import NandVector, nand_op, custom_op, synthesize, set_trace, tst_trace
+from nand.vector import NandVector, nand_op, custom_op, synthesize, set_trace, tst_trace
 from nand.integration import IC, Connection, root
 
 def dff_op(in_, out):

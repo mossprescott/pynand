@@ -6,5 +6,5 @@ This module just re-exports the definitions that are most often needed from wher
 implemented (in the `eval` sub-dir.)
 """
 
-from nand.evaluator import unsigned
+from nand.vector import unsigned
 from nand.syntax import Nand, DFF, ROM, RAM, Input, lazy, clock, build, run, gate_count

@@ -31,7 +31,7 @@ the memory layout also entails constructing a new UI harness, which is beside th
 from nand.component import Nand, Const, ROM
 from nand.integration import IC, Connection, root
 from nand.optimize import simplify
-from nand.evaluator import extend_sign
+from nand.vector import extend_sign
 
 
 def run(ic):

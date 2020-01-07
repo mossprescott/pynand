@@ -1,5 +1,5 @@
 from nand.component import *
-from nand.evaluator import run_op, component_ops
+from nand.vector import run_op, component_ops
 
 
 def test_nand():
