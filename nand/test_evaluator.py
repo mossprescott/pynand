@@ -62,7 +62,7 @@ def test_simple_synthesis():
     ic.wire(Connection(root, "b", 0), Connection(nand, "b", 0))
     ic.wire(Connection(nand, "out", 0), Connection(root, "out", 0))
 
-    nv = synthesize(ic)
+    nv, _ = synthesize(ic)
 
     assert nv.get(("out", 0)) == True
 
@@ -99,7 +99,7 @@ def test_nested_synthesis():
     
     ic = Or()
     
-    nv = synthesize(ic)
+    nv, _ = synthesize(ic)
     
     assert nv.get(("out", 0)) == False
 
@@ -122,7 +122,7 @@ def test_back_edges_none():
     ic.wire(Connection(nand1, "out", 0), Connection(dff, "in_", 0))
     ic.wire(Connection(dff, "out", 0), Connection(root, "out", 0))
     
-    nv = synthesize(ic)
+    nv, _ = synthesize(ic)
     assert nv.non_back_edge_mask == 0b111  # i.e. every bit, which is one Nand, one DFF, and reset
 
 def test_back_edges_goofy():
@@ -135,7 +135,7 @@ def test_back_edges_goofy():
     ic.wire(Connection(nand1, "out", 0), Connection(nand2, "b", 0))
     ic.wire(Connection(nand2, "out", 0), Connection(root, "out", 0))
     
-    nv = synthesize(ic)
+    nv, _ = synthesize(ic)
     assert nv.non_back_edge_mask == 0b011  # i.e. not nand2, yes nand1 and reset
 
     

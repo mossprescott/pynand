@@ -63,6 +63,7 @@ def synthesize(ic):
     initialize_ops = []
     combine_ops = []
     sequence_ops = []
+    stateful = []
     for comp in sorted_comps:
         traces = {}
         for name, bits in comp.inputs().items():
@@ -73,6 +74,7 @@ def synthesize(ic):
         initialize_ops += ops.initialize(**traces)
         combine_ops += ops.combine(**traces)
         sequence_ops += ops.sequence(**traces)
+        stateful.append(ops)
 
     back_edge_from_components = set()
     for to_input, from_output in ic.wires.items():
@@ -87,7 +89,7 @@ def synthesize(ic):
         if conn.comp not in back_edge_from_components:
             non_back_edge_mask |= 1 << bit
 
-    return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask)
+    return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask), stateful
 
     
 def component_ops(comp):
@@ -102,7 +104,7 @@ def component_ops(comp):
     elif isinstance(comp, RAM):
         return RAMOps(comp)
     elif isinstance(comp, Input):
-        return InputOps()
+        return InputOps(comp)
     else:
         raise Exception(f"unrecognized component: {comp}")
 
@@ -165,7 +167,7 @@ class ConstOps(VectorOps):
     def initialize(self, out):
         assert len(out) == self.comp.bits
         def f(traces):
-            return set_multiple_traces(out, self.value, traces)
+            return set_multiple_traces(out, self.comp.value, traces)
         return [custom_op(f)]
 
 class DFFOps(VectorOps):
@@ -179,6 +181,12 @@ class DFFOps(VectorOps):
 class ROMOps(VectorOps):
     def __init__(self, comp):
         self.comp = comp
+        self.storage = []
+
+    def program(self, words):
+        """Replace the contents of the ROM with the provided words. Any leftover address space is
+        effectively filled with zero values."""
+        self.storage = list(words)
 
     def combine(self, address, out):
         assert len(address) == self.comp.address_bits and len(out) == 16
@@ -194,6 +202,19 @@ class ROMOps(VectorOps):
 class RAMOps(VectorOps):
     def __init__(self, comp):
         self.comp = comp
+        self.storage = [0]*(2**comp.address_bits)
+
+    def get(self, address):
+        """Peek at the value in a single cell."""
+        return self.storage[address]
+
+    def set(self, address, value):
+        """Poke a value into a single cell.
+
+        TODO: keep track of which cells are updated, for efficient updates when used as the
+        screen buffer?
+        """
+        self.storage[address] = value
 
     def combine(self, address, out, **_unused):
         """Note: only using one of the inputs."""
@@ -217,6 +238,14 @@ class RAMOps(VectorOps):
         return [custom_op(write)]
 
 class InputOps(VectorOps):
+    def __init__(self, comp):
+        self.comp = comp
+        self.value = 0
+
+    def set(self, value):
+        """Provide the value that will appear at the output."""
+        self.value = value
+
     def combine(self, out):
         assert len(out) == 16
         def read(traces):
