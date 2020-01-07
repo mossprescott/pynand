@@ -1,8 +1,7 @@
 import collections
 import itertools
 
-from nand.evaluator import NandVector
-from nand.component import Component, Const
+from nand.component import Component, Const, DFF
 
 class IC:
     """An integrated circuit assembles one or more components by recording how their
@@ -181,7 +180,7 @@ class IC:
                     stack.append(n)
                     name_comp = wires_by_target_comp.get(n, [])
                     for _, nxt in sorted(name_comp, key=lambda t: t[0]):
-                        if not (ignore_dffs and not nxt.has_combine_ops()):
+                        if not (ignore_dffs and isinstance(nxt, DFF)):
                             loop(nxt)
                     stack.remove(n)
                     visited.append(n)
@@ -195,7 +194,7 @@ class IC:
         reachable = dfs([root], False)
         reachable.remove(root)
         
-        dffs = [n for n in reachable if not n.has_combine_ops()]
+        dffs = [n for n in reachable if isinstance(n, DFF)]
         result = dfs([root] + dffs, True)
         result.remove(root)
 
@@ -213,82 +212,6 @@ class IC:
                 num = -2
             return (num, conn.name, conn.bit)
         return by_component
-
-
-    def synthesize(self):
-        """Compile the chip down to traces and ops for evaluation.
-
-        Returns a NandVector.
-        """
-        return self.flatten()._synthesize()
-
-    def _synthesize(self):
-        # check for missing wires?
-        # check for unused components?
-
-        any_clock_references = any([True for conn in self.wires.values() if conn == clock])
-
-        # Assign a bit for each output connection:
-        all_bits = {}
-        next_bit = 0
-        if any_clock_references:
-            all_bits[clock] = next_bit
-            next_bit += 1
-            
-        for conn in sorted(set(self.wires.values()), key=self._connections_sort_key()):
-            if conn != clock:
-                all_bits[conn] = next_bit
-                next_bit += 1
-        
-        # Construct map of IC inputs, directly from all_bits:
-        inputs = {
-            (name, bit): 1 << all_bits[Connection(root, name, bit)]
-            for name, bits in self._inputs.items()
-            for bit in range(bits)  # TODO: None if single bit?
-        }
-        
-        if any_clock_references:
-            inputs[("common.clock", 0)] = 1 << all_bits[clock]
-
-        # Construct map of IC ouputs, mapped to all_bits via wires:
-        outputs = {
-            (name, bit): 1 << all_bits[self.wires[Connection(root, name, bit)]]
-            for name, bits in self._outputs.items()
-            for bit in range(bits)  # TODO: None if single bit?
-        }
-
-        internal = {}  # TODO
-
-        sorted_comps = self.sorted_components()
-
-        # For each component, construct a map of its traces' bit masks, and ask the component for its ops:
-        initialize_ops = []
-        combine_ops = []
-        sequence_ops = []
-        for comp in sorted_comps:
-            traces = {}
-            for name, bits in comp.inputs().items():
-                traces[name] = [1 << all_bits[self.wires[Connection(comp, name, bit)]] for bit in range(bits)]
-            for name, bits in comp.outputs().items():
-                traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
-            initialize_ops += comp.initialize(**traces)
-            combine_ops += comp.combine(**traces)
-            sequence_ops += comp.sequence(**traces)
-
-        back_edge_from_components = set()
-        for to_input, from_output in self.wires.items():
-            if (not isinstance(from_output.comp, Const)
-                and from_output.comp in sorted_comps
-                and to_input.comp in sorted_comps
-                and from_output.comp.has_combine_ops()
-                and sorted_comps.index(from_output.comp) > sorted_comps.index(to_input.comp)):
-                back_edge_from_components.add(from_output.comp)
-        non_back_edge_mask = 0
-        for conn, bit in all_bits.items():
-            if conn.comp not in back_edge_from_components:
-                non_back_edge_mask |= 1 << bit
-
-        return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask)
 
 
     def __str__(self):

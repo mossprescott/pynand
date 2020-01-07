@@ -1,4 +1,228 @@
-"""A new evaluator, based on bit vectors."""
+"""A low-level, precise evaluator, which can simulate _any_ IC based on Nand gates, as well as any 
+custom component which can express its behavior in terms of updating bits in a state vector. 
+
+This simulation allows all the components of the Nand2Tetris course to be designed and tested,
+without relying on any pre-defined components. However, very large chips such as large RAMs 
+constructed from Nands or even DFFs are too slow to simulate directly, so predefined ROM and RAM
+components are provided instead for use in the full CPU/Computer.
+
+Getting this level of performance out of such a low-level simulation, in Python, is a bit of a feat,
+so there's a lot of low-level bit slicing tricks being employed here. Compare with the much simpler, 
+faster, but more limited simulator in codegen.py.
+"""
+
+from nand.component import Nand, Const, DFF, RAM, ROM, Input
+from nand.integration import Connection, root, clock
+
+def synthesize(ic):
+    """Compile the chip down to traces and ops for evaluation.
+
+    Returns a NandVector.
+    """
+    ic = ic.flatten()
+            
+    # TODO: check for missing wires?
+    # TODO: check for unused components?
+
+    any_clock_references = any([True for conn in ic.wires.values() if conn == clock])
+
+    # Assign a bit for each output connection:
+    all_bits = {}
+    next_bit = 0
+    if any_clock_references:
+        all_bits[clock] = next_bit
+        next_bit += 1
+        
+    for conn in sorted(set(ic.wires.values()), key=ic._connections_sort_key()):
+        if conn != clock:
+            all_bits[conn] = next_bit
+            next_bit += 1
+    
+    # Construct map of IC inputs, directly from all_bits:
+    inputs = {
+        (name, bit): 1 << all_bits[Connection(root, name, bit)]
+        for name, bits in ic._inputs.items()
+        for bit in range(bits)
+    }
+    
+    if any_clock_references:
+        inputs[("common.clock", 0)] = 1 << all_bits[clock]
+
+    # Construct map of IC ouputs, mapped to all_bits via wires:
+    outputs = {
+        (name, bit): 1 << all_bits[ic.wires[Connection(root, name, bit)]]
+        for name, bits in ic._outputs.items()
+        for bit in range(bits)
+    }
+
+    internal = {}  # TODO
+
+    sorted_comps = ic.sorted_components()
+
+    # For each component, construct a map of its traces' bit masks, and ask the component for its ops:
+    initialize_ops = []
+    combine_ops = []
+    sequence_ops = []
+    for comp in sorted_comps:
+        traces = {}
+        for name, bits in comp.inputs().items():
+            traces[name] = [1 << all_bits[ic.wires[Connection(comp, name, bit)]] for bit in range(bits)]
+        for name, bits in comp.outputs().items():
+            traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
+        ops = component_ops(comp)
+        initialize_ops += ops.initialize(**traces)
+        combine_ops += ops.combine(**traces)
+        sequence_ops += ops.sequence(**traces)
+
+    back_edge_from_components = set()
+    for to_input, from_output in ic.wires.items():
+        if (not isinstance(from_output.comp, Const)
+            and from_output.comp in sorted_comps
+            and to_input.comp in sorted_comps
+            and not isinstance(from_output.comp, DFF)
+            and sorted_comps.index(from_output.comp) > sorted_comps.index(to_input.comp)):
+            back_edge_from_components.add(from_output.comp)
+    non_back_edge_mask = 0
+    for conn, bit in all_bits.items():
+        if conn.comp not in back_edge_from_components:
+            non_back_edge_mask |= 1 << bit
+
+    return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask)
+
+    
+def component_ops(comp):
+    if isinstance(comp, Nand):
+        return NandOps()
+    elif isinstance(comp, Const):
+        return ConstOps(comp)
+    elif isinstance(comp, DFF):
+        return DFFOps()
+    elif isinstance(comp, ROM):
+        return ROMOps(comp)
+    elif isinstance(comp, RAM):
+        return RAMOps(comp)
+    elif isinstance(comp, Input):
+        return InputOps()
+    else:
+        raise Exception(f"unrecognized component: {comp}")
+
+
+class VectorOps:
+    def initialize(self, **trace_map):
+        """Stage 1: set non-zero initial values.
+        """
+        return []
+        
+    def combine(self, **trace_map):
+        """Stage 2: define combinational logic, as operations which are performed on the chip's traces
+        to propagate signals.
+
+        Given a map of input and output refs to traces, return a list of operations which update
+        the output traces.
+        """
+        return []
+
+    def sequence(self, **trace_map):
+        """Stage 3: define sequential logic, as operations which are performed on the chip's traces
+        at the falling edge of the clock signal.
+
+        Given a map of input and output refs to traces, return a list of operations which update
+        the output traces.
+        """
+        return []
+
+    # def has_combine_ops(self):
+    #     """True if the component _ever_ updates any output in combinational fashion (as most do).
+    #     False only for components which only ever latch inputs and update their outputs during
+    #     flop/sequence.
+    #
+    #     This is useful for determining evaluation order: non-combinational components can be evaluated
+    #     later, which can help to break cycles (the same cycles that these components tend to
+    #     participate in.)
+    #
+    #     Current theory is that this only really needs to work for DFFs. Note that RAM, despite
+    #     having both combinational and sequential behavior, actually treats its one output as
+    #     combinational. However, if someone decides to implement a 16-bit Register with a purely
+    #     latched output, this will handle that.
+    #     """
+    #
+    #     trace_map = {
+    #         name: [0]*bits
+    #         for (name, bits) in itertools.chain(self.inputs().items(), self.outputs().items())
+    #     }
+    #     return len(self.combine(**trace_map)) > 0
+
+
+class NandOps(VectorOps):
+    def combine(self, a, b, out):
+        assert len(a) == 1 and len(b) == 1 and len(out) == 1
+        return [nand_op(a[0], b[0], out[0])]
+
+class ConstOps(VectorOps):
+    def __init__(self, comp):
+        self.comp = comp
+
+    def initialize(self, out):
+        assert len(out) == self.comp.bits
+        def f(traces):
+            return set_multiple_traces(out, self.value, traces)
+        return [custom_op(f)]
+
+class DFFOps(VectorOps):
+    def sequence(self, in_, out):
+        assert len(in_) == 1 and len(out) == 1
+        def flop(traces):
+            val = tst_trace(in_[0], traces)
+            return set_trace(out[0], val, traces)
+        return [custom_op(flop)]
+
+class ROMOps(VectorOps):
+    def __init__(self, comp):
+        self.comp = comp
+
+    def combine(self, address, out):
+        assert len(address) == self.comp.address_bits and len(out) == 16
+        def read(traces):
+            address_val = get_multiple_traces(address, traces)
+            if address_val < len(self.storage):
+                out_val = self.storage[address_val]
+            else:
+                out_val = 0
+            return set_multiple_traces(out, out_val, traces)
+        return [custom_op(read)]
+
+class RAMOps(VectorOps):
+    def __init__(self, comp):
+        self.comp = comp
+
+    def combine(self, address, out, **_unused):
+        """Note: only using one of the inputs."""
+        assert len(address) == self.comp.address_bits and len(out) == 16
+        def read(traces):
+            address_val = get_multiple_traces(address, traces)
+            out_val = self.get(address_val)
+            return set_multiple_traces(out, out_val, traces)
+        return [custom_op(read)]
+
+    def sequence(self, in_, load, address, **_unused):
+        """Note: not using `out`."""
+        assert len(in_) == 16 and len(load) == 1 and len(address) == self.comp.address_bits
+        def write(traces):
+            load_val = tst_trace(load[0], traces)
+            if load_val:
+                in_val = get_multiple_traces(in_, traces)
+                address_val = get_multiple_traces(address, traces)
+                self.set(address_val, in_val)
+            return traces
+        return [custom_op(write)]
+
+class InputOps(VectorOps):
+    def combine(self, out):
+        assert len(out) == 16
+        def read(traces):
+            return set_multiple_traces(out, self.value, traces)
+        return [custom_op(read)]
+
 
 class NandVector:
     """Tracks the true/false state of each of a set of bits, related by a sequence of Nand ops.
