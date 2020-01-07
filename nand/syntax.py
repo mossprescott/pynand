@@ -2,7 +2,7 @@
 """
 import nand.component
 from nand.integration import IC, Connection, root, common
-from nand.evaluator import synthesize, extend_sign
+from nand.evaluator import synthesize, extend_sign, NandVectorWrapper, NandVectorComputerWrapper
 from nand.optimize import simplify
 
 
@@ -254,84 +254,16 @@ def build(builder):
     return Chip(constr)
 
 
-class NandVectorWrapper:
-    """Convenient syntax around a NandVector. You get one of these from run(chip).
-    """
-    
-    def __init__(self, vector, components):
-        self._vector = vector
-        self._components = components
-        
-    def __setattr__(self, name, value):
-        """Set the value of a single- or multiple-bit input."""
-        if name in ('_vector', '_components'): return object.__setattr__(self, name, value)
-        
-        if (name, None) in self._vector.inputs:
-            self._vector.set((name, None), value)
-        for i in range(16):
-            if (name, i) in self._vector.inputs:
-                self._vector.set((name, i), bool(value & (1 << i)))
-
-    def tick(self):
-        """Raise the common `clock` signal (and propagate state changes eagerly)."""
-        if ('common.clock', 0) in self._vector.inputs:
-            self._vector._propagate()
-            self._vector.set(('common.clock', 0), 1)  # TODO: first check that it was low
-
-    def tock(self):
-        """Lower the common `clock` signal (and propagate state changes eagerly)."""
-        if ('common.clock', 0) in self._vector.inputs:
-            self._vector._propagate()
-            self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
-        self._vector._flop()
-
-    def __getattr__(self, name):
-        """Get the value of a single- or multiple-bit output."""
-
-        if (name, None) in self._vector.outputs:
-            return extend_sign(self._vector.get((name, None)))
-        else:
-            tmp = 0
-            for i in range(16):
-                if (name, i) in self._vector.outputs and self._vector.get((name, i)):
-                    tmp |= 1 << i
-            return extend_sign(tmp)
-
-    def get_internal(self, name):
-        """Get the value of a single- or multiple-bit signal which is internal to the component."""
-        if (name, None) in self._vector.internal:
-            return extend_sign(self._vector.get_internal((name, None)))
-        else:
-            tmp = 0
-            for i in range(16):
-                if (name, i) in self._vector.internal and self._vector.get_internal((name, i)):
-                    tmp |= 1 << i
-            return extend_sign(tmp)
-
-    def outputs(self):
-        return dict([(name, self.__getattr__(name)) for (name, _) in self._vector.outputs.keys()])
-
-    def internal(self):
-        return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
-        
-    def components(self, types):
-        """List of internal components (e.g. RAM, ROM).
-        
-        Note: types should be one or more of the types defined in nand.component, not the wrappers
-        with the same names defined in this module.
-        """
-        return [c for c in self._components if isinstance(c, types)]
-
-    def __repr__(self):
-        return str(self.outputs())
-
-
 def run(chip, optimize=True, **args):
     """Construct a complete IC, synthesize it, and wrap it for easy access."""
     ic = _constr(chip).flatten()
     if optimize:
         ic = simplify(ic)
-    w = NandVectorWrapper(*synthesize(ic))
+    nv, stateful = synthesize(ic)
+    if any(isinstance(c, nand.component.ROM) for c in ic.sorted_components()):
+        w = NandVectorComputerWrapper(nv, stateful)
+    else:
+        w = NandVectorWrapper(nv)
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
