@@ -2,7 +2,10 @@
 
 """Run the full computer with display and keyboard connected via pygame.
 
-The program to run must be in Hack assembly form (.asm), and is specified 
+The program to run must be in Hack assembly form (.asm), and is specified by the sys.argv[1].
+The `codegen` simulator is used unless env var `PYNAND_SUMLATOR` is set to "vector":
+
+$ python computer.py project_06/Blink.asm
 
 Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
 $ pip3 install pygame==2.0.0dev6
@@ -21,7 +24,7 @@ import project_06
 
 
 EVENT_INTERVAL = 1/10
-DISPLAY_INTERVAL = 1/1
+DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
 CYCLE_INTERVAL = 1.0
 
 COLORS = [0xFFFFFF, 0x000000]
