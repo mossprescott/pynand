@@ -529,6 +529,10 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     def __init__(self, vector, stateful):
         NandVectorWrapper.__init__(self, vector)
         self._stateful = stateful
+        self._rom, = [c for c in self._stateful if isinstance(c, ROMOps)]
+        self._mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
+        self._screen, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 13]
+        self._keyboard, = [c for c in self._stateful if isinstance(c, InputOps)]
 
     def run_program(self, instructions):
         """Install and run a sequence of instructions, stopping when pc runs off the end."""
@@ -545,18 +549,6 @@ class NandVectorComputerWrapper(NandVectorWrapper):
         self.ticktock()
         self.reset = 0
 
-    def peek(self, address):
-        """Read a single word from the Computer's memory."""
-
-        mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
-        return mem.storage[address]
-
-    def poke(self, address, value):
-        """Write a single word to the Computer's memory."""
-
-        mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
-        mem.storage[address] = value
-
     def init_rom(self, instructions):
         """Overwrite the top of the ROM with a sequence of instructions.
 
@@ -569,5 +561,24 @@ class NandVectorComputerWrapper(NandVectorWrapper):
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
         ]
-        rom, = [c for c in self._stateful if isinstance(c, ROMOps)]
-        rom.storage = prg
+        self._rom.storage = prg
+
+    def peek(self, address):
+        """Read a single word from the Computer's memory."""
+        return self._mem.storage[address]
+
+    def poke(self, address, value):
+        """Write a single word to the Computer's memory."""
+        self._mem.storage[address] = value
+
+    def peek_screen(self, address):
+        """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
+        return self._screen.storage[address]
+    
+    def poke_screen(self, address, value):
+        """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
+        self._screen.storage[address] = value
+    
+    def set_keydown(self, keycode):
+        """Provide the code which identifies a single key which is currently pressed."""
+        self._keyboard.value = keycode
