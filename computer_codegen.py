@@ -43,11 +43,6 @@ class KVM:
         flags |= pygame.SCALED
         self.screen = pygame.display.set_mode((width, height), flags=flags)
         pygame.display.set_caption(title)
-        
-        # offscreen = Surface(size, depth=1)
-        # pixels = offscreen.get_buffer()
-        # pixels.write(1, 0)  # ???
-        # offscreen.blit(screen)
 
     def process_events(self):
         """Drain pygame's event loop, returning the pressed key, if any.
@@ -55,7 +50,6 @@ class KVM:
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_q]: sys.exit()  # HACK
         
         # TODO: map K_... to ASCII plus control codes
         # codes = [i for i in range(256) if keys[i]]
@@ -74,13 +68,13 @@ class KVM:
             return NEWLINE
         return None
 
-    def update_display(self, pixels):
+    def update_display(self, get_pixel):
         self.screen.fill(COLORS[0])
 
         row_words = self.width//16
         for y in range(self.height):
             for w in range(row_words):
-                word = pixels[y*row_words + w]
+                word = get_pixel(y*row_words + w)
                 for i in range(16):
                     if word & 0b1:
                         x = w*16 + i
@@ -97,27 +91,21 @@ def main():
         prg = project_06.load_file(f)
 
     computer = translate(project_05.Computer.constr())()
-    test_codegen.init_rom(computer, prg)
+    computer.init_rom(prg)
     
-    # main_mem = test_05.get_ram(computer, address_bits=14)
-    # screen_mem = test_05.get_ram(computer, address_bits=13)
-    # keyboard, = computer.components(nand.component.Input)
-
     kvm = KVM(sys.argv[1], 512, 256)
 
     cycles = 0
     while True:
-        computer.tick(); computer.tock(); cycles += 1
+        computer.ticktock(); cycles += 1
 
         # A few times per second, process events and update the display:
         if cycles % (CPS//30) == 0:
             key = kvm.process_events()
-            # keyboard.set(key or 0)
-            computer._keyboard = key or 0
+            computer.set_keydown(key or 0)
 
         if cycles % (CPS//15) == 0:
-            # kvm.update_display(screen_mem.storage)
-            kvm.update_display(computer._screen)
+            kvm.update_display(computer.peek_screen)
 
         if cycles % (CPS*5) == 0:
             print(f"cycles: {cycles/1000:0,.0f}k; pc: {computer.pc}")

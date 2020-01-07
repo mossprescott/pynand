@@ -13,7 +13,7 @@ directly in Python:
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
 
-Any other ICs that appear are flattened to combinations of these. The downside is that it a 
+Any other ICs that appear are flattened to combinations of these. The downside is that a 
 moderate amount of flattening will have a significant impact on simulation speed. For example,
 the entire Computer amounts to 35 components; it's basically just decoding the instruction, 
 the ALU function, and a little wiring. That's why this is fast.
@@ -23,15 +23,15 @@ to add, but they should be limited to operations that:
 - are generally useful (i.e. not design-specific logic)
 - are already implemented with Nand, DFF, etc., and shown to be practical
 
-That's right, the entire MemorySystem (mapping main memory, screen memory, and keyboard input into 
-a flat address space) is all implemented with fixed logic. The rationale for that is that changing 
+That's right, the entire MemorySystem (mapping main memory, screen memory, and keyboard input 
+into a flat address space) is all implemented with fixed logic. The rationale is that changing 
 the memory layout also entails constructing a new UI harness, which is beside the point.
 """
 
 from nand.component import Nand, Const, ROM
 from nand.integration import IC, Connection, root
 from nand.optimize import simplify
-
+from nand.evaluator import extend_sign
 
 PRIMITIVES = set([
     "Nand",
@@ -69,6 +69,8 @@ def generate_python(ic):
     # print(ic)
     
     all_comps = ic.sorted_components()
+
+    supr = 'SOC' if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps) else 'Chip'
 
     lines = []
     def l(indent, str):
@@ -134,9 +136,9 @@ def generate_python(ic):
     def binary16(comp, template):
         l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
 
-    l(0, f"class {class_name}(Chip):")
+    l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
-    l(2,     f"Chip.__init__(self, {ic.inputs()!r}, {ic.outputs()!r})")
+    l(2,     f"{supr}.__init__(self, {ic.inputs()!r}, {ic.outputs()!r})")
     for name in ic.inputs():
         l(2, f"self._{name} = 0  # input")
     for name in ic.outputs():
@@ -144,11 +146,6 @@ def generate_python(ic):
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
             l(2, f"self._{all_comps.index(comp)}_out = 0  # register")
-        elif isinstance(comp, IC) and comp.label == "MemorySystem":
-            l(2, f"self._rom = []  # memory system")
-            l(2, f"self._ram = [0]*(1 << 14)  # memory system")
-            l(2, f"self._screen = [0]*(1 << 13)  # memory system")
-            l(2, f"self._keyboard = 0  # memory system")
             
     l(0, "")
     
@@ -267,7 +264,75 @@ class Chip:
         return object.__getattribute__(self, f"_{name}")
 
     def tick(self):
+        """Raise the clock, preparing to advance to the next cycle."""
         pass
 
     def tock(self):
+        """Lower the clock, causing clocked chips to assume their new values."""
         self._eval(True)
+        
+    def ticktock(self):
+        """Equivalent to tick(); tock()."""
+        self.tock()
+
+
+class SOC(Chip):
+    """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
+    
+    def __init__(self, inputs, outputs):
+        Chip.__init__(self, inputs, outputs)
+        self._rom = []
+        self._ram = [0]*(1 << 14)
+        self._screen = [0]*(1 << 13)
+        self._keyboard = 0
+        
+    def init_rom(self, instructions):
+        """Overwrite the top of the ROM with a sequence of instructions.
+    
+        A two-instruction infinite loop is written immediately
+        after the program, which could in theory be used to detect termination.
+        """
+    
+        size = len(instructions)
+        self._rom = instructions + [
+            size,  # @size (which is the address of this instruction)
+            0b111_0_000000_000_111,  # JMP
+        ]
+
+    def reset_program(self):
+        """Reset the PC to 0, so that the program will continue execution as if from startup.
+        
+        All other state is unaffected.
+        """
+        self.reset = True
+        self.ticktock()
+        self.reset = False
+        
+    def run_program(self, instructions):
+        """Install and run a sequence of instructions, stopping when pc runs off the end."""
+
+        self.init_rom(instructions)
+        self.reset_program()
+
+        while self.pc <= len(instructions):
+            self.ticktock()
+
+    def peek(self, address):
+        """Read a value from the main RAM. Address must be between 0x000 and 0x3FFF."""
+        return self._ram[address]
+    
+    def poke(self, address, value):
+        """Write a value to the main RAM. Address must be between 0x000 and 0x3FFF."""
+        self._ram[address] = extend_sign(value)
+    
+    def peek_screen(self, address):
+        """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
+        return self._screen[address]
+    
+    def poke_screen(self, address, value):
+        """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
+        self._screen[address] = extend_sign(value)
+    
+    def set_keydown(self, keycode):
+        """Provide the code which identifies a single key which is currently pressed."""
+        self._keyboard = keycode
