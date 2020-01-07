@@ -1,15 +1,28 @@
-# Note: install updated pygame with Mojave fix: 
-# pip3 install pygame==2.0.0dev6
+#! /usr/bin/env python
 
-import sys
+"""Run the full computer with display and keyboard connected via pygame.
+
+The program to run must be in Hack assembly form (.asm), and is specified 
+
+Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
+$ pip3 install pygame==2.0.0dev6
+"""
+
+import os
 import pygame
 from pygame import Surface, Color, PixelArray
+import sys
+import time
 
 import nand.component
 from nand.syntax import run
 import project_05
 import project_06
 
+
+EVENT_INTERVAL = 1/10
+DISPLAY_INTERVAL = 1/1
+CYCLE_INTERVAL = 1.0
 
 COLORS = [0xFFFFFF, 0x000000]
 """0: White, 1: Black, as it was meant to be."""
@@ -78,33 +91,42 @@ class KVM:
         pygame.display.flip()
 
 
-CPS = 1000
-
 def main():
     with open(sys.argv[1]) as f:
         prg = project_06.load_file(f)
 
-    computer = run(project_05.Computer)
+    computer = run(project_05.Computer, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
     computer.init_rom(prg)
     
     kvm = KVM(sys.argv[1], 512, 256)
 
-    cycles = 0
+    last_cycle_time = last_event_time = last_display_time = now = time.monotonic()
+    
+    last_cycle_count = cycles = 0
     while True:
         computer.ticktock(); cycles += 1
 
+        now = time.monotonic()
+        
         # A few times per second, process events and update the display:
-        if cycles % (CPS//30) == 0:
+        if now >= last_event_time + EVENT_INTERVAL:
+            last_event_time = now
             key = kvm.process_events()
             computer.set_keydown(key or 0)
 
-        if cycles % (CPS//15) == 0:
+        if now >= last_display_time + DISPLAY_INTERVAL:
+            last_display_time = now
             kvm.update_display(computer.peek_screen)
 
-        if cycles % (CPS*5) == 0:
-            print(f"cycles: {cycles/1000:0,.0f}k; pc: {computer.pc}")
-            print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
-            print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")
+        if now >= last_cycle_time + CYCLE_INTERVAL:
+            cps = (cycles - last_cycle_count)/(now - last_cycle_time)
+            pygame.display.set_caption(f"{sys.argv[1]}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s")
+            last_cycle_time = now
+            last_cycle_count = cycles
+            
+            # print(f"cycles: {cycles//1000:0,d}k; pc: {computer.pc}")
+            # # print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
+            # # print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")
 
 
 if __name__ == "__main__":
