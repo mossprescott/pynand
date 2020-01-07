@@ -1,7 +1,7 @@
 """A faster evaluator, which assumes that certain components are defined in the usual way.
 
 This is meant to be flexible enough to implement new ALUs, new ISAs, and other variations, and yet
-fast enough to run interactive programs.
+fast enough to run interactive programs (about 100 kHz).
 
 The following components are assumed to have the conventional behavior, and are implemented
 directly in Python:
@@ -33,19 +33,16 @@ from nand.integration import IC, Connection, root
 from nand.optimize import simplify
 from nand.evaluator import extend_sign
 
-PRIMITIVES = set([
-    "Nand",
-    "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
-    "Inc16", "Register",  # Needed for PC
-    "Not", "And", "Or",  # Needed for CPU
-    "MemorySystem",  # Needed for Computer
-])
+
+def run(ic):
+    """Prepare an IC for simulation, returning an object which exposes the inputs and outputs
+    as attributes. If the IC is Computer, it also provides access to the ROM, RAM, etc.
+    """
+    return translate(ic)()
 
 
 def translate(ic):
-    """Generate a Python class implementing the IC, and providing the same interface as you get
-    from nand.syntax.run().
-    """
+    """Generate a Python class implementing the IC."""
     
     class_name, lines = generate_python(ic)
     
@@ -57,6 +54,15 @@ def translate(ic):
             mode='single'))
     
     return locals()[class_name]
+
+
+PRIMITIVES = set([
+    "Nand",
+    "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
+    "Inc16", "Register",  # Needed for PC
+    "Not", "And", "Or",  # Needed for CPU
+    "MemorySystem",  # Needed for Computer
+])
 
 
 def generate_python(ic):

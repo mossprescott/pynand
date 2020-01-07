@@ -1,8 +1,10 @@
 """Wrappers around IC and NandVector providing a more compact way of constructing and interacting with chips.
 """
+
+
+import nand.codegen
 import nand.component
 from nand.integration import IC, Connection, root, common
-from nand.evaluator import synthesize, extend_sign, NandVectorWrapper, NandVectorComputerWrapper
 from nand.optimize import simplify
 
 
@@ -254,16 +256,20 @@ def build(builder):
     return Chip(constr)
 
 
-def run(chip, optimize=True, **args):
-    """Construct a complete IC, synthesize it, and wrap it for easy access."""
-    ic = _constr(chip).flatten()
-    if optimize:
-        ic = simplify(ic)
-    nv, stateful = synthesize(ic)
-    if any(isinstance(c, nand.component.ROM) for c in ic.sorted_components()):
-        w = NandVectorComputerWrapper(nv, stateful)
+def run(chip, optimize=True, simulator='vector', **args):
+    """Construct a complete IC, synthesize it, wrap it for easy access, and initialize inputs.
+    
+    `simulator` can be 'vector', for the slow, precise simulator, or 'codegen', for the fast, 
+    less flexible one.
+    """
+    
+    ic = _constr(chip)
+
+    if simulator == 'codegen':
+        w = nand.codegen.run(ic)
     else:
-        w = NandVectorWrapper(nv)
+        w = nand.evaluator.run(ic, optimize)
+
     for name, value in args.items():
         w.__setattr__(name, value)
     return w

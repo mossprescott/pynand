@@ -1,5 +1,8 @@
 """A low-level, precise evaluator, which can simulate _any_ IC based on Nand gates, as well as any 
-custom component which can express its behavior in terms of updating bits in a state vector. 
+custom component which can express its behavior in terms of updating bits in a state vector.
+
+This is fast enough for small tests, about 1 kHz, but not fast enough to run large interactive 
+programs.
 
 This simulation allows all the components of the Nand2Tetris course to be designed and tested,
 without relying on any pre-defined components. However, very large chips such as large RAMs 
@@ -13,11 +16,28 @@ faster, but more limited simulator in codegen.py.
 
 from nand.component import Nand, Const, DFF, RAM, ROM, Input
 from nand.integration import Connection, root, clock
+from nand.optimize import simplify
+
+
+def run(ic, optimize = True):
+    """Prepare an IC for simulation, returning an object which exposes the inputs and outputs
+    as attributes. If the IC is Computer, it also provides access to the ROM, RAM, etc.
+    """
+    ic = ic.flatten()
+    if optimize:
+        ic = simplify(ic)
+    nv, stateful = synthesize(ic)
+    if any(isinstance(c, ROM) for c in ic.sorted_components()):
+        w = NandVectorComputerWrapper(nv, stateful)
+    else:
+        w = NandVectorWrapper(nv)
+    return w
+
 
 def synthesize(ic):
     """Compile the chip down to traces and ops for evaluation.
 
-    Returns a NandVector.
+    Returns a NandVector and a list of stateful components (e.g. RAMs).
     """
     ic = ic.flatten()
             
