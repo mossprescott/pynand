@@ -2,7 +2,7 @@
 """
 import nand.component
 from nand.integration import IC, Connection, root, common
-from nand.evaluator import extend_sign
+from nand.evaluator import synthesize, extend_sign
 from nand.optimize import simplify
 
 
@@ -331,7 +331,7 @@ def run(chip, optimize=True, **args):
     ic = _constr(chip).flatten()
     if optimize:
         ic = simplify(ic)
-    w = NandVectorWrapper(ic.synthesize(), ic.sorted_components())
+    w = NandVectorWrapper(*synthesize(ic))
     for name, value in args.items():
         w.__setattr__(name, value)
     return w
