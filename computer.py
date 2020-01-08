@@ -5,7 +5,7 @@
 The program to run must be in Hack assembly form (.asm), and is specified by the sys.argv[1].
 The `codegen` simulator is used unless env var `PYNAND_SUMLATOR` is set to "vector":
 
-$ python computer.py project_06/Blink.asm
+$ python computer.py examples/Blink.asm
 
 Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
 $ pip3 install pygame==2.0.0dev6

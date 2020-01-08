@@ -39,7 +39,7 @@ When all those tests pass, you're done with the first chapter. Move on to test_0
 
 ## Step 2: Enjoy
 
-Run `python computer.py project_06/Pong.asm`. Bask in the glory of a CPU you built from scratch.
+Run `python computer.py examples/Pong.asm`. Bask in the glory of a CPU you built from scratch.
 Note: the awesomeness starts after about 5 million cycles.
 
 
