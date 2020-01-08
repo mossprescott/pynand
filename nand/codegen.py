@@ -81,7 +81,6 @@ def generate_python(ic):
     lines = []
     def l(indent, str):
         l = "    "*indent + str
-        # print(f"> {l}")
         lines.append(l)
 
     def src_one(comp, name):
