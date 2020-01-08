@@ -224,11 +224,11 @@ def test_ram8():
     ram_test(ram, 8)
 
 
-# This one works, but it's annoyingly slow (~20s):
+# This one works, but it's annoyingly slow (~15s):
 # def test_ram64():
 #     ram = run(RAM64)
 #     ram_test(ram, 64)
-#
+
 # This one's implementation is commented out:
 # def test_ram512():
 #     ram = run(RAM512)

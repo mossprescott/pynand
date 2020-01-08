@@ -82,29 +82,29 @@ def test_ops():
 
 
 def test_load_add():
-    with open("project_06/Add.asm") as f:
+    with open("examples/Add.asm") as f:
         add = load_file(f)
     assert add == ADD_PROGRAM
 
 
 def test_load_max_no_symbols():
-    with open("project_06/MaxL.asm") as f:
+    with open("examples/MaxL.asm") as f:
         max_ = load_file(f)
     assert max_ == MAX_PROGRAM
 
 
 def test_load_max():
-    with open("project_06/Max.asm") as f:
+    with open("examples/Max.asm") as f:
         max_ = load_file(f)
     assert max_ == MAX_PROGRAM
 
 
 def test_load_rect():
-    with open("project_06/RectL.asm") as f:
+    with open("examples/RectL.asm") as f:
         rect1 = load_file(f)
     assert len(rect1) == 25
 
-    with open("project_06/Rect.asm") as f:
+    with open("examples/Rect.asm") as f:
         rect2 = load_file(f)
     assert len(rect2) == 25
 
@@ -112,11 +112,11 @@ def test_load_rect():
 
 
 def test_load_pong():
-    with open("project_06/PongL.asm") as f:
+    with open("examples/PongL.asm") as f:
         pong1 = load_file(f)
     assert len(pong1) == 27483
 
-    with open("project_06/Pong.asm") as f:
+    with open("examples/Pong.asm") as f:
         pong2 = load_file(f)
     assert len(pong2) == 27483
 

@@ -1,114 +1,251 @@
-from project_05 import *
-import nand.component
+from nand import unsigned
+from nand.codegen import run
+from nand.component import Nand
+from nand.integration import IC, Connection, root
+import nand.syntax
+import project_02
+import project_03
+import project_05
+import test_05
 
 
-def test_memory_system():
-    mem = run(MemorySystem)
+def test_nand():
+    ic = nand.syntax._constr(nand.syntax.Nand)
 
-    # set RAM[0] = -1
-    mem.in_ = -1
-    mem.load = 1
-    mem.address = 0
-    mem.tick(); mem.tock()
+    nnd = run(ic)
 
-    # RAM[0] holds value
-    mem.in_ = 9999
-    mem.load = 0
-    mem.tick(); mem.tock()
-    assert mem.out == -1
+    assert nnd.out == True
 
-    # Did not also write to upper RAM or Screen
-    mem.address = 0x2000
-    assert mem.out == 0
-    mem.address = 0x4000
-    assert mem.out == 0
+    nnd.a = True
+    assert nnd.out == True
 
-    # Set RAM[2000] = 2222
-    mem.in_ = 2222
-    mem.load = 1
-    mem.address = 0x2000
-    mem.tick(); mem.tock()
-    assert mem.out == 2222
+    nnd.b = True
+    assert nnd.out == False
 
-    # RAM[2000] holds value
-    mem.in_ = 9999
-    mem.load = 0
-    mem.tick(); mem.tock()
-    assert mem.out == 2222
-
-    # Did not also write to lower RAM or Screen
-    mem.address = 0
-    assert mem.out == -1
-    mem.address = 0x4000
-    assert mem.out == 0
-
-    # Low order address bits connected
-    # (note: not actually testing anything in this system?)
-    mem.address = 0x0001; assert mem.out == 0
-    mem.address = 0x0002; assert mem.out == 0
-    mem.address = 0x0004; assert mem.out == 0
-    mem.address = 0x0008; assert mem.out == 0
-    mem.address = 0x0010; assert mem.out == 0
-    mem.address = 0x0020; assert mem.out == 0
-    mem.address = 0x0040; assert mem.out == 0
-    mem.address = 0x0080; assert mem.out == 0
-    mem.address = 0x0100; assert mem.out == 0
-    mem.address = 0x0200; assert mem.out == 0
-    mem.address = 0x0400; assert mem.out == 0
-    mem.address = 0x0800; assert mem.out == 0
-    mem.address = 0x1000; assert mem.out == 0
-    mem.address = 0x2000; assert mem.out == 2222
-
-    # RAM[0x1234] = 1234
-    mem.address = 0x1234
-    mem.in_ = 1234
-    mem.load = 1
-    mem.tick(); mem.tock()
-    assert mem.out == 1234
-
-    # Did not also write to upper RAM or Screen
-    mem.address = 0x2234
-    assert mem.out == 0
-    mem.address = 0x6234
-    assert mem.out == 0
-
-    # RAM[0x2345] = 2345
-    mem.address = 0x2345
-    mem.in_ = 2345
-    mem.load = 1
-    mem.tick(); mem.tock()
-    assert mem.out == 2345
-
-    # Did not also write to lower RAM or Screen
-    mem.address = 0x0345
-    assert mem.out == 0
-    mem.address = 0x4345
-    assert mem.out == 0
+    nnd.a = False
+    assert nnd.out == True
 
 
-    ### Keyboard test
+def test_and3():
+    """A simple component that's definitely not handled as a primitive."""
 
-    mem.address = 0x6000
-    # TODO: simulate 'k' key pressed
-    # assert mem.out == 75
-    assert mem.out == 0
+    ic = IC("And3", {"a": 1, "b": 1, "c": 1}, {"out": 1})
+    nand1 = Nand()
+    ic.wire(Connection(root, "a", 0), Connection(nand1, "a", 0))
+    ic.wire(Connection(root, "b", 0), Connection(nand1, "b", 0))
+    nand2 = Nand()
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "a", 0))
+    ic.wire(Connection(nand1, "out", 0), Connection(nand2, "b", 0))
+    nand3 = Nand()
+    ic.wire(Connection(nand2, "out", 0), Connection(nand3, "a", 0))
+    ic.wire(Connection(root, "c", 0), Connection(nand3, "b", 0))
+    nand4 = Nand()
+    ic.wire(Connection(nand3, "out", 0), Connection(nand4, "a", 0))
+    ic.wire(Connection(nand3, "out", 0), Connection(nand4, "b", 0))
+    ic.wire(Connection(nand4, "out", 0), Connection(root, "out", 0))
+
+    and3 = run(ic)
+
+    assert and3.out == False
+
+    for i in range(8):
+        a, b, c = [bool(i & (1 << j)) for j in range(3)]
+        and3.a = a
+        and3.b = b
+        and3.c = c
+        assert and3.out == (a and b and c)
 
 
-    ### Screen test
+def test_alu():
+    alu = run(project_02.ALU.constr())
+    
+    # HACK: copied verbatim from test_02
+    
+    alu.x = 0
+    alu.y = -1 
 
-    mem.load = 1
-    mem.in_ = -1
-    mem.address = 0x4fcf
-    mem.tick(); mem.tock()
-    assert mem.out == -1
+    alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
 
-    mem.address = 0x504f
-    mem.tick(); mem.tock()
-    assert mem.out == -1
+    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # 1
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # Y
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y + 1
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 0  # X - 1
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # Y - 1
+    assert alu.out == -2 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # X + Y
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # X - Y
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+
+    alu.x = 17
+    alu.y = 3 
+
+    alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
+    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # 1
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
+    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
+    assert alu.out == 17 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # Y
+    assert alu.out == 3 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
+    assert alu.out == -18 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
+    assert alu.out == -4 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
+    assert alu.out == -17 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
+    assert alu.out == -3 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
+    assert alu.out == 18 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y + 1
+    assert alu.out == 4 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 0  # X - 1
+    assert alu.out == 16 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # Y - 1
+    assert alu.out == 2 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # X + Y
+    assert alu.out == 20 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # X - Y
+    assert alu.out == 14 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
+    assert alu.out == -14 and alu.zr == 0 and alu.ng == 1
+
+    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
+    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+
+    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
+    assert alu.out == 19 and alu.zr == 0 and alu.ng == 0
+
+
+def test_pc():
+    pc = run(project_03.PC.constr())
+
+    # HACK: copied verbatim from test_02
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 0; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = -32123
+    pc.tick(); pc.tock()
+    assert pc.out == 2
+
+    pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == -32123
+
+    pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == -32122
+
+    pc.tick(); pc.tock()
+    assert pc.out == -32121
+
+    pc.in_ = 12345; pc.load = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.load = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.reset = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 0
+
+    pc.load = 0; pc.inc = 1
+    pc.tick(); pc.tock()
+    assert pc.out == 1
+
+    pc.in_ = 22222; pc.reset = 1; pc.inc = 0
+    pc.tick(); pc.tock()
+    assert pc.out == 0
 
 
 def test_cpu():
-    cpu = run(CPU)
+    cpu = run(project_05.CPU.constr())
+
+    # HACK: copied verbatim from test_05
 
     cpu.instruction = 0b0011000000111001  # @12345
     cpu.tick(); cpu.tock()
@@ -301,30 +438,11 @@ def test_cpu():
     assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
 
 
-def test_computer_no_program():
-    computer = run(Computer)
-    
-    for _ in range(100):
-        computer.ticktock()
-    
-    assert computer.pc == 100
-
-
-# Add.hack:
-ADD_PROGRAM = [
-    0b0000000000000010,  # @2
-    0b1110110000010000,  # D=A
-    0b0000000000000011,  # @3
-    0b1110000010010000,  # D=D+A
-    0b0000000000000000,  # @0
-    0b1110001100001000,  # M=D
-]
-
 def test_computer_add():
-    computer = run(Computer)
+    computer = run(project_05.Computer.constr())
     
     # First run (at the beginning PC=0)
-    computer.run_program(ADD_PROGRAM)
+    computer.run_program(test_05.ADD_PROGRAM)
     
     assert computer.peek(0) == 5
     
@@ -337,41 +455,22 @@ def test_computer_add():
     # Second run, to check that the PC was reset correctly.
     computer.poke(0, 12345)
     computer.reset = 0    
-    while computer.pc < len(ADD_PROGRAM):
+    while computer.pc < len(test_05.ADD_PROGRAM):
         computer.ticktock()
 
     assert computer.peek(0) == 5        
 
 
-MAX_PROGRAM = [
-    0b0000000000000000,  #  0: @0
-    0b1111110000010000,  #  1: D=M
-    0b0000000000000001,  #  2: @1
-    0b1111010011010000,  #  3: D=D-M  ; D = mem[0] - mem[1]
-    0b0000000000001010,  #  4: @10
-    0b1110001100000001,  #  5: D; JGT
-    0b0000000000000001,  #  6: @1
-    0b1111110000010000,  #  7: D=M    ; D = mem[1]
-    0b0000000000001100,  #  8: @12
-    0b1110101010000111,  #  9: JMP
-    0b0000000000000000,  # 10: @0
-    0b1111110000010000,  # 11: D=M    ; D = mem[0]
-    0b0000000000000010,  # 12: @2
-    0b1110001100001000,  # 13: M=D    ; mem[2] = max
-    0b0000000000001110,  # 14: @14
-    0b1110101010000111,  # 15: JMP    ; infinite loop
-]
-
 def test_computer_max():
-    computer = run(Computer)
+    computer = run(project_05.Computer.constr())
 
-    computer.init_rom(MAX_PROGRAM)
+    computer.init_rom(test_05.MAX_PROGRAM)
 
     # first run: compute max(3,5)
     computer.poke(0, 3)
     computer.poke(1, 5)
     for _ in range(14):
-        computer.ticktock()    
+        computer.tick(); computer.tock()    
     assert computer.peek(2) == 5
 
     # second run: compute max(23456,12345)
@@ -383,7 +482,7 @@ def test_computer_max():
         computer.ticktock()    
     assert computer.peek(2) == 23456
 
- 
+
 def cycles_per_second():
     """Estimate the speed of CPU simulation by running Max repeatedly with random input.
     """
@@ -391,9 +490,9 @@ def cycles_per_second():
     import random
     import timeit
     
-    computer = run(Computer)
+    computer = run(project_05.Computer.constr())
 
-    computer.init_rom(MAX_PROGRAM)
+    computer.init_rom(test_05.MAX_PROGRAM)
 
     def once():
         x = random.randint(0, 0x7FFF)
@@ -413,4 +512,4 @@ def cycles_per_second():
 def test_speed():
     cps = cycles_per_second()
     print(f"Measured speed: {cps:0,.1f} cycles/s")
-    assert cps > 1000
+    assert cps > 100_000

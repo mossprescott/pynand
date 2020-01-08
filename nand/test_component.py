@@ -1,5 +1,5 @@
 from nand.component import *
-from nand.evaluator import run_op
+from nand.vector import run_op, component_ops
 
 
 def test_nand():
@@ -12,7 +12,9 @@ def test_nand():
 
     traces = {"a": [0b001], "b": [0b010], "out": [0b100]}
 
-    op, = nand.combine(**traces)
+    ops = component_ops(nand)
+    
+    op, = ops.combine(**traces)
     assert run_op(op, 0b000) == 0b100
     assert run_op(op, 0b001) == 0b101
     assert run_op(op, 0b010) == 0b110
@@ -22,7 +24,7 @@ def test_nand():
     assert run_op(op, 0b110) == 0b110
     assert run_op(op, 0b111) == 0b011
 
-    assert nand.sequence(**traces) == []
+    assert ops.sequence(**traces) == []
 
 
 def test_dff():
@@ -33,9 +35,11 @@ def test_dff():
 
     traces = {"in_": [0b01], "out": [0b10]}
 
-    assert dff.combine(**traces) == []
+    ops = component_ops(dff)
 
-    op, = dff.sequence(**traces)
+    assert ops.combine(**traces) == []
+
+    op, = ops.sequence(**traces)
     assert run_op(op, 0b00) == 0b00
     assert run_op(op, 0b01) == 0b11
     assert run_op(op, 0b10) == 0b00
@@ -53,16 +57,18 @@ def test_rom():
         "out": [0b10000 << i for i in range(16)]
     }
 
-    op, = rom.combine(**traces)
+    ops = component_ops(rom)
 
-    rom.program([1, 2, 3, 4, 5])
+    op, = ops.combine(**traces)
+
+    ops.program([1, 2, 3, 4, 5])
     for i in range(16):
         if i < 5:
             assert run_op(op, i) == ((i+1) << 4) | i
         else:
             assert run_op(op, i) == 0x00 | i
 
-    assert rom.sequence(**traces) == []
+    assert ops.sequence(**traces) == []
 
 
 def test_ram():
@@ -78,10 +84,12 @@ def test_ram():
         "out": [0b1 << (i+21) for i in range(16)]
     }
 
-    op, = ram.combine(**traces)
+    ops = component_ops(ram)
+
+    op, = ops.combine(**traces)
 
     for i in range(16):
-        ram.set(i, i)
+        ops.set(i, i)
 
     for i in range(16):
         addr = i << 17
@@ -89,14 +97,14 @@ def test_ram():
         assert run_op(op, addr) == out | addr
 
 
-    op, = ram.sequence(**traces)
+    op, = ops.sequence(**traces)
 
     for i in range(16):
         in_ = 12345 + i
         load = 0b1 << 16
         addr = i << 17
         run_op(op, addr | load | in_)
-        assert ram.get(i) == 12345 + i
+        assert ops.get(i) == 12345 + i
 
 
 def test_input():
@@ -107,19 +115,13 @@ def test_input():
 
     traces = { "out": [0b1 << i for i in range(16)]}
 
-    op, = inpt.combine(**traces)
+    ops = component_ops(inpt)
+
+    op, = ops.combine(**traces)
 
     assert run_op(op, 0) == 0
 
-    inpt.set(12345)
+    ops.set(12345)
     assert run_op(op, 0) == 12345
 
-    assert inpt.sequence(**traces) == []
-
-
-def test_has_combine_ops():
-    assert Nand().has_combine_ops() == True
-    assert DFF().has_combine_ops() == False
-    assert ROM(1).has_combine_ops() == True
-    assert RAM(1).has_combine_ops() == True
-    assert Input().has_combine_ops() == True
+    assert ops.sequence(**traces) == []
