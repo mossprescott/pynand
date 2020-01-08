@@ -143,7 +143,7 @@ def generate_python(ic):
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
-    l(2,     f"{supr}.__init__(self, {ic.inputs()!r}, {ic.outputs()!r})")
+    l(2,     f"{supr}.__init__(self)")
     for name in ic.inputs():
         l(2, f"self._{name} = 0  # input")
     for name in ic.outputs():
@@ -188,10 +188,6 @@ def generate_python(ic):
             l(3,   f"_{all_comps.index(comp)}_out = self._rom[_{all_comps.index(comp)}_address]")
             l(2, f"else:")
             l(3,   f"_{all_comps.index(comp)}_out = 0")
-        # elif isinstance(comp, RAM):
-        #     l(2, f"_{all_comps.index(comp)}_out = self.{all_comps.index(comp)}[{src_many(comp, 'address', comp.address_bits)}]")
-        # elif isinstance(comp, Input):
-        #     l(2, f"# _{all_comps.index(comp)} is a Input: self._{all_comps.index(comp)} is used")
         elif comp.label == "MemorySystem":
             l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")  # TODO: 15?
             l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
@@ -203,7 +199,6 @@ def generate_python(ic):
             l(2, f"else:")
             l(3,   f"_{all_comps.index(comp)}_out = 0")
         else:
-            # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
@@ -235,6 +230,19 @@ def generate_python(ic):
             raise Exception(f"Unrecognized primitive: {comp}")
     l(0, "")
     
+    for name in ic.inputs():
+        l(1, f"def _set_{name}(self, value):")
+        l(2,   f"self._{name} = value")
+        l(2,   f"self.__dirty = True")
+        l(1, f"{name} = property(fset=_set_{name})")
+        l(0, "")
+    for name in ic.outputs():
+        l(1, f"@property")
+        l(1, f"def {name}(self):")
+        l(2,   f"self._eval(False)")
+        l(2,   f"return self._{name}")    
+        l(0, "")
+    
     return class_name, lines
 
 
@@ -244,7 +252,18 @@ def print_lines(lines):
         print(f"{str(i+1).rjust(3)}: {l}")
 
 
-class ChipCommon:
+class Chip:
+    """Super for generated classes, providing tick, tock, and ticktock.
+    
+    This: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
+    chips that refer to it directly aren't simulated properly by this implementation.
+    
+    TODO: handle "clock" correctly, and also implement the components needed by those tests?
+    """
+    
+    def __init__(self):
+        self.__dirty = True
+    
     def tick(self):
         """Raise the clock, preparing to advance to the next cycle."""
         pass
@@ -255,39 +274,13 @@ class ChipCommon:
         
     def ticktock(self):
         """Equivalent to tick(); tock()."""
-        self.tock()
+        self._eval(True)
 
 
-class Chip(ChipCommon):
-    """Super for chips that aren't the full computer; mostly deals with inputs and outputs.
-    """
-    def __init__(self, inputs, outputs):
-        self.__inputs = inputs
-        self.__outputs = outputs
-        self.__dirty = True
-
-    def __setattr__(self, name, value):
-        if name.startswith('_'): return object.__setattr__(self, name, value)
-        
-        if name not in self.__inputs:
-            raise Exception(f"No such input: {name}")
-
-        object.__setattr__(self, f"_{name}", value)
-        self.__dirty = True
-    
-    def __getattr__(self, name):
-        if name not in self.__outputs:
-            raise Exception(f"No such output: {name}")
-
-        if self.__dirty:
-            self._eval(False)
-        return object.__getattribute__(self, f"_{name}")
-
-
-class SOC(ChipCommon):
+class SOC(Chip):
     """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
     
-    def __init__(self, _inputs, _outputs):
+    def __init__(self):
         self._rom = []
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
@@ -326,20 +319,6 @@ class SOC(ChipCommon):
 
         while self._pc <= len(instructions):
             self.ticktock()
-
-    # Note: only one input (reset) and one output (pc) are exposed, so they're each handled 
-    # as properties to avoid the overhead of __getattr__ and __setattr__.
-    # TODO: generate these along with _eval, in case someone wants to get fancy.
-    
-    def _set_reset(self, value):
-        self._reset = value
-        self.__dirty = True
-    reset = property(fset=_set_reset)
-
-    @property
-    def pc(self):
-        self._eval(False)
-        return self._pc
 
     def peek(self, address):
         """Read a value from the main RAM. Address must be between 0x000 and 0x3FFF."""
