@@ -26,11 +26,11 @@ _NOTE: for the time being, solved versions of each component are included. When 
 working as intended, we'll come back and clean it up so the exercises are ready to solve._
 
 First clone the repo and run `pytest`. If your environment is set up, you should see a lot of 
-errors, because none of the components are implemented yet (except `Nand`, which you get for 
-free).
+failing tests, because none of the components are implemented yet (except `Nand`, which you get 
+for free).
 
-Now open `project01.py` in a text editor and replace the `___`s in the body of the `mkNot` 
-function with references to the input so that it computes the expected result.
+Now open `project01.py` in a text editor, find the `mkNot` function, and replace the `___`s
+with references to the inputs so that it computes the expected result.
 
 Run `pytest test_01.py`. If `test_not` passes, you can move on to the next component.
 
