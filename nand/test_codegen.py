@@ -1,5 +1,5 @@
 from nand import unsigned
-from nand.codegen import translate
+from nand.codegen import run
 from nand.component import Nand
 from nand.integration import IC, Connection, root
 import nand.syntax
@@ -12,7 +12,7 @@ import test_05
 def test_nand():
     ic = nand.syntax._constr(nand.syntax.Nand)
 
-    nnd = translate(ic)()
+    nnd = run(ic)
 
     assert nnd.out == True
 
@@ -44,7 +44,7 @@ def test_and3():
     ic.wire(Connection(nand3, "out", 0), Connection(nand4, "b", 0))
     ic.wire(Connection(nand4, "out", 0), Connection(root, "out", 0))
 
-    and3 = translate(ic)()
+    and3 = run(ic)
 
     assert and3.out == False
 
@@ -57,7 +57,7 @@ def test_and3():
 
 
 def test_alu():
-    alu = translate(project_02.ALU.constr())()
+    alu = run(project_02.ALU.constr())
     
     # HACK: copied verbatim from test_02
     
@@ -178,7 +178,7 @@ def test_alu():
 
 
 def test_pc():
-    pc = translate(project_03.PC.constr())()
+    pc = run(project_03.PC.constr())
 
     # HACK: copied verbatim from test_02
 
@@ -243,7 +243,7 @@ def test_pc():
 
 
 def test_cpu():
-    cpu = translate(project_05.CPU.constr())()
+    cpu = run(project_05.CPU.constr())
 
     # HACK: copied verbatim from test_05
 
@@ -439,7 +439,7 @@ def test_cpu():
 
 
 def test_computer_add():
-    computer = translate(project_05.Computer.constr())()
+    computer = run(project_05.Computer.constr())
     
     # First run (at the beginning PC=0)
     computer.run_program(test_05.ADD_PROGRAM)
@@ -462,7 +462,7 @@ def test_computer_add():
 
 
 def test_computer_max():
-    computer = translate(project_05.Computer.constr())()
+    computer = run(project_05.Computer.constr())
 
     computer.init_rom(test_05.MAX_PROGRAM)
 
@@ -490,7 +490,7 @@ def cycles_per_second():
     import random
     import timeit
     
-    computer = translate(project_05.Computer.constr())()
+    computer = run(project_05.Computer.constr())
 
     computer.init_rom(test_05.MAX_PROGRAM)
 
