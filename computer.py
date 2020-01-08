@@ -2,8 +2,8 @@
 
 """Run the full computer with display and keyboard connected via pygame.
 
-The program to run must be in Hack assembly form (.asm), and is specified by the sys.argv[1].
-The `codegen` simulator is used unless env var `PYNAND_SUMLATOR` is set to "vector":
+The program to run must be in Hack assembly form (.asm), and is specified by sys.argv[1].
+The `codegen` simulator is used unless env var `PYNAND_SIMULATOR` is set to "vector":
 
 $ python computer.py examples/Blink.asm
 
@@ -31,7 +31,11 @@ COLORS = [0xFFFFFF, 0x000000]
 """0: White, 1: Black, as it was meant to be."""
 
 
-# "Recognizes all ASCII characters, as well as the following keys: newline (128=String.newline()), backspace (129=String.backspace()), left arrow (130), up arrow (131), right arrow (132), down arrow (133), home (134), end (135), page up (136), page down (137), insert (138), delete (139), ESC (140), F1-F12 (141-152)."
+# "Recognizes all ASCII characters, as well as the following keys: 
+# newline (128=String.newline()), backspace (129=String.backspace()), 
+# left arrow (130), up arrow (131), right arrow (132), down arrow (133), 
+# home (134), end (135), page up (136), page down (137), 
+# insert (138), delete (139), ESC (140), F1-F12 (141-152)."
 LEFT_ARROW = 130
 UP_ARROW = 131
 RIGHT_ARROW = 132
@@ -61,22 +65,25 @@ class KVM:
             if event.type == pygame.QUIT: sys.exit()
         keys = pygame.key.get_pressed()
         
-        # TODO: map K_... to ASCII plus control codes
-        # codes = [i for i in range(256) if keys[i]]
         # print(f"key codes: {codes}")
         # print(f"mods: {hex(pygame.key.get_mods())}")
-        # HACK: arrow keys not coming through from pygame, so just map WASD for now:
-        if keys[pygame.K_a]:
-            return LEFT_ARROW
-        elif keys[pygame.K_d]:
-            return RIGHT_ARROW
+        if keys[pygame.K_UP]:
+            key = UP_ARROW
+        elif keys[pygame.K_LEFT]:
+            key = LEFT_ARROW
+        elif keys[pygame.K_DOWN]:
+            key = DOWN_ARROW
+        elif keys[pygame.K_RIGHT]:
+            key = RIGHT_ARROW
         elif keys[pygame.K_ESCAPE]:
-            return ESCAPE
+            key = ESCAPE
         elif keys[pygame.K_SPACE]:
-            return ord(' ')
+            key = ord(' ')
         elif keys[pygame.K_RETURN]:
-            return NEWLINE
-        return None
+            key = NEWLINE
+        else:
+            key = None
+        return key
 
     def update_display(self, get_pixel):
         self.screen.fill(COLORS[0])
