@@ -114,6 +114,8 @@ def generate_python(ic):
         for i in range(1, bits):
             conn_i = ic.wires[Connection(comp, name, i)]
             if conn_i.comp != conn0.comp or conn_i.name != conn0.name or conn_i.bit != i:
+                # TODO: handle assembly of multiple bits into one; (_123 << 15) | (_456 << 14) | ...
+                print(f"{conn0}; {conn_i} -> {Connection(comp, name, i)}")
                 raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
         
         conn = conn0
