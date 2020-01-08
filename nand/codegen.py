@@ -97,12 +97,12 @@ def generate_python(ic):
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
-        if conn.bit != 0:
-            return f"({value} & (1 << {conn.bit}) != 0)"
+        if conn.bit != 0 or any(c.comp == conn.comp and c.name == conn.name and c.bit != 0 for c in ic.wires.values()):
+            return f"({value} & {hex(1 << conn.bit)} != 0)"
         elif conn.comp.label == "Register":
             raise Exception("TODO: unexpected wiring for 1-bit component")
         else:
-            return f"({value} & 0b1 != 0)" 
+            return value
 
     def src_many(comp, name, bits=None):
         if bits is None:
