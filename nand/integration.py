@@ -1,3 +1,5 @@
+"""Tools for assembling components into chips."""
+
 import collections
 import itertools
 
