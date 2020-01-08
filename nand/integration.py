@@ -25,12 +25,6 @@ class IC:
     def outputs(self):
         return self._outputs
 
-    def has_combine_ops(self):
-        """Just return True, because that's virtually always the case and the answer only becomes
-        interesting after flattening, when no child ICs are left anyway.
-        """
-        return True
-
     def wire(self, from_output, to_input):
         """Connect a single trace from an output of one component to an input of another.
 
@@ -246,7 +240,7 @@ class IC:
                 return ""
             elif isinstance(from_comp, Const):
                 return ""
-            elif not from_comp.has_combine_ops():
+            elif isinstance(from_comp, DFF):
                 return " (latched)"
             elif all_comps.index(from_comp) > all_comps.index(to_comp):
                 return " (back-edge)"

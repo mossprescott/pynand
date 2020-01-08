@@ -153,28 +153,6 @@ class VectorOps:
         """
         return []
 
-    # def has_combine_ops(self):
-    #     """True if the component _ever_ updates any output in combinational fashion (as most do).
-    #     False only for components which only ever latch inputs and update their outputs during
-    #     flop/sequence.
-    #
-    #     This is useful for determining evaluation order: non-combinational components can be evaluated
-    #     later, which can help to break cycles (the same cycles that these components tend to
-    #     participate in.)
-    #
-    #     Current theory is that this only really needs to work for DFFs. Note that RAM, despite
-    #     having both combinational and sequential behavior, actually treats its one output as
-    #     combinational. However, if someone decides to implement a 16-bit Register with a purely
-    #     latched output, this will handle that.
-    #     """
-    #
-    #     trace_map = {
-    #         name: [0]*bits
-    #         for (name, bits) in itertools.chain(self.inputs().items(), self.outputs().items())
-    #     }
-    #     return len(self.combine(**trace_map)) > 0
-
-
 class NandOps(VectorOps):
     def combine(self, a, b, out):
         assert len(a) == 1 and len(b) == 1 and len(out) == 1
