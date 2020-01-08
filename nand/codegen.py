@@ -29,7 +29,7 @@ the memory layout also entails constructing a new UI harness, which is beside th
 """
 
 from nand.component import Nand, Const, ROM
-from nand.integration import IC, Connection, root
+from nand.integration import IC, Connection, root, clock
 from nand.optimize import simplify
 from nand.vector import extend_sign
 
@@ -75,6 +75,9 @@ def generate_python(ic):
     # print(ic)
     
     all_comps = ic.sorted_components()
+
+    if any(conn == clock for conn in ic.wires.values()):
+        raise NotImplementedError("This simulator cannot handle chips that refer to 'clock' directly.")
 
     supr = 'SOC' if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps) else 'Chip'
 
