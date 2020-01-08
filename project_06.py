@@ -58,9 +58,9 @@ def parse_op(string):
     to a symbol or variable.
     """
     
-    m = re.match(r"@(\d+)", string)
+    m = re.match(r"@((?:0x)?\d+)", string)
     if m:
-        return int(m.group(1))
+        return eval(m.group(1))
     else:
         m = re.match(r"(?:([ADM]+)=)?([^;]+)(?:;J(..))?", string)
         if m:
