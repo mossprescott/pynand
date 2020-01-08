@@ -245,13 +245,28 @@ def print_lines(lines):
         print(f"{str(i+1).rjust(3)}: {l}")
 
 
-class Chip:
-    """Super for generated classes, which mostly deals with inputs and outputs."""
+class ChipCommon:
+    def tick(self):
+        """Raise the clock, preparing to advance to the next cycle."""
+        pass
+
+    def tock(self):
+        """Lower the clock, causing clocked chips to assume their new values."""
+        self._eval(True)
+        
+    def ticktock(self):
+        """Equivalent to tick(); tock()."""
+        self.tock()
+
+
+class Chip(ChipCommon):
+    """Super for chips that aren't the full computer; mostly deals with inputs and outputs.
+    """
     def __init__(self, inputs, outputs):
         self.__inputs = inputs
         self.__outputs = outputs
         self.__dirty = True
-        
+
     def __setattr__(self, name, value):
         if name.startswith('_'): return object.__setattr__(self, name, value)
         
@@ -269,28 +284,18 @@ class Chip:
             self._eval(False)
         return object.__getattribute__(self, f"_{name}")
 
-    def tick(self):
-        """Raise the clock, preparing to advance to the next cycle."""
-        pass
 
-    def tock(self):
-        """Lower the clock, causing clocked chips to assume their new values."""
-        self._eval(True)
-        
-    def ticktock(self):
-        """Equivalent to tick(); tock()."""
-        self.tock()
-
-
-class SOC(Chip):
+class SOC(ChipCommon):
     """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
     
-    def __init__(self, inputs, outputs):
-        Chip.__init__(self, inputs, outputs)
+    def __init__(self, _inputs, _outputs):
         self._rom = []
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0
+        
+        self.__dirty = True
+        
         
     def init_rom(self, instructions):
         """Overwrite the top of the ROM with a sequence of instructions.
@@ -320,8 +325,22 @@ class SOC(Chip):
         self.init_rom(instructions)
         self.reset_program()
 
-        while self.pc <= len(instructions):
+        while self._pc <= len(instructions):
             self.ticktock()
+
+    # Note: only one input (reset) and one output (pc) are exposed, so they're each handled 
+    # as properties to avoid the overhead of __getattr__ and __setattr__.
+    # TODO: generate these along with _eval, in case someone wants to get fancy.
+    
+    def _set_reset(self, value):
+        self._reset = value
+        self.__dirty = True
+    reset = property(fset=_set_reset)
+
+    @property
+    def pc(self):
+        self._eval(False)
+        return self._pc
 
     def peek(self, address):
         """Read a value from the main RAM. Address must be between 0x000 and 0x3FFF."""
