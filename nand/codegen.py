@@ -233,7 +233,7 @@ def generate_python(ic):
         if bits == 1:
             l(2, f"self._{name} = {src_one(root, name)}")
         else:
-            l(2, f"self._{name} = {src_many(root, name)}")
+            l(2, f"self._{name} = {src_many(root, name, bits)}")
 
     l(2, "if update_state:")
     l(3,   "pass")
