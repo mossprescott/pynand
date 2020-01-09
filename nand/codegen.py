@@ -86,6 +86,9 @@ def generate_python(ic):
         l = "    "*indent + str
         lines.append(l)
 
+    def output_name(comp):
+        return f"_{all_comps.index(comp)}_out"
+
     def src_one(comp, name, bit=0):
         conn = ic.wires[Connection(comp, name, bit)]
         
@@ -129,16 +132,17 @@ def generate_python(ic):
             return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'in_'))}")
+        l(2, f"{output_name(comp)} = {template.format(src_one(comp, 'in_'))}")
 
     def binary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'a'), src_one(comp, 'b'))}")
+        l(2, f"{output_name(comp)} = {template.format(src_one(comp, 'a'), src_one(comp, 'b'))}")
 
     def unary16(comp, template, bits=None):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'in_', bits))}")
+        l(2, f"{output_name(comp)} = {template.format(src_many(comp, 'in_', bits))}")
         
     def binary16(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
+        l(2, f"{output_name(comp)} = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
+
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
@@ -149,7 +153,7 @@ def generate_python(ic):
         l(2, f"self._{name} = 0  # output")
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
-            l(2, f"self._{all_comps.index(comp)}_out = 0  # register")
+            l(2, f"self.{output_name(comp)} = 0  # register")
             
     l(0, "")
     
@@ -184,19 +188,19 @@ def generate_python(ic):
         elif isinstance(comp, ROM):
             l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
             l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._rom[_{all_comps.index(comp)}_address]")
+            l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
             l(2, f"else:")
-            l(3,   f"_{all_comps.index(comp)}_out = 0")
+            l(3,   f"{output_name(comp)} = 0")
         elif comp.label == "MemorySystem":
-            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")  # TODO: 15?
+            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")
             l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._ram[_{all_comps.index(comp)}_address]")
+            l(3,   f"{output_name(comp)} = self._ram[_{all_comps.index(comp)}_address]")
             l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
+            l(3,   f"{output_name(comp)} = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
             l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._keyboard")
+            l(3,   f"{output_name(comp)} = self._keyboard")
             l(2, f"else:")
-            l(3,   f"_{all_comps.index(comp)}_out = 0")
+            l(3,   f"{output_name(comp)} = 0")
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
 
@@ -215,7 +219,7 @@ def generate_python(ic):
         elif comp.label == "Register":
             # l(3, f"print('register: {all_comps.index(comp)}')")  # HACK
             l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"self._{all_comps.index(comp)}_out = {src_many(comp, 'in_')}")
+            l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
         elif comp.label == "MemorySystem":
             l(3, f"if {src_one(comp, 'load')}:")
