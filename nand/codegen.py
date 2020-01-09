@@ -86,8 +86,8 @@ def generate_python(ic):
         l = "    "*indent + str
         lines.append(l)
 
-    def src_one(comp, name):
-        conn = ic.wires[Connection(comp, name, 0)]
+    def src_one(comp, name, bit=0):
+        conn = ic.wires[Connection(comp, name, bit)]
         
         # TODO: deal with lots of cases
         if isinstance(conn.comp, Const):
@@ -109,30 +109,24 @@ def generate_python(ic):
             bits = 16
 
         conn0 = ic.wires[Connection(comp, name, 0)]
-        if conn0.bit != 0:
-            raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
-        for i in range(1, bits):
-            conn_i = ic.wires[Connection(comp, name, i)]
-            if conn_i.comp != conn0.comp or conn_i.name != conn0.name or conn_i.bit != i:
-                # TODO: handle assembly of multiple bits into one; (_123 << 15) | (_456 << 14) | ...
-                print(f"{conn0}; {conn_i} -> {Connection(comp, name, i)}")
-                raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
+        src_conns = [(i, ic.wires.get(Connection(comp, name, i))) for i in range(bits)]
+        if all((c.comp == conn0.comp and c.name == conn0.name and c.bit == bit) for (bit, c) in src_conns):            
+            conn = conn0
         
-        conn = conn0
-        
-        # TODO: deal with lots of cases
-        if isinstance(conn.comp, Const):
-            return conn.comp.value
+            if isinstance(conn.comp, Const):
+                return conn.comp.value
 
-        if conn.comp == root:
-            name = f"self._{conn.name}"
-        else:
-            name = f"_{all_comps.index(conn.comp)}_{conn.name}"
+            if conn.comp == root:
+                name = f"self._{conn.name}"
+            else:
+                name = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
-        if conn.comp.label == "Register":
-            return f"self.{name}"
+            if conn.comp.label == "Register":
+                return f"self.{name}"
+            else:
+                return name    
         else:
-            return name
+            return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
         l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'in_'))}")
