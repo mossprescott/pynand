@@ -132,17 +132,65 @@ def generate_python(ic):
             return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
-        l(2, f"{output_name(comp)} = {template.format(src_one(comp, 'in_'))}")
+        return template.format(src_one(comp, 'in_'))
 
     def binary1(comp, template):
-        l(2, f"{output_name(comp)} = {template.format(src_one(comp, 'a'), src_one(comp, 'b'))}")
+        return template.format(src_one(comp, 'a'), src_one(comp, 'b'))
 
     def unary16(comp, template, bits=None):
-        l(2, f"{output_name(comp)} = {template.format(src_many(comp, 'in_', bits))}")
+        return template.format(src_many(comp, 'in_', bits))
         
     def binary16(comp, template):
-        l(2, f"{output_name(comp)} = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
+        return template.format(src_many(comp, 'a'), src_many(comp, 'b'))
 
+    def component_expr(comp):
+        if isinstance(comp, Nand):
+            return binary1(comp, "not ({} and {})")
+        elif isinstance(comp, Const):
+            return None
+        elif comp.label == 'Not':
+            return unary1(comp, "not {}")
+        elif comp.label == 'And':
+            return binary1(comp, "{} and {}")
+        elif comp.label == 'Or':
+            return binary1(comp, "{} or {}")
+        elif comp.label == 'Not16':
+            return unary16(comp, "~{}")
+        elif comp.label == 'And16':
+            return binary16(comp, "{} & {}")
+        elif comp.label == 'Add16':
+            return binary16(comp, "extend_sign({} + {})")
+        elif comp.label == 'Mux16':
+            return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
+        elif comp.label == 'Zero16':
+            return unary16(comp, "{} == 0")
+        elif comp.label == 'Inc16':
+            return unary16(comp, "extend_sign({} + 1)")
+        elif comp.label == "Register":
+            return None
+        elif isinstance(comp, ROM):
+            return None
+            # TODO: switch to a nested expr:
+        #     l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
+        #     l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
+        #     l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
+        #     l(2, f"else:")
+        #     l(3,   f"{output_name(comp)} = 0")
+        elif comp.label == "MemorySystem":
+            return None
+            # TODO: switch to a nested expr:
+        #     l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")
+        #     l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
+        #     l(3,   f"{output_name(comp)} = self._ram[_{all_comps.index(comp)}_address]")
+        #     l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
+        #     l(3,   f"{output_name(comp)} = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
+        #     l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
+        #     l(3,   f"{output_name(comp)} = self._keyboard")
+        #     l(2, f"else:")
+        #     l(3,   f"{output_name(comp)} = 0")
+        else:
+            raise Exception(f"Unrecognized primitive: {comp}")
+    
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
@@ -161,28 +209,12 @@ def generate_python(ic):
     l(2,   "def extend_sign(x):")
     l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
-        if isinstance(comp, Nand):
-            binary1(comp, "not ({} and {})")
-        elif isinstance(comp, Const):
+        # TODO: identify components whose single output is used only once; inline them to
+        # save evaluation when Mux16 selects only one value to be used.
+        # Including for chains of references, and for non-trivial expressions like 
+        # decoding the address for RAM load (which is only used when instructions reference M)
+        if isinstance(comp, Const):
             pass
-        elif comp.label == 'Not':
-            unary1(comp, "not {}")
-        elif comp.label == 'And':
-            binary1(comp, "{} and {}")
-        elif comp.label == 'Or':
-            binary1(comp, "{} or {}")
-        elif comp.label == 'Not16':
-            unary16(comp, "~{}")
-        elif comp.label == 'And16':
-            binary16(comp, "{} & {}")
-        elif comp.label == 'Add16':
-            binary16(comp, "extend_sign({} + {})")
-        elif comp.label == 'Mux16':
-            binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
-        elif comp.label == 'Zero16':
-            unary16(comp, "{} == 0")
-        elif comp.label == 'Inc16':
-            unary16(comp, "extend_sign({} + 1)")
         elif comp.label == "Register":
             l(2, f"# _{all_comps.index(comp)} is a Register; updated later")
         elif isinstance(comp, ROM):
@@ -202,7 +234,11 @@ def generate_python(ic):
             l(2, f"else:")
             l(3,   f"{output_name(comp)} = 0")
         else:
-            raise Exception(f"Unrecognized primitive: {comp}")
+            expr = component_expr(comp)
+            if expr:
+                l(2, f"{output_name(comp)} = {expr}")
+            else:
+                raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
         if bits == 1:
