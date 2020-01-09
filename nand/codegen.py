@@ -113,21 +113,18 @@ def generate_python(ic):
 
         conn0 = ic.wires[Connection(comp, name, 0)]
         src_conns = [(i, ic.wires.get(Connection(comp, name, i))) for i in range(bits)]
-        if all((c.comp == conn0.comp and c.name == conn0.name and c.bit == bit) for (bit, c) in src_conns):            
+        if all((c.comp == conn0.comp and c.name == conn0.name and c.bit == bit) for (bit, c) in src_conns):
             conn = conn0
         
             if isinstance(conn.comp, Const):
                 return conn.comp.value
 
             if conn.comp == root:
-                name = f"self._{conn.name}"
+                return f"self._{conn.name}"
+            elif conn.comp.label == "Register":
+                return f"self._{all_comps.index(conn.comp)}_{conn.name}"
             else:
-                name = f"_{all_comps.index(conn.comp)}_{conn.name}"
-
-            if conn.comp.label == "Register":
-                return f"self.{name}"
-            else:
-                return name    
+                return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
         else:
             return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
