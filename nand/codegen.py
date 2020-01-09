@@ -89,6 +89,7 @@ def generate_python(ic):
     def inlinable(comp):
         """If a component has only one output and it's only connected to one input, it can be 
         inlined, and its evaluation may be skipped thanks to short-circuiting.
+        This alone is good for about 20% speedup.
         """
         connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
         return len(connections) <= 1
@@ -183,25 +184,13 @@ def generate_python(ic):
         elif comp.label == "Register":
             return None
         elif isinstance(comp, ROM):
+            # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
-            # TODO: switch to a nested expr:
-        #     l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
-        #     l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
-        #     l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
-        #     l(2, f"else:")
-        #     l(3,   f"{output_name(comp)} = 0")
         elif comp.label == "MemorySystem":
-            return None
-            # TODO: switch to a nested expr:
-        #     l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")
-        #     l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-        #     l(3,   f"{output_name(comp)} = self._ram[_{all_comps.index(comp)}_address]")
-        #     l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
-        #     l(3,   f"{output_name(comp)} = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
-        #     l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
-        #     l(3,   f"{output_name(comp)} = self._keyboard")
-        #     l(2, f"else:")
-        #     l(3,   f"{output_name(comp)} = 0")
+            # Note: the source of address better not be a big computation. At the moment it's always 
+            # register A (so, saved in self)
+            address = src_many(comp, 'address', 14)
+            return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
     
@@ -223,28 +212,14 @@ def generate_python(ic):
     l(2,   "def extend_sign(x):")
     l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
-        # TODO: identify components whose single output is used only once; inline them to
-        # save evaluation when Mux16 selects only one value to be used.
-        # Including for chains of references, and for non-trivial expressions like 
-        # decoding the address for RAM load (which is only used when instructions reference M)
         if isinstance(comp, Const):
             pass
         elif comp.label == "Register":
-            l(2, f"# _{all_comps.index(comp)} is a Register; updated later")
+            pass
         elif isinstance(comp, ROM):
             l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
             l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
             l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
-            l(2, f"else:")
-            l(3,   f"{output_name(comp)} = 0")
-        elif comp.label == "MemorySystem":
-            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")
-            l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-            l(3,   f"{output_name(comp)} = self._ram[_{all_comps.index(comp)}_address]")
-            l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
-            l(3,   f"{output_name(comp)} = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
-            l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
-            l(3,   f"{output_name(comp)} = self._keyboard")
             l(2, f"else:")
             l(3,   f"{output_name(comp)} = 0")
         elif not inlinable(comp):
@@ -272,12 +247,16 @@ def generate_python(ic):
             l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
         elif comp.label == "MemorySystem":
+            # Note: the source of address better not be a big computation. At the moment it's always 
+            # register A (so, saved in self)
+            address_expr = src_many(comp, 'address', 14)
+            in_name = f"_{all_comps.index(comp)}_in"
             l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"_{all_comps.index(comp)}_in = {src_many(comp, 'in_')}")
-            l(4,   f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-            l(5,     f"self._ram[_{all_comps.index(comp)}_address] = _{all_comps.index(comp)}_in")
-            l(4,   f"elif _{all_comps.index(comp)}_address < 0x6000:")
-            l(5,     f"self._screen[_{all_comps.index(comp)}_address & 0x1fff] = _{all_comps.index(comp)}_in")
+            l(4,   f"{in_name} = {src_many(comp, 'in_')}")
+            l(4,   f"if 0 <= {address_expr} < 0x4000:")
+            l(5,     f"self._ram[{address_expr}] = {in_name}")
+            l(4,   f"elif 0x4000 <= {address_expr} < 0x6000:")
+            l(5,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
