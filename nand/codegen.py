@@ -28,7 +28,7 @@ into a flat address space) is all implemented with fixed logic. The rationale is
 the memory layout also entails constructing a new UI harness, which is beside the point.
 """
 
-from nand.component import Nand, Const, ROM
+from nand.component import Nand, Const, DFF, ROM
 from nand.integration import IC, Connection, root, clock
 from nand.optimize import simplify
 from nand.vector import extend_sign
@@ -109,8 +109,12 @@ def generate_python(ic):
             expr = component_expr(conn.comp)
             if expr:
                 value = f"({expr})"
+            elif isinstance(conn.comp, DFF):
+                value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
+        elif isinstance(conn.comp, DFF):
+            value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -183,6 +187,8 @@ def generate_python(ic):
             return unary16(comp, "extend_sign({} + 1)")
         elif comp.label == "Register":
             return None
+        elif isinstance(comp, DFF):
+            return None
         elif isinstance(comp, ROM):
             # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
@@ -205,14 +211,15 @@ def generate_python(ic):
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
             l(2, f"self.{output_name(comp)} = 0  # register")
-            
+        elif isinstance(comp, DFF):
+            l(2, f"self.{output_name(comp)} = False  # dff")
     l(0, "")
-    
+
     l(1, f"def _eval(self, update_state):")
     l(2,   "def extend_sign(x):")
     l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
-        if isinstance(comp, Const):
+        if isinstance(comp, (Const, DFF)):
             pass
         elif comp.label == "Register":
             pass
@@ -236,9 +243,12 @@ def generate_python(ic):
             l(2, f"self._{name} = {src_many(root, name, bits)}")
 
     l(2, "if update_state:")
-    l(3,   "pass")
+    any_state = False
     for comp in all_comps:
-        if not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
+        if isinstance(comp, DFF):
+            l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
+            any_state = True
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
@@ -246,6 +256,7 @@ def generate_python(ic):
             l(3, f"if {src_one(comp, 'load')}:")
             l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+            any_state = True
         elif comp.label == "MemorySystem":
             # Note: the source of address better not be a big computation. At the moment it's always 
             # register A (so, saved in self)
@@ -257,9 +268,12 @@ def generate_python(ic):
             l(5,     f"self._ram[{address_expr}] = {in_name}")
             l(4,   f"elif 0x4000 <= {address_expr} < 0x6000:")
             l(5,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            any_state = True
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
+    if not any_state:
+        l(3,   "pass")
     l(0, "")
     
     for name in ic.inputs():
