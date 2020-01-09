@@ -24,7 +24,7 @@ import project_06
 
 
 EVENT_INTERVAL = 1/10
-DISPLAY_INTERVAL = 1/5  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
+DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
 CYCLE_INTERVAL = 1.0
 
 COLORS = [0xFFFFFF, 0x000000]
@@ -116,27 +116,29 @@ def main():
     while True:
         computer.ticktock(); cycles += 1
 
-        now = time.monotonic()
+        # Note: check the time only every few frames to reduce the overhead of timing
+        if cycles % 10 == 0:
+            now = time.monotonic()
         
-        # A few times per second, process events and update the display:
-        if now >= last_event_time + EVENT_INTERVAL:
-            last_event_time = now
-            key = kvm.process_events()
-            computer.set_keydown(key or 0)
+            # A few times per second, process events and update the display:
+            if now >= last_event_time + EVENT_INTERVAL:
+                last_event_time = now
+                key = kvm.process_events()
+                computer.set_keydown(key or 0)
 
-        if now >= last_display_time + DISPLAY_INTERVAL:
-            last_display_time = now
-            kvm.update_display(computer.peek_screen)
+            if now >= last_display_time + DISPLAY_INTERVAL:
+                last_display_time = now
+                kvm.update_display(computer.peek_screen)
 
-        if now >= last_cycle_time + CYCLE_INTERVAL:
-            cps = (cycles - last_cycle_count)/(now - last_cycle_time)
-            pygame.display.set_caption(f"{sys.argv[1]}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
-            last_cycle_time = now
-            last_cycle_count = cycles
+            if now >= last_cycle_time + CYCLE_INTERVAL:
+                cps = (cycles - last_cycle_count)/(now - last_cycle_time)
+                pygame.display.set_caption(f"{sys.argv[1]}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
+                last_cycle_time = now
+                last_cycle_count = cycles
             
-            # print(f"cycles: {cycles//1000:0,d}k; pc: {computer.pc}")
-            # print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
-            # print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")
+                # print(f"cycles: {cycles//1000:0,d}k; pc: {computer.pc}")
+                # print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
+                # print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")
 
 
 if __name__ == "__main__":
