@@ -86,6 +86,13 @@ def generate_python(ic):
         l = "    "*indent + str
         lines.append(l)
 
+    def inlinable(comp):
+        """If a component has only one output and it's only connected to one input, it can be 
+        inlined, and its evaluation may be skipped thanks to short-circuiting.
+        """
+        connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
+        return len(connections) <= 1
+
     def output_name(comp):
         return f"_{all_comps.index(comp)}_out"
 
@@ -97,6 +104,12 @@ def generate_python(ic):
             value = conn.comp.value
         elif conn.comp == root:
             value = f"self._{conn.name}"
+        elif inlinable(conn.comp):
+            expr = component_expr(conn.comp)
+            if expr:
+                value = f"({expr})"
+            else:
+                value = f"_{all_comps.index(conn.comp)}_{conn.name}"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -123,8 +136,12 @@ def generate_python(ic):
                 return f"self._{conn.name}"
             elif conn.comp.label == "Register":
                 return f"self._{all_comps.index(conn.comp)}_{conn.name}"
-            else:
-                return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
+            elif inlinable(conn.comp):
+                expr = component_expr(conn.comp)
+                if expr:
+                    return f"({expr})"
+
+            return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
         else:
             return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
@@ -230,7 +247,7 @@ def generate_python(ic):
             l(3,   f"{output_name(comp)} = self._keyboard")
             l(2, f"else:")
             l(3,   f"{output_name(comp)} = 0")
-        else:
+        elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
                 l(2, f"{output_name(comp)} = {expr}")
