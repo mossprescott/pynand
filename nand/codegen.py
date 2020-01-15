@@ -28,8 +28,8 @@ into a flat address space) is all implemented with fixed logic. The rationale is
 the memory layout also entails constructing a new UI harness, which is beside the point.
 """
 
-from nand.component import Nand, Const, ROM
-from nand.integration import IC, Connection, root
+from nand.component import Nand, Const, DFF, ROM
+from nand.integration import IC, Connection, root, clock
 from nand.optimize import simplify
 from nand.vector import extend_sign
 
@@ -76,165 +76,218 @@ def generate_python(ic):
     
     all_comps = ic.sorted_components()
 
+    if any(conn == clock for conn in ic.wires.values()):
+        raise NotImplementedError("This simulator cannot handle chips that refer to 'clock' directly.")
+
     supr = 'SOC' if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps) else 'Chip'
 
     lines = []
     def l(indent, str):
         l = "    "*indent + str
-        # print(f"> {l}")
         lines.append(l)
 
-    def src_one(comp, name):
-        conn = ic.wires[Connection(comp, name, 0)]
+    def inlinable(comp):
+        """If a component has only one output and it's only connected to one input, it can be 
+        inlined, and its evaluation may be skipped thanks to short-circuiting.
+        This alone is good for about 20% speedup.
+        """
+        connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
+        return len(connections) <= 1
+
+    def output_name(comp):
+        return f"_{all_comps.index(comp)}_out"
+
+    def src_one(comp, name, bit=0):
+        conn = ic.wires[Connection(comp, name, bit)]
         
         # TODO: deal with lots of cases
         if isinstance(conn.comp, Const):
             value = conn.comp.value
         elif conn.comp == root:
             value = f"self._{conn.name}"
+        elif inlinable(conn.comp):
+            expr = component_expr(conn.comp)
+            if expr:
+                value = f"({expr})"
+            elif isinstance(conn.comp, DFF):
+                value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
+            else:
+                value = f"_{all_comps.index(conn.comp)}_{conn.name}"
+        elif isinstance(conn.comp, DFF):
+            value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
-        if conn.bit != 0:
-            return f"({value} & (1 << {conn.bit}) != 0)"
+        if conn.bit != 0 or any(c.comp == conn.comp and c.name == conn.name and c.bit != 0 for c in ic.wires.values()):
+            return f"({value} & {hex(1 << conn.bit)} != 0)"
         elif conn.comp.label == "Register":
             raise Exception("TODO: unexpected wiring for 1-bit component")
         else:
-            return f"({value} & 0b1 != 0)" 
+            return value
 
     def src_many(comp, name, bits=None):
         if bits is None:
             bits = 16
 
         conn0 = ic.wires[Connection(comp, name, 0)]
-        if conn0.bit != 0:
-            raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
-        for i in range(1, bits):
-            conn_i = ic.wires[Connection(comp, name, i)]
-            if conn_i.comp != conn0.comp or conn_i.name != conn0.name or conn_i.bit != i:
-                raise Exception(f"TODO: unexpected wiring for {bits}-bit component")
+        src_conns = [(i, ic.wires.get(Connection(comp, name, i))) for i in range(bits)]
+        if all((c.comp == conn0.comp and c.name == conn0.name and c.bit == bit) for (bit, c) in src_conns):
+            conn = conn0
         
-        conn = conn0
-        
-        # TODO: deal with lots of cases
-        if isinstance(conn.comp, Const):
-            return conn.comp.value
+            if isinstance(conn.comp, Const):
+                return conn.comp.value
 
-        if conn.comp == root:
-            name = f"self._{conn.name}"
-        else:
-            name = f"_{all_comps.index(conn.comp)}_{conn.name}"
+            if conn.comp == root:
+                return f"self._{conn.name}"
+            elif conn.comp.label == "Register":
+                return f"self._{all_comps.index(conn.comp)}_{conn.name}"
+            elif inlinable(conn.comp):
+                expr = component_expr(conn.comp)
+                if expr:
+                    return f"({expr})"
 
-        if conn.comp.label == "Register":
-            return f"self.{name}"
+            return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
         else:
-            return name
+            return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'in_'))}")
+        return template.format(src_one(comp, 'in_'))
 
     def binary1(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_one(comp, 'a'), src_one(comp, 'b'))}")
+        return template.format(src_one(comp, 'a'), src_one(comp, 'b'))
 
     def unary16(comp, template, bits=None):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'in_', bits))}")
+        return template.format(src_many(comp, 'in_', bits))
         
     def binary16(comp, template):
-        l(2, f"_{all_comps.index(comp)}_out = {template.format(src_many(comp, 'a'), src_many(comp, 'b'))}")
+        return template.format(src_many(comp, 'a'), src_many(comp, 'b'))
+
+    def component_expr(comp):
+        if isinstance(comp, Nand):
+            return binary1(comp, "not ({} and {})")
+        elif isinstance(comp, Const):
+            return None
+        elif comp.label == 'Not':
+            return unary1(comp, "not {}")
+        elif comp.label == 'And':
+            return binary1(comp, "{} and {}")
+        elif comp.label == 'Or':
+            return binary1(comp, "{} or {}")
+        elif comp.label == 'Not16':
+            return unary16(comp, "~{}")
+        elif comp.label == 'And16':
+            return binary16(comp, "{} & {}")
+        elif comp.label == 'Add16':
+            return binary16(comp, "extend_sign({} + {})")
+        elif comp.label == 'Mux16':
+            return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
+        elif comp.label == 'Zero16':
+            return unary16(comp, "{} == 0")
+        elif comp.label == 'Inc16':
+            return unary16(comp, "extend_sign({} + 1)")
+        elif comp.label == "Register":
+            return None
+        elif isinstance(comp, DFF):
+            return None
+        elif isinstance(comp, ROM):
+            # Note: the ROM is read on every cycle, so no point in trying to inline it away
+            return None
+        elif comp.label == "MemorySystem":
+            # Note: the source of address better not be a big computation. At the moment it's always 
+            # register A (so, saved in self)
+            address = src_many(comp, 'address', 14)
+            return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
+        else:
+            raise Exception(f"Unrecognized primitive: {comp}")
+    
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
-    l(2,     f"{supr}.__init__(self, {ic.inputs()!r}, {ic.outputs()!r})")
+    l(2,     f"{supr}.__init__(self)")
     for name in ic.inputs():
         l(2, f"self._{name} = 0  # input")
     for name in ic.outputs():
         l(2, f"self._{name} = 0  # output")
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
-            l(2, f"self._{all_comps.index(comp)}_out = 0  # register")
-            
+            l(2, f"self.{output_name(comp)} = 0  # register")
+        elif isinstance(comp, DFF):
+            l(2, f"self.{output_name(comp)} = False  # dff")
     l(0, "")
-    
+
     l(1, f"def _eval(self, update_state):")
     l(2,   "def extend_sign(x):")
     l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
-        if isinstance(comp, Nand):
-            binary1(comp, "not ({} and {})")
-        elif isinstance(comp, Const):
+        if isinstance(comp, (Const, DFF)):
             pass
-        elif comp.label == 'Not':
-            unary1(comp, "not {}")
-        elif comp.label == 'And':
-            binary1(comp, "{} and {}")
-        elif comp.label == 'Or':
-            binary1(comp, "{} or {}")
-        elif comp.label == 'Not16':
-            unary16(comp, "~{}")
-        elif comp.label == 'And16':
-            binary16(comp, "{} & {}")
-        elif comp.label == 'Add16':
-            binary16(comp, "extend_sign({} + {})")
-        elif comp.label == 'Mux16':
-            binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
-        elif comp.label == 'Zero16':
-            unary16(comp, "{} == 0")
-        elif comp.label == 'Inc16':
-            unary16(comp, "extend_sign({} + 1)")
         elif comp.label == "Register":
-            l(2, f"# _{all_comps.index(comp)} is a Register; updated later")
+            pass
         elif isinstance(comp, ROM):
             l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
             l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._rom[_{all_comps.index(comp)}_address]")
+            l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
             l(2, f"else:")
-            l(3,   f"_{all_comps.index(comp)}_out = 0")
-        # elif isinstance(comp, RAM):
-        #     l(2, f"_{all_comps.index(comp)}_out = self.{all_comps.index(comp)}[{src_many(comp, 'address', comp.address_bits)}]")
-        # elif isinstance(comp, Input):
-        #     l(2, f"# _{all_comps.index(comp)} is a Input: self._{all_comps.index(comp)} is used")
-        elif comp.label == "MemorySystem":
-            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', 14)}")  # TODO: 15?
-            l(2, f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._ram[_{all_comps.index(comp)}_address]")
-            l(2, f"elif _{all_comps.index(comp)}_address < 0x6000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._screen[_{all_comps.index(comp)}_address & 0x1fff]")
-            l(2, f"elif _{all_comps.index(comp)}_address == 0x6000:")
-            l(3,   f"_{all_comps.index(comp)}_out = self._keyboard")
-            l(2, f"else:")
-            l(3,   f"_{all_comps.index(comp)}_out = 0")
-        else:
-            # print(f"TODO: {comp.label}")
-            raise Exception(f"Unrecognized primitive: {comp}")
+            l(3,   f"{output_name(comp)} = 0")
+        elif not inlinable(comp):
+            expr = component_expr(comp)
+            if expr:
+                l(2, f"{output_name(comp)} = {expr}")
+            else:
+                raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
         if bits == 1:
             l(2, f"self._{name} = {src_one(root, name)}")
         else:
-            l(2, f"self._{name} = {src_many(root, name)}")
+            l(2, f"self._{name} = {src_many(root, name, bits)}")
 
     l(2, "if update_state:")
-    l(3,   "pass")
+    any_state = False
     for comp in all_comps:
-        if not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
+        if isinstance(comp, DFF):
+            l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
+            any_state = True
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
             # l(3, f"print('register: {all_comps.index(comp)}')")  # HACK
             l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"self._{all_comps.index(comp)}_out = {src_many(comp, 'in_')}")
+            l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+            any_state = True
         elif comp.label == "MemorySystem":
+            # Note: the source of address better not be a big computation. At the moment it's always 
+            # register A (so, saved in self)
+            address_expr = src_many(comp, 'address', 14)
+            in_name = f"_{all_comps.index(comp)}_in"
             l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"_{all_comps.index(comp)}_in = {src_many(comp, 'in_')}")
-            l(4,   f"if 0 <= _{all_comps.index(comp)}_address < 0x4000:")
-            l(5,     f"self._ram[_{all_comps.index(comp)}_address] = _{all_comps.index(comp)}_in")
-            l(4,   f"elif _{all_comps.index(comp)}_address < 0x6000:")
-            l(5,     f"self._screen[_{all_comps.index(comp)}_address & 0x1fff] = _{all_comps.index(comp)}_in")
+            l(4,   f"{in_name} = {src_many(comp, 'in_')}")
+            l(4,   f"if 0 <= {address_expr} < 0x4000:")
+            l(5,     f"self._ram[{address_expr}] = {in_name}")
+            l(4,   f"elif 0x4000 <= {address_expr} < 0x6000:")
+            l(5,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            any_state = True
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
+    if not any_state:
+        l(3,   "pass")
     l(0, "")
+    
+    for name in ic.inputs():
+        l(1, f"def _set_{name}(self, value):")
+        l(2,   f"self._{name} = value")
+        l(2,   f"self.__dirty = True")
+        l(1, f"{name} = property(fset=_set_{name})")
+        l(0, "")
+    for name in ic.outputs():
+        l(1, f"@property")
+        l(1, f"def {name}(self):")
+        l(2,   f"self._eval(False)")
+        l(2,   f"return self._{name}")    
+        l(0, "")
     
     return class_name, lines
 
@@ -246,29 +299,17 @@ def print_lines(lines):
 
 
 class Chip:
-    """Super for generated classes, which mostly deals with inputs and outputs."""
-    def __init__(self, inputs, outputs):
-        self.__inputs = inputs
-        self.__outputs = outputs
-        self.__dirty = True
-        
-    def __setattr__(self, name, value):
-        if name.startswith('_'): return object.__setattr__(self, name, value)
-        
-        if name not in self.__inputs:
-            raise Exception(f"No such input: {name}")
-
-        object.__setattr__(self, f"_{name}", value)
+    """Super for generated classes, providing tick, tock, and ticktock.
+    
+    This: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
+    chips that refer to it directly aren't simulated properly by this implementation.
+    
+    TODO: handle "clock" correctly, and also implement the components needed by those tests?
+    """
+    
+    def __init__(self):
         self.__dirty = True
     
-    def __getattr__(self, name):
-        if name not in self.__outputs:
-            raise Exception(f"No such output: {name}")
-
-        if self.__dirty:
-            self._eval(False)
-        return object.__getattribute__(self, f"_{name}")
-
     def tick(self):
         """Raise the clock, preparing to advance to the next cycle."""
         pass
@@ -279,18 +320,20 @@ class Chip:
         
     def ticktock(self):
         """Equivalent to tick(); tock()."""
-        self.tock()
+        self._eval(True)
 
 
 class SOC(Chip):
     """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
     
-    def __init__(self, inputs, outputs):
-        Chip.__init__(self, inputs, outputs)
+    def __init__(self):
         self._rom = []
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0
+        
+        self.__dirty = True
+        
         
     def init_rom(self, instructions):
         """Overwrite the top of the ROM with a sequence of instructions.
@@ -320,7 +363,7 @@ class SOC(Chip):
         self.init_rom(instructions)
         self.reset_program()
 
-        while self.pc <= len(instructions):
+        while self._pc <= len(instructions):
             self.ticktock()
 
     def peek(self, address):
