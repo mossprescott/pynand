@@ -189,6 +189,18 @@ def super_optimize(ic):
     of Nands up to the same size, until one is found that returns the same result for all inputs.
     
     Works only on chips that can be expressed as DAGs of only Nands, with no references to `clock`.
+    
+    The number of potential circuits grows pretty appallingly:
+    X = # of input bits
+    Y = # of gates
+    Z = # of output bits
+    unique configurations = X^2 * (X + 1)^2 * ... * (X + Y - 1)^2  *  Y * (Y-1) * ... (Y - (Z-1))
+                          = ((X + Y - 1)! / (X - 1)!)^2 * Y!/(Y-Z)!
+    
+    For example, HalfAdder has 2 inputs, 5 gates, and 2 outputs:
+    (6!/1!)^2 * 5!/3! = ~10.4 million
+    
+    DMux4Way: 2, 13, 4 => (14!/1!)^2 * 13!/11! = 8e21. That's not good! ~260,000 years if we could check one per second.
     """
      
     print(f"original: {ic}")
