@@ -163,7 +163,7 @@ def generate_dags(inputs, outputs, max_size):
                     yield nands + [nand], wires + [(a_src, Connection(nand, "a", 0)), (b_src, Connection(nand, "b", 0))]
 
 
-    for size in range(max_size):
+    for size in range(len(oconns), max_size+1):
         for nands, wires in loop(size):
             # DONE: probably ok to insist that every output has a unique source
             # possibly also insist that every input is used?
