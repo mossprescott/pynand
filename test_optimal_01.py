@@ -23,13 +23,13 @@ def test_mux():
     assert gate_count(Mux)['nands'] == 4
 
 def test_dmux():
-    assert gate_count(DMux)['nands'] == 5
+    assert gate_count(DMux)['nands'] == 4  # optimal, per super_optimize()
 
 def test_dmux4way():
-    assert gate_count(DMux4Way)['nands'] == 14  # optimal?
+    assert gate_count(DMux4Way)['nands'] == 13  # optimal?
 
 def test_dmux8way():
-    assert gate_count(DMux8Way)['nands'] == 31  # optimal?
+    assert gate_count(DMux8Way)['nands'] == 30  # optimal?
 
 def test_not16():
     assert gate_count(Not16)['nands'] == 16
