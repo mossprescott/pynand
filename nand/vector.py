@@ -14,6 +14,8 @@ so there's a lot of low-level bit slicing tricks being employed here. Compare wi
 faster, but more limited simulator in codegen.py.
 """
 
+import itertools
+
 from nand.component import Nand, Const, DFF, RAM, ROM, Input
 from nand.integration import Connection, root, clock
 from nand.optimize import simplify
@@ -53,7 +55,8 @@ def synthesize(ic):
         all_bits[clock] = next_bit
         next_bit += 1
         
-    for conn in sorted(set(ic.wires.values()), key=ic._connections_sort_key()):
+    all_source_conns = set(itertools.chain(ic.wires.values(), [Connection(root, n, b) for (n, bits) in ic._inputs.items() for b in range(bits)]))
+    for conn in sorted(all_source_conns, key=ic._connections_sort_key()):
         if conn != clock:
             all_bits[conn] = next_bit
             next_bit += 1
