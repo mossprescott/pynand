@@ -54,8 +54,11 @@ Mux = build(mkMux)
 def mkDMux(inputs, outputs):
     in_ = inputs.in_
     sel = inputs.sel
-    outputs.a = And(a=in_, b=Not(in_=sel).out).out
-    outputs.b = And(a=in_, b=sel).out
+    # This optimal version was found by nand.optimize.super_optimize():
+    nand0 = Nand(a=in_, b=sel).out
+    nand1 = Nand(a=in_, b=nand0).out
+    outputs.a = Not(in_=nand1).out
+    outputs.b = Not(in_=nand0).out
 
 DMux = build(mkDMux)
 
