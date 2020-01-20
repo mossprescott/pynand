@@ -113,7 +113,7 @@ RAM512 = build(mkRAM512)
 
 
 # Note: here's an implementation which is probably correct, but the resulting chip
-# is so large when it's flattened that there's not much hope of actually simulating it.
+# is so large when it's flattened that it's no fun actually trying to simulate it.
 def mkRAM4K(inputs, outputs):
     def mkRShift9(inputs, outputs):
         outputs.out[0] = inputs.in_[9]
@@ -123,14 +123,14 @@ def mkRAM4K(inputs, outputs):
 
     shifted = RShift9(in_=inputs.address)
     load = DMux8Way(in_=inputs.load, sel=shifted.out)
-    ram0 = RAM64(in_=inputs.in_, load=load.a, address=inputs.address)
-    ram1 = RAM64(in_=inputs.in_, load=load.b, address=inputs.address)
-    ram2 = RAM64(in_=inputs.in_, load=load.c, address=inputs.address)
-    ram3 = RAM64(in_=inputs.in_, load=load.d, address=inputs.address)
-    ram4 = RAM64(in_=inputs.in_, load=load.e, address=inputs.address)
-    ram5 = RAM64(in_=inputs.in_, load=load.f, address=inputs.address)
-    ram6 = RAM64(in_=inputs.in_, load=load.g, address=inputs.address)
-    ram7 = RAM64(in_=inputs.in_, load=load.h, address=inputs.address)
+    ram0 = RAM512(in_=inputs.in_, load=load.a, address=inputs.address)
+    ram1 = RAM512(in_=inputs.in_, load=load.b, address=inputs.address)
+    ram2 = RAM512(in_=inputs.in_, load=load.c, address=inputs.address)
+    ram3 = RAM512(in_=inputs.in_, load=load.d, address=inputs.address)
+    ram4 = RAM512(in_=inputs.in_, load=load.e, address=inputs.address)
+    ram5 = RAM512(in_=inputs.in_, load=load.f, address=inputs.address)
+    ram6 = RAM512(in_=inputs.in_, load=load.g, address=inputs.address)
+    ram7 = RAM512(in_=inputs.in_, load=load.h, address=inputs.address)
     outputs.out = Mux8Way16(a=ram0.out, b=ram1.out, c=ram2.out, d=ram3.out,
                             e=ram4.out, f=ram5.out, g=ram6.out, h=ram7.out,
                             sel=shifted.out).out
