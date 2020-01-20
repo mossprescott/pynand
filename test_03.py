@@ -248,6 +248,9 @@ def test_ram512():
 
 
 # This is still just too darn slow (almost 5 minutes.)
+# TODO: fix flattening and synthesis so this isn't so slow; the time's probably
+# actually not in codegen or execution.
+#
 # def test_ram4k_legit():
 #     """The challenge is to implement RAM4K from Registers."""
 #     assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
