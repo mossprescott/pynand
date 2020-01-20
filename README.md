@@ -1,12 +1,12 @@
 # From Nand to Tetris in Python
 
 An alternative language and test harness for doing the exercises from the amazing book/course
-[Nand To Tetris](https://www.nand2tetris.org). My goal is to provide a better experience
-as compared to the tools provided by the authors:
+[Nand To Tetris](https://www.nand2tetris.org). This version, in Python, may provide a better 
+experience as compared to the tools provided by the authors:
 
 * No need to install Java
 * No clunky UI
-* You only need python, a text editor, and basic command-line skills.
+* You only need Python, a text editor, and basic command-line skills.
 
 
 ## Requirements
@@ -22,19 +22,20 @@ For the full Computer simulation including display and keyboard, `pygame` is req
 
 ## Step 1: Do the Exercises
 
-_NOTE: for the time being, solved versions of each component are included. When everything's 
-working as intended, we'll come back and clean it up so the exercises are ready to solve._
+First clone the repo and run `pytest`. All the tests should pass, because the included solutions 
+are used for every component.
 
-First clone the repo and run `pytest`. If your environment is set up, you should see a lot of 
-failing tests, because none of the components are implemented yet (except `Nand`, which you get 
-for free).
-
-Now open `project01.py` in a text editor, find the `mkNot` function, and replace the `___`s
-with references to the inputs so that it computes the expected result.
+Now open [project_01.py](project_01.py) in a text editor, find the `mkNot` function, and the line
+with `solved_01.Not`. Replace that with `Nand(a=..., b=...)` using the inputs so that it computes 
+the expected result.
 
 Run `pytest test_01.py`. If `test_not` passes, you can move on to the next component.
 
-When all those tests pass, you're done with the first chapter. Move on to test_02.py…
+When you're all done, delete the line `from nand.solutions import solved_01` at the top of the 
+file to be sure you didn't miss anything. Actually, if you prefer you can start by deleting that 
+line, then work on getting the tests to pass one at a time.
+
+That's it for the first chapter. Now move on to `test_02.py`…
 
 
 ## Step 2: Enjoy
