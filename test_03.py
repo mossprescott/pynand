@@ -247,7 +247,7 @@ def test_ram512():
     ram_test(ram, 512)
 
 
-# This is still just too darn slow (more than a minute).
+# This is still just too darn slow (almost 5 minutes.)
 # def test_ram4k_legit():
 #     """The challenge is to implement RAM4K from Registers."""
 #     assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
