@@ -65,7 +65,7 @@ def dff_fine_test(dff):
     # global), and providing tick() and tock() to cycle it.
 
 
-def test_dff_legit():
+def test_my_dff_legit():
     """The challenge is to implement DFF with only Nand gates."""
     assert list(gate_count(MyDFF).keys()) == ['nands']
 
