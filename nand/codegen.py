@@ -16,6 +16,9 @@ directly in Python:
 A few more are implemented so that this simulator can also be used (and tested) with smaller 
 chips:
 - DFF
+- DMux
+- TODO: DMux8Way
+- Mux8Way16
 - TODO: RAM
 
 Any other ICs that appear are flattened to combinations of these. The downside is that a 
@@ -67,6 +70,8 @@ PRIMITIVES = set([
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
     "MemorySystem",  # Needed for Computer
+    # Additional components used by various components, but not typically used in a full computer sim:
+    "DMux", "Mux8Way16",
 ])
 
 
@@ -237,6 +242,35 @@ def generate_python(ic, inline=True):
             l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
             l(2, f"else:")
             l(3,   f"{output_name(comp)} = 0")
+        elif comp.label == "DMux":
+            in_name = f"_{all_comps.index(comp)}_in"
+            a_name = f"_{all_comps.index(comp)}_a"
+            b_name = f"_{all_comps.index(comp)}_b"
+            l(2, f"{in_name} = {src_one(comp, 'in_')}")
+            l(2, f"if {src_one(comp, 'sel')}:")
+            l(3,   f"{a_name}, {b_name} = 0, {in_name}")
+            l(2, f"else:")
+            l(3,   f"{a_name}, {b_name} = {in_name}, 0")
+        elif comp.label == "Mux8Way16":
+            sel_name = f"_{all_comps.index(comp)}_sel"
+            out_name = f"_{all_comps.index(comp)}_out"
+            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(2, f"if {sel_name} == 0:")
+            l(3,   f"{out_name} = {src_many(comp, 'a')}")
+            l(2, f"elif {sel_name} == 1:")
+            l(3,   f"{out_name} = {src_many(comp, 'b')}")
+            l(2, f"elif {sel_name} == 2:")
+            l(3,   f"{out_name} = {src_many(comp, 'c')}")
+            l(2, f"elif {sel_name} == 3:")
+            l(3,   f"{out_name} = {src_many(comp, 'd')}")
+            l(2, f"elif {sel_name} == 4:")
+            l(3,   f"{out_name} = {src_many(comp, 'e')}")
+            l(2, f"elif {sel_name} == 5:")
+            l(3,   f"{out_name} = {src_many(comp, 'f')}")
+            l(2, f"elif {sel_name} == 6:")
+            l(3,   f"{out_name} = {src_many(comp, 'g')}")
+            l(2, f"elif {sel_name} == 7:")
+            l(3,   f"{out_name} = {src_many(comp, 'h')}")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
@@ -256,7 +290,7 @@ def generate_python(ic, inline=True):
         if isinstance(comp, DFF):
             l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":

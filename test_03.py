@@ -223,11 +223,12 @@ def test_ram8():
     ram = run(RAM8)
     ram_test(ram, 8)
 
-
-# This one works, but it's annoyingly slow (~15s):
-# def test_ram64():
-#     ram = run(RAM64)
-#     ram_test(ram, 64)
+def test_ram64():
+    # Gate-level simulation is anoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM64, simulator='codegen')
+    ram_test(ram, 64)
+    assert False
 
 # This one's implementation is commented out:
 # def test_ram512():
