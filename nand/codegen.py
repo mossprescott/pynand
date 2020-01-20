@@ -17,7 +17,7 @@ A few more are implemented so that this simulator can also be used (and tested) 
 chips:
 - DFF
 - DMux
-- TODO: DMux8Way
+- DMux8Way
 - Mux8Way16
 - TODO: RAM
 
