@@ -198,6 +198,13 @@ def generate_python(ic, inline=True):
             return unary16(comp, "{} == 0")
         elif comp.label == 'Inc16':
             return unary16(comp, "extend_sign({} + 1)")
+        elif comp.label == 'DMux':
+            return None  # note: multiple outputs doesn't really inline
+        elif comp.label == 'DMux8Way':
+            return None  # note: multiple outputs doesn't really inline
+        elif comp.label == 'Mux8Way16':
+            # TODO: this one _could_ be inlined with a large nested if/else expr.
+            return None
         elif comp.label == "Register":
             return None
         elif isinstance(comp, DFF):
