@@ -42,7 +42,7 @@ def mkInc16(inputs, outputs):
     outputs.out[0] = Not(in_=inputs.in_[0]).out
     carry = inputs.in_[0]
     for i in range(1, 16):
-        tmp = HalfAdder(a=inputs.in_[i], b=carry)
+        tmp = HalfAdder(a=carry, b=inputs.in_[i])
         outputs.out[i] = tmp.sum
         carry = tmp.carry
 
