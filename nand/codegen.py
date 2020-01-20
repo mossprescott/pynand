@@ -13,6 +13,11 @@ directly in Python:
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
 
+A few more are implemented so that this simulator can also be used (and tested) with smaller 
+chips:
+- DFF
+- TODO: RAM
+
 Any other ICs that appear are flattened to combinations of these. The downside is that a 
 moderate amount of flattening will have a significant impact on simulation speed. For example,
 the entire Computer amounts to 35 components; it's basically just decoding the instruction, 
@@ -65,7 +70,7 @@ PRIMITIVES = set([
 ])
 
 
-def generate_python(ic):
+def generate_python(ic, inline=True):
     """Given an IC, generate the Python source of a class which implements the chip, as a sequence of lines."""
 
     class_name = f"{ic.label}_gen"
@@ -91,8 +96,11 @@ def generate_python(ic):
         inlined, and its evaluation may be skipped thanks to short-circuiting.
         This alone is good for about 20% speedup.
         """
-        connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
-        return len(connections) <= 1
+        if inline:
+            connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
+            return len(connections) <= 1
+        else:
+            return False
 
     def output_name(comp):
         return f"_{all_comps.index(comp)}_out"
@@ -301,7 +309,7 @@ def print_lines(lines):
 class Chip:
     """Super for generated classes, providing tick, tock, and ticktock.
     
-    This: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
+    Note: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
     chips that refer to it directly aren't simulated properly by this implementation.
     
     TODO: handle "clock" correctly, and also implement the components needed by those tests?
