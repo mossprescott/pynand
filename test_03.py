@@ -247,15 +247,16 @@ def test_ram512():
     ram_test(ram, 512)
 
 
-def test_ram4k_legit():
-    """The challenge is to implement RAM4K from Registers."""
-    assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
-
-def test_ram4k():
-    # Gate-level simulation is annoyingly slow for this large chip, so use the less
-    # exacting but much more efficient codegen simulator:
-    ram = run(RAM4K, simulator='codegen')
-    ram_test(ram, 4096)
+# This is still just too darn slow (more than a minute).
+# def test_ram4k_legit():
+#     """The challenge is to implement RAM4K from Registers."""
+#     assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
+#
+# def test_ram4k():
+#     # Gate-level simulation is annoyingly slow for this large chip, so use the less
+#     # exacting but much more efficient codegen simulator:
+#     ram = run(RAM4K, simulator='codegen')
+#     ram_test(ram, 4096)
 
 
 def test_ram16k_legit():
