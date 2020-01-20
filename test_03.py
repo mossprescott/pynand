@@ -223,26 +223,45 @@ def test_ram8():
     ram = run(RAM8)
     ram_test(ram, 8)
 
+
+def test_ram64_legit():
+    """The challenge is to implement RAM64 from Registers."""
+    assert gate_count(RAM64).keys() == set(['nands', 'dffs'])
+
 def test_ram64():
-    # Gate-level simulation is anoyingly slow for this large chip, so use the less
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
     # exacting but much more efficient codegen simulator:
     ram = run(RAM64, simulator='codegen')
     ram_test(ram, 64)
-    assert False
 
-# This one's implementation is commented out:
-# def test_ram512():
-#     ram = run(RAM512)
-#     ram_test(ram, 512)
-#
-# This one I never even tried:
-# def test_ram4k():
-#     ram = run(RAM4K)
-#     ram_test(ram, 4096)
 
+def test_ram512_legit():
+    """The challenge is to implement RAM512 from Registers."""
+    assert gate_count(RAM512).keys() == set(['nands', 'dffs'])
+
+def test_ram512():
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM512, simulator='codegen')
+    ram_test(ram, 512)
+
+
+def test_ram4k_legit():
+    """The challenge is to implement RAM4K from Registers."""
+    assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
+
+def test_ram4k():
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM4K, simulator='codegen')
+    ram_test(ram, 4096)
+
+
+def test_ram16k_legit():
+    # This large RAM has to be implemented as a wrapper around a Memory:
+    assert True
 
 def test_ram16K():
-    # This large RAM has to be implemented as a wrapper around a Memory:
     ram = run(RAM16K)
     ram_test(ram, 16384)
 
