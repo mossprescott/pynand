@@ -13,6 +13,14 @@ directly in Python:
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
 
+A few more are implemented so that this simulator can also be used (and tested) with smaller 
+chips:
+- DFF
+- DMux
+- DMux8Way
+- Mux8Way16
+- TODO: RAM
+
 Any other ICs that appear are flattened to combinations of these. The downside is that a 
 moderate amount of flattening will have a significant impact on simulation speed. For example,
 the entire Computer amounts to 35 components; it's basically just decoding the instruction, 
@@ -62,10 +70,12 @@ PRIMITIVES = set([
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
     "MemorySystem",  # Needed for Computer
+    # Additional components used in the exercises, but not typically used in a full computer sim:
+    "DMux", "DMux8Way", "Mux8Way16",
 ])
 
 
-def generate_python(ic):
+def generate_python(ic, inline=True):
     """Given an IC, generate the Python source of a class which implements the chip, as a sequence of lines."""
 
     class_name = f"{ic.label}_gen"
@@ -91,8 +101,11 @@ def generate_python(ic):
         inlined, and its evaluation may be skipped thanks to short-circuiting.
         This alone is good for about 20% speedup.
         """
-        connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
-        return len(connections) <= 1
+        if inline:
+            connections = set((f.name, t.comp, t.name) for (t, f) in ic.wires.items() if f.comp == comp)
+            return len(connections) <= 1
+        else:
+            return False
 
     def output_name(comp):
         return f"_{all_comps.index(comp)}_out"
@@ -109,11 +122,11 @@ def generate_python(ic):
             expr = component_expr(conn.comp)
             if expr:
                 value = f"({expr})"
-            elif isinstance(conn.comp, DFF):
+            elif conn.comp.label in ("DFF", "Register"):
                 value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
-        elif isinstance(conn.comp, DFF):
+        elif conn.comp.label in ("DFF", "Register"):
             value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
@@ -185,6 +198,13 @@ def generate_python(ic):
             return unary16(comp, "{} == 0")
         elif comp.label == 'Inc16':
             return unary16(comp, "extend_sign({} + 1)")
+        elif comp.label == 'DMux':
+            return None  # note: multiple outputs doesn't really inline
+        elif comp.label == 'DMux8Way':
+            return None  # note: multiple outputs doesn't really inline
+        elif comp.label == 'Mux8Way16':
+            # TODO: this one _could_ be inlined with a large nested if/else expr.
+            return None
         elif comp.label == "Register":
             return None
         elif isinstance(comp, DFF):
@@ -229,6 +249,41 @@ def generate_python(ic):
             l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
             l(2, f"else:")
             l(3,   f"{output_name(comp)} = 0")
+        elif comp.label == "DMux":
+            in_name = f"_{all_comps.index(comp)}_in"
+            sel_name = f"_{all_comps.index(comp)}_sel"
+            l(2, f"{in_name} = {src_one(comp, 'in_')}")
+            l(2, f"{sel_name} = {src_one(comp, 'sel')}")
+            l(2, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
+            l(2, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
+        elif comp.label == "DMux8Way":
+            in_name = f"_{all_comps.index(comp)}_in"
+            sel_name = f"_{all_comps.index(comp)}_sel"
+            l(2, f"{in_name} = {src_one(comp, 'in_')}")
+            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            for i, c in enumerate("abcdefgh"):
+                l(2, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
+        elif comp.label == "Mux8Way16":
+            # TODO: this could be flattened to one expression and/or inlined
+            sel_name = f"_{all_comps.index(comp)}_sel"
+            out_name = f"_{all_comps.index(comp)}_out"
+            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(2, f"if {sel_name} == 0:")
+            l(3,   f"{out_name} = {src_many(comp, 'a')}")
+            l(2, f"elif {sel_name} == 1:")
+            l(3,   f"{out_name} = {src_many(comp, 'b')}")
+            l(2, f"elif {sel_name} == 2:")
+            l(3,   f"{out_name} = {src_many(comp, 'c')}")
+            l(2, f"elif {sel_name} == 3:")
+            l(3,   f"{out_name} = {src_many(comp, 'd')}")
+            l(2, f"elif {sel_name} == 4:")
+            l(3,   f"{out_name} = {src_many(comp, 'e')}")
+            l(2, f"elif {sel_name} == 5:")
+            l(3,   f"{out_name} = {src_many(comp, 'f')}")
+            l(2, f"elif {sel_name} == 6:")
+            l(3,   f"{out_name} = {src_many(comp, 'g')}")
+            l(2, f"elif {sel_name} == 7:")
+            l(3,   f"{out_name} = {src_many(comp, 'h')}")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
@@ -248,7 +303,7 @@ def generate_python(ic):
         if isinstance(comp, DFF):
             l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16'):
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
@@ -301,7 +356,7 @@ def print_lines(lines):
 class Chip:
     """Super for generated classes, providing tick, tock, and ticktock.
     
-    This: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
+    Note: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
     chips that refer to it directly aren't simulated properly by this implementation.
     
     TODO: handle "clock" correctly, and also implement the components needed by those tests?

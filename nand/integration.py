@@ -202,7 +202,7 @@ class IC:
         all_comps = self.sorted_components()
         def by_component(conn):
             if conn.comp == root:
-                num = -1  # inputs first 
+                num = -1  # inputs first
             elif conn.comp in all_comps:
                 num = all_comps.index(conn.comp)
             else:

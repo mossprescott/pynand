@@ -1,3 +1,4 @@
+from nand import DFF, run, gate_count
 from project_03 import *
 
 def dff_coarse_test(dff):
@@ -65,7 +66,7 @@ def dff_fine_test(dff):
     # global), and providing tick() and tock() to cycle it.
 
 
-def test_dff_legit():
+def test_my_dff_legit():
     """The challenge is to implement DFF with only Nand gates."""
     assert list(gate_count(MyDFF).keys()) == ['nands']
 
@@ -224,24 +225,45 @@ def test_ram8():
     ram_test(ram, 8)
 
 
-# This one works, but it's annoyingly slow (~15s):
-# def test_ram64():
-#     ram = run(RAM64)
-#     ram_test(ram, 64)
+def test_ram64_legit():
+    """The challenge is to implement RAM64 from Registers."""
+    assert gate_count(RAM64).keys() == set(['nands', 'dffs'])
 
-# This one's implementation is commented out:
-# def test_ram512():
-#     ram = run(RAM512)
-#     ram_test(ram, 512)
+def test_ram64():
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM64, simulator='codegen')
+    ram_test(ram, 64)
+
+
+def test_ram512_legit():
+    """The challenge is to implement RAM512 from Registers."""
+    assert gate_count(RAM512).keys() == set(['nands', 'dffs'])
+
+def test_ram512():
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM512, simulator='codegen')
+    ram_test(ram, 512)
+
+
+# This is still just too darn slow (almost 5 minutes.)
+# def test_ram4k_legit():
+#     """The challenge is to implement RAM4K from Registers."""
+#     assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
 #
-# This one I never even tried:
 # def test_ram4k():
-#     ram = run(RAM4K)
+#     # Gate-level simulation is annoyingly slow for this large chip, so use the less
+#     # exacting but much more efficient codegen simulator:
+#     ram = run(RAM4K, simulator='codegen')
 #     ram_test(ram, 4096)
 
 
-def test_ram16K():
+def test_ram16k_legit():
     # This large RAM has to be implemented as a wrapper around a Memory:
+    assert True
+
+def test_ram16K():
     ram = run(RAM16K)
     ram_test(ram, 16384)
 
