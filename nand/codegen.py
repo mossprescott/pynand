@@ -117,11 +117,11 @@ def generate_python(ic, inline=True):
             expr = component_expr(conn.comp)
             if expr:
                 value = f"({expr})"
-            elif isinstance(conn.comp, DFF):
+            elif conn.comp.label in ("DFF", "Register"):
                 value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
-        elif isinstance(conn.comp, DFF):
+        elif conn.comp.label in ("DFF", "Register"):
             value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
