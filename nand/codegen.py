@@ -70,8 +70,8 @@ PRIMITIVES = set([
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
     "MemorySystem",  # Needed for Computer
-    # Additional components used by various components, but not typically used in a full computer sim:
-    "DMux", "Mux8Way16",
+    # Additional components used in the exercises, but not typically used in a full computer sim:
+    "DMux", "DMux8Way", "Mux8Way16",
 ])
 
 
@@ -244,14 +244,20 @@ def generate_python(ic, inline=True):
             l(3,   f"{output_name(comp)} = 0")
         elif comp.label == "DMux":
             in_name = f"_{all_comps.index(comp)}_in"
-            a_name = f"_{all_comps.index(comp)}_a"
-            b_name = f"_{all_comps.index(comp)}_b"
+            sel_name = f"_{all_comps.index(comp)}_sel"
             l(2, f"{in_name} = {src_one(comp, 'in_')}")
-            l(2, f"if {src_one(comp, 'sel')}:")
-            l(3,   f"{a_name}, {b_name} = 0, {in_name}")
-            l(2, f"else:")
-            l(3,   f"{a_name}, {b_name} = {in_name}, 0")
+            l(2, f"{sel_name} = {src_one(comp, 'sel')}")
+            l(2, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
+            l(2, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
+        elif comp.label == "DMux8Way":
+            in_name = f"_{all_comps.index(comp)}_in"
+            sel_name = f"_{all_comps.index(comp)}_sel"
+            l(2, f"{in_name} = {src_one(comp, 'in_')}")
+            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            for i, c in enumerate("abcdefgh"):
+                l(2, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
         elif comp.label == "Mux8Way16":
+            # TODO: this could be flattened to one expression and/or inlined
             sel_name = f"_{all_comps.index(comp)}_sel"
             out_name = f"_{all_comps.index(comp)}_out"
             l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
@@ -290,7 +296,7 @@ def generate_python(ic, inline=True):
         if isinstance(comp, DFF):
             l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'Mux8Way16'):
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
