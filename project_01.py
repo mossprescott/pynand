@@ -1,3 +1,5 @@
+# See https://www.nand2tetris.org/project01
+
 from nand import Nand, build
 
 # SOLVERS: remove this import to get started

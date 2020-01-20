@@ -1,3 +1,5 @@
+# See https://www.nand2tetris.org/project06
+
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_06
 
