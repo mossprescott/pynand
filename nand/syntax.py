@@ -17,7 +17,24 @@ class Chip:
 
         comp = self.constr()
 
-        return Instance(comp, args)
+        missing_args = comp.inputs().keys() - args.keys()
+        if missing_args:
+            raise SyntaxError(f"Missing input(s): {missing_args}")
+
+        def to_ref(name, val):
+            if name not in comp.inputs():
+                raise SyntaxError(f"Unrecognized input: {name!r}")
+
+            if isinstance(val, Ref):
+                return val
+            elif isinstance(val, int):
+                return Ref(Instance(nand.component.Const(comp.inputs()[name], val), {}), "out", None)
+            else:
+                raise SyntaxError(f"Expected a reference for input {name!r}, got {val}")
+
+        arg_refs = {name: to_ref(name, val) for (name, val) in args.items()}
+
+        return Instance(comp, arg_refs)
 
 
 class Ref:
@@ -46,22 +63,12 @@ class Ref:
 class Instance:
     def __init__(self, ic, args):
         self._ic = ic
-        def to_ref(name, val):
-            if name not in ic.inputs():
-                raise SyntaxError(f"Unexpected argument: {name}")
-
-            if isinstance(val, Ref):
-                return val
-            elif isinstance(val, int):
-                return Ref(Instance(nand.component.Const(ic.inputs()[name], val), {}), "out", None)
-            else:
-                raise SyntaxError(f"Expected a reference for input '{name}', got {val}")
-
-        self.args = {name: to_ref(name, val) for (name, val) in args.items()}
+        self.args = args
 
     def __getattr__(self, name):
-        # TODO: check ic's outputs
-        if name == "ic": raise Exception("Probably you want '_ic'")  # TEMP
+        if name not in self._ic.outputs():
+            raise SyntaxError(f"Unrecognized output: {name!r}")
+
         return Ref(self, name, None)
 
     def __str__(self):

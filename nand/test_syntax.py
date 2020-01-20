@@ -199,7 +199,49 @@ def test_error_unexpected_arg():
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
-    assert str(exc_info.value) == "Unexpected argument: c"
+    assert str(exc_info.value) == "Unrecognized input: 'c'"
+
+
+def test_error_missing_arg():
+    def mkAnd(inputs, outputs):
+        outputs.out = Nand(a=inputs.a, b=inputs.b).out
+    And = build(mkAnd)
+
+    def mkWrap(inputs, outputs):
+        outputs.out = And(a=inputs.in_).out  # Missing `b=` here
+    Wrap = build(mkWrap)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        chip = Wrap.constr()
+    assert str(exc_info.value) == "Missing input(s): {'b'}"
+
+
+def test_error_unknown_input():
+    def mkAnd(inputs, outputs):
+        outputs.out = Nand(a=inputs.a, b=inputs.b).out
+    And = build(mkAnd)
+
+    def mkWrap(inputs, outputs):
+        outputs.out = And(a=inputs.in_, b=inputs.in_, c=inputs.in_).out  # Extra input: `c`
+    Wrap = build(mkWrap)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        chip = Wrap.constr()
+    assert str(exc_info.value) == "Unrecognized input: 'c'"
+
+
+def test_error_unknown_output():
+    def mkAnd(inputs, outputs):
+        outputs.out = Nand(a=inputs.a, b=inputs.b).out
+    And = build(mkAnd)
+
+    def mkWrap(inputs, outputs):
+        outputs.out = And(a=inputs.in_, b=inputs.in_).result  # Wrong name
+    Wrap = build(mkWrap)
+
+    with pytest.raises(SyntaxError) as exc_info:
+        chip = Wrap.constr()
+    assert str(exc_info.value) == "Unrecognized output: 'result'"
 
 
 def test_error_ref_expected_for_input():
