@@ -1,4 +1,4 @@
-from nand import *
+from nand import Nand, build
 from project_01 import And, And16, Or, Mux16, Not, Not16, Xor
 
 # SOLVERS: remove this import to get started

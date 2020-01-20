@@ -2,6 +2,7 @@
 in using the minimum number of gates and/or making the (theoretically) fastest circuits.
 """
 
+from nand import DFF, gate_count
 from project_03 import *
 
 def test_dff():

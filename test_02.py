@@ -1,3 +1,4 @@
+from nand import run, unsigned
 from project_02 import *
 
 def test_halfAdder():

@@ -1,3 +1,4 @@
+from nand import DFF, run, gate_count
 from project_03 import *
 
 def dff_coarse_test(dff):

@@ -1,5 +1,6 @@
-from project_05 import *
+from nand import run
 import nand.component
+from project_05 import *
 
 
 def test_memory_system():

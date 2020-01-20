@@ -1,4 +1,4 @@
-from nand import *
+from nand import Nand, build
 
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_01
