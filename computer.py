@@ -103,7 +103,7 @@ class KVM:
 
 def main():
     with open(sys.argv[1], mode='r') as f:
-        prg = project_06.load_file(f)
+        prg = project_06.assemble(f)
 
     computer = run(project_05.Computer, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
     computer.init_rom(prg)
