@@ -2,6 +2,7 @@
 in using the minimum number of gates and/or making the (theoretically) fastest circuits.
 """
 
+from nand import gate_count
 from project_05 import *
 
 def test_memory_system():
