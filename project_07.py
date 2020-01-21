@@ -5,7 +5,11 @@ from nand.solutions import solved_07
 
 
 class Translator:
+    """Translates all the arithmetic and memory access opcodes of the VM to assembly instructions.
+    """
+    
     def __init__(self):
+        # SOLVERS: remove this when all the method bodies are filled in
         self.solved = solved_07.Translator()
 
 

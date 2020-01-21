@@ -1,4 +1,4 @@
-"""Solutions for project 07.
+"""Solutions for projects 07 and 08.
 
 SPOILER ALERT: this files contains a complete VM translator.
 If you want to write this on your own, stop reading now!
@@ -9,6 +9,11 @@ If you want to write this on your own, stop reading now!
 
 
 class Translator:
+    """Translate all VM opcodes to assembly instructions. 
+    
+    Note: this implementation is not broken out into separate classes for each project.
+    """
+    
     def __init__(self):
         self.seq = 0
 
@@ -208,7 +213,22 @@ class Translator:
             f"@{namespace}.{index}",
             "D=M",
         ] + _PUSH_D
-        
+
+
+    def label(self, name):
+        namespace = "_"  # HACK: need to get it from the caller
+        return [
+            f"// label {name}",
+            f"({namespace}.{name})",
+        ]
+    
+    def if_goto(self, name):
+        namespace = "_"  # HACK: need to get it from the caller
+        return [f"// if-goto {name}"] + _POP_D + [
+            f"@{namespace}.{name}",
+            "D;JNE",
+        ]
+
 
     def next_label(self, name):
         result = f"_{name}_{self.seq}"
