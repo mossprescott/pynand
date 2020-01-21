@@ -123,7 +123,7 @@ class Translator:
     def _pop_segment(self, segment_ptr, index):
         # TODO: special-case small indexes
         return [
-            f"// pop argument {index}",
+            f"// pop {segment_ptr} {index}",
             f"@{index}",
             "D=A",
             f"@{segment_ptr}",
@@ -135,6 +135,38 @@ class Translator:
             "A=M",
             "M=D",
         ]
+
+    def push_local(self, index):
+        return self._push_segment("LCL", index)
+
+    def push_argument(self, index):
+        return self._push_segment("ARG", index)
+
+    def push_this(self, index):
+        return self._push_segment("THIS", index)
+
+    def push_that(self, index):
+        return self._push_segment("THAT", index)
+
+    def push_temp(self, index):
+        assert 0 <= index < 8
+        return [
+            f"// push temp {index}",
+            f"@{5+index}",
+            "D=M",
+        ] + _PUSH_D
+        
+
+    def _push_segment(self, segment_ptr, index):
+        return [
+            f"// push {segment_ptr} {index}",
+            f"@{index}",
+            "D=A",
+            f"@{segment_ptr}",
+            "A=D+M",
+            "D=M",
+        ] + _PUSH_D
+
 
     def next_label(self, name):
         result = f"_{name}_{self.seq}"

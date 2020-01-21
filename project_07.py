@@ -86,6 +86,26 @@ class Translator:
         # SOLVERS: implement
         return self.solved.pop_temp(index)
 
+    def push_local(self, index):
+        # SOLVERS: implement
+        return self.solved.push_local(index)
+
+    def push_argument(self, index):
+        # SOLVERS: implement
+        return self.solved.push_argument(index)
+
+    def push_this(self, index):
+        # SOLVERS: implement
+        return self.solved.push_this(index)
+
+    def push_that(self, index):
+        # SOLVERS: implement
+        return self.solved.push_that(index)
+
+    def push_temp(self, index):
+        # SOLVERS: implement
+        return self.solved.push_temp(index)
+
 
     #
     # Helpers:

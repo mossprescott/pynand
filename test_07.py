@@ -26,9 +26,8 @@ def test_simple_add():
     computer.poke(0, 256)  # initializes the stack pointer
 
     computer.init_rom(pgm)
-    for _ in range(60):
+    for _ in range(len(pgm)):
         computer.ticktock()
-        # print(f"PC: {computer.pc}; SP: {computer.peek(0)}; RAM[256]: {computer.peek(256)}")
 
     assert computer.peek(0) == 257
     assert computer.peek(256) == 15
@@ -37,6 +36,8 @@ def test_simple_add():
 def test_stack_ops():
     translate = Translator()
     
+    # Executes a sequence of arithmetic and logical operations
+    # on the stack. 
     STACK_TEST = list(itertools.chain(
         translate.push_constant(17),
         translate.push_constant(17),
@@ -94,7 +95,7 @@ def test_stack_ops():
     computer.poke(0, 256)  # initializes the stack pointer
 
     computer.init_rom(pgm)
-    for _ in range(1000):
+    for _ in range(len(pgm)):
         computer.ticktock()
 
     assert computer.peek(0) == 266
@@ -129,17 +130,17 @@ def test_memory_access_basic():
         translate.pop_that(2),
         translate.push_constant(510),
         translate.pop_temp(6),
-        # translate.push_local(0),
-        # translate.push_that(5),
-        # translate.add(),
-        # translate.push_argument(1),
-        # translate.sub(),
-        # translate.push_this(6),
-        # translate.push_this(6),
-        # translate.add(),
-        # translate.sub(),
-        # translate.push_temp(6),
-        # translate.add(),
+        translate.push_local(0),
+        translate.push_that(5),
+        translate.add(),
+        translate.push_argument(1),
+        translate.sub(),
+        translate.push_this(6),
+        translate.push_this(6),
+        translate.add(),
+        translate.sub(),
+        translate.push_temp(6),
+        translate.add(),
     ))
 
     pgm = assemble(BASIC_TEST)
@@ -153,10 +154,8 @@ def test_memory_access_basic():
     computer.poke(4, 3010)  # base address of the that segment
 
     computer.init_rom(pgm)
-    # for _ in range(600):  # enough cycles to complete the execution
-    for _ in range(len(BASIC_TEST)):
+    for _ in range(len(pgm)):
         computer.ticktock()
-        print_vm_state(computer, num_locals=1, num_args=3)
 
     assert computer.peek(256) == 472
     assert computer.peek(300) == 10
