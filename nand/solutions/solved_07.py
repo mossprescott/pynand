@@ -8,13 +8,30 @@ If you want to write this on your own, stop reading now!
 # things that can be said about it.
 
 
-def translate(lines):
+def translate_push_constant(value):
     return [
-        "@15",
+        f"@{value}",
         "D=A",
+        ] + _PUSH_D
+
+
+def translate_add():
+    return [
         "@SP",
-        "A=M",
-        "M=D",
+        "AM=M-1",
+        "D=M",
         "@SP",
-        "M=M+1",
-    ]
+        "AM=M-1",
+        "D=D+M",
+        ] + _PUSH_D
+
+
+# Common sequence pushing the contents of the D register onto the stack:
+_PUSH_D = [
+    "@SP",
+    "A=M",
+    "M=D",
+    "@SP",
+    "M=M+1",    
+]
+    
