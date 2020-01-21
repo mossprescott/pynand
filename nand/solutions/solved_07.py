@@ -107,16 +107,16 @@ class Translator:
             ] + _PUSH_D
             
     def pop_local(self, index):
-        return self._pop_segment("LCL", index)
+        return [f"// pop local {index}"] + self._pop_segment("LCL", index)
         
     def pop_argument(self, index):
-        return self._pop_segment("ARG", index)
+        return [f"// pop argument {index}"] + self._pop_segment("ARG", index)
         
     def pop_this(self, index):
-        return self._pop_segment("THIS", index)
+        return [f"// pop this {index}"] + self._pop_segment("THIS", index)
         
     def pop_that(self, index):
-        return self._pop_segment("THAT", index)
+        return [f"// pop that {index}"] + self._pop_segment("THAT", index)
     
     def pop_temp(self, index):
         assert 0 <= index < 8
@@ -128,7 +128,6 @@ class Translator:
     def _pop_segment(self, segment_ptr, index):
         # TODO: special-case small indexes
         return [
-            f"// pop {segment_ptr} {index}",
             f"@{index}",
             "D=A",
             f"@{segment_ptr}",
@@ -238,6 +237,59 @@ class Translator:
         ]
 
 
+    def function(self, class_name, function_name, num_vars):
+        # Note: when num_vars is 1 or less, it costs no cycles to initialize them to 0, and 
+        # it will make the behavior more predictable when there are errors in the program.
+        return [
+            f"// function {class_name}.{function_name} {num_vars}",
+            "@SP",
+            "A=M"
+        ] + [
+            "M=0",
+            "A=A+1",
+        ]*num_vars
+
+    def return_op(self):
+        return ["// return"] + self._pop_segment("ARG", 0) + [
+            # SP = LCL
+            "@LCL",
+            "D=M",
+            "@SP",
+            "M=D",
+            # R15 = old ARG
+            "@ARG",
+            "D=M",
+            "@R15",
+            "M=D",
+            # restore segment pointers from stack:
+        ] + _POP_D + [
+            "@THAT",
+            "M=D"
+        ] + _POP_D + [
+            "@THIS",
+            "M=D",
+        ] + _POP_D + [
+            "@ARG",
+            "M=D"
+        ] + _POP_D + [
+            "@LCL",
+            "M=D",
+            # R14 = return address
+        ] + _POP_D + [
+            "@R14",
+            "M=D",
+            # SP = R15 + 1
+            "@R15",
+            "D=M+1",
+            "@SP",
+            "M=D",
+            # jmp to R14
+            "@R14",
+            "A=M",
+            "0;JMP",
+        ]
+
+
     def next_label(self, name):
         result = f"_{name}_{self.seq}"
         self.seq += 1
@@ -277,7 +329,8 @@ THAT = 4
 
 
 def print_vm_state(computer, num_locals, num_args):
-    stack = [str(computer.peek(i)) for i in range(256, computer.peek(SP))]
+    stack_bottom = max(256, computer.peek(ARG)+num_args+5)
+    stack = [str(computer.peek(i)) for i in range(stack_bottom, computer.peek(SP))]
     lcl = [str(computer.peek(i)) for i in range(computer.peek(LCL), computer.peek(LCL)+num_locals)]
     arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(ARG)+num_args)]
     tmp = [str(computer.peek(i)) for i in range(5, 13)]

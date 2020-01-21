@@ -12,7 +12,7 @@ class Translator(project_07.Translator):
 
 
     #
-    # Basic Loop:
+    # Program Flow — Basic Loop:
     #
 
     def label(self, name):
@@ -25,10 +25,22 @@ class Translator(project_07.Translator):
 
 
     #
-    # Fibonacci Series:
+    # Program Flow — Fibonacci Series:
     #
     
     def goto(self, name):
         # SOLVERS: implement
         return self.solved.goto(name)
     
+    
+    #
+    # Function Calls — Simple Function:
+    #
+    
+    def function(self, class_name, function_name, num_locals):
+        # SOLVERS: implement
+        return self.solved.function(class_name, function_name, num_locals)
+
+    def return_op(self):
+        # SOLVERS: implement
+        return self.solved.return_op()
