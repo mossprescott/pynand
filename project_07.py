@@ -16,6 +16,31 @@ def translate_add(label_gen):
     return solved_07.translate_add(label_gen)
 
 
+def translate_sub(label_gen):
+    # SOLVERS: implement the sub opcode
+    return solved_07.translate_sub(label_gen)
+
+
+def translate_neg(label_gen):
+    # SOLVERS: implement the neg opcode
+    return solved_07.translate_neg(label_gen)
+
+
+def translate_and(label_gen):
+    # SOLVERS: implement the and opcode
+    return solved_07.translate_and(label_gen)
+
+
+def translate_or(label_gen):
+    # SOLVERS: implement the or opcode
+    return solved_07.translate_or(label_gen)
+
+
+def translate_not(label_gen):
+    # SOLVERS: implement the not opcode
+    return solved_07.translate_not(label_gen)
+
+
 def translate_eq(label_gen):
     # SOLVERS: implement the eq opcode
     return solved_07.translate_eq(label_gen)

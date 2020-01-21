@@ -40,43 +40,51 @@ def test_stack_ops():
         translate_push_constant(label_gen, 17),
         translate_push_constant(label_gen, 17),
         translate_eq(label_gen),
+        
         translate_push_constant(label_gen, 17),
         translate_push_constant(label_gen, 16),
         translate_eq(label_gen),
+        
         translate_push_constant(label_gen, 16),
         translate_push_constant(label_gen, 17),
         translate_eq(label_gen),
+        
         translate_push_constant(label_gen, 892),
         translate_push_constant(label_gen, 891),
         translate_lt(label_gen),
+        
         translate_push_constant(label_gen, 891),
         translate_push_constant(label_gen, 892),
         translate_lt(label_gen),
+        
         translate_push_constant(label_gen, 891),
         translate_push_constant(label_gen, 891),
         translate_lt(label_gen),
+        
         translate_push_constant(label_gen, 32767),
         translate_push_constant(label_gen, 32766),
         translate_gt(label_gen),
+        
         translate_push_constant(label_gen, 32766),
         translate_push_constant(label_gen, 32767),
         translate_gt(label_gen),
+        
         translate_push_constant(label_gen, 32766),
         translate_push_constant(label_gen, 32766),
         translate_gt(label_gen),
-    #     translate_push_constant(label_gen, 57),
-    #     translate_push_constant(label_gen, 31),
-    #     translate_push_constant(label_gen, 53),
-    #     translate_add(label_gen),
-    #     translate_push_constant(label_gen, 112),
-    #     translate_sub(label_gen),
-    #     translate_neg(label_gen),
-    #     translate_and(label_gen),
-    #     translate_push_constant(label_gen, 82),
-    #     translate_or(label_gen),
-    #     translate_not(label_gen),
+        
+        translate_push_constant(label_gen, 57),
+        translate_push_constant(label_gen, 31),
+        translate_push_constant(label_gen, 53),
+        translate_add(label_gen),
+        translate_push_constant(label_gen, 112),
+        translate_sub(label_gen),
+        translate_neg(label_gen),
+        translate_and(label_gen),
+        translate_push_constant(label_gen, 82),
+        translate_or(label_gen),
+        translate_not(label_gen),
     ))
-    print('\n'.join(STACK_TEST))
 
     pgm = assemble(STACK_TEST)
 
@@ -86,11 +94,9 @@ def test_stack_ops():
 
     computer.init_rom(pgm)
     for _ in range(1000):
-    # for _ in range(30):
         computer.ticktock()
-        # print(f"PC: {computer.pc}; SP: {computer.peek(0)}; RAM[256...]: {', '.join(str(computer.peek(i)) for i in range(256, 266))}")
 
-    # assert computer.peek(0) == 266
+    assert computer.peek(0) == 266
     assert computer.peek(256) == -1
     assert computer.peek(257) == 0
     assert computer.peek(258) == 0
@@ -100,4 +106,4 @@ def test_stack_ops():
     assert computer.peek(262) == -1
     assert computer.peek(263) == 0
     assert computer.peek(264) == 0
-    # assert computer.peek(265) == 91
+    assert computer.peek(265) == -91

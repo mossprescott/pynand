@@ -9,6 +9,7 @@ If you want to write this on your own, stop reading now!
 
 
 def translate_push_constant(label_gen, value):
+    # TODO: special-case 1, 0, -1 and negative values
     return [
         f"// push constant {value}",
         f"@{value}",
@@ -17,9 +18,58 @@ def translate_push_constant(label_gen, value):
 
 
 def translate_add(label_gen):
+    # TODO: mutate M in place, for a lot fewer instructions
     return ["// add"] + _POP_D_M + [
         "D=D+M",
         ] + _PUSH_D
+
+
+def translate_sub(label_gen):
+    # TODO: mutate M in place, for a lot fewer instructions
+    return ["// sub"] + _POP_D_M + [
+        "D=M-D",
+        ] + _PUSH_D
+
+
+def translate_neg(label_gen):
+    # TODO: negate M in place, for a lot fewer instructions
+    return ["// neg"] + _POP_D + [
+        "D=-D",
+        ] + _PUSH_D
+
+
+def translate_and(label_gen):
+    # TODO: mutate M in place, for a lot fewer instructions
+    return ["// and"] + _POP_D_M + [
+        "D=D&M",
+        ] + _PUSH_D
+
+
+def translate_or(label_gen):
+    # TODO: mutate M in place, for a lot fewer instructions
+    return ["// or"] + _POP_D_M + [
+        "D=D|M",
+        ] + _PUSH_D
+
+
+def translate_not(label_gen):
+    # TODO: negate M in place, for a lot fewer instructions
+    return ["// neg"] + _POP_D + [
+        "D=!D",
+        ] + _PUSH_D
+    
+    # l1 = label_gen("not")
+    # l2 = label_gen("not")
+    # return ["// not"] + _POP_D + [
+    #     f"@{l1}",
+    #     "D;JEQ",
+    #     "D=0",
+    #     f"@{l2}",
+    #     "0;JMP",
+    #     f"({l1})",
+    #     "D=-1",
+    #     f"({l2})",
+    #     ] + _PUSH_D
 
 
 def translate_eq(label_gen):
@@ -90,6 +140,13 @@ _PUSH_D = [
     "M=D",
     "@SP",
     "M=M+1",    
+]
+
+# Common sequence popping one value from the stack into D:
+_POP_D = [
+    "@SP",
+    "AM=M-1",
+    "D=M",
 ]
 
 # Common sequence popping two values from the stack into D (top) and M (second from top):
