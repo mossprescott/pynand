@@ -3,54 +3,54 @@
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_07
 
-def translate_push_constant(label_gen, value):
-    # SOLVERS: write some code here to construct a list of strings containing Hack assembly 
-    # instructions to push `value` onto the stack
-    return solved_07.translate_push_constant(label_gen, value)
 
+class Translator:
+    def __init__(self):
+        self.solved = solved_07.Translator()
 
-def translate_add(label_gen):
-    # SOLVERS: implement the add opcode
-    # Hint: this is actually going to be the same instructions every time, so just build
-    # a list and return it.
-    return solved_07.translate_add(label_gen)
+    def push_constant(self, value):
+        # SOLVERS: write some code here to construct a list of strings containing Hack assembly 
+        # instructions to push `value` onto the stack
+        return self.solved.push_constant(value)
 
+    def add(self):
+        # SOLVERS: implement the add opcode
+        # Hint: this is actually going to be the same instructions every time, so just build
+        # a list and return it.
+        return self.solved.add()
 
-def translate_sub(label_gen):
-    # SOLVERS: implement the sub opcode
-    return solved_07.translate_sub(label_gen)
+    def sub(self):
+        # SOLVERS: implement the sub opcode
+        return self.solved.sub()
 
+    def neg(self):
+        # SOLVERS: implement the sub opcode
+        return self.solved.neg()
 
-def translate_neg(label_gen):
-    # SOLVERS: implement the neg opcode
-    return solved_07.translate_neg(label_gen)
+    def and_op(self):
+        # SOLVERS: implement the and opcode
+        return self.solved.and_op()
 
+    def or_op(self):
+        # SOLVERS: implement the or opcode
+        return self.solved.or_op()
 
-def translate_and(label_gen):
-    # SOLVERS: implement the and opcode
-    return solved_07.translate_and(label_gen)
+    def not_op(self):
+        # SOLVERS: implement the not opcode
+        return self.solved.not_op()
 
+    def eq(self):
+        # SOLVERS: implement the eq opcode
+        return self.solved.eq()
 
-def translate_or(label_gen):
-    # SOLVERS: implement the or opcode
-    return solved_07.translate_or(label_gen)
+    def lt(self):
+        # SOLVERS: implement the lt opcode
+        return self.solved.lt()
 
+    def gt(self):
+        # SOLVERS: implement the gt opcode
+        return self.solved.gt()
 
-def translate_not(label_gen):
-    # SOLVERS: implement the not opcode
-    return solved_07.translate_not(label_gen)
-
-
-def translate_eq(label_gen):
-    # SOLVERS: implement the eq opcode
-    return solved_07.translate_eq(label_gen)
-
-
-def translate_lt(label_gen):
-    # SOLVERS: implement the lt opcode
-    return solved_07.translate_lt(label_gen)
-
-
-def translate_gt(label_gen):
-    # SOLVERS: implement the gt opcode
-    return solved_07.translate_gt(label_gen)
+    def next_label(self, name):
+        # SOLVERS: this might be useful
+        return self.solved.next_label(name)
