@@ -168,6 +168,48 @@ class Translator:
         ] + _PUSH_D
 
 
+    def pop_pointer(self, index):
+        if index == 0:
+            segment_ptr = "THIS"
+        elif index == 1:
+            segment_ptr = "THAT"
+        else:
+            raise SyntaxError(f"Invalid index for pop pointer: {index}")
+        return [f"// pop pointer {index}"] + _POP_D + [
+            f"@{segment_ptr}",
+            "M=D",
+        ]
+
+    def push_pointer(self, index):
+        if index == 0:
+            segment_ptr = "THIS"
+        elif index == 1:
+            segment_ptr = "THAT"
+        else:
+            raise SyntaxError(f"Invalid index for push pointer: {index}")
+        return [
+            f"// push pointer {index}",
+            f"@{segment_ptr}",
+            "D=M",
+        ] + _PUSH_D
+
+
+    def pop_static(self, index):
+        namespace = "static"  # HACK: need to get it from the caller
+        return [f"// pop static {index}"] + _POP_D + [
+            f"@{namespace}.{index}",
+            "M=D",
+        ]
+        
+    def push_static(self, index):
+        namespace = "static"  # HACK: need to get it from the caller
+        return [
+            f"// push static {index}",
+            f"@{namespace}.{index}",
+            "D=M",
+        ] + _PUSH_D
+        
+
     def next_label(self, name):
         result = f"_{name}_{self.seq}"
         self.seq += 1
@@ -212,8 +254,10 @@ def print_vm_state(computer, num_locals, num_args):
     arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(ARG)+num_args)]
     tmp = [str(computer.peek(i)) for i in range(5, 13)]
     gpr = [str(computer.peek(i)) for i in range(13, 16)]
+    static = [str(computer.peek(i)) for i in range(16, 32)]
     print(f"PC: {computer.pc}; temp: {tmp}; gpr: {gpr}")
     print(f"  stack: {stack}; local: {lcl}; arg: {arg}")
+    print(f"  static: {static}")
 
 
 # TODO: VM debugger

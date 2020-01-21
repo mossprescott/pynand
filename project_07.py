@@ -108,6 +108,32 @@ class Translator:
 
 
     #
+    # Memory Access - Pointer:
+    #
+
+    def pop_pointer(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_pointer(index)
+
+    def push_pointer(self, index):
+        # SOLVERS: implement
+        return self.solved.push_pointer(index)
+
+
+    #
+    # Memory Access - Static:
+    #
+
+    def pop_static(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_static(index)
+
+    def push_static(self, index):
+        # SOLVERS: implement
+        return self.solved.push_static(index)
+
+
+    #
     # Helpers:
     #
 
