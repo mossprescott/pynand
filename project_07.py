@@ -19,3 +19,13 @@ def translate_add(label_gen):
 def translate_eq(label_gen):
     # SOLVERS: implement the eq opcode
     return solved_07.translate_eq(label_gen)
+
+
+def translate_lt(label_gen):
+    # SOLVERS: implement the lt opcode
+    return solved_07.translate_lt(label_gen)
+
+
+def translate_gt(label_gen):
+    # SOLVERS: implement the gt opcode
+    return solved_07.translate_gt(label_gen)

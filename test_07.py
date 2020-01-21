@@ -46,35 +46,35 @@ def test_stack_ops():
         translate_push_constant(label_gen, 16),
         translate_push_constant(label_gen, 17),
         translate_eq(label_gen),
-        # translate_push_constant(892),
-    #     translate_push_constant(891),
-    #     translate_lt(),
-    #     translate_push_constant(891),
-    #     translate_push_constant(892),
-    #     translate_lt(),
-    #     translate_push_constant(891),
-    #     translate_push_constant(891),
-    #     translate_lt(),
-    #     translate_push_constant(32767),
-    #     translate_push_constant(32766),
-    #     translate_gt(),
-    #     translate_push_constant(32766),
-    #     translate_push_constant(32767),
-    #     translate_gt(),
-    #     translate_push_constant(32766),
-    #     translate_push_constant(32766),
-    #     translate_gt(),
-    #     translate_push_constant(57),
-    #     translate_push_constant(31),
-    #     translate_push_constant(53),
-    #     translate_add(),
-    #     translate_push_constant(112),
-    #     translate_sub(),
-    #     translate_neg(),
-    #     translate_and(),
-    #     translate_push_constant(82),
-    #     translate_or(),
-    #     translate_not(),
+        translate_push_constant(label_gen, 892),
+        translate_push_constant(label_gen, 891),
+        translate_lt(label_gen),
+        translate_push_constant(label_gen, 891),
+        translate_push_constant(label_gen, 892),
+        translate_lt(label_gen),
+        translate_push_constant(label_gen, 891),
+        translate_push_constant(label_gen, 891),
+        translate_lt(label_gen),
+        translate_push_constant(label_gen, 32767),
+        translate_push_constant(label_gen, 32766),
+        translate_gt(label_gen),
+        translate_push_constant(label_gen, 32766),
+        translate_push_constant(label_gen, 32767),
+        translate_gt(label_gen),
+        translate_push_constant(label_gen, 32766),
+        translate_push_constant(label_gen, 32766),
+        translate_gt(label_gen),
+    #     translate_push_constant(label_gen, 57),
+    #     translate_push_constant(label_gen, 31),
+    #     translate_push_constant(label_gen, 53),
+    #     translate_add(label_gen),
+    #     translate_push_constant(label_gen, 112),
+    #     translate_sub(label_gen),
+    #     translate_neg(label_gen),
+    #     translate_and(label_gen),
+    #     translate_push_constant(label_gen, 82),
+    #     translate_or(label_gen),
+    #     translate_not(label_gen),
     ))
     print('\n'.join(STACK_TEST))
 
@@ -94,10 +94,10 @@ def test_stack_ops():
     assert computer.peek(256) == -1
     assert computer.peek(257) == 0
     assert computer.peek(258) == 0
-    # assert computer.peek(259) == 0
-    # assert computer.peek(260) == -1
-    # assert computer.peek(261) == 0
-    # assert computer.peek(262) == -1
-    # assert computer.peek(263) == 0
-    # assert computer.peek(264) == 0
+    assert computer.peek(259) == 0
+    assert computer.peek(260) == -1
+    assert computer.peek(261) == 0
+    assert computer.peek(262) == -1
+    assert computer.peek(263) == 0
+    assert computer.peek(264) == 0
     # assert computer.peek(265) == 91
