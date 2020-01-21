@@ -22,3 +22,13 @@ class Translator(project_07.Translator):
     def if_goto(self, name):
         # SOLVERS: implement
         return self.solved.if_goto(name)
+
+
+    #
+    # Fibonacci Series:
+    #
+    
+    def goto(self, name):
+        # SOLVERS: implement
+        return self.solved.goto(name)
+    

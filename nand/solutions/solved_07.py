@@ -229,6 +229,14 @@ class Translator:
             "D;JNE",
         ]
 
+    def goto(self, name):
+        namespace = "_"  # HACK: need to get it from the caller
+        return [
+            f"// goto {name}",
+            f"@{namespace}.{name}",
+            "0;JMP",
+        ]
+
 
     def next_label(self, name):
         result = f"_{name}_{self.seq}"
