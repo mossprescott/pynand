@@ -100,6 +100,41 @@ class Translator:
             "D=-1",
             f"({l2})",
             ] + _PUSH_D
+            
+    def pop_local(self, index):
+        return self._pop_segment("LCL", index)
+        
+    def pop_argument(self, index):
+        return self._pop_segment("ARG", index)
+        
+    def pop_this(self, index):
+        return self._pop_segment("THIS", index)
+        
+    def pop_that(self, index):
+        return self._pop_segment("THAT", index)
+    
+    def pop_temp(self, index):
+        assert 0 <= index < 8
+        return [f"// pop temp {index}"] + _POP_D + [
+            f"@{5+index}",
+            "M=D",
+        ]
+    
+    def _pop_segment(self, segment_ptr, index):
+        # TODO: special-case small indexes
+        return [
+            f"// pop argument {index}",
+            f"@{index}",
+            "D=A",
+            f"@{segment_ptr}",
+            "D=D+M",
+            "@R15",
+            "M=D",
+        ] + _POP_D + [
+            "@R15",
+            "A=M",
+            "M=D",
+        ]
 
     def next_label(self, name):
         result = f"_{name}_{self.seq}"
@@ -113,7 +148,7 @@ _PUSH_D = [
     "A=M",
     "M=D",
     "@SP",
-    "M=M+1",    
+    "M=M+1",
 ]
 
 # Common sequence popping one value from the stack into D:
@@ -129,5 +164,27 @@ _POP_D_M = [
     "AM=M-1",
     "D=M",
     "@SP",
-    "AM=M-1",    
+    "AM=M-1",
 ]
+
+SP = 0
+LCL = 1
+ARG = 2
+THIS = 3
+THAT = 4
+
+
+def print_vm_state(computer, num_locals, num_args):
+    stack = [str(computer.peek(i)) for i in range(256, computer.peek(SP))]
+    lcl = [str(computer.peek(i)) for i in range(computer.peek(LCL), computer.peek(LCL)+num_locals)]
+    arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(ARG)+num_args)]
+    tmp = [str(computer.peek(i)) for i in range(5, 13)]
+    gpr = [str(computer.peek(i)) for i in range(13, 16)]
+    print(f"PC: {computer.pc}; temp: {tmp}; gpr: {gpr}")
+    print(f"  stack: {stack}; local: {lcl}; arg: {arg}")
+
+
+# TODO: VM debugger
+# Record a map of instructions back to the opcodes they were translated from.
+# Execute one opcode at a time, show state after each.
+# Capture number of locals/args as call/function ops go by?

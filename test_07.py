@@ -6,6 +6,7 @@ from project_06 import assemble
 
 from project_07 import *
 
+from nand.solutions.solved_07 import print_vm_state
 
 
 def test_simple_add():
@@ -107,3 +108,61 @@ def test_stack_ops():
     assert computer.peek(263) == 0
     assert computer.peek(264) == 0
     assert computer.peek(265) == -91
+
+
+def test_memory_access_basic():
+    translate = Translator()
+    
+    # Executes pop and push commands using the virtual memory segments.
+    BASIC_TEST = list(itertools.chain(
+        translate.push_constant(10),
+        translate.pop_local(0),
+        translate.push_constant(21),
+        translate.push_constant(22),
+        translate.pop_argument(2),
+        translate.pop_argument(1),
+        translate.push_constant(36),
+        translate.pop_this(6),
+        translate.push_constant(42),
+        translate.push_constant(45),
+        translate.pop_that(5),
+        translate.pop_that(2),
+        translate.push_constant(510),
+        translate.pop_temp(6),
+        # translate.push_local(0),
+        # translate.push_that(5),
+        # translate.add(),
+        # translate.push_argument(1),
+        # translate.sub(),
+        # translate.push_this(6),
+        # translate.push_this(6),
+        # translate.add(),
+        # translate.sub(),
+        # translate.push_temp(6),
+        # translate.add(),
+    ))
+
+    pgm = assemble(BASIC_TEST)
+
+    computer = run(Computer, simulator='codegen')
+
+    computer.poke(0, 256)   # stack pointer
+    computer.poke(1, 300)   # base address of the local segment
+    computer.poke(2, 400)   # base address of the argument segment
+    computer.poke(3, 3000)  # base address of the this segment
+    computer.poke(4, 3010)  # base address of the that segment
+
+    computer.init_rom(pgm)
+    # for _ in range(600):  # enough cycles to complete the execution
+    for _ in range(len(BASIC_TEST)):
+        computer.ticktock()
+        print_vm_state(computer, num_locals=1, num_args=3)
+
+    assert computer.peek(256) == 472
+    assert computer.peek(300) == 10
+    assert computer.peek(401) == 21
+    assert computer.peek(402) == 22
+    assert computer.peek(3006) == 36
+    assert computer.peek(3012) == 42
+    assert computer.peek(3015) == 45
+    assert computer.peek(11) == 510

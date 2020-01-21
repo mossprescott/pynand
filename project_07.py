@@ -8,6 +8,11 @@ class Translator:
     def __init__(self):
         self.solved = solved_07.Translator()
 
+
+    #
+    # Simple Add:
+    #
+
     def push_constant(self, value):
         # SOLVERS: write some code here to construct a list of strings containing Hack assembly 
         # instructions to push `value` onto the stack
@@ -18,6 +23,11 @@ class Translator:
         # Hint: this is actually going to be the same instructions every time, so just build
         # a list and return it.
         return self.solved.add()
+
+
+    #
+    # Stack Ops:
+    #
 
     def sub(self):
         # SOLVERS: implement the sub opcode
@@ -50,6 +60,36 @@ class Translator:
     def gt(self):
         # SOLVERS: implement the gt opcode
         return self.solved.gt()
+
+        
+    #
+    # Memory Access - Basic:
+    #
+
+    def pop_local(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_local(index)
+
+    def pop_argument(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_argument(index)
+
+    def pop_this(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_this(index)
+
+    def pop_that(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_that(index)
+
+    def pop_temp(self, index):
+        # SOLVERS: implement
+        return self.solved.pop_temp(index)
+
+
+    #
+    # Helpers:
+    #
 
     def next_label(self, name):
         # SOLVERS: this might be useful
