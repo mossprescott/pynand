@@ -28,28 +28,7 @@ class Translator:
         self.eq_label = self._compare("EQ")
         self.lt_label = self._compare("LT")
         self.gt_label = self._compare("GT")
-        # # Common implementation for EQ:
-        # self.eq_label = self.asm.next_label("eq_common")
-        # l1 = self.asm.next_label("eq_common$1")
-        # l2 = self.asm.next_label("eq_common$2")
-        # self.asm.start("eq_common")
-        # self.asm.label(self.eq_label)
-        # self.asm.instr("@R15")    # R15 = return address
-        # self.asm.instr("M=D")
-        # self._pop_d_m()           # EQ
-        # self.asm.instr("D=M-D")
-        # self.asm.instr(f"@{l1}")
-        # self.asm.instr("D;JEQ")
-        # self.asm.instr("D=0")
-        # self.asm.instr(f"@{l2}")
-        # self.asm.instr("0;JMP")
-        # self.asm.label(l1)
-        # self.asm.instr("D=-1")
-        # self.asm.label(l2)
-        # self._push_d()
-        # self.asm.instr("@R15")   # JMP to R15
-        # self.asm.instr("A=M")
-        # self.asm.instr("0;JMP")
+        self.return_label = self._return()
         
         self.asm.label(start)
 
@@ -276,52 +255,10 @@ class Translator:
         self.asm.instr("M=D")
 
     def return_op(self):
-        self.asm.start(f"return")
-        
-        # R13 = result
-        self._pop_d()
-        self.asm.instr("@R13")
-        self.asm.instr("M=D")
-        
-        # SP = LCL
-        self.asm.instr("@LCL")
-        self.asm.instr("D=M")
-        self.asm.instr("@SP")
-        self.asm.instr("M=D")
-        # R15 = ARG
-        self.asm.instr("@ARG")
-        self.asm.instr("D=M")
-        self.asm.instr("@R15")
-        self.asm.instr("M=D")
-        # restore segment pointers from stack:
-        self._pop_d()
-        self.asm.instr("@THAT")
-        self.asm.instr("M=D")
-        self._pop_d()
-        self.asm.instr("@THIS")
-        self.asm.instr("M=D")
-        self._pop_d()
-        self.asm.instr("@ARG")
-        self.asm.instr("M=D")
-        self._pop_d()
-        self.asm.instr("@LCL")
-        self.asm.instr("M=D")
-        # R14 = return address
-        self._pop_d()
-        self.asm.instr("@R14")
-        self.asm.instr("M=D")
-        # SP = R15
-        self.asm.instr("@R15")
-        self.asm.instr("D=M")
-        self.asm.instr("@SP")
-        self.asm.instr("M=D")
-        # Push R13 (result)
-        self.asm.instr("@R13")
-        self.asm.instr("D=M")
-        self._push_d()
-        # jmp to R14
-        self.asm.instr("@R14")
-        self.asm.instr("A=M")
+        # A short sequence that jumps to the common impl, which costs only 2 instructions in ROM per
+        # use. Note: this is simple because it doesn't need to retun here.
+        self.asm.start("return")
+        self.asm.instr(f"@{self.return_label}")
         self.asm.instr("0;JMP")
 
 
@@ -430,6 +367,61 @@ class Translator:
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")
+
+
+    def _return(self):
+        label = self.asm.next_label("return_common")
+        
+        self.asm.start(f"return_common")
+        self.asm.label(label)
+        
+        # R13 = result
+        self._pop_d()
+        self.asm.instr("@R13")
+        self.asm.instr("M=D")
+        
+        # SP = LCL
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+        # R15 = ARG
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+        # restore segment pointers from stack:
+        self._pop_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+        # R14 = return address
+        self._pop_d()
+        self.asm.instr("@R14")
+        self.asm.instr("M=D")
+        # SP = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+        # Push R13 (result)
+        self.asm.instr("@R13")
+        self.asm.instr("D=M")
+        self._push_d()
+        # jmp to R14
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        
+        return label
 
 
 def translate_line(translate, line):
