@@ -11,6 +11,9 @@ class Translator:
     """
     
     def __init__(self):
+        # AssemblySource deals with keeping track of emitted instructions, and provides a nice
+        # log of execution which makes debugging a lot easier. In any case, the tests assume you use
+        # it, so you might as well not fight it.
         self.asm = AssemblySource()
 
         # SOLVERS: remove this when all the method bodies are filled in
@@ -22,17 +25,17 @@ class Translator:
     #
 
     def push_constant(self, value):
-        # SOLVERS: write some code here to construct a list of strings containing Hack assembly 
-        # instructions to push `value` onto the stack
+        # SOLVERS: write some code here to emit Hack assembly instructions to push `value` onto the stack
         #
-        # self.asm.start("push constant")  # this is a comment, which is shown when debugging
+        # self.asm.start("push constant")  # insert a comment which is shown when debugging
+        # self.asm.instr(f"@{value}")
+        # self.asm.instr("D=A")
+        # ...
         
         return self.solved.push_constant(value)
 
     def add(self):
         # SOLVERS: implement the add opcode
-        # Hint: this is actually going to be the same instructions every time, so just build
-        # a list and return it.
         return self.solved.add()
 
 
@@ -144,10 +147,6 @@ class Translator:
         return self.solved.push_static(index)
 
 
-    #
-    # Helpers:
-    #
-
-    def next_label(self, name):
-        # SOLVERS: this might be useful
-        return self.solved.next_label(name)
+def translate_line(translator, line):
+    # SOLVERS: parse one line of VM source, using the methods of Translator to handle the opcode, if any
+    solved_07.translate_line(translator, line)

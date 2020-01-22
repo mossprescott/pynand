@@ -193,7 +193,7 @@ class Translator:
         elif index == 1:
             segment_ptr = "THAT"
         else:
-            raise SyntaxError(f"Invalid index for pop pointer: {index}")
+            raise SyntaxError(f"Invalid index for pop pointer: {index!r}")
         self._pop_d()
         self.asm.instr(f"@{segment_ptr}")
         self.asm.instr("M=D")
@@ -386,3 +386,35 @@ class Translator:
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")
+
+
+def translate_line(translate, line):
+    """Parse a line of VM source, and invoke a translator to handle it.
+    
+    Note: this is the absolutely the dumbest possible parser, not dealing with 
+    """
+    
+    words = line.strip().split(' ')
+    if len(words) == 0:
+        pass
+    elif words[0] == "function":
+        c, f = words[1].split('.')
+        translate.function(c, f, int(words[2]))
+    elif words[0] == "call":
+        c, f = words[1].split('.')
+        translate.call(c, f, int(words[2]))
+    elif words[0] in ("label", "goto", "if-goto"):
+        translate.__getattribute__(words[0].replace('-', '_'))(words[1])
+    elif words[0] in ("push", "pop"):
+        name = '_'.join(words[:-1])
+        index = int(words[-1])
+        translate.__getattribute__(name)(index)
+    elif len(words) == 1:
+        if words[0] in ("and", "or", "not", "return"):
+            translate.__getattribute__(words[0] + "_op")()
+        else:
+            translate.__getattribute__(words[0])()
+    else:
+        raise Exception(f"Unable to translate: {line}")
+    
+    
