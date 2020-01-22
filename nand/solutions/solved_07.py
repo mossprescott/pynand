@@ -18,7 +18,8 @@ class Translator:
         self.asm = asm
         self.class_namespace = "static"
         self.function_namespace = "_"
-
+        
+    
     def push_constant(self, value):
         # TODO: special-case 1, 0, -1 and negative values
         self.asm.start(f"push constant {value}")
@@ -352,6 +353,16 @@ class Translator:
         self.asm.instr(f"@{class_name.lower()}.{function_name}")
         self.asm.instr("0;JMP")
         self.asm.label(f"{l1}")
+
+
+    def preamble(self):
+        self.asm.start("VM initialization")
+        self.asm.instr("@256")
+        self.asm.instr("D=A")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+
+        self.call("Sys", "init", 0)  # TODO: don't need the full frame?
 
 
     def _push_d(self):

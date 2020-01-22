@@ -53,3 +53,12 @@ class Translator(project_07.Translator):
     def call(self, class_name, function_name, num_args):
         # SOLVERS: implement
         return self.solved.call(class_name, function_name, num_args)
+
+
+    #
+    # Function Calls - Fibonacci Element:
+    #
+    
+    def preamble(self):
+        # SOLVERS: emit instructions to be 
+        return self.solved.preamble()

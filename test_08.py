@@ -151,6 +151,9 @@ def test_simple_function():
 
 
 def test_nested_call():
+    """Multiple function calls, with and without arguments.
+    """
+    
     translate = Translator()
 
     # Performs a simple calculation and returns the result.
@@ -237,12 +240,69 @@ def test_nested_call():
         computer.poke(i, -1)
 
     translate.asm.run(assemble, computer, stop_cycles=1000, debug=True)
-    # translate.asm.run(assemble, computer, stop_cycles=4000, debug=True)
 
-    # assert computer.peek(0) == 261
+    assert computer.peek(0) == 261
     assert computer.peek(1) == 261
     assert computer.peek(2) == 256
     assert computer.peek(3) == 4000
     assert computer.peek(4) == 5000
     assert computer.peek(5) == 135
     assert computer.peek(6) == 246
+
+
+def test_fibonacci_element():
+    """Sys.init, declared out of sequence, requiring the translator to supply initialization and then 
+    call Sys.init. This is finally a fully legitimate VM program, executed in the normal way.
+    """
+    
+    translate = Translator()
+  
+    # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
+    translate.preamble()
+    
+    # Main.vm:
+    # Computes the n'th element of the Fibonacci series, recursively.
+    # n is given in argument[0].  Called by the Sys.init function 
+    # (part of the Sys.vm file), which also pushes the argument[0] 
+    # parameter before this code starts running.
+    translate.function("Main", "fibonacci", 0)
+    translate.push_argument(0)
+    translate.push_constant(2)
+    translate.lt()                          # checks if n<2
+    translate.if_goto("IF_TRUE")
+    translate.goto("IF_FALSE")
+    translate.label("IF_TRUE")              # if n<2, return n
+    translate.push_argument(0)        
+    translate.return_op()
+    translate.label("IF_FALSE")             # if n>=2, returns fib(n-2)+fib(n-1)
+    translate.push_argument(0)
+    translate.push_constant(2)
+    translate.sub()
+    translate.call("Main", "fibonacci", 1)  # computes fib(n-2)
+    translate.push_argument(0)
+    translate.push_constant(1)
+    translate.sub()
+    translate.call("Main", "fibonacci", 1)  # computes fib(n-1)
+    translate.add()                         # returns fib(n-1) + fib(n-2)
+    translate.return_op()
+  
+    # Sys.vm:
+    # Pushes a constant, say n, onto the stack, and calls the Main.fibonacci
+    # function, which computes the n'th element of the Fibonacci series.
+    # Note that by convention, the Sys.init function is called "automatically" 
+    # by the bootstrap code.
+    translate.function("Sys", "init", 0)
+    translate.push_constant(4)
+    translate.call("Main", "fibonacci", 1)   # computes the 4'th fibonacci element
+    translate.label("WHILE")
+    translate.goto("WHILE")                  # loops infinitely
+
+
+    computer = run(Computer, simulator='codegen')
+
+    # Note: no initialization this time
+    
+    translate.asm.run(assemble, computer, stop_cycles=2000, debug=True)
+
+    assert computer.peek(0) == 262
+    assert computer.peek(261) == 3

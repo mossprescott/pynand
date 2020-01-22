@@ -51,7 +51,7 @@ class AssemblySource:
         return self.lines.__iter__()
 
 
-    def run(self, assembler, computer, stop_cycles=None, debug=False, num_locals=2, num_args=2):
+    def run(self, assembler, computer, stop_cycles=None, debug=False):
         """Step through the execution of the generated program, using the provided assembler and 
         computer.
         
@@ -76,25 +76,27 @@ class AssemblySource:
         def print_state():
             tmp = [str(computer.peek(i)) for i in range(5, 13)]
             gpr = [str(computer.peek(i)) for i in range(13, 16)]
-            lcl = [str(computer.peek(i)) for i in range(computer.peek(LCL), computer.peek(LCL)+num_locals)]
-            arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(ARG)+num_args)]
-            stack_bottom = max(256, computer.peek(ARG)+num_args+5)
-            stack = [str(computer.peek(i)) for i in range(stack_bottom, computer.peek(SP))]
+            arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(LCL)-5)]
+            saved = [str(computer.peek(i)) for i in range(computer.peek(LCL)-5, computer.peek(LCL))]
+            stack = [str(computer.peek(i)) for i in range(computer.peek(LCL), computer.peek(SP))]
             static = [str(computer.peek(i)) for i in range(16, 32)]
             print(f"  temp: {tmp}; gpr: {gpr}")
-            print(f"  local: {lcl}; arg: {arg}; stack({computer.peek(SP)}): {stack}")
-            print(f"  static: {static}")
+            print(f"  arg({computer.peek(ARG)}): {arg}; return: {saved[0]}; l,a,t,t: {saved[1:]}")
+            print(f"  local+stack({computer.peek(SP)}): {stack[-20:]}")
+            # print(f"  static: {static}")
 
         for cycles in range(stop_cycles):
             if debug:
                 op = self.src_map.get(computer.pc)
                 if op:
                     print_state()
-                    print(f"{computer.pc}: {op}")
-            if computer.peek(0) < 256: 
-                print(f"broken stack at {computer.pc}")
-                print_state()
-                raise Exception()
+                    print(f"{computer.pc}: {op} ({cycles:0,d} of {stop_cycles:0,d} cycles)")
+            # This is handy to catch common errors, but doesn't work when the stack is going to be
+            # initialized by the program itself.
+            # if computer.peek(0) < 256:
+            #     print(f"broken stack at {computer.pc}")
+            #     print_state()
+            #     raise Exception()
             computer.ticktock()
         print_state()
 
