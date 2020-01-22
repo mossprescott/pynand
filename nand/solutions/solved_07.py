@@ -33,11 +33,18 @@ class Translator:
 
     
     def push_constant(self, value):
-        # TODO: special-case 1, 0, -1 and negative values
+        assert 0 <= value < 2**15
         self.asm.start(f"push constant {value}")
-        self.asm.instr(f"@{value}")
-        self.asm.instr("D=A")
-        self._push_d()
+        if value <= 1:
+            # Save a couple of instructions by embedding the value right in the assignment:
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr(f"M={value}")
+        else:
+            self.asm.instr(f"@{value}")
+            self.asm.instr("D=A")
+            self._push_d()
 
     def add(self):
         self.asm.start("add")
