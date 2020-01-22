@@ -245,6 +245,7 @@ class Translator:
 
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.asm.label(f"{self.function_namespace}")
+
         self.asm.instr("@SP")
         self.asm.instr("A=M")
         for _ in range(num_vars):
@@ -256,18 +257,23 @@ class Translator:
 
     def return_op(self):
         self.asm.start(f"return")
-        self._pop_segment("ARG", 0)
-            # SP = LCL
+        
+        # R13 = result
+        self._pop_d()
+        self.asm.instr("@R13")
+        self.asm.instr("M=D")
+        
+        # SP = LCL
         self.asm.instr("@LCL")
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("M=D")
-            # R15 = old ARG
+        # R15 = ARG
         self.asm.instr("@ARG")
         self.asm.instr("D=M")
         self.asm.instr("@R15")
         self.asm.instr("M=D")
-            # restore segment pointers from stack:
+        # restore segment pointers from stack:
         self._pop_d()
         self.asm.instr("@THAT")
         self.asm.instr("M=D")
@@ -280,16 +286,20 @@ class Translator:
         self._pop_d()
         self.asm.instr("@LCL")
         self.asm.instr("M=D")
-            # R14 = return address
+        # R14 = return address
         self._pop_d()
         self.asm.instr("@R14")
         self.asm.instr("M=D")
-            # SP = R15 + 1
+        # SP = R15
         self.asm.instr("@R15")
-        self.asm.instr("D=M+1")
+        self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("M=D")
-            # jmp to R14
+        # Push R13 (result)
+        self.asm.instr("@R13")
+        self.asm.instr("D=M")
+        self._push_d()
+        # jmp to R14
         self.asm.instr("@R14")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
@@ -299,6 +309,15 @@ class Translator:
         l1 = self.asm.next_label("RET_ADDRESS_CALL")
 
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
+        
+        # R15 = SP - num_args
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr(f"@{num_args}")  # TODO: special-case 0 and 1
+        self.asm.instr("D=D-A")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+        
         self.asm.instr(f"@{l1}")
         self.asm.instr("D=A")
         self._push_d()
@@ -314,19 +333,22 @@ class Translator:
         self.asm.instr("@THAT")
         self.asm.instr("D=M")
         self._push_d()
-            # LCL = SP
+        
+        # LCL = SP
+        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
+        # state of the segment pointers consistent after each opcode, so it's easier to debug.
         self.asm.instr("@SP")
         self.asm.instr("D=M")
         self.asm.instr("@LCL")
         self.asm.instr("M=D")
-            
-            # ARG = SP - (5 + num_args)
-        self.asm.instr(f"@{5 + num_args}")
-        self.asm.instr("D=D-A")
+        
+        # ARG = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
         self.asm.instr("@ARG")
         self.asm.instr("M=D")
             
-            # JMP to callee
+        # JMP to callee
         self.asm.instr(f"@{class_name.lower()}.{function_name}")
         self.asm.instr("0;JMP")
         self.asm.label(f"{l1}")
