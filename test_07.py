@@ -154,33 +154,27 @@ def test_memory_access_pointer():
     
     # Executes pop and push commands using the
     # pointer, this, and that segments.
-    POINTER_TEST = list(itertools.chain(
-        translate.push_constant(3030),
-        translate.pop_pointer(0),
-        translate.push_constant(3040),
-        translate.pop_pointer(1),
-        translate.push_constant(32),
-        translate.pop_this(2),
-        translate.push_constant(46),
-        translate.pop_that(6),
-        translate.push_pointer(0),
-        translate.push_pointer(1),
-        translate.add(),
-        translate.push_this(2),
-        translate.sub(),
-        translate.push_that(6),
-        translate.add(),
-    ))
+    translate.push_constant(3030)
+    translate.pop_pointer(0)
+    translate.push_constant(3040)
+    translate.pop_pointer(1)
+    translate.push_constant(32)
+    translate.pop_this(2)
+    translate.push_constant(46)
+    translate.pop_that(6)
+    translate.push_pointer(0)
+    translate.push_pointer(1)
+    translate.add()
+    translate.push_this(2)
+    translate.sub()
+    translate.push_that(6)
+    translate.add()
     
-    pgm = assemble(POINTER_TEST)
-
     computer = run(Computer, simulator='codegen')
 
     computer.poke(0, 256)   # stack pointer
 
-    computer.init_rom(pgm)
-    for _ in range(len(pgm)):
-        computer.ticktock()
+    translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(256) == 6084
     assert computer.peek(3) == 3030
@@ -193,28 +187,22 @@ def test_memory_access_static():
     translate = Translator()
     
     # Executes pop and push commands using the static segment.
-    STATIC_TEST = list(itertools.chain(
-        translate.push_constant(111),
-        translate.push_constant(333),
-        translate.push_constant(888),
-        translate.pop_static(8),
-        translate.pop_static(3),
-        translate.pop_static(1),
-        translate.push_static(3),
-        translate.push_static(1),
-        translate.sub(),
-        translate.push_static(8),
-        translate.add(),
-    ))
-
-    pgm = assemble(STATIC_TEST)
+    translate.push_constant(111)
+    translate.push_constant(333)
+    translate.push_constant(888)
+    translate.pop_static(8)
+    translate.pop_static(3)
+    translate.pop_static(1)
+    translate.push_static(3)
+    translate.push_static(1)
+    translate.sub()
+    translate.push_static(8)
+    translate.add()
 
     computer = run(Computer, simulator='codegen')
 
     computer.poke(0, 256)   # stack pointer
 
-    computer.init_rom(pgm)
-    for _ in range(len(pgm)):
-        computer.ticktock()
+    translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(256) == 1110

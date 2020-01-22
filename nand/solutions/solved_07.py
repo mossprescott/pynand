@@ -16,6 +16,8 @@ class Translator:
     
     def __init__(self, asm):
         self.asm = asm
+        self.class_namespace = "_"
+        self.function_namespace = None
 
     def push_constant(self, value):
         # TODO: special-case 1, 0, -1 and negative values
@@ -191,10 +193,9 @@ class Translator:
             segment_ptr = "THAT"
         else:
             raise SyntaxError(f"Invalid index for pop pointer: {index}")
-        return [f"// pop pointer {index}"] + _POP_D + [
-            f"@{segment_ptr}",
-            "M=D",
-        ]
+        self._pop_d()
+        self.asm.instr(f"@{segment_ptr}")
+        self.asm.instr("M=D")
 
     def push_pointer(self, index):
         self.asm.start(f"push pointer {index}")
@@ -204,42 +205,35 @@ class Translator:
             segment_ptr = "THAT"
         else:
             raise SyntaxError(f"Invalid index for push pointer: {index}")
-        return [
-            f"// push pointer {index}",
-            f"@{segment_ptr}",
-            "D=M",
-        ] + _PUSH_D
+        self.asm.instr(f"@{segment_ptr}")
+        self.asm.instr("D=M")
+        self._push_d()
 
 
     def pop_static(self, index):
         self.asm.start(f"push static {index}")
-        namespace = "static"  # HACK: need to get it from the caller
-        return [f"// pop static {index}"] + _POP_D + [
-            f"@{namespace}.{index}",
-            "M=D",
-        ]
+        self._pop_d()
+        self.asm.instr(f"@{self.class_namespace}.static{index}")
+        self.asm.instr("M=D")
         
     def push_static(self, index):
         self.asm.start(f"pop static {index}")
-        namespace = "static"  # HACK: need to get it from the caller
-        return [
-            f"// push static {index}",
-            f"@{namespace}.{index}",
-            "D=M",
-        ] + _PUSH_D
+        self.asm.instr(f"@{self.class_namespace}.static{index}")
+        self.asm.instr("D=M")
+        self._push_d()
 
 
     def label(self, name):
         self.asm.start(f"label {name}")
         return [
             f"// label {name}",
-            f"({self.namespace}${name})",
+            f"({self.function_namespace}${name})",
         ]
     
     def if_goto(self, name):
         self.asm.start(f"if-goto {name}")
         return [f"// if-goto {name}"] + _POP_D + [
-            f"@{self.namespace}${name}",
+            f"@{self.function_namespace}${name}",
             "D;JNE",
         ]
 
@@ -247,17 +241,18 @@ class Translator:
         self.asm.start(f"goto {name}")
         return [
             f"// goto {name}",
-            f"@{self.namespace}${name}",
+            f"@{self.function_namespace}${name}",
             "0;JMP",
         ]
 
 
     def function(self, class_name, function_name, num_vars):
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
-        self.namespace = f"{class_name.lower()}.{function_name}"
+        self.class_namespace = class_name.lower()
+        self.function_namespace = f"{class_name.lower()}.{function_name}"
         return [
             f"// function {class_name}.{function_name} {num_vars}",
-            f"({self.namespace})",
+            f"({self.function_namespace})",
             "@SP",
             "A=M"
         ] + [
