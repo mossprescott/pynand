@@ -103,35 +103,31 @@ def test_memory_access_basic():
     translate = Translator()
     
     # Executes pop and push commands using the virtual memory segments.
-    BASIC_TEST = list(itertools.chain(
-        translate.push_constant(10),
-        translate.pop_local(0),
-        translate.push_constant(21),
-        translate.push_constant(22),
-        translate.pop_argument(2),
-        translate.pop_argument(1),
-        translate.push_constant(36),
-        translate.pop_this(6),
-        translate.push_constant(42),
-        translate.push_constant(45),
-        translate.pop_that(5),
-        translate.pop_that(2),
-        translate.push_constant(510),
-        translate.pop_temp(6),
-        translate.push_local(0),
-        translate.push_that(5),
-        translate.add(),
-        translate.push_argument(1),
-        translate.sub(),
-        translate.push_this(6),
-        translate.push_this(6),
-        translate.add(),
-        translate.sub(),
-        translate.push_temp(6),
-        translate.add(),
-    ))
-
-    pgm = assemble(BASIC_TEST)
+    translate.push_constant(10)
+    translate.pop_local(0)
+    translate.push_constant(21)
+    translate.push_constant(22)
+    translate.pop_argument(2)
+    translate.pop_argument(1)
+    translate.push_constant(36)
+    translate.pop_this(6)
+    translate.push_constant(42)
+    translate.push_constant(45)
+    translate.pop_that(5)
+    translate.pop_that(2)
+    translate.push_constant(510)
+    translate.pop_temp(6)
+    translate.push_local(0)
+    translate.push_that(5)
+    translate.add()
+    translate.push_argument(1)
+    translate.sub()
+    translate.push_this(6)
+    translate.push_this(6)
+    translate.add()
+    translate.sub()
+    translate.push_temp(6)
+    translate.add()
 
     computer = run(Computer, simulator='codegen')
 
@@ -141,9 +137,7 @@ def test_memory_access_basic():
     computer.poke(3, 3000)  # base address of the this segment
     computer.poke(4, 3010)  # base address of the that segment
 
-    computer.init_rom(pgm)
-    for _ in range(len(pgm)):
-        computer.ticktock()
+    translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(256) == 472
     assert computer.peek(300) == 10

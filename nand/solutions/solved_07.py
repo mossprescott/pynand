@@ -115,72 +115,76 @@ class Translator:
         self._push_d()
             
     def pop_local(self, index):
-        return [f"// pop local {index}"] + self._pop_segment("LCL", index)
+        self.asm.start(f"pop local {index}")
+        self._pop_segment("LCL", index)
         
     def pop_argument(self, index):
-        return [f"// pop argument {index}"] + self._pop_segment("ARG", index)
+        self.asm.start(f"pop argument {index}")
+        self._pop_segment("ARG", index)
         
     def pop_this(self, index):
-        return [f"// pop this {index}"] + self._pop_segment("THIS", index)
+        self.asm.start(f"pop this {index}")
+        self._pop_segment("THIS", index)
         
     def pop_that(self, index):
-        return [f"// pop that {index}"] + self._pop_segment("THAT", index)
+        self.asm.start(f"pop that {index}")
+        self._pop_segment("THAT", index)
     
     def pop_temp(self, index):
         assert 0 <= index < 8
-        return [f"// pop temp {index}"] + _POP_D + [
-            f"@{5+index}",
-            "M=D",
-        ]
+        self.asm.start(f"pop temp {index}")
+        self._pop_d()
+        self.asm.instr(f"@{5+index}")
+        self.asm.instr("M=D")
     
     def _pop_segment(self, segment_ptr, index):
         # TODO: special-case small indexes
-        return [
-            f"@{index}",
-            "D=A",
-            f"@{segment_ptr}",
-            "D=D+M",
-            "@R15",
-            "M=D",
-        ] + _POP_D + [
-            "@R15",
-            "A=M",
-            "M=D",
-        ]
+        self.asm.instr(f"@{index}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{segment_ptr}")
+        self.asm.instr("D=D+M")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@R15")
+        self.asm.instr("A=M")
+        self.asm.instr("M=D")
 
     def push_local(self, index):
+        self.asm.start(f"push local {index}")
         return self._push_segment("LCL", index)
 
     def push_argument(self, index):
+        self.asm.start(f"push argument {index}")
         return self._push_segment("ARG", index)
 
     def push_this(self, index):
+        self.asm.start(f"push this {index}")
         return self._push_segment("THIS", index)
 
     def push_that(self, index):
+        self.asm.start(f"push that {index}")
         return self._push_segment("THAT", index)
 
     def push_temp(self, index):
         assert 0 <= index < 8
-        return [
-            f"// push temp {index}",
-            f"@{5+index}",
-            "D=M",
-        ] + _PUSH_D
+        self.asm.start(f"push temp {index}")
+        self.asm.instr(f"@{5+index}")
+        self.asm.instr("D=M")
+        self._push_d()
         
 
     def _push_segment(self, segment_ptr, index):
-        return [
-            f"// push {segment_ptr} {index}",
-            f"@{index}",
-            "D=A",
-            f"@{segment_ptr}",
-            "A=D+M",
-            "D=M",
-        ] + _PUSH_D
+        self.asm.instr(f"@{index}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{segment_ptr}")
+        self.asm.instr("A=D+M")
+        self.asm.instr("D=M")
+        self._push_d()
 
 
     def pop_pointer(self, index):
+        self.asm.start(f"pop pointer {index}")
         if index == 0:
             segment_ptr = "THIS"
         elif index == 1:
@@ -193,6 +197,7 @@ class Translator:
         ]
 
     def push_pointer(self, index):
+        self.asm.start(f"push pointer {index}")
         if index == 0:
             segment_ptr = "THIS"
         elif index == 1:
@@ -207,6 +212,7 @@ class Translator:
 
 
     def pop_static(self, index):
+        self.asm.start(f"push static {index}")
         namespace = "static"  # HACK: need to get it from the caller
         return [f"// pop static {index}"] + _POP_D + [
             f"@{namespace}.{index}",
@@ -214,6 +220,7 @@ class Translator:
         ]
         
     def push_static(self, index):
+        self.asm.start(f"pop static {index}")
         namespace = "static"  # HACK: need to get it from the caller
         return [
             f"// push static {index}",
@@ -223,18 +230,21 @@ class Translator:
 
 
     def label(self, name):
+        self.asm.start(f"label {name}")
         return [
             f"// label {name}",
             f"({self.namespace}${name})",
         ]
     
     def if_goto(self, name):
+        self.asm.start(f"if-goto {name}")
         return [f"// if-goto {name}"] + _POP_D + [
             f"@{self.namespace}${name}",
             "D;JNE",
         ]
 
     def goto(self, name):
+        self.asm.start(f"goto {name}")
         return [
             f"// goto {name}",
             f"@{self.namespace}${name}",
@@ -243,6 +253,7 @@ class Translator:
 
 
     def function(self, class_name, function_name, num_vars):
+        self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.namespace = f"{class_name.lower()}.{function_name}"
         return [
             f"// function {class_name}.{function_name} {num_vars}",
@@ -259,6 +270,7 @@ class Translator:
         ]
 
     def return_op(self):
+        self.asm.start(f"return")
         return ["// return"] + self._pop_segment("ARG", 0) + [
             # SP = LCL
             "@LCL",
@@ -300,6 +312,7 @@ class Translator:
 
 
     def call(self, class_name, function_name, num_args):
+        self.asm.start(f"call {class_name}.{function_name} {num_args}")
         l1 = self.next_label("RET_ADDRESS_CALL")
         return [
             f"// call {class_name}.{function_name} {num_args}",
