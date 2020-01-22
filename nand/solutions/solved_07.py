@@ -19,6 +19,40 @@ class Translator:
         self.class_namespace = "static"
         self.function_namespace = "_"
         
+        # HACK: some code that's always required, even when preamble is not used.
+        
+        start = self.asm.next_label("start")
+        self.asm.instr(f"@{start}")
+        self.asm.instr("0;JMP")
+        
+        self.eq_label = self._compare("EQ")
+        self.lt_label = self._compare("LT")
+        self.gt_label = self._compare("GT")
+        # # Common implementation for EQ:
+        # self.eq_label = self.asm.next_label("eq_common")
+        # l1 = self.asm.next_label("eq_common$1")
+        # l2 = self.asm.next_label("eq_common$2")
+        # self.asm.start("eq_common")
+        # self.asm.label(self.eq_label)
+        # self.asm.instr("@R15")    # R15 = return address
+        # self.asm.instr("M=D")
+        # self._pop_d_m()           # EQ
+        # self.asm.instr("D=M-D")
+        # self.asm.instr(f"@{l1}")
+        # self.asm.instr("D;JEQ")
+        # self.asm.instr("D=0")
+        # self.asm.instr(f"@{l2}")
+        # self.asm.instr("0;JMP")
+        # self.asm.label(l1)
+        # self.asm.instr("D=-1")
+        # self.asm.label(l2)
+        # self._push_d()
+        # self.asm.instr("@R15")   # JMP to R15
+        # self.asm.instr("A=M")
+        # self.asm.instr("0;JMP")
+        
+        self.asm.label(start)
+
     
     def push_constant(self, value):
         # TODO: special-case 1, 0, -1 and negative values
@@ -70,52 +104,37 @@ class Translator:
         self._push_d()
 
     def eq(self):
-        l1 = self.asm.next_label("eq")
-        l2 = self.asm.next_label("eq")
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
+        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        return_label = self.asm.next_label("eq_return")
         self.asm.start("eq")
-        self._pop_d_m()
-        self.asm.instr("D=M-D")
-        self.asm.instr(f"@{l1}")
-        self.asm.instr("D;JEQ")
-        self.asm.instr("D=0")
-        self.asm.instr(f"@{l2}")
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{self.eq_label}")
         self.asm.instr("0;JMP")
-        self.asm.label(l1)
-        self.asm.instr("D=-1")
-        self.asm.label(l2)
-        self._push_d()
+        self.asm.label(return_label)
 
     def lt(self):
-        l1 = self.asm.next_label("lt")
-        l2 = self.asm.next_label("lt")
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
+        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        return_label = self.asm.next_label("lt_return")
         self.asm.start("lt")
-        self._pop_d_m()
-        self.asm.instr("D=M-D")
-        self.asm.instr(f"@{l1}")
-        self.asm.instr("D;JLT")
-        self.asm.instr("D=0")
-        self.asm.instr(f"@{l2}")
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{self.lt_label}")
         self.asm.instr("0;JMP")
-        self.asm.label(l1)
-        self.asm.instr("D=-1")
-        self.asm.label(l2)
-        self._push_d()
+        self.asm.label(return_label)
 
     def gt(self):
-        l1 = self.asm.next_label("gt")
-        l2 = self.asm.next_label("gt")
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
+        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        return_label = self.asm.next_label("gt_return")
         self.asm.start("gt")
-        self._pop_d_m()
-        self.asm.instr("D=M-D")
-        self.asm.instr(f"@{l1}")
-        self.asm.instr("D;JGT")
-        self.asm.instr("D=0")
-        self.asm.instr(f"@{l2}")
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{self.gt_label}")
         self.asm.instr("0;JMP")
-        self.asm.label(l1)
-        self.asm.instr("D=-1")
-        self.asm.label(l2)
-        self._push_d()
+        self.asm.label(return_label)
             
     def pop_local(self, index):
         self.asm.start(f"pop local {index}")
@@ -364,6 +383,31 @@ class Translator:
 
         self.call("Sys", "init", 0)  # TODO: don't need the full frame?
 
+
+    def _compare(self, op):
+        # Common implementation for compare opcodes:
+        label = self.asm.next_label(f"{op.lower()}_common")
+        l1 = self.asm.next_label(f"{op.lower()}_common$1")
+        l2 = self.asm.next_label(f"{op.lower()}_common$2")
+        self.asm.start(f"{op.lower()}_common")
+        self.asm.label(label)
+        self.asm.instr("@R15")    # R15 = return address
+        self.asm.instr("M=D")
+        self._pop_d_m()           # EQ
+        self.asm.instr("D=M-D")
+        self.asm.instr(f"@{l1}")
+        self.asm.instr(f"D;J{op}")
+        self.asm.instr("D=0")
+        self.asm.instr(f"@{l2}")
+        self.asm.instr("0;JMP")
+        self.asm.label(l1)
+        self.asm.instr("D=-1")
+        self.asm.label(l2)
+        self._push_d()
+        self.asm.instr("@R15")   # JMP to R15
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        return label
 
     def _push_d(self):
         """Common sequence pushing the contents of the D register onto the stack."""
