@@ -40,18 +40,12 @@ class Translator:
         self._push_d()
 
     def add(self):
-        # TODO: mutate M in place, for a lot fewer instructions
         self.asm.start("add")
-        self._pop_d_m()
-        self.asm.instr("D=D+M")
-        self._push_d()
-
+        self._binary("D+M")
+        
     def sub(self):
-        # TODO: mutate M in place, for a lot fewer instructions
         self.asm.start("sub")
-        self._pop_d_m()
-        self.asm.instr("D=M-D")
-        self._push_d()
+        self._binary("M-D")
 
     def neg(self):
         # TODO: negate M in place, for a lot fewer instructions
@@ -61,18 +55,12 @@ class Translator:
         self._push_d()
 
     def and_op(self):
-        # TODO: mutate M in place, for a lot fewer instructions
         self.asm.start("and")
-        self._pop_d_m()
-        self.asm.instr("D=D&M")
-        self._push_d()
+        self._binary("D&M")
 
     def or_op(self):
-        # TODO: mutate M in place, for a lot fewer instructions
         self.asm.start("or")
-        self._pop_d_m()
-        self.asm.instr("D=D|M")
-        self._push_d()
+        self._binary("D|M")
 
     def not_op(self):
         # TODO: negate M in place, for a lot fewer instructions
@@ -348,9 +336,19 @@ class Translator:
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")
+        
+    def _binary(self, op):
+        """Pop two, combine, and push, but update SP only once."""
+        self.asm.instr("@SP")
+        self.asm.instr("AM=M-1")  # update SP
+        self.asm.instr("D=M")     # D = top
+        self.asm.instr("@SP")
+        self.asm.instr("A=M-1")   # Don't update SP again
+
+        self.asm.instr(f"M={op}")   
+        
 
     def _call(self):
-        
         label = self.asm.next_label("call_common")
         
         self.asm.start(f"call_common")
