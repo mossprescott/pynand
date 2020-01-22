@@ -31,12 +31,12 @@ class Translator(project_07.Translator):
     def goto(self, name):
         # SOLVERS: implement
         return self.solved.goto(name)
-    
-    
+
+
     #
     # Function Calls — Simple Function:
     #
-    
+
     def function(self, class_name, function_name, num_locals):
         # SOLVERS: implement
         return self.solved.function(class_name, function_name, num_locals)
@@ -44,3 +44,12 @@ class Translator(project_07.Translator):
     def return_op(self):
         # SOLVERS: implement
         return self.solved.return_op()
+
+
+    #
+    # Function Calls — Nested Call:
+    #
+
+    def call(self, class_name, function_name, num_args):
+        # SOLVERS: implement
+        return self.solved.call(class_name, function_name, num_args)

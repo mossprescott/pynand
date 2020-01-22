@@ -6,9 +6,6 @@ from project_06 import assemble
 
 from project_07 import *
 
-# debug tools:
-from nand.solutions.solved_07 import print_vm_state
-from nand.codegen import print_lines
 
 def test_simple_add():
     translate = Translator()

@@ -66,7 +66,8 @@ class AssemblySource:
             stop_cycles = self.instruction_count
 
         if debug:
-            print_lines(self.lines)
+            # print_lines(self.lines)
+            print('\n'.join(self.lines))
             print()
     
         asm = assembler(self)
@@ -81,7 +82,7 @@ class AssemblySource:
             stack = [str(computer.peek(i)) for i in range(stack_bottom, computer.peek(SP))]
             static = [str(computer.peek(i)) for i in range(16, 32)]
             print(f"  temp: {tmp}; gpr: {gpr}")
-            print(f"  local: {lcl}; arg: {arg}; stack: {stack}")
+            print(f"  local: {lcl}; arg: {arg}; stack({computer.peek(SP)}): {stack}")
             print(f"  static: {static}")
 
         for cycles in range(stop_cycles):
@@ -90,6 +91,10 @@ class AssemblySource:
                 if op:
                     print_state()
                     print(f"{computer.pc}: {op}")
+            if computer.peek(0) < 256: 
+                print(f"broken stack at {computer.pc}")
+                print_state()
+                raise Exception()
             computer.ticktock()
         print_state()
 

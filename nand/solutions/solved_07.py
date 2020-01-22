@@ -16,8 +16,8 @@ class Translator:
     
     def __init__(self, asm):
         self.asm = asm
-        self.class_namespace = "_"
-        self.function_namespace = None
+        self.class_namespace = "static"
+        self.function_namespace = "_"
 
     def push_constant(self, value):
         # TODO: special-case 1, 0, -1 and negative values
@@ -225,126 +225,112 @@ class Translator:
 
     def label(self, name):
         self.asm.start(f"label {name}")
-        return [
-            f"// label {name}",
-            f"({self.function_namespace}${name})",
-        ]
+        self.asm.label(f"{self.function_namespace}${name}")
     
     def if_goto(self, name):
         self.asm.start(f"if-goto {name}")
-        return [f"// if-goto {name}"] + _POP_D + [
-            f"@{self.function_namespace}${name}",
-            "D;JNE",
-        ]
+        self._pop_d()
+        self.asm.instr(f"@{self.function_namespace}${name}")
+        self.asm.instr("D;JNE")
 
     def goto(self, name):
         self.asm.start(f"goto {name}")
-        return [
-            f"// goto {name}",
-            f"@{self.function_namespace}${name}",
-            "0;JMP",
-        ]
+        self.asm.instr(f"@{self.function_namespace}${name}")
+        self.asm.instr("0;JMP")
 
 
     def function(self, class_name, function_name, num_vars):
-        self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.class_namespace = class_name.lower()
         self.function_namespace = f"{class_name.lower()}.{function_name}"
-        return [
-            f"// function {class_name}.{function_name} {num_vars}",
-            f"({self.function_namespace})",
-            "@SP",
-            "A=M"
-        ] + [
-            "M=0",
-            "A=A+1",
-        ]*num_vars + [
-            "D=A",
-            "@SP",
-            "M=D",
-        ]
+
+        self.asm.start(f"function {class_name}.{function_name} {num_vars}")
+        self.asm.label(f"{self.function_namespace}")
+        self.asm.instr("@SP")
+        self.asm.instr("A=M")
+        for _ in range(num_vars):
+            self.asm.instr("M=0")
+            self.asm.instr("A=A+1")
+        self.asm.instr("D=A")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
 
     def return_op(self):
         self.asm.start(f"return")
-        return ["// return"] + self._pop_segment("ARG", 0) + [
+        self._pop_segment("ARG", 0)
             # SP = LCL
-            "@LCL",
-            "D=M",
-            "@SP",
-            "M=D",
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
             # R15 = old ARG
-            "@ARG",
-            "D=M",
-            "@R15",
-            "M=D",
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
             # restore segment pointers from stack:
-        ] + _POP_D + [
-            "@THAT",
-            "M=D"
-        ] + _POP_D + [
-            "@THIS",
-            "M=D",
-        ] + _POP_D + [
-            "@ARG",
-            "M=D"
-        ] + _POP_D + [
-            "@LCL",
-            "M=D",
+        self._pop_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
             # R14 = return address
-        ] + _POP_D + [
-            "@R14",
-            "M=D",
+        self._pop_d()
+        self.asm.instr("@R14")
+        self.asm.instr("M=D")
             # SP = R15 + 1
-            "@R15",
-            "D=M+1",
-            "@SP",
-            "M=D",
+        self.asm.instr("@R15")
+        self.asm.instr("D=M+1")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
             # jmp to R14
-            "@R14",
-            "A=M",
-            "0;JMP",
-        ]
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
 
 
     def call(self, class_name, function_name, num_args):
+        l1 = self.asm.next_label("RET_ADDRESS_CALL")
+
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
-        l1 = self.next_label("RET_ADDRESS_CALL")
-        return [
-            f"// call {class_name}.{function_name} {num_args}",
-            f"@{l1}",
-            "D=A",
-        ] + _PUSH_D + [
-            "@LCL",
-            "D=A",
-        ] + _PUSH_D + [
-            "@ARG",
-            "D=A",
-        ] + _PUSH_D + [
-            "@THIS",
-            "D=A",
-        ] + _PUSH_D + [
-            "@THAT",
-            "D=A",
-        ] + _PUSH_D + [
+        self.asm.instr(f"@{l1}")
+        self.asm.instr("D=A")
+        self._push_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("D=M")
+        self._push_d()
             # LCL = SP
-            "@SP",
-            "D=A",
-            "@LCL",
-            "M=D",
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
             
             # ARG = SP - (5 + num_args)
-            f"@{5 + num_args}",
-            "D=D-A",
-            "@ARG",
-            "M=D",
+        self.asm.instr(f"@{5 + num_args}")
+        self.asm.instr("D=D-A")
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
             
             # JMP to callee
-            f"@{class_name.lower()}.{function_name}",
-            "0;JMP",
-            f"({l1})",
-        ]
-        
-        return None
+        self.asm.instr(f"@{class_name.lower()}.{function_name}")
+        self.asm.instr("0;JMP")
+        self.asm.label(f"{l1}")
+
 
     def _push_d(self):
         """Common sequence pushing the contents of the D register onto the stack."""
