@@ -4,9 +4,6 @@ SPOILER ALERT: this files contains a complete VM translator.
 If you want to write this on your own, stop reading now!
 """
 
-# Disclaimer: this implementation was written quickly and seems to work, but those are the only good
-# things that can be said about it.
-
 
 class Translator:
     """Translate all VM opcodes to assembly instructions. 
@@ -25,10 +22,12 @@ class Translator:
         self.asm.instr(f"@{start}")
         self.asm.instr("0;JMP")
         
+        # "Microcoded" instructions:
         self.eq_label = self._compare("EQ")
         self.lt_label = self._compare("LT")
         self.gt_label = self._compare("GT")
         self.return_label = self._return()
+        self.call_label = self._call()
         
         self.asm.label(start)
 
@@ -263,7 +262,9 @@ class Translator:
 
 
     def call(self, class_name, function_name, num_args):
-        l1 = self.asm.next_label("RET_ADDRESS_CALL")
+        # TODO: pull out more common code here? There are two args: num_args and return address.
+        
+        return_label = self.asm.next_label("RET_ADDRESS_CALL")
 
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
         
@@ -275,40 +276,20 @@ class Translator:
         self.asm.instr("@R15")
         self.asm.instr("M=D")
         
-        self.asm.instr(f"@{l1}")
+        # Push the return address
+        self.asm.instr(f"@{return_label}")
         self.asm.instr("D=A")
         self._push_d()
-        self.asm.instr("@LCL")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@ARG")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@THIS")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@THAT")
-        self.asm.instr("D=M")
-        self._push_d()
-        
-        # LCL = SP
-        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
-        # state of the segment pointers consistent after each opcode, so it's easier to debug.
-        self.asm.instr("@SP")
-        self.asm.instr("D=M")
-        self.asm.instr("@LCL")
-        self.asm.instr("M=D")
-        
-        # ARG = R15
-        self.asm.instr("@R15")
-        self.asm.instr("D=M")
-        self.asm.instr("@ARG")
-        self.asm.instr("M=D")
-            
-        # JMP to callee
+
+        # D = callee address
         self.asm.instr(f"@{class_name.lower()}.{function_name}")
+        self.asm.instr("D=A")
+
+        # Jump to the common implementation
+        self.asm.instr(f"@{self.call_label}") 
         self.asm.instr("0;JMP")
-        self.asm.label(f"{l1}")
+
+        self.asm.label(f"{return_label}")
 
 
     def preamble(self):
@@ -368,6 +349,48 @@ class Translator:
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")
 
+    def _call(self):
+        
+        label = self.asm.next_label("call_common")
+        
+        self.asm.start(f"call_common")
+        self.asm.label(label)
+        
+        # Note: ARG has already been stashed in R15 when arriving here.
+        self.asm.instr("@R14")    # R14 = callee
+        self.asm.instr("M=D")
+
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("D=M")
+        self._push_d()
+        
+        # LCL = SP
+        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
+        # state of the segment pointers consistent after each opcode, so it's easier to debug.
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+        
+        # ARG = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+
+        self.asm.instr("@R14")   # JMP to R15 (the callee)
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        return label
 
     def _return(self):
         label = self.asm.next_label("return_common")
