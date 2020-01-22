@@ -1,5 +1,7 @@
 # See https://www.nand2tetris.org/project07
 
+from nand.translate import AssemblySource
+
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_07
 
@@ -9,8 +11,10 @@ class Translator:
     """
     
     def __init__(self):
+        self.asm = AssemblySource()
+
         # SOLVERS: remove this when all the method bodies are filled in
-        self.solved = solved_07.Translator()
+        self.solved = solved_07.Translator(self.asm)
 
 
     #
@@ -20,6 +24,9 @@ class Translator:
     def push_constant(self, value):
         # SOLVERS: write some code here to construct a list of strings containing Hack assembly 
         # instructions to push `value` onto the stack
+        #
+        # self.asm.start("push constant")  # this is a comment, which is shown when debugging
+        
         return self.solved.push_constant(value)
 
     def add(self):

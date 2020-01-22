@@ -6,28 +6,22 @@ from project_06 import assemble
 
 from project_07 import *
 
+# debug tools:
 from nand.solutions.solved_07 import print_vm_state
-
+from nand.codegen import print_lines
 
 def test_simple_add():
     translate = Translator()
     
     # Pushes and adds two constants
-    SIMPLE_ADD = list(itertools.chain(
-        translate.push_constant(7),
-        translate.push_constant(8),
-        translate.add(),
-    ))
-
-    pgm = assemble(SIMPLE_ADD)
+    translate.push_constant(7)
+    translate.push_constant(8)
+    translate.add()
 
     computer = run(Computer, simulator='codegen')
-
     computer.poke(0, 256)  # initializes the stack pointer
 
-    computer.init_rom(pgm)
-    for _ in range(len(pgm)):
-        computer.ticktock()
+    translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(0) == 257
     assert computer.peek(256) == 15
@@ -38,65 +32,59 @@ def test_stack_ops():
     
     # Executes a sequence of arithmetic and logical operations
     # on the stack. 
-    STACK_TEST = list(itertools.chain(
-        translate.push_constant(17),
-        translate.push_constant(17),
-        translate.eq(),
-        
-        translate.push_constant(17),
-        translate.push_constant(16),
-        translate.eq(),
-        
-        translate.push_constant(16),
-        translate.push_constant(17),
-        translate.eq(),
-        
-        translate.push_constant(892),
-        translate.push_constant(891),
-        translate.lt(),
-        
-        translate.push_constant(891),
-        translate.push_constant(892),
-        translate.lt(),
-        
-        translate.push_constant(891),
-        translate.push_constant(891),
-        translate.lt(),
-        
-        translate.push_constant(32767),
-        translate.push_constant(32766),
-        translate.gt(),
-        
-        translate.push_constant(32766),
-        translate.push_constant(32767),
-        translate.gt(),
-        
-        translate.push_constant(32766),
-        translate.push_constant(32766),
-        translate.gt(),
-        
-        translate.push_constant(57),
-        translate.push_constant(31),
-        translate.push_constant(53),
-        translate.add(),
-        translate.push_constant(112),
-        translate.sub(),
-        translate.neg(),
-        translate.and_op(),
-        translate.push_constant(82),
-        translate.or_op(),
-        translate.not_op(),
-    ))
-
-    pgm = assemble(STACK_TEST)
+    translate.push_constant(17)
+    translate.push_constant(17)
+    translate.eq()
+    
+    translate.push_constant(17)
+    translate.push_constant(16)
+    translate.eq()
+    
+    translate.push_constant(16)
+    translate.push_constant(17)
+    translate.eq()
+    
+    translate.push_constant(892)
+    translate.push_constant(891)
+    translate.lt()
+    
+    translate.push_constant(891)
+    translate.push_constant(892)
+    translate.lt()
+    
+    translate.push_constant(891)
+    translate.push_constant(891)
+    translate.lt()
+    
+    translate.push_constant(32767)
+    translate.push_constant(32766)
+    translate.gt()
+    
+    translate.push_constant(32766)
+    translate.push_constant(32767)
+    translate.gt()
+    
+    translate.push_constant(32766)
+    translate.push_constant(32766)
+    translate.gt()
+    
+    translate.push_constant(57)
+    translate.push_constant(31)
+    translate.push_constant(53)
+    translate.add()
+    translate.push_constant(112)
+    translate.sub()
+    translate.neg()
+    translate.and_op()
+    translate.push_constant(82)
+    translate.or_op()
+    translate.not_op()
 
     computer = run(Computer, simulator='codegen')
 
     computer.poke(0, 256)  # initializes the stack pointer
 
-    computer.init_rom(pgm)
-    for _ in range(len(pgm)):
-        computer.ticktock()
+    translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(0) == 266
     assert computer.peek(256) == -1
