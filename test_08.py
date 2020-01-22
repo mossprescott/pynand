@@ -6,10 +6,6 @@ from project_06 import assemble
 
 from project_08 import *
 
-# TEMP: debug stuff
-from nand.solutions.solved_07 import print_vm_state
-from nand.codegen import print_lines
-
 
 def test_basic_loop():
     translate = Translator()
