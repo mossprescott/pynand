@@ -9,7 +9,7 @@ from project_07 import *
 
 def test_simple_add():
     translate = Translator()
-    
+
     # Pushes and adds two constants
     translate.push_constant(7)
     translate.push_constant(8)
@@ -81,7 +81,7 @@ def test_stack_ops():
 
     computer.poke(0, 256)  # initializes the stack pointer
 
-    translate.asm.run(assemble, computer, debug=True)
+    translate.asm.run(assemble, computer, stop_cycles=1000, debug=True)
 
     assert computer.peek(0) == 266
     assert computer.peek(256) == -1
