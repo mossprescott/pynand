@@ -312,10 +312,9 @@ class Translator:
     def _push_d(self):
         """Common sequence pushing the contents of the D register onto the stack."""
         self.asm.instr("@SP")
-        self.asm.instr("A=M")
-        self.asm.instr("M=D")
-        self.asm.instr("@SP")
         self.asm.instr("M=M+1")
+        self.asm.instr("A=M-1")
+        self.asm.instr("M=D")
 
     def _pop_d(self):
         """Common sequence popping one value from the stack into D."""
