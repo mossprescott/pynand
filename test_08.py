@@ -306,3 +306,59 @@ def test_fibonacci_element():
 
     assert computer.peek(0) == 262
     assert computer.peek(261) == 3
+
+
+def test_statics_multiple_files():
+    """Tests that different functions, stored in two different classes, manipulate the static 
+    segment correctly. 
+    
+    Note: the original materials actually refer to _files_ not _classes_, but I think in the context
+    of this language there's a one-to-one correspondence.
+    """
+    
+    translate = Translator()
+  
+    # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
+    translate.preamble()
+    
+    # Sys.vm:
+    translate.function("Sys", "init", 0)
+    translate.push_constant(6)
+    translate.push_constant(8)
+    translate.call("Class1", "set", 2)
+    translate.pop_temp(0) # Dumps the return value
+    translate.push_constant(23)
+    translate.push_constant(15)
+    translate.call("Class2", "set", 2)
+    translate.pop_temp(0) # Dumps the return value
+    translate.call("Class1", "get", 0)
+    translate.call("Class2", "get", 0)
+    translate.label("WHILE")
+    translate.goto("WHILE")
+
+    for class_name in ["Class1", "Class2"]:
+        # Stores two supplied arguments in static[0] and static[1].
+        translate.function(class_name, "set", 0)
+        translate.push_argument(0)
+        translate.pop_static(0)
+        translate.push_argument(1)
+        translate.pop_static(1)
+        translate.push_constant(0)
+        translate.return_op()
+        # Returns static[0] - static[1].
+        translate.function(class_name, "get", 0)
+        translate.push_static(0)
+        translate.push_static(1)
+        translate.sub()
+        translate.return_op()
+
+
+    computer = run(Computer, simulator='codegen')
+
+    # Note: no initialization this time
+
+    translate.asm.run(assemble, computer, stop_cycles=2500, debug=True)
+
+    assert computer.peek(0) == 263
+    assert computer.peek(261) == -2
+    assert computer.peek(262) == 8
