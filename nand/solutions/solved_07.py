@@ -41,6 +41,12 @@ class Translator:
             self.asm.instr("M=M+1")
             self.asm.instr("A=M-1")
             self.asm.instr(f"M={value}")
+        elif value == 2:
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=1")
+            self.asm.instr("M=M+1")
         else:
             self.asm.instr(f"@{value}")
             self.asm.instr("D=A")
