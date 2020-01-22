@@ -48,11 +48,8 @@ class Translator:
         self._binary("M-D")
 
     def neg(self):
-        # TODO: negate M in place, for a lot fewer instructions
         self.asm.start("neg")
-        self._pop_d()
-        self.asm.instr("D=-D")
-        self._push_d()
+        self._unary("-M")
 
     def and_op(self):
         self.asm.start("and")
@@ -63,11 +60,8 @@ class Translator:
         self._binary("D|M")
 
     def not_op(self):
-        # TODO: negate M in place, for a lot fewer instructions
         self.asm.start("not")
-        self._pop_d()
-        self.asm.instr("D=!D")
-        self._push_d()
+        self._unary("!M")
 
     def eq(self):
         # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
@@ -347,6 +341,11 @@ class Translator:
 
         self.asm.instr(f"M={op}")   
         
+    def _unary(self, op):
+        """Modify the top item on the stack without updating SP."""
+        self.asm.instr("@SP")
+        self.asm.instr("A=M-1")
+        self.asm.instr(f"M={op}")
 
     def _call(self):
         label = self.asm.next_label("call_common")
