@@ -48,6 +48,7 @@ class Translator:
             self.asm.instr("M=1")
             self.asm.instr("M=M+1")
         else:
+            # All other values use D for 6 instructions total:
             self.asm.instr(f"@{value}")
             self.asm.instr("D=A")
             self._push_d()
@@ -133,17 +134,29 @@ class Translator:
         self.asm.instr("M=D")
     
     def _pop_segment(self, segment_ptr, index):
-        # TODO: special-case small indexes
-        self.asm.instr(f"@{index}")
-        self.asm.instr("D=A")
-        self.asm.instr(f"@{segment_ptr}")
-        self.asm.instr("D=D+M")
-        self.asm.instr("@R15")
-        self.asm.instr("M=D")
-        self._pop_d()
-        self.asm.instr("@R15")
-        self.asm.instr("A=M")
-        self.asm.instr("M=D")
+        if index <= 6:
+            self._pop_d()
+            
+            self.asm.instr(f"@{segment_ptr}")
+            if index == 0:
+                self.asm.instr("A=M")
+            else:
+                self.asm.instr("A=M+1")
+                for _ in range(index-1):
+                    self.asm.instr("A=A+1")
+            self.asm.instr("M=D")
+            
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr("D=A")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("D=D+M")
+            self.asm.instr("@R15")
+            self.asm.instr("M=D")
+            self._pop_d()
+            self.asm.instr("@R15")
+            self.asm.instr("A=M")
+            self.asm.instr("M=D")
 
     def push_local(self, index):
         self.asm.start(f"push local {index}")
@@ -170,11 +183,25 @@ class Translator:
         
 
     def _push_segment(self, segment_ptr, index):
-        self.asm.instr(f"@{index}")
-        self.asm.instr("D=A")
-        self.asm.instr(f"@{segment_ptr}")
-        self.asm.instr("A=D+M")
-        self.asm.instr("D=M")
+        if index == 0:
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=M")
+            self.asm.instr("D=M")
+        elif index == 1:
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=M+1")
+            self.asm.instr("D=M")
+        elif index == 2:
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=M+1")
+            self.asm.instr("A=A+1")
+            self.asm.instr("D=M")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr("D=A")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=D+M")
+            self.asm.instr("D=M")
         self._push_d()
 
 
