@@ -292,6 +292,8 @@ class Translator:
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
                 
         # Push the return address
+        # Note: could save 2 instrs here by stashing it in R13, but then the common code 
+        # sequence would be longer and take more cycles, so not worht it?
         self.asm.instr(f"@{return_label}")
         self.asm.instr("D=A")
         self._push_d()
@@ -302,9 +304,14 @@ class Translator:
         self.asm.instr("@R14")
         self.asm.instr("M=D")
         
-        # D = num_args + 1
-        self.asm.instr(f"@{num_args+1}")
-        self.asm.instr("D=A")
+        # Tricky: choose a value that saves one instruction at each site when num_args is 2 or less,
+        # at the expense of two instructions at runtime for 1 or less.
+        # D = num_args - 1
+        if num_args <= 2:
+            self.asm.instr(f"D={num_args-1}")
+        else:
+            self.asm.instr(f"@{num_args-1}")
+            self.asm.instr("D=A")
 
         # Jump to the common implementation
         self.asm.instr(f"@{self.call_label}") 
@@ -388,7 +395,7 @@ class Translator:
     def _call(self):
         """Common sequence for all calls.
         
-        D = num_args + 1
+        D = num_args - 1
         R14 = callee address
         stack: return address already pushed
         """
@@ -398,9 +405,11 @@ class Translator:
         self.asm.start(f"call_common")
         self.asm.label(label)
 
-        # R15 = SP - (D+1) (which will be the new ARG)
+        # R15 = SP - (D + 2) (which will be the new ARG)
         self.asm.instr("@SP")
         self.asm.instr("D=M-D")
+        self.asm.instr("D=D-1")
+        self.asm.instr("D=D-1")
         self.asm.instr("@R15")
         self.asm.instr("M=D")
 
