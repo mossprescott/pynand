@@ -235,7 +235,7 @@ def test_nested_call():
     for i in range(261, 300):
         computer.poke(i, -1)
 
-    translate.asm.run(assemble, computer, stop_cycles=1000, debug=True)
+    translate.asm.run(assemble, computer, stop_cycles=4000, debug=True)
 
     assert computer.peek(0) == 261
     assert computer.peek(1) == 261
