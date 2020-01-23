@@ -293,7 +293,7 @@ class Translator:
                 
         # Push the return address
         # Note: could save 2 instrs here by stashing it in R13, but then the common code 
-        # sequence would be longer and take more cycles, so not worht it?
+        # sequence would be longer and take more cycles, so not worth it?
         self.asm.instr(f"@{return_label}")
         self.asm.instr("D=A")
         self._push_d()
@@ -325,29 +325,39 @@ class Translator:
         self.asm.instr("@SP")
         self.asm.instr("M=D")
 
-        self.call("Sys", "init", 0)  # TODO: don't need the full frame?
+        self.call("Sys", "init", 0)
 
 
     def _compare(self, op):
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
-        l1 = self.asm.next_label(f"{op.lower()}_common$1")
-        l2 = self.asm.next_label(f"{op.lower()}_common$2")
+        end_label = self.asm.next_label(f"{op.lower()}_common$end")
         self.asm.start(f"{op.lower()}_common")
         self.asm.label(label)
-        self.asm.instr("@R15")    # R15 = return address
+        self.asm.instr("@R15")    # R15 = D (the return address)
         self.asm.instr("M=D")
-        self._pop_d_m()           # EQ
+        
+        # D = top, M = second from top, SP -= 1 (not 2!)
+        self.asm.instr("@SP")
+        self.asm.instr("AM=M-1")
+        self.asm.instr("D=M")
+        self.asm.instr("A=A-1")
+
+        # Compare
         self.asm.instr("D=M-D")
-        self.asm.instr(f"@{l1}")
+        
+        # Set result True, optimistically (since A is already loaded with the destination)
+        self.asm.instr("M=-1")
+        
+        self.asm.instr(f"@{end_label}")
         self.asm.instr(f"D;J{op}")
-        self.asm.instr("D=0")
-        self.asm.instr(f"@{l2}")
-        self.asm.instr("0;JMP")
-        self.asm.label(l1)
-        self.asm.instr("D=-1")
-        self.asm.label(l2)
-        self._push_d()
+        
+        # Set result False
+        self.asm.instr("@SP")
+        self.asm.instr("A=M-1")
+        self.asm.instr("M=0")
+
+        self.asm.label(end_label)
         self.asm.instr("@R15")   # JMP to R15
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
@@ -366,14 +376,6 @@ class Translator:
         self.asm.instr("AM=M-1")
         self.asm.instr("D=M")
 
-    def _pop_d_m(self):
-        """Common sequence popping two values from the stack into D (top) and M (second from top)."""
-        self.asm.instr("@SP")
-        self.asm.instr("AM=M-1")
-        self.asm.instr("D=M")
-        self.asm.instr("@SP")
-        self.asm.instr("AM=M-1")
-        
     def _binary(self, op):
         """Pop two, combine, and push, but update SP only once."""
         self.asm.instr("@SP")
