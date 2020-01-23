@@ -130,7 +130,7 @@ class Translator:
         assert 0 <= index < 8
         self.asm.start(f"pop temp {index}")
         self._pop_d()
-        self.asm.instr(f"@{5+index}")
+        self.asm.instr(f"@R{5+index}")
         self.asm.instr("M=D")
     
     def _pop_segment(self, segment_ptr, index):
@@ -177,7 +177,7 @@ class Translator:
     def push_temp(self, index):
         assert 0 <= index < 8
         self.asm.start(f"push temp {index}")
-        self.asm.instr(f"@{5+index}")
+        self.asm.instr(f"@R{5+index}")
         self.asm.instr("D=M")
         self._push_d()
         
@@ -277,34 +277,33 @@ class Translator:
 
     def return_op(self):
         # A short sequence that jumps to the common impl, which costs only 2 instructions in ROM per
-        # use. Note: this is simple because it doesn't need to retun here.
+        # use. Note: this is simple because it doesn't need to return here.
         self.asm.start("return")
         self.asm.instr(f"@{self.return_label}")
         self.asm.instr("0;JMP")
 
 
     def call(self, class_name, function_name, num_args):
-        # TODO: pull out more common code here? There are two args: num_args and return address.
+        # Note: this is currently 13 instructions per occurrence, which is pretty heavy.
+        # Can it be shrunk more? Move more work into the common impl somehow?
         
         return_label = self.asm.next_label("RET_ADDRESS_CALL")
 
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
-        
-        # R15 = SP - num_args
-        self.asm.instr("@SP")
-        self.asm.instr("D=M")
-        self.asm.instr(f"@{num_args}")  # TODO: special-case 0 and 1
-        self.asm.instr("D=D-A")
-        self.asm.instr("@R15")
-        self.asm.instr("M=D")
-        
+                
         # Push the return address
         self.asm.instr(f"@{return_label}")
         self.asm.instr("D=A")
         self._push_d()
 
-        # D = callee address
+        # R14 = callee address
         self.asm.instr(f"@{class_name.lower()}.{function_name}")
+        self.asm.instr("D=A")
+        self.asm.instr("@R14")
+        self.asm.instr("M=D")
+        
+        # D = num_args + 1
+        self.asm.instr(f"@{num_args+1}")
         self.asm.instr("D=A")
 
         # Jump to the common implementation
@@ -387,15 +386,25 @@ class Translator:
         self.asm.instr(f"M={op}")
 
     def _call(self):
-        label = self.asm.next_label("call_common")
+        """Common sequence for all calls.
         
+        D = num_args + 1
+        R14 = callee address
+        stack: return address already pushed
+        """
+        
+        label = self.asm.next_label("call_common")
+
         self.asm.start(f"call_common")
         self.asm.label(label)
-        
-        # Note: ARG has already been stashed in R15 when arriving here.
-        self.asm.instr("@R14")    # R14 = callee
+
+        # R15 = SP - (D+1) (which will be the new ARG)
+        self.asm.instr("@SP")
+        self.asm.instr("D=M-D")
+        self.asm.instr("@R15")
         self.asm.instr("M=D")
 
+        # push four segment pointers:
         self.asm.instr("@LCL")
         self.asm.instr("D=M")
         self._push_d()
@@ -408,7 +417,7 @@ class Translator:
         self.asm.instr("@THAT")
         self.asm.instr("D=M")
         self._push_d()
-        
+
         # LCL = SP
         # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
         # state of the segment pointers consistent after each opcode, so it's easier to debug.
@@ -416,14 +425,15 @@ class Translator:
         self.asm.instr("D=M")
         self.asm.instr("@LCL")
         self.asm.instr("M=D")
-        
+
         # ARG = R15
         self.asm.instr("@R15")
         self.asm.instr("D=M")
         self.asm.instr("@ARG")
         self.asm.instr("M=D")
 
-        self.asm.instr("@R14")   # JMP to R15 (the callee)
+        # JMP to R14 (the callee)
+        self.asm.instr("@R14")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
         return label
