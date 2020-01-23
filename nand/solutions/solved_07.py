@@ -304,13 +304,11 @@ class Translator:
         self.asm.instr("@R14")
         self.asm.instr("M=D")
         
-        # Tricky: choose a value that saves one instruction at each site when num_args is 2 or less,
-        # at the expense of two instructions at runtime for 1 or less.
-        # D = num_args - 1
-        if num_args <= 2:
-            self.asm.instr(f"D={num_args-1}")
+        # D = num_args
+        if num_args <= 1:
+            self.asm.instr(f"D={num_args}")
         else:
-            self.asm.instr(f"@{num_args-1}")
+            self.asm.instr(f"@{num_args}")
             self.asm.instr("D=A")
 
         # Jump to the common implementation
@@ -395,7 +393,7 @@ class Translator:
     def _call(self):
         """Common sequence for all calls.
         
-        D = num_args - 1
+        D = num_args
         R14 = callee address
         stack: return address already pushed
         """
@@ -408,7 +406,6 @@ class Translator:
         # R15 = SP - (D + 2) (which will be the new ARG)
         self.asm.instr("@SP")
         self.asm.instr("D=M-D")
-        self.asm.instr("D=D-1")
         self.asm.instr("D=D-1")
         self.asm.instr("@R15")
         self.asm.instr("M=D")
