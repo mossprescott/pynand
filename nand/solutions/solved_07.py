@@ -381,8 +381,7 @@ class Translator:
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")  # update SP
         self.asm.instr("D=M")     # D = top
-        self.asm.instr("@SP")
-        self.asm.instr("A=M-1")   # Don't update SP again
+        self.asm.instr("A=A-1")   # Don't update SP again
 
         self.asm.instr(f"M={op}")   
         
