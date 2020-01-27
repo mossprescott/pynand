@@ -1,3 +1,5 @@
+import os
+
 from nand.codegen import print_lines
 
 class AssemblySource:
@@ -11,7 +13,7 @@ class AssemblySource:
         self.instruction_count = 0
         self.lines = []
         self.src_map = {}
-    
+        
 
     def next_label(self, name):
         """Generate a unique label starting with `name`.
@@ -73,6 +75,12 @@ class AssemblySource:
         asm = assembler(self)
         computer.init_rom(asm)
 
+        SP = 0
+        LCL = 1
+        ARG = 2
+        THIS = 3
+        THAT = 4
+
         def print_state():
             tmp = [str(computer.peek(i)) for i in range(5, 13)]
             gpr = [str(computer.peek(i)) for i in range(13, 16)]
@@ -100,9 +108,12 @@ class AssemblySource:
             computer.ticktock()
         print_state()
 
-        
-SP = 0
-LCL = 1
-ARG = 2
-THIS = 3
-THAT = 4
+
+def translate_dir(translator, handle_line, dir_path):
+    for fn in os.listdir(dir_path):
+        if fn.endswith(".vm"):
+            print(f"// Loading VM source: {fn}")
+            with open(f"{dir_path}/{fn}", mode='r') as f:
+                for l in f:
+                    handle_line(translator, l)
+
