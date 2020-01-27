@@ -78,8 +78,8 @@ class Translator:
         self._unary("!M")
 
     def eq(self):
-        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
-        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions
+        # per ocurrence as opposed to about 11. On the other hand, this is 20 instructions at runtime.
         return_label = self.asm.next_label("eq_return")
         self.asm.start("eq")
         self.asm.instr(f"@{return_label}")
@@ -89,8 +89,8 @@ class Translator:
         self.asm.label(return_label)
 
     def lt(self):
-        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
-        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions
+        # per ocurrence as opposed to about 11. On the other hand, this is 20 instructions at runtime.
         return_label = self.asm.next_label("lt_return")
         self.asm.start("lt")
         self.asm.instr(f"@{return_label}")
@@ -100,8 +100,8 @@ class Translator:
         self.asm.label(return_label)
 
     def gt(self):
-        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions,
-        # as opposed to 20 or more (which could probaby be reduced to more like 16).
+        # A short sequence that jumps to the common impl and returns, which costs only 4 instructions
+        # per ocurrence as opposed to about 11. On the other hand, this is 20 instructions at runtime.
         return_label = self.asm.next_label("gt_return")
         self.asm.start("gt")
         self.asm.instr(f"@{return_label}")
