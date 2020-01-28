@@ -503,29 +503,39 @@ class Translator:
 def translate_line(translate, line):
     """Parse a line of VM source, and invoke a translator to handle it.
     
-    Note: this is the absolutely the dumbest possible parser, not dealing with 
     """
     
+    op, args = parse_line(line)
+    translate.__getattribute__(op)(*args)
+
+
+def parse_line(line):
+    """Parse a line into a tuple (op_code, [args]).
+
+    Note: this is the absolutely the dumbest possible parser, not doing any real validation or
+    imposing any structure at all, but munging the input into a shape that fits Translator.
+    """
+
     words = line.strip().split(' ')
     if len(words) == 0:
         pass
     elif words[0] == "function":
         c, f = words[1].split('.')
-        translate.function(c, f, int(words[2]))
+        return "function", (c, f, int(words[2]),)
     elif words[0] == "call":
         c, f = words[1].split('.')
-        translate.call(c, f, int(words[2]))
+        return "call", (c, f, int(words[2]),)
     elif words[0] in ("label", "goto", "if-goto"):
-        translate.__getattribute__(words[0].replace('-', '_'))(words[1])
+        return words[0].replace('-', '_'), (words[1],)
     elif words[0] in ("push", "pop"):
         name = '_'.join(words[:-1])
         index = int(words[-1])
-        translate.__getattribute__(name)(index)
+        return name, (index,)
     elif len(words) == 1:
         if words[0] in ("and", "or", "not", "return"):
-            translate.__getattribute__(words[0] + "_op")()
+            return words[0] + "_op", ()
         else:
-            translate.__getattribute__(words[0])()
+            return words[0], ()
     else:
         raise Exception(f"Unable to translate: {line}")
     
