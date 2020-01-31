@@ -500,15 +500,16 @@ class Translator:
         return label
 
 
-def translate_line(translate, line):
-    """Parse a line of VM source, and invoke a translator to handle it.
-    
-    """
-    
-    op, args = parse_line(line)
-    translate.__getattribute__(op)(*args)
-
-
+    def rewrite_ops(self, ops):
+        """Rewrite patterns of ops for which a more efficient sequence is available, say by
+        using an op that isn't part of the VM's external specification.
+        
+        Expected to be called with large, coherent chunks of ops; at least an entire function
+        at a time, or maybe a file at a time.
+        """
+        
+        return ops
+        
 def parse_line(line):
     """Parse a line into a tuple (op_code, [args]).
 

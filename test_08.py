@@ -7,6 +7,10 @@ from project_06 import assemble
 from project_08 import *
 
 
+# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
+# coverage, but they don't isolate problems well for debugging.
+
+
 def test_basic_loop():
     translate = Translator()
     

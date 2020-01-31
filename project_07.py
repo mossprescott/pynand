@@ -146,7 +146,18 @@ class Translator:
         # SOLVERS: implement
         return self.solved.push_static(index)
 
+    
+    #
+    # (Optional) Optimization:
+    #
+    def rewrite_ops(self, ops):
+        # SOLVERS: ignore for now. This is a hook to allow the Translator to inspect and modify the 
+        # opcode sequence before it is translated, in case a "better" equivalent sequence is possible.
+        return ops
 
-def translate_line(translator, line):
-    # SOLVERS: parse one line of VM source, using the methods of Translator to handle the opcode, if any
-    solved_07.translate_line(translator, line)
+
+def parse_line(line):
+    # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of 
+    # the method of Translator which handls the opcode, and a sequence with any arguments. 
+    # E.g. ("push_constant", [1])
+    return solved_07.parse_line(line)

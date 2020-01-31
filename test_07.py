@@ -7,6 +7,10 @@ from project_06 import assemble
 from project_07 import *
 
 
+# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
+# coverage, but they don't isolate problems well for debugging.
+
+
 def test_simple_add():
     translate = Translator()
 
@@ -203,3 +207,6 @@ def test_memory_access_static():
     translate.asm.run(assemble, computer, debug=True)
 
     assert computer.peek(256) == 1110
+
+
+# TODO: tests for parse_line
