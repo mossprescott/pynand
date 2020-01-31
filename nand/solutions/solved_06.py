@@ -129,11 +129,15 @@ def assemble(lines):
     ops = []
     next_variable = 16
     for line in code_lines:
-        if "(" not in line:
+        if "(" in line:
+            pass
+        else:
             m = re.match(r"@(\D.*)", line)
             if m:
                 symbol_str = m.group(1)
                 if symbol_str not in symbols:
+                    # TODO: capture these for testing (i.e. checking for bad references)
+                    # print(f"Allocated static: {symbol_str}; {next_variable}")
                     symbols[symbol_str] = next_variable
                     next_variable += 1
                 ops.append(symbols[symbol_str])
