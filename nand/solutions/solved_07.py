@@ -513,7 +513,7 @@ class Translator:
 def parse_line(line):
     """Parse a line into a tuple (op_code, [args]).
 
-    Note: this is the absolutely the dumbest possible parser, not doing any real validation or
+    Note: this is absolutely the dumbest possible parser, not doing any real validation or
     imposing any structure at all, but munging the input into a shape that fits Translator.
     """
 
