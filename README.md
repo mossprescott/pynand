@@ -45,6 +45,10 @@ Note: the awesomeness starts after about 5 million cycles.
 
 ![Pong screenshot](examples/Pong.png)
 
+You can also run VM programs with `python vm.py [dir]`, but for the time being you'll have to 
+find your own. Tip: download the nand2tetris tools and use the included Jack compiler to generate
+".vm" files, and use the included "OS" implementation.
+
 
 ## Step 3: Go Further
 
