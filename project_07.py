@@ -158,6 +158,6 @@ class Translator:
 
 def parse_line(line):
     # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of 
-    # the method of Translator which handls the opcode, and a sequence with any arguments. 
-    # E.g. ("push_constant", [1])
+    # the method of Translator which handles the opcode, and a sequence with any arguments. 
+    # E.g. ("push_constant", [1]), ("add", []), ("function", ["Main", "main", 2])
     return solved_07.parse_line(line)
