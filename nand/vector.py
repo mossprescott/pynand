@@ -558,7 +558,7 @@ class NandVectorComputerWrapper(NandVectorWrapper):
 
         # The ROM size limits the size of program that can run, not to mention, e.g. the format of 
         # instructions used to load jump targets.
-        rom_max = 2**self._rom.address_bits
+        rom_max = 2**self._rom.comp.address_bits
         if size >= rom_max:
             raise Exception(f"Too many instructions: {size:0,d} >= {rom_max:0,d}")
             
