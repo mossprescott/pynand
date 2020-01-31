@@ -1,0 +1,16 @@
+function Main.main 1
+push constant 1
+call Screen.setColor 1
+pop temp 0
+push constant 10
+push constant 20
+push constant 30
+push constant 40
+call Screen.drawRectangle 4
+pop temp 0
+push constant 100
+push constant 200
+push constant 20
+call Screen.drawCircle 3
+pop temp 0
+return
