@@ -8,7 +8,7 @@ directly in Python:
 - Nand, of course
 - common 1-bit functions: Not, And, Or
 - common 16-bit functions: Not16, And16, Add16, Inc16, Mux16
-- one oddball: Zero16 (which could be generalized to Eq16)
+- a couple of oddballs: Zero16 (which could be generalized to Eq16), Neg16
 - Register
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
@@ -55,7 +55,7 @@ def translate(ic):
     class_name, lines = generate_python(ic)
     
     # print(ic)
-    # print_lines(lines)
+    print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
@@ -66,7 +66,7 @@ def translate(ic):
 
 PRIMITIVES = set([
     "Nand",
-    "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
+    "Not16", "And16", "Add16", "Mux16", "Zero16", "Neg16",  # These are enough for the ALU
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
     "MemorySystem",  # Needed for Computer
@@ -196,6 +196,8 @@ def generate_python(ic, inline=True):
             return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
+        elif comp.label == 'Neg16':
+            return unary16(comp, "{} < 0")
         elif comp.label == 'Inc16':
             return None
         elif comp.label == 'DMux':
@@ -308,7 +310,7 @@ def generate_python(ic, inline=True):
         if isinstance(comp, DFF):
             l(4, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Neg16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
