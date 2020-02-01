@@ -408,10 +408,13 @@ class SOC(Chip):
         if size >= 2**15:
             raise Exception(f"Too many instructions: {size:0,d} >= {2**15:0,d}")
             
-        self._rom = instructions + [
+        contents = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
         ]
+        self._rom = contents
+        # TODO: surprisingly, this is not faster (no apparent effect):
+        # self._rom = array.array('H', contents)
 
     def reset_program(self):
         """Reset the PC to 0, so that the program will continue execution as if from startup.
