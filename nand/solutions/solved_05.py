@@ -60,12 +60,11 @@ def mkCPU(inputs, outputs):
     alu = lazy()
     a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
     d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
+    jump_lt = And(a=alu.ng, b=jlt).out
+    jump_eq = And(a=alu.zr, b=jeq).out
+    jump_gt = And(a=And(a=Not(in_=alu.ng).out, b=Not(in_=alu.zr).out).out, b=jgt).out
     jump = And(a=i,
-               b=Or(a=     And(a=alu.ng, b=jlt).out,                      # lt
-                    b=Or(a=And(a=alu.zr, b=jeq).out,                      # eq
-                         b=And(a=And(a=Not(in_=alu.ng).out, b=Not(in_=alu.zr).out).out, b=jgt).out  # gt
-                         ).out
-                    ).out
+               b=Or(a=jump_lt, b=Or(a=jump_eq, b=jump_gt).out).out
               ).out
     pc = PC(in_=a_reg.out, load=jump, inc=1, reset=reset)
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
