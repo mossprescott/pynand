@@ -517,9 +517,9 @@ def parse_line(line):
     imposing any structure at all, but munging the input into a shape that fits Translator.
     """
 
-    words = line.strip().split(' ')
-    if len(words) == 0:
-        pass
+    words = line.strip().split()
+    if not words:
+        return None
     elif words[0] == "function":
         c, f = words[1].split('.')
         return "function", (c, f, int(words[2]),)
