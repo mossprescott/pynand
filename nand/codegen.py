@@ -195,7 +195,14 @@ def generate_python(ic, inline=True):
         elif comp.label == 'Add16':
             return None
         elif comp.label == 'Mux16':
-            return binary16(comp, f"{{b}} if {src_one(comp, 'sel')} else {{a}}")
+            sel = src_one(comp, 'sel')
+            # TODO: simplify the IC to eliminate these constants instead
+            if sel == 0:
+                return src_many(comp, 'a')
+            elif sel == 1:
+                return src_many(comp, 'b')
+            else:
+                return binary16(comp, f"{{b}} if {sel} else {{a}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
         elif comp.label == 'Neg16':
@@ -316,10 +323,13 @@ def generate_python(ic, inline=True):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
-            # l(4, f"print('register: {all_comps.index(comp)}')")  # HACK
-            l(4, f"if {src_one(comp, 'load')}:")
-            l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
-            # l(5,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+            load = src_one(comp, 'load')
+            # TODO: simplify the IC to eliminate these constants instead
+            if load == 1:
+                l(4, f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
+            else:
+                l(4, f"if {load}:")
+                l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             any_state = True
         elif comp.label == "MemorySystem":
             # Note: the source of address better not be a big computation. At the moment it's always 
