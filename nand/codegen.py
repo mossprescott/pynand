@@ -191,13 +191,13 @@ def generate_python(ic, inline=True):
         elif comp.label == 'And16':
             return binary16(comp, "{} & {}")
         elif comp.label == 'Add16':
-            return binary16(comp, "extend_sign({} + {})")
+            return None
         elif comp.label == 'Mux16':
             return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
         elif comp.label == 'Inc16':
-            return unary16(comp, "extend_sign({} + 1)")
+            return None
         elif comp.label == 'DMux':
             return None  # note: multiple outputs doesn't really inline
         elif comp.label == 'DMux8Way':
@@ -236,19 +236,14 @@ def generate_python(ic, inline=True):
     l(0, "")
 
     l(1, f"def _eval(self, update_state):")
-    l(2,   "def extend_sign(x):")
-    l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
         elif comp.label == "Register":
             pass
         elif isinstance(comp, ROM):
-            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
-            l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
-            l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
-            l(2, f"else:")
-            l(3,   f"{output_name(comp)} = 0")
+            # TODO: trap index errors with try/except
+            l(2, f"{output_name(comp)} = self._rom[{src_many(comp, 'address', comp.address_bits)}]")
         elif comp.label == "DMux":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
@@ -284,6 +279,15 @@ def generate_python(ic, inline=True):
             l(3,   f"{out_name} = {src_many(comp, 'g')}")
             l(2, f"elif {sel_name} == 7:")
             l(3,   f"{out_name} = {src_many(comp, 'h')}")
+        elif comp.label == "Add16":
+            out_name = output_name(comp)
+            l(2, f"{out_name} = {src_many(comp, 'a')} + {src_many(comp, 'b')}")
+            l(2, f"if {out_name} < -32768: {out_name} += 65536")
+            l(2, f"if {out_name} > 32767: {out_name} -= 65536")
+        elif comp.label == "Inc16":
+            out_name = output_name(comp)
+            l(2, f"{out_name} = {src_many(comp, 'in_')} + 1")
+            l(2, f"if {out_name} > 32767: {out_name} -= 65536")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
