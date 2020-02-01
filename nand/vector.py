@@ -555,6 +555,13 @@ class NandVectorComputerWrapper(NandVectorWrapper):
         """
 
         size = len(instructions)
+
+        # The ROM size limits the size of program that can run, not to mention, e.g. the format of 
+        # instructions used to load jump targets.
+        rom_max = 2**self._rom.comp.address_bits
+        if size >= rom_max:
+            raise Exception(f"Too many instructions: {size:0,d} >= {rom_max:0,d}")
+            
         prg = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP

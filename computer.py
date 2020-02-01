@@ -18,7 +18,7 @@ import sys
 import time
 
 import nand.component
-from nand.syntax import run
+import nand.syntax
 import project_05
 import project_06
 
@@ -27,9 +27,15 @@ EVENT_INTERVAL = 1/10
 DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
 CYCLE_INTERVAL = 1.0
 
+
+def main():
+    with open(sys.argv[1], mode='r') as f:
+        prg = project_06.assemble(f)
+    run(prg)
+
+
 COLORS = [0xFFFFFF, 0x000000]
 """0: White, 1: Black, as it was meant to be."""
-
 
 # "Recognizes all ASCII characters, as well as the following keys: 
 # newline (128=String.newline()), backspace (129=String.backspace()), 
@@ -101,12 +107,9 @@ class KVM:
         pygame.display.flip()
 
 
-def main():
-    with open(sys.argv[1], mode='r') as f:
-        prg = project_06.load_file(f)
-
-    computer = run(project_05.Computer, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
-    computer.init_rom(prg)
+def run(program, src_map=None):
+    computer = nand.syntax.run(project_05.Computer, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
+    computer.init_rom(program)
     
     kvm = KVM(sys.argv[1], 512, 256)
 
@@ -116,6 +119,11 @@ def main():
     while True:
         computer.ticktock(); cycles += 1
 
+        op = src_map.get(computer.pc) if src_map else None
+        if op and op.startswith("call") and (
+            'Screen' in op or 'Main' in op or 'init' in op):
+            print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
+        
         # Note: check the time only every few frames to reduce the overhead of timing
         if cycles % 10 == 0:
             now = time.monotonic()

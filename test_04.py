@@ -1,7 +1,7 @@
 from nand import run, unsigned
 # Note: using the included implementations, so you can work on the projects in any order
 from nand.solutions.solved_05 import Computer
-from nand.solutions.solved_06 import load_file
+from nand.solutions.solved_06 import assemble
 
 from project_04 import *
 
@@ -9,7 +9,7 @@ from project_04 import *
 def test_mult():
     computer = run(Computer)
 
-    computer.init_rom(load_file(MULT_ASM))
+    computer.init_rom(assemble(MULT_ASM))
 
     computer.poke(2, -1)
     for _ in range(20):
@@ -60,7 +60,7 @@ def test_fill():
     # We're going to run a few million cycles, so the faster simulator is a better option:
     computer = run(Computer, simulator='codegen')
 
-    computer.init_rom(load_file(FILL_ASM))
+    computer.init_rom(assemble(FILL_ASM))
 
     computer.set_keydown(0)  # the keyboard is untouched
     for _ in range(1_000_000):

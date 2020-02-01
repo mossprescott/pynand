@@ -1,3 +1,5 @@
+import pytest
+
 from nand import DFF, run, gate_count
 from project_03 import *
 
@@ -70,29 +72,21 @@ def test_my_dff_legit():
     """The challenge is to implement DFF with only Nand gates."""
     assert list(gate_count(MyDFF).keys()) == ['nands']
 
-def test_my_dff_coarse():
-    # Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-    # raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
-    # work, but it seems like this exercise might need to be dropped.
-    dff = run(MyDFF, optimize=False)
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# work, but it seems like this exercise might need to be dropped.
+@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
+def test_dff_coarse(dff_type, opt):
+    dff = run(dff_type, optimize=opt)
     dff_coarse_test(dff)
 
-def test_my_dff_fine():
-    # Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-    # raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
-    # work, but it seems like this exercise might need to be dropped.
-    dff = run(MyDFF, optimize=False)
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# work, but it seems like this exercise might need to be dropped.
+@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
+def test_dff_fine(dff_type, opt):
+    dff = run(dff_type, optimize=opt)
     dff_fine_test(dff)
-
-
-def test_dff_coarse():
-    dff = run(DFF)
-    dff_coarse_test(dff)
-
-def test_dff_fine():
-    dff = run(DFF)
-    dff_fine_test(dff)
-
 
 
 def test_bit_coarse():
@@ -247,19 +241,19 @@ def test_ram512():
     ram_test(ram, 512)
 
 
-# This is still just too darn slow (almost 5 minutes.)
 # TODO: fix flattening and synthesis so this isn't so slow; the time's probably
 # actually not in codegen or execution.
-#
-# def test_ram4k_legit():
-#     """The challenge is to implement RAM4K from Registers."""
-#     assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
-#
-# def test_ram4k():
-#     # Gate-level simulation is annoyingly slow for this large chip, so use the less
-#     # exacting but much more efficient codegen simulator:
-#     ram = run(RAM4K, simulator='codegen')
-#     ram_test(ram, 4096)
+@pytest.mark.skip(reason="This is just too slow (about 40s.)")
+def test_ram4k_legit():
+    """The challenge is to implement RAM4K from Registers."""
+    assert gate_count(RAM4K).keys() == set(['nands', 'dffs'])
+
+@pytest.mark.skip(reason="This is just too slow (almost 5 minutes.)")
+def test_ram4k():
+    # Gate-level simulation is annoyingly slow for this large chip, so use the less
+    # exacting but much more efficient codegen simulator:
+    ram = run(RAM4K, simulator='codegen')
+    ram_test(ram, 4096)
 
 
 def test_ram16k_legit():

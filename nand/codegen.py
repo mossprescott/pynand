@@ -398,6 +398,11 @@ class SOC(Chip):
         """
     
         size = len(instructions)
+
+        # Assuming a 15-bit ROM, as we do here, we can't address more than 32K of instructions:
+        if size >= 2**15:
+            raise Exception(f"Too many instructions: {size:0,d} >= {2**15:0,d}")
+            
         self._rom = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP

@@ -18,7 +18,7 @@ def parse_op(string):
     return instr
 
 
-def load_file(f):
+def assemble(lines):
     """Load the lines of file and parse them as assembly commands, accounting for
     builtin symbols, labels, and variables.
 
@@ -29,4 +29,4 @@ def load_file(f):
 
     # SOLVERS: replace this with code to parse a sequence of lines, using parse_op 
     # to handle the individual instructions found within it.
-    return solved_06.load_file(f)
+    return solved_06.assemble(lines)

@@ -97,8 +97,8 @@ def parse_op(string):
             raise Exception(f"unrecognized: {line}")
 
 
-def load_file(f):
-    """Load the lines of file and parse them as assembly commands, accounting for
+def assemble(lines):
+    """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
     
     "//" denotes a comment and is ignored, along with the remainder of the line.
@@ -107,7 +107,7 @@ def load_file(f):
     """
     
     code_lines = []
-    for line in f:
+    for line in lines:
         m = re.match(r"([^/]*)(?://.*)?", line)
         if m:
             string = m.group(1).strip()
@@ -129,11 +129,15 @@ def load_file(f):
     ops = []
     next_variable = 16
     for line in code_lines:
-        if "(" not in line:
+        if "(" in line:
+            pass
+        else:
             m = re.match(r"@(\D.*)", line)
             if m:
                 symbol_str = m.group(1)
                 if symbol_str not in symbols:
+                    # TODO: capture these for testing (i.e. checking for bad references)
+                    # print(f"Allocated static: {symbol_str}; {next_variable}")
                     symbols[symbol_str] = next_variable
                     next_variable += 1
                 ops.append(symbols[symbol_str])
