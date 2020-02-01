@@ -169,33 +169,33 @@ def generate_python(ic, inline=True):
         return template.format(src_one(comp, 'in_'))
 
     def binary1(comp, template):
-        return template.format(src_one(comp, 'a'), src_one(comp, 'b'))
+        return template.format(a=src_one(comp, 'a'), b=src_one(comp, 'b'))
 
     def unary16(comp, template, bits=None):
         return template.format(src_many(comp, 'in_', bits))
         
     def binary16(comp, template):
-        return template.format(src_many(comp, 'a'), src_many(comp, 'b'))
+        return template.format(a=src_many(comp, 'a'), b=src_many(comp, 'b'))
 
     def component_expr(comp):
         if isinstance(comp, Nand):
-            return binary1(comp, "not ({} and {})")
+            return binary1(comp, "not ({a} and {b})")
         elif isinstance(comp, Const):
             return None
         elif comp.label == 'Not':
             return unary1(comp, "not {}")
         elif comp.label == 'And':
-            return binary1(comp, "{} and {}")
+            return binary1(comp, "{a} and {b}")
         elif comp.label == 'Or':
-            return binary1(comp, "{} or {}")
+            return binary1(comp, "{a} or {b}")
         elif comp.label == 'Not16':
             return unary16(comp, "~{}")
         elif comp.label == 'And16':
-            return binary16(comp, "{} & {}")
+            return binary16(comp, "{a} & {b}")
         elif comp.label == 'Add16':
             return None
         elif comp.label == 'Mux16':
-            return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
+            return binary16(comp, f"{{b}} if {src_one(comp, 'sel')} else {{a}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
         elif comp.label == 'Neg16':
