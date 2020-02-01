@@ -132,7 +132,9 @@ def generate_python(ic, inline=True):
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
         if conn.bit != 0 or any(c.comp == conn.comp and c.name == conn.name and c.bit != 0 for c in ic.wires.values()):
-            return f"({value} & {hex(1 << conn.bit)} != 0)"
+            # Note: assuming the value is used as a condition and not actually comparing with 0
+            # saves ~5%. But could be dangerous?
+            return f"({value} & {hex(1 << conn.bit)})"
         elif conn.comp.label == "Register":
             raise Exception("TODO: unexpected wiring for 1-bit component")
         else:
