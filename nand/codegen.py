@@ -235,7 +235,8 @@ def generate_python(ic, inline=True):
             l(2, f"self.{output_name(comp)} = False  # dff")
     l(0, "")
 
-    l(1, f"def _eval(self, update_state):")
+    l(1, f"def _eval(self, update_state, cycles=1):")
+    l(2,   f"for _ in range(cycles):")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
@@ -243,96 +244,96 @@ def generate_python(ic, inline=True):
             pass
         elif isinstance(comp, ROM):
             # TODO: trap index errors with try/except
-            l(2, f"{output_name(comp)} = self._rom[{src_many(comp, 'address', comp.address_bits)}]")
+            l(3, f"{output_name(comp)} = self._rom[{src_many(comp, 'address', comp.address_bits)}]")
         elif comp.label == "DMux":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
-            l(2, f"{in_name} = {src_one(comp, 'in_')}")
-            l(2, f"{sel_name} = {src_one(comp, 'sel')}")
-            l(2, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
-            l(2, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
+            l(3, f"{in_name} = {src_one(comp, 'in_')}")
+            l(3, f"{sel_name} = {src_one(comp, 'sel')}")
+            l(3, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
+            l(3, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
         elif comp.label == "DMux8Way":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
-            l(2, f"{in_name} = {src_one(comp, 'in_')}")
-            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(3, f"{in_name} = {src_one(comp, 'in_')}")
+            l(3, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
             for i, c in enumerate("abcdefgh"):
-                l(2, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
+                l(3, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
         elif comp.label == "Mux8Way16":
             # TODO: this could be flattened to one expression and/or inlined
             sel_name = f"_{all_comps.index(comp)}_sel"
             out_name = f"_{all_comps.index(comp)}_out"
-            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
-            l(2, f"if {sel_name} == 0:")
-            l(3,   f"{out_name} = {src_many(comp, 'a')}")
-            l(2, f"elif {sel_name} == 1:")
-            l(3,   f"{out_name} = {src_many(comp, 'b')}")
-            l(2, f"elif {sel_name} == 2:")
-            l(3,   f"{out_name} = {src_many(comp, 'c')}")
-            l(2, f"elif {sel_name} == 3:")
-            l(3,   f"{out_name} = {src_many(comp, 'd')}")
-            l(2, f"elif {sel_name} == 4:")
-            l(3,   f"{out_name} = {src_many(comp, 'e')}")
-            l(2, f"elif {sel_name} == 5:")
-            l(3,   f"{out_name} = {src_many(comp, 'f')}")
-            l(2, f"elif {sel_name} == 6:")
-            l(3,   f"{out_name} = {src_many(comp, 'g')}")
-            l(2, f"elif {sel_name} == 7:")
-            l(3,   f"{out_name} = {src_many(comp, 'h')}")
+            l(3, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(3, f"if {sel_name} == 0:")
+            l(4,   f"{out_name} = {src_many(comp, 'a')}")
+            l(3, f"elif {sel_name} == 1:")
+            l(4,   f"{out_name} = {src_many(comp, 'b')}")
+            l(3, f"elif {sel_name} == 2:")
+            l(4,   f"{out_name} = {src_many(comp, 'c')}")
+            l(3, f"elif {sel_name} == 3:")
+            l(4,   f"{out_name} = {src_many(comp, 'd')}")
+            l(3, f"elif {sel_name} == 4:")
+            l(4,   f"{out_name} = {src_many(comp, 'e')}")
+            l(3, f"elif {sel_name} == 5:")
+            l(4,   f"{out_name} = {src_many(comp, 'f')}")
+            l(3, f"elif {sel_name} == 6:")
+            l(4,   f"{out_name} = {src_many(comp, 'g')}")
+            l(3, f"elif {sel_name} == 7:")
+            l(4,   f"{out_name} = {src_many(comp, 'h')}")
         elif comp.label == "Add16":
             out_name = output_name(comp)
-            l(2, f"{out_name} = {src_many(comp, 'a')} + {src_many(comp, 'b')}")
-            l(2, f"if {out_name} < -32768: {out_name} += 65536")
-            l(2, f"if {out_name} > 32767: {out_name} -= 65536")
+            l(3, f"{out_name} = {src_many(comp, 'a')} + {src_many(comp, 'b')}")
+            l(3, f"if {out_name} < -32768: {out_name} += 65536")
+            l(3, f"if {out_name} > 32767: {out_name} -= 65536")
         elif comp.label == "Inc16":
             out_name = output_name(comp)
-            l(2, f"{out_name} = {src_many(comp, 'in_')} + 1")
-            l(2, f"if {out_name} > 32767: {out_name} -= 65536")
+            l(3, f"{out_name} = {src_many(comp, 'in_')} + 1")
+            l(3, f"if {out_name} > 32767: {out_name} -= 65536")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
-                l(2, f"{output_name(comp)} = {expr}")
+                l(3, f"{output_name(comp)} = {expr}")
             else:
                 raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
         if bits == 1:
-            l(2, f"self._{name} = {src_one(root, name)}")
+            l(3, f"self._{name} = {src_one(root, name)}")
         else:
-            l(2, f"self._{name} = {src_many(root, name, bits)}")
+            l(3, f"self._{name} = {src_many(root, name, bits)}")
 
-    l(2, "if update_state:")
+    l(3, "if update_state:")
     any_state = False
     for comp in all_comps:
         if isinstance(comp, DFF):
-            l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
+            l(4, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
         elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
-            # l(3, f"print('register: {all_comps.index(comp)}')")  # HACK
-            l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
-            # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+            # l(4, f"print('register: {all_comps.index(comp)}')")  # HACK
+            l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
+            # l(5,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
             any_state = True
         elif comp.label == "MemorySystem":
             # Note: the source of address better not be a big computation. At the moment it's always 
             # register A (so, saved in self)
             address_expr = src_many(comp, 'address', 14)
             in_name = f"_{all_comps.index(comp)}_in"
-            l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"{in_name} = {src_many(comp, 'in_')}")
-            l(4,   f"if 0 <= {address_expr} < 0x4000:")
-            l(5,     f"self._ram[{address_expr}] = {in_name}")
-            l(4,   f"elif 0x4000 <= {address_expr} < 0x6000:")
-            l(5,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"{in_name} = {src_many(comp, 'in_')}")
+            l(5,   f"if 0 <= {address_expr} < 0x4000:")
+            l(6,     f"self._ram[{address_expr}] = {in_name}")
+            l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
+            l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
             any_state = True
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
     if not any_state:
-        l(3,   "pass")
+        l(4,   "pass")
     l(0, "")
     
     for name in ic.inputs():
@@ -377,9 +378,9 @@ class Chip:
         """Lower the clock, causing clocked chips to assume their new values."""
         self._eval(True)
         
-    def ticktock(self):
+    def ticktock(self, cycles=1):
         """Equivalent to tick(); tock()."""
-        self._eval(True)
+        self._eval(True, cycles)
 
 
 class SOC(Chip):

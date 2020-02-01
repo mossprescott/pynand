@@ -25,7 +25,9 @@ import project_06
 
 EVENT_INTERVAL = 1/10
 DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
-CYCLE_INTERVAL = 1.0
+CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so it doesn't bounce around too much
+
+CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
 def main():
@@ -117,15 +119,20 @@ def run(program, src_map=None):
     
     last_cycle_count = cycles = 0
     while True:
-        computer.ticktock(); cycles += 1
+        if not src_map:
+            computer.ticktock(CYCLES_PER_CALL)
+            cycles += CYCLES_PER_CALL
+            
+        else:
+            computer.ticktock(); cycles += 1
 
-        op = src_map.get(computer.pc) if src_map else None
-        if op and op.startswith("call") and (
-            'Screen' in op or 'Main' in op or 'init' in op):
-            print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
+            op = src_map.get(computer.pc) if src_map else None
+            if op and op.startswith("call") and (
+                'Screen' in op or 'Main' in op or 'init' in op):
+                print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
         
         # Note: check the time only every few frames to reduce the overhead of timing
-        if cycles % 10 == 0:
+        if cycles % CYCLES_PER_CALL == 0:
             now = time.monotonic()
         
             # A few times per second, process events and update the display:
