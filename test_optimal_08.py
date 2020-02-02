@@ -10,6 +10,7 @@ from project_08 import Translator
 # from nand.translate import AssemblySource
 # from nand.solutions import solved_07
 
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_code_size_pong():
     """A simple translator will work for small programs, but won't be able to fit a real program in the ROM."""
 
@@ -28,6 +29,7 @@ def test_code_size_pong():
     assert translate.asm.instruction_count <= 2**15
 
 
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_cycles_to_init():
     """Count the number of cycles executed before Main.main is called."""
 
