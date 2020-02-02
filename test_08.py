@@ -134,7 +134,7 @@ def test_simple_function():
     computer.poke(4, 4000)
     computer.poke(310, 1234)
     computer.poke(311, 37)
-    computer.poke(312, 1000)
+    computer.poke(312, translate.asm.instruction_count)  # return address: the infinite loop after the end of the program
     computer.poke(313, 305)
     computer.poke(314, 300)
     computer.poke(315, 3010)
