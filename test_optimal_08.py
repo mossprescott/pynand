@@ -1,4 +1,5 @@
 import os
+import pytest
 
 import nand.syntax
 from nand.translate import translate_dir
