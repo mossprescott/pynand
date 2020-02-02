@@ -1,10 +1,10 @@
 from nand import run
 import nand.component
-from project_05 import *
+import project_05
 
 
 def test_memory_system():
-    mem = run(MemorySystem)
+    mem = run(project_05.MemorySystem)
 
     # set RAM[0] = -1
     mem.in_ = -1
@@ -108,8 +108,8 @@ def test_memory_system():
     assert mem.out == -1
 
 
-def test_cpu():
-    cpu = run(CPU)
+def test_cpu(chip=project_05.CPU):
+    cpu = run(chip)
 
     cpu.instruction = 0b0011000000111001  # @12345
     cpu.tick(); cpu.tock()
@@ -302,8 +302,8 @@ def test_cpu():
     assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
 
 
-def test_computer_no_program():
-    computer = run(Computer)
+def test_computer_no_program(chip=project_05.Computer):
+    computer = run(chip)
     
     for _ in range(100):
         computer.ticktock()
@@ -321,8 +321,8 @@ ADD_PROGRAM = [
     0b1110001100001000,  # M=D
 ]
 
-def test_computer_add():
-    computer = run(Computer)
+def test_computer_add(chip=project_05.Computer):
+    computer = run(chip)
     
     # First run (at the beginning PC=0)
     computer.run_program(ADD_PROGRAM)
@@ -363,8 +363,8 @@ MAX_PROGRAM = [
     0b1110101010000111,  # 15: JMP    ; infinite loop
 ]
 
-def test_computer_max():
-    computer = run(Computer)
+def test_computer_max(chip=project_05.Computer):
+    computer = run(chip)
 
     computer.init_rom(MAX_PROGRAM)
 
@@ -385,14 +385,14 @@ def test_computer_max():
     assert computer.peek(2) == 23456
 
  
-def cycles_per_second():
+def cycles_per_second(chip):
     """Estimate the speed of CPU simulation by running Max repeatedly with random input.
     """
     
     import random
     import timeit
     
-    computer = run(Computer)
+    computer = run(chip)
 
     computer.init_rom(MAX_PROGRAM)
 
@@ -411,7 +411,7 @@ def cycles_per_second():
     return count*14/time
 
 
-def test_speed():
-    cps = cycles_per_second()
+def test_speed(chip=project_05.Computer):
+    cps = cycles_per_second(chip)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
     assert cps > 1000
