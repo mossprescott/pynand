@@ -163,7 +163,7 @@ def generate_python(ic, inline=True):
 
             return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
         else:
-            return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
+            return "extend_sign(" + " | ".join(f"(bool({src_one(comp, name, i)}) << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
         return template.format(src_one(comp, 'in_'))
@@ -309,7 +309,7 @@ def generate_python(ic, inline=True):
 
     for name, bits in ic.outputs().items():
         if bits == 1:
-            l(3, f"self._{name} = {src_one(root, name)}")
+            l(3, f"self._{name} = bool({src_one(root, name)})")
         else:
             l(3, f"self._{name} = {src_many(root, name, bits)}")
 
