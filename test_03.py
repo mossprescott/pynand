@@ -3,9 +3,21 @@ import pytest
 from nand import DFF, run, gate_count
 from project_03 import *
 
-def dff_coarse_test(dff):
+
+def test_my_dff_legit():
+    """The challenge is to implement DFF with only Nand gates."""
+    assert list(gate_count(MyDFF).keys()) == ['nands']
+
+
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# work, but it seems like this exercise might need to be dropped.
+@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
+def test_dff_coarse(dff_type, opt):
     """Test of DFF behavior when inputs are always stable across clock cycles.
     """
+
+    dff = run(dff_type, optimize=opt)
 
     dff.tick(); dff.tock()
     assert dff.out == 0
@@ -23,9 +35,15 @@ def dff_coarse_test(dff):
     assert dff.out == 0
 
 
-def dff_fine_test(dff):
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# work, but it seems like this exercise might need to be dropped.
+@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
+def test_dff_fine(dff_type, opt):
     """Test of DFF behavior with varying signal timing.
     """
+
+    dff = run(dff_type, optimize=opt)
 
     dff.tick(); dff.tock()
     assert dff.out == 0
@@ -66,27 +84,6 @@ def dff_fine_test(dff):
     # FIXME: minimally need a way to update the clock that forces values to propagate, so you don't
     # have to inspect values to get the correct behavior. Probably by making clock special (and
     # global), and providing tick() and tock() to cycle it.
-
-
-def test_my_dff_legit():
-    """The challenge is to implement DFF with only Nand gates."""
-    assert list(gate_count(MyDFF).keys()) == ['nands']
-
-# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
-# work, but it seems like this exercise might need to be dropped.
-@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
-def test_dff_coarse(dff_type, opt):
-    dff = run(dff_type, optimize=opt)
-    dff_coarse_test(dff)
-
-# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
-# work, but it seems like this exercise might need to be dropped.
-@pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
-def test_dff_fine(dff_type, opt):
-    dff = run(dff_type, optimize=opt)
-    dff_fine_test(dff)
 
 
 def test_bit_coarse():
