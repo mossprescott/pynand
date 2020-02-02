@@ -67,6 +67,34 @@ def mkAdd16(inputs, outputs):
 Add16 = build(mkAdd16)
 
 
+def mkZero16(inputs, outputs):
+    in_ = inputs.in_
+    outputs.out = And(
+        a=And(a=And(a=And(a=Not(in_=in_[15]).out,
+                          b=Not(in_=in_[14]).out).out,
+                    b=And(a=Not(in_=in_[13]).out,
+                          b=Not(in_=in_[12]).out).out).out,
+              b=And(a=And(a=Not(in_=in_[11]).out,
+                          b=Not(in_=in_[10]).out).out,
+                    b=And(a=Not(in_=in_[ 9]).out,
+                          b=Not(in_=in_[ 8]).out).out).out).out,
+        b=And(a=And(a=And(a=Not(in_=in_[ 7]).out,
+                          b=Not(in_=in_[ 6]).out).out,
+                    b=And(a=Not(in_=in_[ 5]).out,
+                          b=Not(in_=in_[ 4]).out).out).out,
+              b=And(a=And(a=Not(in_=in_[ 3]).out,
+                          b=Not(in_=in_[ 2]).out).out,
+                    b=And(a=Not(in_=in_[ 1]).out,
+                          b=Not(in_=in_[ 0]).out).out).out).out).out
+Zero16 = build(mkZero16)
+
+
+def mkNeg16(inputs, outputs):
+    outputs.out = inputs.in_[15]
+
+Neg16 = build(mkNeg16)
+
+
 def mkALU(inputs, outputs):
     x = inputs.x
     y = inputs.y
@@ -92,29 +120,8 @@ def mkALU(inputs, outputs):
     
     out = Mux16(a=result, b=result_inverted, sel=no).out
     
-    def mkZero16(inputs, outputs):
-        in_ = inputs.in_
-        outputs.out = And(
-            a=And(a=And(a=And(a=Not(in_=in_[15]).out,
-                              b=Not(in_=in_[14]).out).out,
-                        b=And(a=Not(in_=in_[13]).out,
-                              b=Not(in_=in_[12]).out).out).out,
-                  b=And(a=And(a=Not(in_=in_[11]).out,
-                              b=Not(in_=in_[10]).out).out,
-                        b=And(a=Not(in_=in_[ 9]).out,
-                              b=Not(in_=in_[ 8]).out).out).out).out,
-            b=And(a=And(a=And(a=Not(in_=in_[ 7]).out,
-                              b=Not(in_=in_[ 6]).out).out,
-                        b=And(a=Not(in_=in_[ 5]).out,
-                              b=Not(in_=in_[ 4]).out).out).out,
-                  b=And(a=And(a=Not(in_=in_[ 3]).out,
-                              b=Not(in_=in_[ 2]).out).out,
-                        b=And(a=Not(in_=in_[ 1]).out,
-                              b=Not(in_=in_[ 0]).out).out).out).out).out
-    Zero16 = build(mkZero16)
-    
     outputs.out = out
     outputs.zr = Zero16(in_=out).out
-    outputs.ng = out[15]
+    outputs.ng = Neg16(in_=out).out
     
 ALU = build(mkALU)

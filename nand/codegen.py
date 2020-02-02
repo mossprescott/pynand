@@ -8,7 +8,7 @@ directly in Python:
 - Nand, of course
 - common 1-bit functions: Not, And, Or
 - common 16-bit functions: Not16, And16, Add16, Inc16, Mux16
-- one oddball: Zero16 (which could be generalized to Eq16)
+- a couple of oddballs: Zero16 (which could be generalized to Eq16), Neg16
 - Register
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
@@ -55,7 +55,7 @@ def translate(ic):
     class_name, lines = generate_python(ic)
     
     # print(ic)
-    # print_lines(lines)
+    print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
@@ -66,7 +66,7 @@ def translate(ic):
 
 PRIMITIVES = set([
     "Nand",
-    "Not16", "And16", "Add16", "Mux16", "Zero16",  # These are enough for the ALU
+    "Not16", "And16", "Add16", "Mux16", "Zero16", "Neg16",  # These are enough for the ALU
     "Inc16", "Register",  # Needed for PC
     "Not", "And", "Or",  # Needed for CPU
     "MemorySystem",  # Needed for Computer
@@ -132,7 +132,9 @@ def generate_python(ic, inline=True):
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
         if conn.bit != 0 or any(c.comp == conn.comp and c.name == conn.name and c.bit != 0 for c in ic.wires.values()):
-            return f"({value} & {hex(1 << conn.bit)} != 0)"
+            # Note: assuming the value is used as a condition and not actually comparing with 0
+            # saves ~5%. But could be dangerous?
+            return f"({value} & {hex(1 << conn.bit)})"
         elif conn.comp.label == "Register":
             raise Exception("TODO: unexpected wiring for 1-bit component")
         else:
@@ -161,43 +163,52 @@ def generate_python(ic, inline=True):
 
             return f"_{all_comps.index(conn.comp)}_{conn.name}"  # but it's always "out"?
         else:
-            return "extend_sign(" + " | ".join(f"({src_one(comp, name, i)} << {i})" for i in range(bits)) + ")"
+            return "extend_sign(" + " | ".join(f"(bool({src_one(comp, name, i)}) << {i})" for i in range(bits)) + ")"
 
     def unary1(comp, template):
         return template.format(src_one(comp, 'in_'))
 
     def binary1(comp, template):
-        return template.format(src_one(comp, 'a'), src_one(comp, 'b'))
+        return template.format(a=src_one(comp, 'a'), b=src_one(comp, 'b'))
 
     def unary16(comp, template, bits=None):
         return template.format(src_many(comp, 'in_', bits))
         
     def binary16(comp, template):
-        return template.format(src_many(comp, 'a'), src_many(comp, 'b'))
+        return template.format(a=src_many(comp, 'a'), b=src_many(comp, 'b'))
 
     def component_expr(comp):
         if isinstance(comp, Nand):
-            return binary1(comp, "not ({} and {})")
+            return binary1(comp, "not ({a} and {b})")
         elif isinstance(comp, Const):
             return None
         elif comp.label == 'Not':
             return unary1(comp, "not {}")
         elif comp.label == 'And':
-            return binary1(comp, "{} and {}")
+            return binary1(comp, "{a} and {b}")
         elif comp.label == 'Or':
-            return binary1(comp, "{} or {}")
+            return binary1(comp, "{a} or {b}")
         elif comp.label == 'Not16':
             return unary16(comp, "~{}")
         elif comp.label == 'And16':
-            return binary16(comp, "{} & {}")
+            return binary16(comp, "{a} & {b}")
         elif comp.label == 'Add16':
-            return binary16(comp, "extend_sign({} + {})")
+            return None
         elif comp.label == 'Mux16':
-            return binary16(comp, f"{{}} if not {src_one(comp, 'sel')} else {{}}")
+            sel = src_one(comp, 'sel')
+            # TODO: simplify the IC to eliminate these constants instead
+            if sel == 0:
+                return src_many(comp, 'a')
+            elif sel == 1:
+                return src_many(comp, 'b')
+            else:
+                return binary16(comp, f"{{b}} if {sel} else {{a}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
+        elif comp.label == 'Neg16':
+            return unary16(comp, "{} < 0")
         elif comp.label == 'Inc16':
-            return unary16(comp, "extend_sign({} + 1)")
+            return None
         elif comp.label == 'DMux':
             return None  # note: multiple outputs doesn't really inline
         elif comp.label == 'DMux8Way':
@@ -235,100 +246,108 @@ def generate_python(ic, inline=True):
             l(2, f"self.{output_name(comp)} = False  # dff")
     l(0, "")
 
-    l(1, f"def _eval(self, update_state):")
-    l(2,   "def extend_sign(x):")
-    l(3,     "return (-1 & ~0xffff) | x if x & 0x8000 != 0 else x")
+    l(1, f"def _eval(self, update_state, cycles=1):")
+    l(2,   f"for _ in range(cycles):")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
         elif comp.label == "Register":
             pass
         elif isinstance(comp, ROM):
-            l(2, f"_{all_comps.index(comp)}_address = {src_many(comp, 'address', comp.address_bits)}")
-            l(2, f"if len(self._rom) > _{all_comps.index(comp)}_address:")
-            l(3,   f"{output_name(comp)} = self._rom[_{all_comps.index(comp)}_address]")
-            l(2, f"else:")
-            l(3,   f"{output_name(comp)} = 0")
+            # TODO: trap index errors with try/except
+            l(3, f"{output_name(comp)} = self._rom[{src_many(comp, 'address', comp.address_bits)}]")
         elif comp.label == "DMux":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
-            l(2, f"{in_name} = {src_one(comp, 'in_')}")
-            l(2, f"{sel_name} = {src_one(comp, 'sel')}")
-            l(2, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
-            l(2, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
+            l(3, f"{in_name} = {src_one(comp, 'in_')}")
+            l(3, f"{sel_name} = {src_one(comp, 'sel')}")
+            l(3, f"_{all_comps.index(comp)}_a = {in_name} if not {sel_name} else 0")
+            l(3, f"_{all_comps.index(comp)}_b = {in_name} if {sel_name} else 0")
         elif comp.label == "DMux8Way":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
-            l(2, f"{in_name} = {src_one(comp, 'in_')}")
-            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(3, f"{in_name} = {src_one(comp, 'in_')}")
+            l(3, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
             for i, c in enumerate("abcdefgh"):
-                l(2, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
+                l(3, f"_{all_comps.index(comp)}_{c} = {in_name} if {sel_name} == {i} else 0")
         elif comp.label == "Mux8Way16":
             # TODO: this could be flattened to one expression and/or inlined
             sel_name = f"_{all_comps.index(comp)}_sel"
             out_name = f"_{all_comps.index(comp)}_out"
-            l(2, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
-            l(2, f"if {sel_name} == 0:")
-            l(3,   f"{out_name} = {src_many(comp, 'a')}")
-            l(2, f"elif {sel_name} == 1:")
-            l(3,   f"{out_name} = {src_many(comp, 'b')}")
-            l(2, f"elif {sel_name} == 2:")
-            l(3,   f"{out_name} = {src_many(comp, 'c')}")
-            l(2, f"elif {sel_name} == 3:")
-            l(3,   f"{out_name} = {src_many(comp, 'd')}")
-            l(2, f"elif {sel_name} == 4:")
-            l(3,   f"{out_name} = {src_many(comp, 'e')}")
-            l(2, f"elif {sel_name} == 5:")
-            l(3,   f"{out_name} = {src_many(comp, 'f')}")
-            l(2, f"elif {sel_name} == 6:")
-            l(3,   f"{out_name} = {src_many(comp, 'g')}")
-            l(2, f"elif {sel_name} == 7:")
-            l(3,   f"{out_name} = {src_many(comp, 'h')}")
+            l(3, f"{sel_name} = {src_many(comp, 'sel', 3)} & 0x07")
+            l(3, f"if {sel_name} == 0:")
+            l(4,   f"{out_name} = {src_many(comp, 'a')}")
+            l(3, f"elif {sel_name} == 1:")
+            l(4,   f"{out_name} = {src_many(comp, 'b')}")
+            l(3, f"elif {sel_name} == 2:")
+            l(4,   f"{out_name} = {src_many(comp, 'c')}")
+            l(3, f"elif {sel_name} == 3:")
+            l(4,   f"{out_name} = {src_many(comp, 'd')}")
+            l(3, f"elif {sel_name} == 4:")
+            l(4,   f"{out_name} = {src_many(comp, 'e')}")
+            l(3, f"elif {sel_name} == 5:")
+            l(4,   f"{out_name} = {src_many(comp, 'f')}")
+            l(3, f"elif {sel_name} == 6:")
+            l(4,   f"{out_name} = {src_many(comp, 'g')}")
+            l(3, f"elif {sel_name} == 7:")
+            l(4,   f"{out_name} = {src_many(comp, 'h')}")
+        elif comp.label == "Add16":
+            out_name = output_name(comp)
+            l(3, f"{out_name} = {src_many(comp, 'a')} + {src_many(comp, 'b')}")
+            l(3, f"if {out_name} < -32768: {out_name} += 65536")
+            l(3, f"if {out_name} > 32767: {out_name} -= 65536")
+        elif comp.label == "Inc16":
+            out_name = output_name(comp)
+            l(3, f"{out_name} = {src_many(comp, 'in_')} + 1")
+            l(3, f"if {out_name} > 32767: {out_name} -= 65536")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
-                l(2, f"{output_name(comp)} = {expr}")
+                l(3, f"{output_name(comp)} = {expr}")
             else:
                 raise Exception(f"Unrecognized primitive: {comp}")
 
     for name, bits in ic.outputs().items():
         if bits == 1:
-            l(2, f"self._{name} = {src_one(root, name)}")
+            l(3, f"self._{name} = bool({src_one(root, name)})")
         else:
-            l(2, f"self._{name} = {src_many(root, name, bits)}")
+            l(3, f"self._{name} = {src_many(root, name, bits)}")
 
-    l(2, "if update_state:")
+    l(3, "if update_state:")
     any_state = False
     for comp in all_comps:
         if isinstance(comp, DFF):
-            l(3, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
+            l(4, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
+        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Neg16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
             # All combinational components: nothing to do here
             pass
         elif comp.label == "Register":
-            # l(3, f"print('register: {all_comps.index(comp)}')")  # HACK
-            l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
-            # l(4,   f"print('  loaded: ' + str({src_many(comp, 'in_')}))")  # HACK
+            load = src_one(comp, 'load')
+            # TODO: simplify the IC to eliminate these constants instead
+            if load == 1:
+                l(4, f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
+            else:
+                l(4, f"if {load}:")
+                l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             any_state = True
         elif comp.label == "MemorySystem":
             # Note: the source of address better not be a big computation. At the moment it's always 
             # register A (so, saved in self)
             address_expr = src_many(comp, 'address', 14)
             in_name = f"_{all_comps.index(comp)}_in"
-            l(3, f"if {src_one(comp, 'load')}:")
-            l(4,   f"{in_name} = {src_many(comp, 'in_')}")
-            l(4,   f"if 0 <= {address_expr} < 0x4000:")
-            l(5,     f"self._ram[{address_expr}] = {in_name}")
-            l(4,   f"elif 0x4000 <= {address_expr} < 0x6000:")
-            l(5,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"{in_name} = {src_many(comp, 'in_')}")
+            l(5,   f"if 0 <= {address_expr} < 0x4000:")
+            l(6,     f"self._ram[{address_expr}] = {in_name}")
+            l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
+            l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
             any_state = True
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
     if not any_state:
-        l(3,   "pass")
+        l(4,   "pass")
     l(0, "")
     
     for name in ic.inputs():
@@ -373,9 +392,9 @@ class Chip:
         """Lower the clock, causing clocked chips to assume their new values."""
         self._eval(True)
         
-    def ticktock(self):
+    def ticktock(self, cycles=1):
         """Equivalent to tick(); tock()."""
-        self._eval(True)
+        self._eval(True, cycles)
 
 
 class SOC(Chip):
@@ -403,10 +422,13 @@ class SOC(Chip):
         if size >= 2**15:
             raise Exception(f"Too many instructions: {size:0,d} >= {2**15:0,d}")
             
-        self._rom = instructions + [
+        contents = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
         ]
+        self._rom = contents
+        # TODO: surprisingly, this is not faster (no apparent effect):
+        # self._rom = array.array('H', contents)
 
     def reset_program(self):
         """Reset the PC to 0, so that the program will continue execution as if from startup.

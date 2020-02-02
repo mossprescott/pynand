@@ -114,7 +114,7 @@ def translate_dir(translator, parse_line, dir_path):
         if fn.endswith(".vm"):
             print(f"// Loading VM source: {fn}")
             with open(f"{dir_path}/{fn}", mode='r') as f:
-                ops = [parse_line(l) for l in f]
+                ops = [parse_line(l) for l in f if parse_line(l) is not None]
             better_ops = translator.rewrite_ops(ops)
             for op, args in better_ops:
                 translator.__getattribute__(op)(*args)
