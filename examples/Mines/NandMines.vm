@@ -1,0 +1,1700 @@
+function NandMines.init 0
+push constant 50
+pop static 0
+push constant 18
+call String.new 1
+push constant 80
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 104
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 102
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 104
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 108
+call String.appendChar 2
+push constant 112
+call String.appendChar 2
+pop static 1
+push constant 29
+call String.new 1
+push constant 80
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 69
+call String.appendChar 2
+push constant 83
+call String.appendChar 2
+push constant 67
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 117
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 110
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 103
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 109
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+pop static 2
+push constant 30
+call String.new 1
+push constant 66
+call String.appendChar 2
+push constant 79
+call String.appendChar 2
+push constant 79
+call String.appendChar 2
+push constant 79
+call String.appendChar 2
+push constant 77
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 40
+call String.appendChar 2
+push constant 112
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 39
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 41
+call String.appendChar 2
+pop static 3
+push constant 16
+call String.new 1
+push constant 67
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 110
+call String.appendChar 2
+push constant 103
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 117
+call String.appendChar 2
+push constant 108
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 105
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 110
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+pop static 4
+call Model.init 0
+pop temp 0
+call View.init 0
+pop temp 0
+push constant 0
+return
+function NandMines.new 0
+push constant 6
+call Memory.alloc 1
+pop pointer 0
+push pointer 0
+call NandMines.restart 1
+pop temp 0
+push pointer 0
+return
+function NandMines.run 6
+call NandMines.init 0
+pop temp 0
+push constant 0
+pop local 1
+push constant 0
+not
+pop local 2
+call NandMines.new 0
+pop local 4
+push constant 0
+pop local 3
+label WHILE_EXP0
+push local 1
+not
+not
+if-goto WHILE_END0
+label WHILE_EXP1
+push local 0
+push constant 0
+eq
+not
+if-goto WHILE_END1
+push local 5
+push constant 1
+add
+pop local 5
+call Keyboard.keyPressed 0
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+label WHILE_EXP2
+call Keyboard.keyPressed 0
+push constant 0
+eq
+not
+not
+if-goto WHILE_END2
+goto WHILE_EXP2
+label WHILE_END2
+push local 3
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+push constant 140
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 4
+call NandMines.paintGameBoard 1
+pop temp 0
+push constant 0
+pop local 3
+label IF_FALSE1
+goto IF_END0
+label IF_FALSE0
+push local 2
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 4
+push local 5
+call NandMines.randomizeBombs 2
+pop temp 0
+push constant 0
+pop local 2
+label IF_FALSE2
+push local 0
+push constant 81
+eq
+push local 0
+push constant 113
+eq
+or
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+not
+pop local 1
+label IF_FALSE3
+push local 0
+push constant 82
+eq
+push local 0
+push constant 114
+eq
+or
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 4
+call NandMines.restart 1
+pop temp 0
+push constant 0
+not
+pop local 2
+label IF_FALSE4
+push local 0
+push constant 72
+eq
+push local 0
+push constant 104
+eq
+or
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push local 4
+call NandMines.showHelpDialog 1
+pop temp 0
+push constant 0
+not
+pop local 3
+label IF_FALSE5
+push local 0
+push constant 130
+eq
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push local 4
+push constant 0
+call NandMines.moveHorizontal 2
+pop temp 0
+label IF_FALSE6
+push local 0
+push constant 131
+eq
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push local 4
+push constant 0
+call NandMines.moveVertical 2
+pop temp 0
+label IF_FALSE7
+push local 0
+push constant 132
+eq
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push local 4
+push constant 0
+not
+call NandMines.moveHorizontal 2
+pop temp 0
+label IF_FALSE8
+push local 0
+push constant 133
+eq
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push local 4
+push constant 0
+not
+call NandMines.moveVertical 2
+pop temp 0
+label IF_FALSE9
+push local 0
+push constant 129
+eq
+push local 0
+push constant 139
+eq
+or
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push local 4
+call NandMines.clearSquare 1
+pop temp 0
+label IF_FALSE10
+push local 0
+push constant 128
+eq
+push local 0
+push constant 138
+eq
+or
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push local 4
+call NandMines.toggleFlag 1
+pop temp 0
+label IF_FALSE11
+label IF_END0
+push constant 0
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push local 4
+call NandMines.dispose 1
+pop temp 0
+push constant 0
+return
+function NandMines.restart 0
+push argument 0
+pop pointer 0
+push this 0
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 0
+call Model.dispose 1
+pop temp 0
+label IF_FALSE0
+call Model.new 0
+pop this 0
+push constant 0
+pop this 1
+push constant 0
+pop this 2
+push constant 0
+pop this 3
+push constant 0
+pop this 4
+call Model.getRows 0
+call Model.getColumns 0
+call Math.multiply 2
+pop this 5
+call View.drawFrame 0
+pop temp 0
+push pointer 0
+call NandMines.paintGameBoard 1
+pop temp 0
+push constant 0
+return
+function NandMines.randomizeBombs 0
+push argument 0
+pop pointer 0
+push this 0
+push static 0
+push argument 1
+call Model.setBombs 3
+pop temp 0
+push constant 0
+return
+function NandMines.showHelpDialog 0
+push argument 0
+pop pointer 0
+call View.showHelp 0
+pop temp 0
+push static 2
+call View.showMessage 1
+pop temp 0
+push constant 0
+return
+function NandMines.paintGameBoard 0
+push argument 0
+pop pointer 0
+push pointer 0
+call NandMines.paintSquares 1
+pop temp 0
+push pointer 0
+call NandMines.paintSelected 1
+pop temp 0
+push static 1
+call View.showMessage 1
+pop temp 0
+push constant 0
+return
+function NandMines.moveHorizontal 0
+push argument 0
+pop pointer 0
+push pointer 0
+push this 2
+push this 3
+push argument 1
+call NandMines.moveHorizontalStartingIn 4
+pop temp 0
+push constant 0
+return
+function NandMines.moveHorizontalStartingIn 2
+push argument 0
+pop pointer 0
+push this 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 3
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 1
+push constant 1
+add
+pop local 1
+goto IF_END1
+label IF_FALSE1
+push argument 1
+push constant 1
+sub
+pop local 1
+label IF_END1
+label WHILE_EXP0
+push local 1
+call Model.getColumns 0
+lt
+push local 1
+push constant 1
+neg
+gt
+and
+not
+if-goto WHILE_END0
+push this 0
+push local 1
+push argument 2
+call Model.getSquare 3
+pop local 0
+push local 0
+call Square.isHidden 1
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+push this 2
+push this 3
+call NandMines.paintSquare 3
+pop temp 0
+push local 1
+pop this 2
+push argument 2
+pop this 3
+push pointer 0
+call NandMines.paintSelected 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE2
+push argument 3
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 1
+push constant 1
+add
+pop local 1
+goto IF_END3
+label IF_FALSE3
+push local 1
+push constant 1
+sub
+pop local 1
+label IF_END3
+goto WHILE_EXP0
+label WHILE_END0
+push argument 3
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push argument 2
+call Model.getRows 0
+push constant 1
+sub
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push constant 0
+pop argument 2
+goto IF_END5
+label IF_FALSE5
+push argument 2
+push constant 1
+add
+pop argument 2
+label IF_END5
+push pointer 0
+push constant 1
+neg
+push argument 2
+push argument 3
+call NandMines.moveHorizontalStartingIn 4
+pop temp 0
+goto IF_END4
+label IF_FALSE4
+push argument 2
+push constant 0
+eq
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+call Model.getRows 0
+push constant 1
+sub
+pop argument 2
+goto IF_END6
+label IF_FALSE6
+push argument 2
+push constant 1
+sub
+pop argument 2
+label IF_END6
+push pointer 0
+call Model.getColumns 0
+push argument 2
+push argument 3
+call NandMines.moveHorizontalStartingIn 4
+pop temp 0
+label IF_END4
+push constant 0
+return
+function NandMines.moveVertical 0
+push argument 0
+pop pointer 0
+push pointer 0
+push this 2
+push this 3
+push argument 1
+call NandMines.moveVerticalStartingIn 4
+pop temp 0
+push constant 0
+return
+function NandMines.moveVerticalStartingIn 2
+push argument 0
+pop pointer 0
+push this 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 3
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 2
+push constant 1
+add
+pop local 1
+goto IF_END1
+label IF_FALSE1
+push argument 2
+push constant 1
+sub
+pop local 1
+label IF_END1
+label WHILE_EXP0
+push local 1
+call Model.getRows 0
+lt
+push local 1
+push constant 1
+neg
+gt
+and
+not
+if-goto WHILE_END0
+push this 0
+push argument 1
+push local 1
+call Model.getSquare 3
+pop local 0
+push local 0
+call Square.isHidden 1
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+push this 2
+push this 3
+call NandMines.paintSquare 3
+pop temp 0
+push argument 1
+pop this 2
+push local 1
+pop this 3
+push pointer 0
+call NandMines.paintSelected 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE2
+push argument 3
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 1
+push constant 1
+add
+pop local 1
+goto IF_END3
+label IF_FALSE3
+push local 1
+push constant 1
+sub
+pop local 1
+label IF_END3
+goto WHILE_EXP0
+label WHILE_END0
+push argument 3
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push argument 1
+call Model.getColumns 0
+push constant 1
+sub
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push constant 0
+pop argument 1
+goto IF_END5
+label IF_FALSE5
+push argument 1
+push constant 1
+add
+pop argument 1
+label IF_END5
+push pointer 0
+push argument 1
+push constant 1
+neg
+push argument 3
+call NandMines.moveVerticalStartingIn 4
+pop temp 0
+goto IF_END4
+label IF_FALSE4
+push argument 1
+push constant 0
+eq
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+call Model.getColumns 0
+push constant 1
+sub
+pop argument 1
+goto IF_END6
+label IF_FALSE6
+push argument 1
+push constant 1
+sub
+pop argument 1
+label IF_END6
+push pointer 0
+push argument 1
+call Model.getRows 0
+push argument 3
+call NandMines.moveVerticalStartingIn 4
+pop temp 0
+label IF_END4
+push constant 0
+return
+function NandMines.toggleFlag 1
+push argument 0
+pop pointer 0
+push this 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 0
+push this 2
+push this 3
+call Model.getSquare 3
+pop local 0
+push local 0
+push local 0
+call Square.isFlag 1
+not
+call Square.setFlag 2
+pop temp 0
+push local 0
+call Square.isFlag 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 4
+push constant 1
+add
+pop this 4
+goto IF_END1
+label IF_FALSE1
+push this 4
+push constant 1
+sub
+pop this 4
+label IF_END1
+push this 4
+push this 0
+call Model.getBombs 1
+call View.showLocatedBombsMessage 2
+pop temp 0
+push pointer 0
+call NandMines.paintSelected 1
+pop temp 0
+push pointer 0
+call NandMines.checkComplete 1
+pop temp 0
+push constant 0
+return
+function NandMines.clearSquare 2
+push argument 0
+pop pointer 0
+push this 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 0
+push this 2
+push this 3
+call Model.getSquare 3
+pop local 1
+push local 1
+push constant 0
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push local 1
+push constant 0
+call Square.setHidden 2
+pop temp 0
+push this 5
+push constant 1
+sub
+pop this 5
+push local 1
+call Square.isFlag 1
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 4
+push constant 1
+sub
+pop this 4
+label IF_FALSE2
+push local 1
+call Square.isBomb 1
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+not
+pop this 1
+push static 3
+call View.showMessage 1
+pop temp 0
+push pointer 0
+call NandMines.paintSquares 1
+pop temp 0
+goto IF_END3
+label IF_FALSE3
+push pointer 0
+push this 2
+push this 3
+call NandMines.paintSquare 3
+pop temp 0
+push pointer 0
+call NandMines.clearBlanks 1
+pop temp 0
+push pointer 0
+call NandMines.checkComplete 1
+pop temp 0
+label IF_END3
+push constant 0
+return
+function NandMines.checkComplete 0
+push argument 0
+pop pointer 0
+push this 5
+push this 4
+eq
+push this 5
+push this 0
+call Model.getBombs 1
+eq
+and
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+not
+pop this 1
+push static 4
+call View.showMessage 1
+pop temp 0
+label IF_FALSE0
+push constant 0
+return
+function NandMines.clearBlanks 5
+push argument 0
+pop pointer 0
+call Model.getRows 0
+call Model.getColumns 0
+call Math.multiply 2
+call Array.new 1
+pop local 4
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+call Model.getRows 0
+call Model.getColumns 0
+call Math.multiply 2
+lt
+not
+if-goto WHILE_END0
+push local 0
+push local 4
+add
+push constant 0
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push this 2
+pop local 0
+push this 3
+pop local 1
+push this 0
+push local 0
+push local 1
+call Model.getSquare 3
+pop local 2
+call LinkedList.new 0
+pop local 3
+push local 3
+push local 2
+call Square.getId 1
+call LinkedList.addLast 2
+pop temp 0
+label WHILE_EXP1
+push local 3
+call LinkedList.getSize 1
+push constant 0
+gt
+not
+if-goto WHILE_END1
+push this 0
+push local 3
+call LinkedList.removeFirst 1
+call Model.getSquareById 2
+pop local 2
+push local 2
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 2
+call Square.isFlag 1
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 2
+call Square.getId 1
+push local 4
+add
+pop pointer 1
+push that 0
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 2
+call Square.getId 1
+push local 4
+add
+push constant 0
+not
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 2
+call Square.isBomb 1
+not
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 2
+call Square.getId 1
+call Model.getColumn 1
+pop local 0
+push local 2
+call Square.getId 1
+call Model.getRow 1
+pop local 1
+push local 2
+call Square.isHidden 1
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 2
+push constant 0
+call Square.setHidden 2
+pop temp 0
+push this 5
+push constant 1
+sub
+pop this 5
+label IF_FALSE4
+push pointer 0
+push local 0
+push local 1
+call NandMines.paintSquare 3
+pop temp 0
+push pointer 0
+push local 0
+push local 1
+call NandMines.getMines 3
+push constant 0
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push local 3
+push local 0
+push constant 1
+sub
+push local 1
+push constant 1
+sub
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push constant 1
+sub
+push local 1
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push constant 1
+sub
+push local 1
+push constant 1
+add
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push local 1
+push constant 1
+sub
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push local 1
+push constant 1
+add
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push constant 1
+add
+push local 1
+push constant 1
+sub
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push constant 1
+add
+push local 1
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+push local 3
+push local 0
+push constant 1
+add
+push local 1
+push constant 1
+add
+call Model.getId 2
+call LinkedList.addLast 2
+pop temp 0
+label IF_FALSE5
+label IF_FALSE3
+label IF_FALSE2
+label IF_FALSE1
+label IF_FALSE0
+goto WHILE_EXP1
+label WHILE_END1
+push local 3
+call LinkedList.dispose 1
+pop temp 0
+push local 4
+call Array.dispose 1
+pop temp 0
+push constant 0
+return
+function NandMines.getMines 2
+push argument 0
+pop pointer 0
+push constant 0
+pop local 1
+push this 0
+push argument 1
+push constant 1
+sub
+push argument 2
+push constant 1
+sub
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE1
+label IF_FALSE0
+push this 0
+push argument 1
+push constant 1
+sub
+push argument 2
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE3
+label IF_FALSE2
+push this 0
+push argument 1
+push constant 1
+sub
+push argument 2
+push constant 1
+add
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE5
+label IF_FALSE4
+push this 0
+push argument 1
+push argument 2
+push constant 1
+sub
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE7
+label IF_FALSE6
+push this 0
+push argument 1
+push argument 2
+push constant 1
+add
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE9
+label IF_FALSE8
+push this 0
+push argument 1
+push constant 1
+add
+push argument 2
+push constant 1
+sub
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE11
+label IF_FALSE10
+push this 0
+push argument 1
+push constant 1
+add
+push argument 2
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE12
+goto IF_FALSE12
+label IF_TRUE12
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE13
+goto IF_FALSE13
+label IF_TRUE13
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE13
+label IF_FALSE12
+push this 0
+push argument 1
+push constant 1
+add
+push argument 2
+push constant 1
+add
+call Model.getSquare 3
+pop local 0
+push local 0
+push constant 0
+eq
+not
+if-goto IF_TRUE14
+goto IF_FALSE14
+label IF_TRUE14
+push local 0
+call Square.isBomb 1
+if-goto IF_TRUE15
+goto IF_FALSE15
+label IF_TRUE15
+push local 1
+push constant 1
+add
+pop local 1
+label IF_FALSE15
+label IF_FALSE14
+push local 1
+return
+function NandMines.paintSelected 1
+push argument 0
+pop pointer 0
+push this 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 0
+push this 2
+push this 3
+call Model.getSquare 3
+pop local 0
+push local 0
+call Square.isFlag 1
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 2
+push this 3
+call View.getSquarePosition 2
+call View.drawFlagSelected 1
+pop temp 0
+goto IF_END1
+label IF_FALSE1
+push this 2
+push this 3
+call View.getSquarePosition 2
+call View.drawSelected 1
+pop temp 0
+label IF_END1
+push constant 0
+return
+function NandMines.paintSquares 2
+push argument 0
+pop pointer 0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+call Model.getColumns 0
+lt
+not
+if-goto WHILE_END0
+push constant 0
+pop local 1
+label WHILE_EXP1
+push local 1
+call Model.getRows 0
+lt
+not
+if-goto WHILE_END1
+push pointer 0
+push local 0
+push local 1
+call NandMines.paintSquare 3
+pop temp 0
+push local 1
+push constant 1
+add
+pop local 1
+goto WHILE_EXP1
+label WHILE_END1
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function NandMines.paintSquare 2
+push argument 0
+pop pointer 0
+push this 0
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push this 0
+push argument 1
+push argument 2
+call Model.getSquare 3
+pop local 1
+push local 1
+push constant 0
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push local 1
+call Square.isHidden 1
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 1
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 1
+call Square.isFlag 1
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 1
+call Square.isBomb 1
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawFlag 1
+pop temp 0
+push constant 0
+return
+goto IF_END5
+label IF_FALSE5
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawFail 1
+pop temp 0
+push constant 0
+return
+label IF_END5
+goto IF_END4
+label IF_FALSE4
+push local 1
+call Square.isBomb 1
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawMine 1
+pop temp 0
+push constant 0
+return
+goto IF_END6
+label IF_FALSE6
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawHidden 1
+pop temp 0
+push constant 0
+return
+label IF_END6
+label IF_END4
+goto IF_END3
+label IF_FALSE3
+push local 1
+call Square.isFlag 1
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawFlag 1
+pop temp 0
+push constant 0
+return
+goto IF_END7
+label IF_FALSE7
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawHidden 1
+pop temp 0
+push constant 0
+return
+label IF_END7
+label IF_END3
+goto IF_END2
+label IF_FALSE2
+push local 1
+call Square.isBomb 1
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawExplosion 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE8
+push pointer 0
+push argument 1
+push argument 2
+call NandMines.getMines 3
+pop local 0
+push local 0
+push constant 0
+eq
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.drawBlank 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE9
+push local 0
+push constant 1
+eq
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw1 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE10
+push local 0
+push constant 2
+eq
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw2 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE11
+push local 0
+push constant 3
+eq
+if-goto IF_TRUE12
+goto IF_FALSE12
+label IF_TRUE12
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw3 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE12
+push local 0
+push constant 4
+eq
+if-goto IF_TRUE13
+goto IF_FALSE13
+label IF_TRUE13
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw4 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE13
+push local 0
+push constant 5
+eq
+if-goto IF_TRUE14
+goto IF_FALSE14
+label IF_TRUE14
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw5 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE14
+push local 0
+push constant 6
+eq
+if-goto IF_TRUE15
+goto IF_FALSE15
+label IF_TRUE15
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw6 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE15
+push local 0
+push constant 7
+eq
+if-goto IF_TRUE16
+goto IF_FALSE16
+label IF_TRUE16
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw7 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE16
+push local 0
+push constant 8
+eq
+if-goto IF_TRUE17
+goto IF_FALSE17
+label IF_TRUE17
+push argument 1
+push argument 2
+call View.getSquarePosition 2
+call View.draw8 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE17
+label IF_END2
+push constant 0
+return
+function NandMines.dispose 0
+push argument 0
+pop pointer 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
