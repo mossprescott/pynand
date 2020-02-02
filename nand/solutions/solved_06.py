@@ -94,7 +94,7 @@ def parse_op(string):
         
             return (0b111 << 13) | (m_for_a << 12) | (alu << 6) | (dest << 3) | jmp
         else:
-            raise Exception(f"unrecognized: {line}")
+            raise Exception(f"unrecognized: {string}")
 
 
 def assemble(lines):
