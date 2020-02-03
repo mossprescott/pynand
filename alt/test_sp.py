@@ -1,10 +1,12 @@
 import pytest
 
 from nand import run, unsigned
+from nand.translate import translate_dir
 import test_05
 import test_06
 import test_07
 import test_08
+import test_optimal_08
 
 from alt.sp import *
 
@@ -187,6 +189,20 @@ def test_vm_fibonacci_element():
 def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=SPComputer, assemble=assemble, translator=Translator)
 
+
+def test_vm_pong_instructions():
+    instruction_count = test_optimal_08.count_pong_instructions(Translator)
+    
+    # compare to the project_08 solution (about 28k)
+    assert instruction_count < -1  # ???
+
+
+def test_vm_cycles_to_init():
+    cycles = test_optimal_08.count_cycles_to_init(SPComputer, assemble, Translator)
+
+    # compare to the project_08 solution (about 4m)
+    assert cycles < -1
+    
 
 def init_sp(cpu):
     ASM = [
