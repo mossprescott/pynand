@@ -259,7 +259,41 @@ class Translator(solved_07.Translator):
         for _ in range(num_vars):
             self.asm.instr("SP++=0")
 
-    # TODO: improve the common sequences _compare, _call, and _return.
+    def _compare(self, op):
+        # Saves about 4 instuctions each time, or a few % at runtime.
+        
+        label = self.asm.next_label(f"{op.lower()}_common")
+        end_label = self.asm.next_label(f"{op.lower()}_common$end")
+        self.asm.start(f"{op.lower()}_common")
+        self.asm.label(label)
+        self.asm.instr("@R15")    # R15 = D (the return address)
+        self.asm.instr("M=D")
+        
+        # D = top, M = second from top
+        self.asm.instr("D=--SP")
+        self.asm.instr("A=--SP")
+
+        # Compare
+        self.asm.instr("D=A-D")
+        
+        # Set result True, optimistically
+        self.asm.instr("SP++=-1")
+        
+        self.asm.instr(f"@{end_label}")
+        self.asm.instr(f"D;J{op}")
+        
+        # Set result False
+        self.asm.instr("D=--SP")  # Drop speculative result
+        self.asm.instr("SP++=0")
+
+        self.asm.label(end_label)
+        self.asm.instr("@R15")   # JMP to R15
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        return label
+
+
+    # TODO: improve the common sequences for _call and _return.
 
 
 if __name__ == "__main__":
