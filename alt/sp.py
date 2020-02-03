@@ -1,6 +1,7 @@
 import re
 
 from nand import *
+from nand.translate import AssemblySource
 
 from nand.solutions.solved_01 import And, Or, Not, Not16, Mux16
 from nand.solutions.solved_02 import Inc16, ALU
@@ -8,6 +9,7 @@ from nand.solutions.solved_02 import Zero16  # HACK: should be defined in projec
 from nand.solutions.solved_03 import Register
 from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06
+from nand.solutions import solved_07
 
 def mkDec16(inputs, outputs):
     """Decrement for 16-bit values, by inverting and incrementing.
@@ -161,7 +163,12 @@ def parse_op(string):
     return solved_06.parse_op(string)
 
 
+def assemble(lines):
+    return solved_06.assemble(lines, parse_op)
+
+
 class Translator(solved_07.Translator):
     def __init__(self):
-        solved_07.Translator.__init__(self)
+        self.asm = AssemblySource()
+        solved_07.Translator.__init__(self, self.asm)
         

@@ -97,7 +97,7 @@ def parse_op(string):
             raise Exception(f"unrecognized: {string}")
 
 
-def assemble(lines):
+def assemble(lines, parse_op=parse_op):
     """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
     

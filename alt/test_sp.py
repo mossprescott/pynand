@@ -3,6 +3,8 @@ import pytest
 from nand import run, unsigned
 import test_05
 import test_06
+import test_07
+import test_08
 
 from alt.sp import *
 
@@ -145,6 +147,45 @@ def test_pop_to_a():
     cpu.instruction = parse_op("D=M")  # Put A on the address lines
     assert cpu.sp == 255
     assert cpu.addressM == 12345
+
+
+#
+# VM translator:
+#
+
+def test_vm_simple_add():
+    test_07.test_simple_add(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_stack_ops():
+    test_07.test_stack_ops(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_memory_access_basic():
+    test_07.test_memory_access_basic(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_memory_access_pointer():
+    test_07.test_memory_access_pointer(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_memory_access_static():
+    test_07.test_memory_access_static(chip=SPComputer, assemble=assemble, translator=Translator)
+
+
+def test_vm_basic_loop():
+    test_08.test_basic_loop(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_fibonacci_series():
+    test_08.test_fibonacci_series(chip=SPComputer, assemble=assemble, translator=Translator)
+    
+def test_vm_simple_function():
+    test_08.test_simple_function(chip=SPComputer, assemble=assemble, translator=Translator)
+    
+def test_vm_nested_call():
+    test_08.test_nested_call(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_fibonacci_element():
+    test_08.test_fibonacci_element(chip=SPComputer, assemble=assemble, translator=Translator)
+
+def test_vm_statics_multiple_files():
+    test_08.test_statics_multiple_files(chip=SPComputer, assemble=assemble, translator=Translator)
 
 
 def init_sp(cpu):

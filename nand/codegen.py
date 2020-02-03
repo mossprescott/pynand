@@ -451,19 +451,25 @@ class SOC(Chip):
     def peek(self, address):
         """Read a value from the main RAM. Address must be between 0x000 and 0x3FFF."""
         return self._ram[address]
-    
+
     def poke(self, address, value):
         """Write a value to the main RAM. Address must be between 0x000 and 0x3FFF."""
         self._ram[address] = extend_sign(value)
-    
+
     def peek_screen(self, address):
         """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
         return self._screen[address]
-    
+
     def poke_screen(self, address, value):
         """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
         self._screen[address] = extend_sign(value)
-    
+
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard = keycode
+
+    # Tricky: SP might get special treatment in some implementations, so provide a named property
+    # That subclasses can override.
+    @property
+    def sp(self):
+        return self._ram[0]
