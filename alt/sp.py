@@ -213,3 +213,12 @@ class Translator(solved_07.Translator):
         self.asm.instr("D=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'D')}")
 
+    def function(self, class_name, function_name, num_vars):
+        self.class_namespace = class_name.lower()
+        self.function_namespace = f"{class_name.lower()}.{function_name}"
+
+        self.asm.start(f"function {class_name}.{function_name} {num_vars}")
+        self.asm.label(f"{self.function_namespace}")
+
+        for _ in range(num_vars):
+            self.asm.instr("SP++=0")
