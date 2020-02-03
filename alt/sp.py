@@ -1,7 +1,7 @@
 import re
 
 from nand import *
-from nand.translate import AssemblySource
+from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Not, Not16, Mux16
 from nand.solutions.solved_02 import Inc16, ALU
@@ -168,6 +168,10 @@ def assemble(lines):
 
 
 class Translator(solved_07.Translator):
+    """Re-use most of the solution's translations, but strategically override most of the 
+    access to SP.
+    """
+    
     def __init__(self):
         self.asm = AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
@@ -222,3 +226,25 @@ class Translator(solved_07.Translator):
 
         for _ in range(num_vars):
             self.asm.instr("SP++=0")
+
+
+if __name__ == "__main__":
+    TRACE = False
+
+    import sys
+    import computer
+
+    translate = Translator()
+    
+    translate.preamble()
+    
+    translate_dir(translate, solved_07.parse_line, sys.argv[1])
+    translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+    
+    if TRACE:
+        for instr in translate.asm:
+            print(instr)
+
+    computer.run(assemble(translate.asm), chip=SPComputer, src_map=translate.asm.src_map if TRACE else None)
+
+
