@@ -317,7 +317,7 @@ ADD_PROGRAM = [
     0b1110110000010000,  # D=A
     0b0000000000000011,  # @3
     0b1110000010010000,  # D=D+A
-    0b0000000000000000,  # @0
+    0b0000000000000001,  # @1     Note: modified to avoid address 0 (SP), which may get special treatment
     0b1110001100001000,  # M=D
 ]
 
@@ -327,7 +327,7 @@ def test_computer_add(chip=project_05.Computer):
     # First run (at the beginning PC=0)
     computer.run_program(ADD_PROGRAM)
     
-    assert computer.peek(0) == 5
+    assert computer.peek(1) == 5
     
 
     # Reset the PC
@@ -336,29 +336,30 @@ def test_computer_add(chip=project_05.Computer):
     assert computer.pc == 0
     
     # Second run, to check that the PC was reset correctly.
-    computer.poke(0, 12345)
+    computer.poke(1, 12345)
     computer.reset = 0    
     while computer.pc < len(ADD_PROGRAM):
         computer.ticktock()
 
-    assert computer.peek(0) == 5        
+    assert computer.peek(1) == 5        
 
 
 MAX_PROGRAM = [
-    0b0000000000000000,  #  0: @0
+    # Note: modified to avoid address 0 (SP), which may get special treatment
+    0b0000000000000001,  #  0: @1
     0b1111110000010000,  #  1: D=M
-    0b0000000000000001,  #  2: @1
-    0b1111010011010000,  #  3: D=D-M  ; D = mem[0] - mem[1]
+    0b0000000000000010,  #  2: @2
+    0b1111010011010000,  #  3: D=D-M  ; D = mem[1] - mem[2]
     0b0000000000001010,  #  4: @10
     0b1110001100000001,  #  5: D; JGT
-    0b0000000000000001,  #  6: @1
-    0b1111110000010000,  #  7: D=M    ; D = mem[1]
+    0b0000000000000010,  #  6: @2
+    0b1111110000010000,  #  7: D=M    ; D = mem[2]
     0b0000000000001100,  #  8: @12
     0b1110101010000111,  #  9: JMP
-    0b0000000000000000,  # 10: @0
-    0b1111110000010000,  # 11: D=M    ; D = mem[0]
-    0b0000000000000010,  # 12: @2
-    0b1110001100001000,  # 13: M=D    ; mem[2] = max
+    0b0000000000000001,  # 10: @1
+    0b1111110000010000,  # 11: D=M    ; D = mem[1]
+    0b0000000000000011,  # 12: @3
+    0b1110001100001000,  # 13: M=D    ; mem[3] = max
     0b0000000000001110,  # 14: @14
     0b1110101010000111,  # 15: JMP    ; infinite loop
 ]
@@ -369,20 +370,20 @@ def test_computer_max(chip=project_05.Computer):
     computer.init_rom(MAX_PROGRAM)
 
     # first run: compute max(3,5)
-    computer.poke(0, 3)
-    computer.poke(1, 5)
+    computer.poke(1, 3)
+    computer.poke(2, 5)
     for _ in range(14):
         computer.ticktock()    
-    assert computer.peek(2) == 5
+    assert computer.peek(3) == 5
 
     # second run: compute max(23456,12345)
     computer.reset_program()
-    computer.poke(0, 23456)
-    computer.poke(1, 12345)
+    computer.poke(1, 23456)
+    computer.poke(2, 12345)
     # The run on these inputs needs less cycles (different branching)
     for _ in range(10):
         computer.ticktock()    
-    assert computer.peek(2) == 23456
+    assert computer.peek(3) == 23456
 
  
 def cycles_per_second(chip):
@@ -400,11 +401,11 @@ def cycles_per_second(chip):
         x = random.randint(0, 0x7FFF)
         y = random.randint(0, 0x7FFF)
         computer.reset_program()
-        computer.poke(0, x)
-        computer.poke(1, y)
+        computer.poke(1, x)
+        computer.poke(2, y)
         for _ in range(14):
             computer.ticktock()
-        assert computer.peek(2) == max(x, y)
+        assert computer.peek(3) == max(x, y)
 
     count, time = timeit.Timer(once).autorange()
 

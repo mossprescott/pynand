@@ -5,19 +5,19 @@
 
 // Symbol-less version of the Max.asm program.
 
-@0
-D=M
 @1
+D=M
+@2
 D=D-M
 @10
 D;JGT
-@1
+@2
 D=M
 @12
 0;JMP
-@0
+@1
 D=M
-@2
+@3
 M=D
 @14
 0;JMP
