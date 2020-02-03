@@ -404,7 +404,7 @@ class Translator:
         self.asm.start(f"call_common")
         self.asm.label(label)
 
-        # R15 = SP - (D + 2) (which will be the new ARG)
+        # R15 = SP - (D + 1) (which will be the new ARG)
         self.asm.instr("@SP")
         self.asm.instr("D=M-D")
         self.asm.instr("D=D-1")
