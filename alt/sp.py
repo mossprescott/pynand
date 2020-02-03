@@ -130,10 +130,6 @@ def mkSPCPU(inputs, outputs):
         sel=is_pop).out
     alu.set(ALU(x=d_reg.out, y=alu_y, zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
-    # HACK: for debugging
-    outputs.is_sp = is_sp
-    outputs.is_sp_write = is_sp_write
-
     # output value to memory (to M or top of stack)
     outputs.outM = alu.out
     
