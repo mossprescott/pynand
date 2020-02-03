@@ -72,6 +72,8 @@ PRIMITIVES = set([
     "MemorySystem",  # Needed for Computer
     # Additional components used in the exercises, but not typically used in a full computer sim:
     "DMux", "DMux8Way", "Mux8Way16",
+    # Additonal for alternative CPUs:
+    "Dec16",
 ])
 
 
@@ -218,6 +220,8 @@ def generate_python(ic, inline=True):
             return unary16(comp, "{} < 0")
         elif comp.label == 'Inc16':
             return None
+        elif comp.label == 'Dec16':
+            return None
         elif comp.label == 'DMux':
             return None  # note: multiple outputs doesn't really inline
         elif comp.label == 'DMux8Way':
@@ -313,6 +317,10 @@ def generate_python(ic, inline=True):
             out_name = output_name(comp)
             l(3, f"{out_name} = {src_many(comp, 'in_')} + 1")
             l(3, f"if {out_name} > 32767: {out_name} -= 65536")
+        elif comp.label == "Dec16":
+            out_name = output_name(comp)
+            l(3, f"{out_name} = {src_many(comp, 'in_')} - 1")
+            l(3, f"if {out_name} < -32768: {out_name} += 65536")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
@@ -332,9 +340,6 @@ def generate_python(ic, inline=True):
         if isinstance(comp, DFF):
             l(4, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Neg16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
-            # All combinational components: nothing to do here
-            pass
         elif comp.label == "Register":
             load = src_one(comp, 'load')
             # TODO: simplify the IC to eliminate these constants instead
@@ -356,6 +361,11 @@ def generate_python(ic, inline=True):
             l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
             l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
             any_state = True
+        elif isinstance(comp, (Const, ROM)):
+            pass
+        elif comp.label in PRIMITIVES:
+            # All combinational components: nothing to do here
+            pass
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
