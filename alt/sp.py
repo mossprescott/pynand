@@ -1,3 +1,29 @@
+"""An alternative CPU which is backward compatible with the Nand to Tetris design, adding a handful of
+new instructions which reduce most interactions with the stack to a single instructions/cycle.
+
+The cost is adding a fourth register to hold SP, and a fair amount of additional logic to decode 2 more 
+instruction formats (give or take), and to wrangle two more possible sources for the address to memory.
+
+The VM translator is specialized to use the new instructions for push and pop operations, and to take
+advantage of them not overwriting the A register.
+
+The result is significant, but not quite mind-blowing:
+- gates: about 1,800 (+50% from 1,262), but could probably be improved
+- instruction count for Pong: 15.7k (-47% from 29.5k)
+- cycles in Sys.init: 2.61m (-34% from 3.97m)
+
+It's also a bit slower per cycle in simulation, resulting in approx. the same net performance 
+(10s to init.)
+
+Caveat: this design is probably not realistic in that the CPU may supply any of three addresses to 
+the RAM (A, SP, or SP-1), based on instruction decoding, and then the RAM is read in the same cycle. 
+In the real world, you would probably need to have the address available at the start of the cycle in
+order for the RAM to be read in time. The original design does have that property, because the address
+is _always_ A (from the previous cycle). That could be put right by pipelining the processor so that
+instruction decoding is one cycle ahead of execution. Of course, there would be more registers (or at 
+least more state to save,) and probably a one-cycle penalty on taken branches.
+"""
+
 import re
 
 from nand import *
@@ -127,6 +153,10 @@ SPCPU = build(mkSPCPU)
 
 
 def mkSPComputer(inputs, outputs):
+    """This is the same as regular Computer, except using SPCPU, and exposing `sp` as an output so that
+    it can be inspected for tests and debugging.
+    """
+    
     reset = inputs.reset
     
     cpu = lazy()
@@ -218,6 +248,8 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"SP++={op.replace('M', 'D')}")
 
     def function(self, class_name, function_name, num_vars):
+        """Pushing zeros is a lot simpler now, saving a few instructions."""
+        
         self.class_namespace = class_name.lower()
         self.function_namespace = f"{class_name.lower()}.{function_name}"
 
@@ -226,6 +258,8 @@ class Translator(solved_07.Translator):
 
         for _ in range(num_vars):
             self.asm.instr("SP++=0")
+
+    # TODO: improve the common sequences _compare, _call, and _return.
 
 
 if __name__ == "__main__":
