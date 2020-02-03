@@ -86,11 +86,11 @@ class AssemblySource:
             gpr = [str(computer.peek(i)) for i in range(13, 16)]
             arg = [str(computer.peek(i)) for i in range(computer.peek(ARG), computer.peek(LCL)-5)]
             saved = [str(computer.peek(i)) for i in range(computer.peek(LCL)-5, computer.peek(LCL))]
-            stack = [str(computer.peek(i)) for i in range(computer.peek(LCL) or 256, computer.peek(SP))]
+            stack = [str(computer.peek(i)) for i in range(computer.peek(LCL) or 256, computer.sp)]
             static = [str(computer.peek(i)) for i in range(16, 32)]
             print(f"  temp: {tmp}; gpr: {gpr}")
             print(f"  arg({computer.peek(ARG)}): {arg}; return: {saved[0]}; l,a,t,t: {saved[1:]}")
-            print(f"  local+stack({computer.peek(SP)}): {stack[-20:]}")
+            print(f"  local+stack({computer.sp}): {stack[-20:]}")
             # print(f"  static: {static}")
 
         for cycles in range(stop_cycles):
