@@ -171,4 +171,21 @@ class Translator(solved_07.Translator):
     def __init__(self):
         self.asm = AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
-        
+
+    def push_constant(self, value):
+        self.asm.start(f"push constant {value}")
+        if value <= 1:
+            self.asm.instr(f"SP++={value}")
+        else:
+            self.asm.instr(f"@{value}")
+            self.asm.instr(f"SP++=A")
+
+    def _push_d(self):
+        # TODO: no need for this as soon as everything's switched to use SP++ directly
+        self.asm.instr("SP++=D")
+
+    def _binary(self, op):
+        # TODO: no need for this as soon as everything's switched to use SP++/--SP directly
+        self.asm.instr("D=--SP")
+        self.asm.instr("A=--SP")
+        self.asm.instr(f"SP++={op.replace('M', 'A')}")
