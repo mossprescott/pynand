@@ -444,7 +444,7 @@ def test_computer_add():
     # First run (at the beginning PC=0)
     computer.run_program(test_05.ADD_PROGRAM)
     
-    assert computer.peek(0) == 5
+    assert computer.peek(1) == 5
     
 
     # Reset the PC
@@ -458,7 +458,7 @@ def test_computer_add():
     while computer.pc < len(test_05.ADD_PROGRAM):
         computer.ticktock()
 
-    assert computer.peek(0) == 5        
+    assert computer.peek(1) == 5        
 
 
 def test_computer_max():
@@ -467,20 +467,20 @@ def test_computer_max():
     computer.init_rom(test_05.MAX_PROGRAM)
 
     # first run: compute max(3,5)
-    computer.poke(0, 3)
-    computer.poke(1, 5)
+    computer.poke(1, 3)
+    computer.poke(2, 5)
     for _ in range(14):
         computer.tick(); computer.tock()    
-    assert computer.peek(2) == 5
+    assert computer.peek(3) == 5
 
     # second run: compute max(23456,12345)
     computer.reset_program()
-    computer.poke(0, 23456)
-    computer.poke(1, 12345)
+    computer.poke(1, 23456)
+    computer.poke(2, 12345)
     # The run on these inputs needs less cycles (different branching)
     for _ in range(10):
         computer.ticktock()    
-    assert computer.peek(2) == 23456
+    assert computer.peek(3) == 23456
 
 
 def cycles_per_second():
@@ -498,11 +498,11 @@ def cycles_per_second():
         x = random.randint(0, 0x7FFF)
         y = random.randint(0, 0x7FFF)
         computer.reset_program()
-        computer.poke(0, x)
-        computer.poke(1, y)
+        computer.poke(1, x)
+        computer.poke(2, y)
         for _ in range(14):
             computer.ticktock()
-        assert computer.peek(2) == max(x, y)
+        assert computer.peek(3) == max(x, y)
 
     count, time = timeit.Timer(once).autorange()
 
