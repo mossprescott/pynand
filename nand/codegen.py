@@ -108,7 +108,12 @@ def generate_python(ic, inline=True):
             return False
 
     def output_name(comp):
-        return f"_{all_comps.index(comp)}_out"
+        if comp.label == "DFF":
+            return f"_{all_comps.index(comp)}_dff"
+        elif comp.label == "Register":
+            return f"_{all_comps.index(comp)}_reg"
+        else:
+            return f"_{all_comps.index(comp)}_out"
 
     def src_one(comp, name, bit=0):
         conn = ic.wires[Connection(comp, name, bit)]
@@ -122,12 +127,16 @@ def generate_python(ic, inline=True):
             expr = component_expr(conn.comp)
             if expr:
                 value = f"({expr})"
-            elif conn.comp.label in ("DFF", "Register"):
-                value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
+            elif conn.comp.label == "DFF":
+                value = f"_{all_comps.index(conn.comp)}_dff"
+            elif conn.comp.label == "Register":
+                value = f"_{all_comps.index(conn.comp)}_reg"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
-        elif conn.comp.label in ("DFF", "Register"):
-            value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
+        elif conn.comp.label == "DFF":
+            value = f"_{all_comps.index(conn.comp)}_dff"
+        elif conn.comp.label == "Register":
+            value = f"_{all_comps.index(conn.comp)}_reg"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -155,7 +164,7 @@ def generate_python(ic, inline=True):
             if conn.comp == root:
                 return f"self._{conn.name}"
             elif conn.comp.label == "Register":
-                return f"self._{all_comps.index(conn.comp)}_{conn.name}"
+                return f"_{all_comps.index(conn.comp)}_reg"
             elif inlinable(conn.comp):
                 expr = component_expr(conn.comp)
                 if expr:
@@ -241,13 +250,17 @@ def generate_python(ic, inline=True):
         l(2, f"self._{name} = 0  # output")
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
-            l(2, f"self.{output_name(comp)} = 0  # register")
+            l(2, f"self.{output_name(comp)} = 0")
         elif isinstance(comp, DFF):
-            l(2, f"self.{output_name(comp)} = False  # dff")
+            l(2, f"self.{output_name(comp)} = False")
     l(0, "")
 
     l(1, f"def _eval(self, update_state, cycles=1):")
     l(2,   f"for _ in range(cycles):")
+    for comp in all_comps:
+        if comp.label in ("DFF", "Register"):
+            comp_name = output_name(comp)
+            l(3, f"{comp_name} = self.{comp_name}")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
