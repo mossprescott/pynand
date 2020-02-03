@@ -109,8 +109,8 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, src_map=None):
-    computer = nand.syntax.run(project_05.Computer, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
+def run(program, chip=project_05.Computer, src_map=None):
+    computer = nand.syntax.run(chip, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
     computer.init_rom(program)
     
     kvm = KVM(sys.argv[1], 512, 256)
