@@ -288,6 +288,69 @@ class Translator(solved_07.Translator):
         self.asm.instr("0;JMP")
         return label
 
+    def _call(self):
+        """Common sequence for all calls.
+        
+        D = num_args
+        R14 = callee address
+        stack: return address already pushed
+        
+        Note: this is about 16 instructions better in all, by reducing each push to a single instruction
+        and keeping the new ARG address in D while the segment pointers are pushed. The total is now 24,
+        not to mention the 10 or so at each point of use that then jumps here. That's still frustratingly
+        many.
+        
+        Possible improvements:
+        - pass the callee address on the stack, now that it's cheaper?
+        - with an immediate load instruction (e.g. A=@LCL), save 5 cycles
+        - with an immediate store (e.g. @LCL=A), save another 3
+        
+        Possibly bigger return from a smarter compiler that avoids saving a full frame when calling 
+        functions that won't use/clobber everything. This is the familiar "leaf function" optimization.
+        """
+        
+        label = self.asm.next_label("call_common")
+
+        self.asm.start(f"call_common")
+        self.asm.label(label)
+
+        # D = SP - (D + 1) (which will be the new ARG)
+        self.asm.instr("@SP")
+        self.asm.instr("D=M-D")
+        self.asm.instr("D=D-1")
+
+        # push four segment pointers:
+        self.asm.instr("@LCL")
+        self.asm.instr("A=M")
+        self.asm.instr("SP++=A")
+        self.asm.instr("@ARG")
+        self.asm.instr("A=M")
+        self.asm.instr("SP++=A")
+        self.asm.instr("@THIS")
+        self.asm.instr("A=M")
+        self.asm.instr("SP++=A")
+        self.asm.instr("@THAT")
+        self.asm.instr("A=M")
+        self.asm.instr("SP++=A")
+
+        # ARG = D
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+
+        # LCL = SP
+        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
+        # state of the segment pointers consistent after each opcode, so it's easier to debug.
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+
+        # JMP to R14 (the callee)
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        return label
+
 
     # TODO: improve the common sequences for _call and _return.
 
