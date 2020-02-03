@@ -180,12 +180,36 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"@{value}")
             self.asm.instr(f"SP++=A")
 
+    def _pop_segment(self, segment_ptr, index):
+        # Since pop doesn't overwrite A, a much simpler sequence works:
+        if index == 0:
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=M")
+        elif index == 1:
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=M+1")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr("D=A")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=D+M")
+        self.asm.instr("D=--SP")
+        self.asm.instr("M=D")
+
     def _push_d(self):
         # TODO: no need for this as soon as everything's switched to use SP++ directly
         self.asm.instr("SP++=D")
 
+    def _pop_d(self):
+        # TODO: no need for this as soon as everything's switched to use SP++ directly?
+        self.asm.instr("D=--SP")
+
     def _binary(self, op):
-        # TODO: no need for this as soon as everything's switched to use SP++/--SP directly
         self.asm.instr("D=--SP")
         self.asm.instr("A=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'A')}")
+
+    def _unary(self, op):
+        self.asm.instr("D=--SP")
+        self.asm.instr(f"SP++={op.replace('M', 'D')}")
+
