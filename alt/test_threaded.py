@@ -75,7 +75,7 @@ def test_call_and_return(simulator):
 
 def test_computer_gates():
    assert gate_count(ThreadedComputer) == {
-       'nands': 1546,  # ??? compare to 1262
+       'nands': 1549,  # ??? compare to 1262
        'dffs': 64,  # 4 registers
        'roms': 1,
        'rams': 2,

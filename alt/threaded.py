@@ -110,7 +110,7 @@ def mkThreadedCPU(inputs, outputs):
     
     alu = lazy()
     pc = lazy()
-    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
+    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=And(a=da, b=Not(in_=call_rtn).out).out).out)
     d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
     ra_reg = Register(in_=pc.nxt, load=call)
 
@@ -270,6 +270,56 @@ class Translator:
         self.asm.start(f"gt")
         self.asm.instr(f"CALL VM.gt")
 
+    def pop_local(self, index):
+        self.asm.start(f"pop local {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.pop_local")
+
+    def pop_argument(self, index):
+        self.asm.start(f"pop argument {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.pop_argument")
+
+    def pop_this(self, index):
+        self.asm.start(f"pop this {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.pop_this")
+
+    def pop_that(self, index):
+        self.asm.start(f"pop that {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.pop_that")
+        
+    def pop_temp(self, index):
+        self.asm.start(f"pop temp {index}")
+        self.asm.instr(f"CALL VM.pop_temp_{index}")
+        
+    def push_local(self, index):
+        self.asm.start(f"push local {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.push_local")
+
+    def push_argument(self, index):
+        self.asm.start(f"push argument {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.push_argument")
+
+    def push_this(self, index):
+        self.asm.start(f"push this {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.push_this")
+
+    def push_that(self, index):
+        self.asm.start(f"push that {index}")
+        self.asm.instr(f"@{index}")
+        self.asm.instr(f"CALL VM.push_that")
+
+    def push_temp(self, index):
+        assert 0 <= index < 8
+        self.asm.start(f"push temp {index}")
+        self.asm.instr(f"CALL VM.push_temp_{index}")
+        
+
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -298,6 +348,11 @@ class Translator:
         self.asm.instr("M=D")
         self.asm.instr("RTN")
 
+        # pop to D; has to be generated inline each time because it's never a tail call:
+        def pop_d():
+            self.asm.instr("@SP")
+            self.asm.instr("AM=M-1")
+            self.asm.instr("D=M")
         
         # push constant
         for value in (0, 1):
@@ -317,6 +372,65 @@ class Translator:
         self.asm.instr("D=A")
         self.asm.instr("@VM._push_d")
         self.asm.instr("0;JMP")
+
+
+        # Push from one of the memory segments:
+        def push_segment(segment_ptr):
+            self.asm.instr("D=A")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("A=D+M")
+            self.asm.instr("D=M")
+            self.asm.instr("@VM._push_d")
+            self.asm.instr("0;JMP")
+        
+        self.asm.label("VM.push_local")
+        push_segment("LCL")
+        self.asm.label("VM.push_argument")
+        push_segment("ARG")
+        self.asm.label("VM.push_this")
+        push_segment("THIS")
+        self.asm.label("VM.push_that")
+        push_segment("THAT")
+
+        for index in range(8):
+            self.asm.label(f"VM.push_temp_{index}")
+            self.asm.instr(f"@R{5+index}")
+            self.asm.instr("D=M")
+            self.asm.instr("@VM._push_d")
+            self.asm.instr("0;JMP")
+
+            
+        # Pop to one of the memory segments:
+        def pop_segment(segment_ptr):
+            # R15 = ptr + index
+            self.asm.instr("D=A")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("D=D+M")
+            self.asm.instr("@R15")
+            self.asm.instr("M=D")
+            # D = RAM[SP--]
+            pop_d()
+            # RAM[R15] = D
+            self.asm.instr("@R15")
+            self.asm.instr("A=M")
+            self.asm.instr("M=D")
+            self.asm.instr("RTN")
+
+        self.asm.label("VM.pop_local")
+        pop_segment("LCL")
+        self.asm.label("VM.pop_argument")
+        pop_segment("ARG")
+        self.asm.label("VM.pop_this")
+        pop_segment("THIS")
+        self.asm.label("VM.pop_that")
+        pop_segment("THAT")
+
+        for index in range(8):
+            self.asm.label(f"VM.pop_temp_{index}")
+            pop_d()
+            self.asm.instr(f"@R{5+index}")
+            self.asm.instr("M=D")
+            self.asm.instr("RTN")
 
 
         # Binary ops:
