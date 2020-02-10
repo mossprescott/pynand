@@ -293,7 +293,12 @@ class Translator:
     def pop_temp(self, index):
         self.asm.start(f"pop temp {index}")
         self.asm.instr(f"CALL VM.pop_temp_{index}")
-        
+
+    def pop_pointer(self, index):
+        assert 0 <= index <= 1
+        self.asm.start(f"pop pointer {index}")
+        self.asm.instr(f"CALL VM.pop_pointer_{index}")
+
     def push_local(self, index):
         self.asm.start(f"push local {index}")
         self.asm.instr(f"@{index}")
@@ -319,6 +324,10 @@ class Translator:
         self.asm.start(f"push temp {index}")
         self.asm.instr(f"CALL VM.push_temp_{index}")
         
+    def push_pointer(self, index):
+        assert 0 <= index <= 1
+        self.asm.start(f"push pointer {index}")
+        self.asm.instr(f"CALL VM.push_pointer_{index}")
 
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
@@ -399,6 +408,18 @@ class Translator:
             self.asm.instr("@VM._push_d")
             self.asm.instr("0;JMP")
 
+        self.asm.label("VM.push_pointer_0")
+        self.asm.instr("@THIS")
+        self.asm.instr("D=M")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+
+        self.asm.label("VM.push_pointer_1")
+        self.asm.instr("@THAT")
+        self.asm.instr("D=M")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+
             
         # Pop to one of the memory segments:
         def pop_segment(segment_ptr):
@@ -431,6 +452,18 @@ class Translator:
             self.asm.instr(f"@R{5+index}")
             self.asm.instr("M=D")
             self.asm.instr("RTN")
+
+        self.asm.label("VM.pop_pointer_0")
+        pop_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("M=D")
+        self.asm.instr("RTN")
+
+        self.asm.label("VM.pop_pointer_1")
+        pop_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        self.asm.instr("RTN")
 
 
         # Binary ops:
