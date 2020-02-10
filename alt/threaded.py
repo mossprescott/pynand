@@ -99,11 +99,11 @@ def mkThreadedCPU(inputs, outputs):
                                      # program (reset==1) or continue executing
                                      # the current program (reset==0).
 
-    i, cr, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
+    i, ncr, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
 
     not_i = Not(in_=i).out
 
-    call_rtn = And(a=i, b=Not(in_=cr).out).out
+    call_rtn = And(a=i, b=Not(in_=ncr).out).out
     rtn = Eq16(a=instruction, b=0x8000).out
     call = And(a=call_rtn, b=Not(in_=rtn).out).out
     call_target = Mask15(in_=instruction).out
@@ -135,7 +135,7 @@ def mkThreadedCPU(inputs, outputs):
 
 
     outputs.outM = alu.out                   # M value output
-    outputs.writeM = And(a=dm, b=i).out      # Write to M?
+    outputs.writeM = And(a=dm, b=And(a=i, b=ncr).out).out      # Write to M?
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
@@ -192,6 +192,7 @@ class Translator:
         # Parameters controlling how many specialized opcode variants are emitted.
         # May be manually tweaked. A smart translator would inspect the source and choose them 
         # to optimize for size/speed.
+        self.SPECIALIZED_MAX_PUSH_CONSTANT = 3
         self.SPECIALIZED_MAX_CALL_NUM_ARGS = 2
 
         start = self.asm.next_label("start")
@@ -219,6 +220,24 @@ class Translator:
 
         self.call("Sys", "init", 0)
     
+    def push_constant(self, value):
+        """Value to push in A if not specialized.
+        """
+
+        assert 0 <= value < 2**15
+        
+        self.asm.start(f"push constant {value}")
+        
+        if value <= self.SPECIALIZED_MAX_PUSH_CONSTANT:
+            self.asm.instr(f"CALL VM.push_constant_{value}")
+        else:
+            self.asm.instr(f"@{value}")
+            self.asm.instr(f"CALL VM.push_constant")
+
+    def add(self):
+        self.asm.start(f"add")
+        self.asm.instr(f"CALL VM.add")
+    
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -238,6 +257,47 @@ class Translator:
             self.asm.instr(f"CALL VM.call")
 
     def _library(self):
+
+        # push from D and return:
+        self.asm.label(f"VM._push_d")
+        self.asm.instr("@SP")
+        self.asm.instr("M=M+1")
+        self.asm.instr("A=M-1")
+        self.asm.instr("M=D")
+        self.asm.instr("RTN")
+
+        
+        # push constant
+        for value in (0, 1):
+            self.asm.label(f"VM.push_constant_{value}")
+            self.asm.instr(f"D={value}")
+            self.asm.instr("@VM._push_d")
+            self.asm.instr(f"0;JMP")
+        
+        for value in range(2, self.SPECIALIZED_MAX_PUSH_CONSTANT+1):
+            self.asm.label(f"VM.push_constant_{value}")
+            self.asm.instr(f"@{value}")
+            self.asm.instr("D=A")
+            self.asm.instr("@VM._push_d")
+            self.asm.instr(f"0;JMP")
+
+        self.asm.label("VM.push_constant")
+        self.asm.instr("D=A")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+
+
+        
+        # add
+        
+        self.asm.label("VM.add")
+        self.asm.instr("@SP")
+        self.asm.instr("AM=M-1")  # update SP
+        self.asm.instr("D=M")     # D = top
+        self.asm.instr("A=A-1")   # Don't update SP again
+        self.asm.instr("M=D+M")
+        self.asm.instr("RTN")
+
         
         # call
         

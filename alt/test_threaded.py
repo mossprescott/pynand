@@ -75,7 +75,7 @@ def test_call_and_return(simulator):
 
 def test_computer_gates():
    assert gate_count(ThreadedComputer) == {
-       'nands': 1544,  # ??? compare to 1262
+       'nands': 1546,  # ??? compare to 1262
        'dffs': 64,  # 4 registers
        'roms': 1,
        'rams': 2,
@@ -119,7 +119,6 @@ def test_assemble_return():
 
 def test_vm_simple_add():
     test_07.test_simple_add(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    assert False
 
 def test_vm_stack_ops():
     test_07.test_stack_ops(chip=ThreadedComputer, assemble=assemble, translator=Translator)
