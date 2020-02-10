@@ -17,5 +17,8 @@ def test_inc16():
 def test_add16():
     assert gate_count(Add16)['nands'] == 140  # ?
 
+def test_zero16():
+    assert gate_count(Zero16)['nands'] == 46  # ?
+
 def test_alu():
     assert gate_count(ALU)['nands'] == 560  # ?
