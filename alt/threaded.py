@@ -237,7 +237,39 @@ class Translator:
     def add(self):
         self.asm.start(f"add")
         self.asm.instr(f"CALL VM.add")
-    
+
+    def sub(self):
+        self.asm.start(f"sub")
+        self.asm.instr(f"CALL VM.sub")
+
+    def neg(self):
+        self.asm.start(f"neg")
+        self.asm.instr(f"CALL VM.neg")
+
+    def and_op(self):
+        self.asm.start(f"and")
+        self.asm.instr(f"CALL VM.and")
+
+    def or_op(self):
+        self.asm.start(f"or")
+        self.asm.instr(f"CALL VM.or")
+
+    def not_op(self):
+        self.asm.start(f"not")
+        self.asm.instr(f"CALL VM.not")
+
+    def eq(self):
+        self.asm.start(f"eq")
+        self.asm.instr(f"CALL VM.eq")
+
+    def lt(self):
+        self.asm.start(f"lt")
+        self.asm.instr(f"CALL VM.lt")
+
+    def gt(self):
+        self.asm.start(f"gt")
+        self.asm.instr(f"CALL VM.gt")
+
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -287,17 +319,76 @@ class Translator:
         self.asm.instr("0;JMP")
 
 
-        
-        # add
-        
-        self.asm.label("VM.add")
-        self.asm.instr("@SP")
-        self.asm.instr("AM=M-1")  # update SP
-        self.asm.instr("D=M")     # D = top
-        self.asm.instr("A=A-1")   # Don't update SP again
-        self.asm.instr("M=D+M")
-        self.asm.instr("RTN")
+        # Binary ops:
 
+        def binary(op):
+            self.asm.instr("@SP")
+            self.asm.instr("AM=M-1")  # update SP
+            self.asm.instr("D=M")     # D = top
+            self.asm.instr("A=A-1")   # Don't update SP again
+            self.asm.instr(f"M={op}")
+            self.asm.instr("RTN")
+
+        self.asm.label("VM.add")
+        binary("D+M")
+        self.asm.label("VM.sub")
+        binary("M-D")
+        self.asm.label("VM.and")
+        binary("D&M")
+        self.asm.label("VM.or")
+        binary("D|M")
+
+
+        # Unary ops:
+
+        def unary(op):
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            self.asm.instr(f"M={op}")
+            self.asm.instr("RTN")
+
+        self.asm.label("VM.neg")
+        unary("-M")
+        self.asm.label("VM.not")
+        unary("!M")
+
+
+        # comparisons:
+        
+        def compare(op):
+            label = self.asm.next_label(f"VM._{op.lower()}")
+            end_label = self.asm.next_label(f"VM._{op.lower()}$end")
+        
+            # D = top, M = second from top, SP -= 1 (not 2!)
+            self.asm.instr("@SP")
+            self.asm.instr("AM=M-1")
+            self.asm.instr("D=M")
+            self.asm.instr("A=A-1")
+
+            # Compare
+            self.asm.instr("D=M-D")
+        
+            # Set result True, optimistically (since A is already loaded with the destination)
+            self.asm.instr("M=-1")
+        
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"D;J{op}")
+        
+            # Set result False
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=0")
+
+            self.asm.label(end_label)
+            self.asm.instr("RTN")
+        
+        self.asm.label(f"VM.eq")
+        compare("EQ")
+        self.asm.label(f"VM.lt")
+        compare("LT")
+        self.asm.label(f"VM.gt")
+        compare("GT")
+        
         
         # call
         
