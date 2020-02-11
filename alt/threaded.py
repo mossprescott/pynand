@@ -2,7 +2,13 @@
 making a simple non-recursive call/return cost only one instruction in ROM per occurrence. With that,
 a "threaded" interpreter is much more compact (and readable).
 
-A register is added to hold the return address, leaving D and A available for arguments.
+Essentially the binary consists of two parts: a fixed "library" if opcode handlers, written using the 
+usual Hack machine instructions, and the actual program, which is now just a sequence of calls into 
+the opcode handlers. Most of these calls are just a single instruction, so the overall size of the 
+binary is roughly the number of opcodes in the VM source, plus the fixed library (roughly 1k).
+
+A register is added to hold the return address, leaving D and A available for arguments, although 
+practically speaking the handler always needs to clobber one register or the other.
 
 CALL [symbol]
 - bit pattern: 10xx_xxxx_xxxx_xxxx
