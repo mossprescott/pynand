@@ -369,10 +369,20 @@ class Translator:
         """Callee address in A. num_args in R13 if not specialized.
         """
 
+        return_label = self.asm.next_label("RET_ADDRESS_CALL")
+
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
 
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        # (push D):
+        self.asm.instr("@SP")
+        self.asm.instr("M=M+1")
+        self.asm.instr("A=M-1")
+        self.asm.instr("M=D")
+
         if num_args <= self.SPECIALIZED_MAX_CALL_NUM_ARGS:
-            self.asm.instr(f"@{class_name}.{function_name}")
+            self.asm.instr(f"@{class_name.lower()}.{function_name}")
             self.asm.instr(f"CALL VM.call_{num_args}")
         else:
             self.asm.instr(f"@{num_args}")
@@ -380,9 +390,10 @@ class Translator:
             self.asm.instr(f"@R13")
             self.asm.instr(f"M=D")
         
-            self.asm.instr(f"@{class_name}.{function_name}")
+            self.asm.instr(f"@{class_name.lower()}.{function_name}")
             self.asm.instr(f"CALL VM.call")
 
+        self.asm.label(return_label)
 
     def _library(self):
 
@@ -621,9 +632,12 @@ class Translator:
 
         # TODO: definitely inline some values
 
+        test_label = "VM.function$test"
         loop_label = "VM.function$loop"
         self.asm.label("VM.function")
         self.asm.instr("D=A")
+        self.asm.instr(f"@{test_label}")
+        self.asm.instr("0;JMP")
         
         self.asm.label(loop_label)
         self.asm.instr("@SP")
@@ -631,6 +645,7 @@ class Translator:
         self.asm.instr("A=M-1")  # TODO: save a few instr. by updating RAM[SP] after
         self.asm.instr("M=0")
         self.asm.instr("D=D-1")
+        self.asm.label(test_label)
         self.asm.instr(f"@{loop_label}")
         self.asm.instr("D;JGT")
 
@@ -695,11 +710,17 @@ class Translator:
             self.asm.instr(f"D=A")
             self.asm.instr(f"@R14")
             self.asm.instr(f"M=D")
-            self.asm.instr(f"@{num_args}")
-            self.asm.instr(f"D=A")
-            self.asm.instr(f"@R13")
-            self.asm.instr(f"M=D")
-            self.asm.instr(f"@VM.call_common")
+
+            if num_args <= 1:
+                self.asm.instr(f"@R13")
+                self.asm.instr(f"M={num_args}")
+            else:
+                self.asm.instr(f"@{num_args}")
+                self.asm.instr(f"D=A")
+                self.asm.instr(f"@R13")
+                self.asm.instr(f"M=D")
+
+            self.asm.instr(f"@VM._call_common")
             self.asm.instr(f"0;JMP")
 
         self.asm.label(f"VM.call")
@@ -707,13 +728,52 @@ class Translator:
         self.asm.instr(f"D=A")
         self.asm.instr(f"@R14")
         self.asm.instr(f"M=D")
-        # fall through to the common impl:
+        # fall through to the common impl...
 
-        self.asm.label(f"VM.call_common")
-        # TODO...
-        self.asm.instr(f"@R14")
-        self.asm.instr(f"A=M")
-        self.asm.instr(f"0;JMP")
+
+        self.asm.label(f"VM._call_common")
+
+        # R15 = SP - (R13 + 1) (which will be the new ARG)
+        self.asm.instr("@R13")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("D=M-D")
+        self.asm.instr("D=D-1")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+
+        # push four segment pointers:
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        push_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        push_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("D=M")
+        push_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("D=M")
+        push_d()
+
+        # LCL = SP
+        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
+        # state of the segment pointers consistent after each opcode, so it's easier to debug.
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+
+        # ARG = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+
+        # JMP to R14 (the callee)
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
 
 
 if __name__ == "__main__":
