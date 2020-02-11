@@ -395,6 +395,9 @@ class Translator:
 
         self.asm.label(return_label)
 
+    def rewrite_ops(self, ops):
+        return ops
+
     def _library(self):
 
         # Push from D:
