@@ -139,11 +139,6 @@ def mkThreadedCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-    # HACK
-    outputs.ra = ra_reg.out
-    outputs.rtn = rtn
-    outputs.call = call
-
 ThreadedCPU = build(mkThreadedCPU)
 
 
