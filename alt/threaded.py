@@ -187,13 +187,16 @@ class Translator:
     """
     
     def __init__(self):
-        self.asm = AssemblySource()
-
         # Parameters controlling how many specialized opcode variants are emitted.
         # May be manually tweaked. A smart translator would inspect the source and choose them 
         # to optimize for size/speed.
         self.SPECIALIZED_MAX_PUSH_CONSTANT = 3
         self.SPECIALIZED_MAX_CALL_NUM_ARGS = 2
+
+        self.asm = AssemblySource()
+
+        self.class_namespace = "_"
+        self.function_namespace = "_"
 
         start = self.asm.next_label("start")
         self.asm.instr(f"@{start}")
@@ -329,6 +332,16 @@ class Translator:
         self.asm.start(f"push pointer {index}")
         self.asm.instr(f"CALL VM.push_pointer_{index}")
 
+    def pop_static(self, index):
+        self.asm.start(f"push static {index}")
+        self.asm.instr(f"@{self.class_namespace}.static{index}")
+        self.asm.instr(f"CALL VM.pop_static")
+        
+    def push_static(self, index):
+        self.asm.start(f"pop static {index}")
+        self.asm.instr(f"@{self.class_namespace}.static{index}")
+        self.asm.instr(f"CALL VM.push_static")
+
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -408,18 +421,6 @@ class Translator:
             self.asm.instr("@VM._push_d")
             self.asm.instr("0;JMP")
 
-        self.asm.label("VM.push_pointer_0")
-        self.asm.instr("@THIS")
-        self.asm.instr("D=M")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
-
-        self.asm.label("VM.push_pointer_1")
-        self.asm.instr("@THAT")
-        self.asm.instr("D=M")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
-
             
         # Pop to one of the memory segments:
         def pop_segment(segment_ptr):
@@ -453,6 +454,21 @@ class Translator:
             self.asm.instr("M=D")
             self.asm.instr("RTN")
 
+
+        # Push/pop pointer:
+
+        self.asm.label("VM.push_pointer_0")
+        self.asm.instr("@THIS")
+        self.asm.instr("D=M")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+
+        self.asm.label("VM.push_pointer_1")
+        self.asm.instr("@THAT")
+        self.asm.instr("D=M")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+
         self.asm.label("VM.pop_pointer_0")
         pop_d()
         self.asm.instr("@THIS")
@@ -462,6 +478,24 @@ class Translator:
         self.asm.label("VM.pop_pointer_1")
         pop_d()
         self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        self.asm.instr("RTN")
+
+
+        # Push/pop static:
+        
+        self.asm.label("VM.push_static")
+        self.asm.instr("D=M")
+        self.asm.instr("@VM._push_d")
+        self.asm.instr("0;JMP")
+        
+        self.asm.label("VM.pop_static")
+        self.asm.instr("D=A")
+        self.asm.instr("@R15")  # R15 = target address
+        self.asm.instr("M=D")
+        pop_d()
+        self.asm.instr("@R15")
+        self.asm.instr("A=M")
         self.asm.instr("M=D")
         self.asm.instr("RTN")
 
