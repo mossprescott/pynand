@@ -351,6 +351,20 @@ class Translator:
         self.asm.instr(f"@{self.function_namespace}${name}")
         self.asm.instr("0;JMP")
 
+    def function(self, class_name, function_name, num_vars):
+        self.class_namespace = class_name.lower()
+        self.function_namespace = f"{class_name.lower()}.{function_name}"
+
+        self.asm.start(f"function {class_name}.{function_name} {num_vars}")
+        self.asm.label(f"{self.function_namespace}")
+        self.asm.instr(f"@{num_vars}")
+        self.asm.instr(f"CALL VM.function")
+
+    def return_op(self):
+        # Note: not actually going to RTN from this, but using CALL still saves a word.
+        self.asm.start("return")
+        self.asm.instr("CALL VM.return")
+
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -372,13 +386,12 @@ class Translator:
 
     def _library(self):
 
-        # push from D and return:
-        self.asm.label(f"VM._push_d")
-        self.asm.instr("@SP")
-        self.asm.instr("M=M+1")
-        self.asm.instr("A=M-1")
-        self.asm.instr("M=D")
-        self.asm.instr("RTN")
+        # Push from D:
+        def push_d():
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=D")
 
         # pop to D; has to be generated inline each time because it's never a tail call:
         def pop_d():
@@ -386,6 +399,11 @@ class Translator:
             self.asm.instr("AM=M-1")
             self.asm.instr("D=M")
         
+        # push from D and return:
+        self.asm.label(f"VM._push_d")
+        push_d()
+        self.asm.instr("RTN")
+
         # push constant
         for value in (0, 1):
             self.asm.label(f"VM.push_constant_{value}")
@@ -582,8 +600,8 @@ class Translator:
         
         
         # if-goto:
-        not_taken_label = self.asm.next_label("not_taken")
-        self.asm.label(f"VM.if_goto")
+        not_taken_label = "VM.if_goto$not_taken"
+        self.asm.label("VM.if_goto")
         self.asm.instr("D=A")
         self.asm.instr("@R15")  # R15 = target address
         self.asm.instr("M=D")
@@ -597,10 +615,81 @@ class Translator:
         
         self.asm.label(not_taken_label)
         self.asm.instr("RTN")
+
+
+        # function:
+
+        # TODO: definitely inline some values
+
+        loop_label = "VM.function$loop"
+        self.asm.label("VM.function")
+        self.asm.instr("D=A")
         
+        self.asm.label(loop_label)
+        self.asm.instr("@SP")
+        self.asm.instr("M=M+1")
+        self.asm.instr("A=M-1")  # TODO: save a few instr. by updating RAM[SP] after
+        self.asm.instr("M=0")
+        self.asm.instr("D=D-1")
+        self.asm.instr(f"@{loop_label}")
+        self.asm.instr("D;JGT")
+
+        self.asm.instr("RTN")
+
+
+        # return:
         
-        # call
+        self.asm.label("VM.return")
         
+        # R13 = result
+        pop_d()
+        self.asm.instr("@R13")
+        self.asm.instr("M=D")
+        
+        # SP = LCL
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+        # R15 = ARG
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+        # restore segment pointers from stack:
+        pop_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        pop_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("M=D")
+        pop_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+        pop_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+        # R14 = return address
+        pop_d()
+        self.asm.instr("@R14")
+        self.asm.instr("M=D")
+        # SP = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+        # Push R13 (result)
+        self.asm.instr("@R13")
+        self.asm.instr("D=M")
+        push_d()
+        # jmp to R14
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+
+
+        # call:
+
         for num_args in range(self.SPECIALIZED_MAX_CALL_NUM_ARGS+1):
             self.asm.label(f"VM.call_{num_args}")
             self.asm.instr(f"D=A")
