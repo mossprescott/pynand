@@ -30,17 +30,19 @@ def test_backward_compatible_speed():
 #
 # Components:
 #
-def test_eq16():
-    assert run(Eq16, a=1, b=0).out == False
-    assert run(Eq16, a=0, b=0).out == True
-    assert run(Eq16, a=12345, b=12345).out == True
-    assert run(Eq16, a=-23456, b=-23456).out == True
-    assert run(Eq16, a=-32768, b=-32768).out == True
+@pytest.mark.parametrize("simulator", ["vector", "codegen"])
+def test_eq16(simulator):
+    assert run(Eq16, a=1, b=0, simulator=simulator).out == False
+    assert run(Eq16, a=0, b=0, simulator=simulator).out == True
+    assert run(Eq16, a=12345, b=12345, simulator=simulator).out == True
+    assert run(Eq16, a=-23456, b=-23456, simulator=simulator).out == True
+    assert run(Eq16, a=-32768, b=-32768, simulator=simulator).out == True
     for i in range(16):
-        assert run(Eq16, a=(1 << i), b=(1 << i)).out == True
-        assert run(Eq16, a=(1 << i), b=       0).out == False
-        assert run(Eq16, a=       0, b=(1 << i)).out == False
+        assert run(Eq16, a=(1 << i), b=(1 << i), simulator=simulator).out == True
+        assert run(Eq16, a=(1 << i), b=       0, simulator=simulator).out == False
+        assert run(Eq16, a=       0, b=(1 << i), simulator=simulator).out == False
 
+def test_eq16_gates():
     # Ouch. Probably could do it with less if was smarter.
     assert gate_count(Eq16) == {'nands': 110}
 
