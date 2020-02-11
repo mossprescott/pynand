@@ -149,7 +149,6 @@ def test_vm_nested_call():
 
 def test_vm_fibonacci_element():
     test_08.test_fibonacci_element(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    assert False
 
 def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ThreadedComputer, assemble=assemble, translator=Translator)
