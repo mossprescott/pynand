@@ -37,9 +37,13 @@ Interpreter example:
 That's 2 instructions in ROM and 8 at runtime for pushing a large constant. Compare to 6 each in the standard VM.
 For small values, down to 1 (6 at runtime) from 4.
 
-Other opcodes:
-- gotos don't return, so only one instruction in ROM and one added at runtime.
-- call needs an address and arg count, so two or three more instructions to setup, total of 4 or 5 (compare to 13.)
+The result is dramatically smaller executables, which run slower:
+- gates: about 1,550 (+23% from 1,262), but could probably be improved
+- instruction count for Pong: 8.5k (-70% from 29.5k)
+- cycles in Sys.init: 5.5m (+38% from 3.97m)
+
+That means some very large demos can now run. These are programs whose authors probably only ever ran them on the 
+VM-level simulator.
 """
 
 import re
@@ -173,8 +177,6 @@ def parse_op(string, symbols={}):
 
 def assemble(lines):
     return solved_06.assemble(lines, parse_op)
-
-
 
 
 class Translator:
