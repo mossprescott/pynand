@@ -183,10 +183,15 @@ class Translator:
     
     def __init__(self):
         # Parameters controlling how many specialized opcode variants are emitted.
+        # More specialization means a larger library, but smaller object code and 
+        # fewer cycles, generally.
         # May be manually tweaked. A smart translator would inspect the source and choose them 
         # to optimize for size/speed.
-        self.SPECIALIZED_MAX_PUSH_CONSTANT = 3
-        self.SPECIALIZED_MAX_CALL_NUM_ARGS = 2
+        self.SPECIALIZED_MAX_PUSH_CONSTANT = 6  # TODO: 12?
+        self.SPECIALIZED_MAX_POP_SEGMENT = 6  # TODO: 10?
+        self.SPECIALIZED_MAX_PUSH_SEGMENT = 6
+        self.SPECIALIZED_MAX_FUNCTION_NUM_LOCALS = 10  # TODO: ?
+        self.SPECIALIZED_MAX_CALL_NUM_ARGS = 4  # TODO: ?
 
         self.asm = AssemblySource()
 
@@ -270,23 +275,35 @@ class Translator:
 
     def pop_local(self, index):
         self.asm.start(f"pop local {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.pop_local")
+        if index <= self.SPECIALIZED_MAX_POP_SEGMENT:
+            self.asm.instr(f"CALL VM.pop_local_{index}")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.pop_local")
 
     def pop_argument(self, index):
         self.asm.start(f"pop argument {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.pop_argument")
+        if index <= self.SPECIALIZED_MAX_POP_SEGMENT:
+            self.asm.instr(f"CALL VM.pop_argument_{index}")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.pop_argument")
 
     def pop_this(self, index):
         self.asm.start(f"pop this {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.pop_this")
+        if index <= self.SPECIALIZED_MAX_POP_SEGMENT:
+            self.asm.instr(f"CALL VM.pop_this_{index}")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.pop_this")
 
     def pop_that(self, index):
         self.asm.start(f"pop that {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.pop_that")
+        if index <= self.SPECIALIZED_MAX_POP_SEGMENT:
+            self.asm.instr(f"CALL VM.pop_that_{index}")
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.pop_that")
         
     def pop_temp(self, index):
         self.asm.start(f"pop temp {index}")
@@ -299,23 +316,35 @@ class Translator:
 
     def push_local(self, index):
         self.asm.start(f"push local {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.push_local")
+        if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
+            self.asm.instr(f"CALL VM.push_local_{index}")            
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.push_local")
 
     def push_argument(self, index):
         self.asm.start(f"push argument {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.push_argument")
+        if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
+            self.asm.instr(f"CALL VM.push_argument_{index}")            
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.push_argument")
 
     def push_this(self, index):
         self.asm.start(f"push this {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.push_this")
+        if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
+            self.asm.instr(f"CALL VM.push_this_{index}")            
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.push_this")
 
     def push_that(self, index):
         self.asm.start(f"push that {index}")
-        self.asm.instr(f"@{index}")
-        self.asm.instr(f"CALL VM.push_that")
+        if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
+            self.asm.instr(f"CALL VM.push_that_{index}")            
+        else:
+            self.asm.instr(f"@{index}")
+            self.asm.instr(f"CALL VM.push_that")
 
     def push_temp(self, index):
         assert 0 <= index < 8
@@ -357,8 +386,11 @@ class Translator:
 
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.asm.label(f"{self.function_namespace}")
-        self.asm.instr(f"@{num_vars}")
-        self.asm.instr(f"CALL VM.function")
+        if num_vars <= self.SPECIALIZED_MAX_FUNCTION_NUM_LOCALS:
+            self.asm.instr(f"CALL VM.function_{num_vars}")
+        else:
+            self.asm.instr(f"@{num_vars}")
+            self.asm.instr(f"CALL VM.function")
 
     def return_op(self):
         # Note: not actually going to RTN from this, but using CALL still saves a word.
@@ -374,12 +406,7 @@ class Translator:
         self.asm.start(f"call {class_name}.{function_name} {num_args}")
 
         self.asm.instr(f"@{return_label}")
-        self.asm.instr("D=A")
-        # (push D):
-        self.asm.instr("@SP")
-        self.asm.instr("M=M+1")
-        self.asm.instr("A=M-1")
-        self.asm.instr("M=D")
+        self.asm.instr("CALL VM._push_a")
 
         if num_args <= self.SPECIALIZED_MAX_CALL_NUM_ARGS:
             self.asm.instr(f"@{class_name.lower()}.{function_name}")
@@ -414,6 +441,7 @@ class Translator:
             self.asm.instr("D=M")
         
         # push from D and return:
+        # TODO: try inlining this at every use site. That will cost only about 3*11 words of rom, and save 2 cycles each time.
         self.asm.label(f"VM._push_d")
         push_d()
         self.asm.instr("RTN")
@@ -421,16 +449,21 @@ class Translator:
         # push constant
         for value in (0, 1):
             self.asm.label(f"VM.push_constant_{value}")
-            self.asm.instr(f"D={value}")
-            self.asm.instr("@VM._push_d")
-            self.asm.instr(f"0;JMP")
+            # self.asm.instr(f"D={value}")
+            # self.asm.instr("@VM._push_d")
+            # self.asm.instr(f"0;JMP")
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr(f"M={value}")
+            self.asm.instr("RTN")
         
         for value in range(2, self.SPECIALIZED_MAX_PUSH_CONSTANT+1):
             self.asm.label(f"VM.push_constant_{value}")
             self.asm.instr(f"@{value}")
             self.asm.instr("D=A")
             self.asm.instr("@VM._push_d")
-            self.asm.instr(f"0;JMP")
+            self.asm.instr("0;JMP")
 
         self.asm.label("VM.push_constant")
         self.asm.instr("D=A")
@@ -439,7 +472,29 @@ class Translator:
 
 
         # Push from one of the memory segments:
-        def push_segment(segment_ptr):
+        def push_segment(segment_ptr, index):
+            if index == 0:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M")
+                self.asm.instr("D=M")
+                self.asm.instr("@VM._push_d")
+                self.asm.instr("0;JMP")
+            elif index == 1:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M+1")
+                self.asm.instr("D=M")
+                self.asm.instr("@VM._push_d")
+                self.asm.instr("0;JMP")
+            else:
+                self.asm.instr(f"@{index}")
+                self.asm.instr("D=A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=D+M")
+                self.asm.instr("D=M")
+                self.asm.instr("@VM._push_d")
+                self.asm.instr("0;JMP")
+
+        def push_segment_a(segment_ptr):
             self.asm.instr("D=A")
             self.asm.instr(f"@{segment_ptr}")
             self.asm.instr("A=D+M")
@@ -447,25 +502,33 @@ class Translator:
             self.asm.instr("@VM._push_d")
             self.asm.instr("0;JMP")
         
-        self.asm.label("VM.push_local")
-        push_segment("LCL")
-        self.asm.label("VM.push_argument")
-        push_segment("ARG")
-        self.asm.label("VM.push_this")
-        push_segment("THIS")
-        self.asm.label("VM.push_that")
-        push_segment("THAT")
+        for index in range(self.SPECIALIZED_MAX_PUSH_SEGMENT+1):
+            self.asm.label(f"VM.push_local_{index}")
+            push_segment("LCL", index)
+            self.asm.label(f"VM.push_argument_{index}")
+            push_segment("ARG", index)
+            self.asm.label(f"VM.push_this_{index}")
+            push_segment("THIS", index)
+            self.asm.label(f"VM.push_that_{index}")
+            push_segment("THAT", index)
 
-        for index in range(8):
-            self.asm.label(f"VM.push_temp_{index}")
-            self.asm.instr(f"@R{5+index}")
-            self.asm.instr("D=M")
-            self.asm.instr("@VM._push_d")
-            self.asm.instr("0;JMP")
+        self.asm.label("VM.push_local")
+        push_segment_a("LCL")
+        self.asm.label("VM.push_argument")
+        push_segment_a("ARG")
+        self.asm.label("VM.push_this")
+        push_segment_a("THIS")
+        self.asm.label("VM.push_that")
+        push_segment_a("THAT")
 
             
         # Pop to one of the memory segments:
-        def pop_segment(segment_ptr):
+        def pop_segment(segment_ptr, index):
+            # TODO: specialize 0 and 1 to save two instr.
+            self.asm.instr(f"@{index}")
+            pop_segment_a(segment_ptr)
+        
+        def pop_segment_a(segment_ptr):
             # R15 = ptr + index
             self.asm.instr("D=A")
             self.asm.instr(f"@{segment_ptr}")
@@ -480,14 +543,34 @@ class Translator:
             self.asm.instr("M=D")
             self.asm.instr("RTN")
 
+        for index in range(self.SPECIALIZED_MAX_POP_SEGMENT+1):
+            self.asm.label(f"VM.pop_local_{index}")
+            pop_segment("LCL", index)
+            self.asm.label(f"VM.pop_argument_{index}")
+            pop_segment("ARG", index)
+            self.asm.label(f"VM.pop_this_{index}")
+            pop_segment("THIS", index)
+            self.asm.label(f"VM.pop_that_{index}")
+            pop_segment("THAT", index)
+
         self.asm.label("VM.pop_local")
-        pop_segment("LCL")
+        pop_segment_a("LCL")
         self.asm.label("VM.pop_argument")
-        pop_segment("ARG")
+        pop_segment_a("ARG")
         self.asm.label("VM.pop_this")
-        pop_segment("THIS")
+        pop_segment_a("THIS")
         self.asm.label("VM.pop_that")
-        pop_segment("THAT")
+        pop_segment_a("THAT")
+
+
+        # Push/pop temp:
+
+        for index in range(8):
+            self.asm.label(f"VM.push_temp_{index}")
+            self.asm.instr(f"@R{5+index}")
+            self.asm.instr("D=M")
+            self.asm.instr("@VM._push_d")
+            self.asm.instr("0;JMP")
 
         for index in range(8):
             self.asm.label(f"VM.pop_temp_{index}")
@@ -633,7 +716,17 @@ class Translator:
 
         # function:
 
-        # TODO: definitely inline some values
+        for num_vars in range(self.SPECIALIZED_MAX_FUNCTION_NUM_LOCALS+1):
+            self.asm.label(f"VM.function_{num_vars}")
+            self.asm.instr("@SP")
+            self.asm.instr("A=M")
+            for _ in range(num_vars):
+                self.asm.instr("M=0")
+                self.asm.instr("A=A+1")
+            self.asm.instr("D=A")
+            self.asm.instr("@SP")
+            self.asm.instr("M=D")
+            self.asm.instr("RTN")
 
         test_label = "VM.function$test"
         loop_label = "VM.function$loop"
@@ -777,6 +870,17 @@ class Translator:
         self.asm.instr("@R14")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
+
+
+        # Used to push the return address in call ops:
+        
+        self.asm.label("VM._push_a")
+        self.asm.instr("D=A")
+        self.asm.instr("@SP")
+        self.asm.instr("M=M+1")
+        self.asm.instr("A=M-1")
+        self.asm.instr("M=D")
+        self.asm.instr("RTN")
 
 
 if __name__ == "__main__":
