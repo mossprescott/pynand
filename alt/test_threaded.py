@@ -156,25 +156,13 @@ def test_vm_statics_multiple_files():
 
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
-    
+
     # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # ~8_500
+    assert instruction_count < -1  # ~8_700
 
 
 def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(ThreadedComputer, assemble, Translator)
 
     # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # ~6m
-    
-
-# def init_sp(cpu):
-#     ASM = [
-#         "@256",
-#         "D=A",
-#         "@0",
-#         "M=D",
-#     ]
-#     for instr in ASM:
-#         cpu.instruction = parse_op(instr)
-#         cpu.ticktock()
+    assert cycles < -1  # ~5.1m

@@ -39,8 +39,8 @@ For small values, down to 1 (6 at runtime) from 4.
 
 The result is dramatically smaller executables, which run slower:
 - gates: about 1,550 (+23% from 1,262), but could probably be improved
-- instruction count for Pong: 8.5k (-70% from 29.5k)
-- cycles in Sys.init: 5.5m (+38% from 3.97m)
+- instruction count for Pong: 8.7k (-70% from 29.5k)
+- cycles in Sys.init: 5.1m (+28% from 3.97m)
 
 That means some very large demos can now run. These are programs whose authors probably only ever ran them on the 
 VM-level simulator.
@@ -442,18 +442,9 @@ class Translator:
             self.asm.instr("AM=M-1")
             self.asm.instr("D=M")
         
-        # push from D and return:
-        # TODO: try inlining this at every use site. That will cost only about 3*11 words of rom, and save 2 cycles each time.
-        self.asm.label(f"VM._push_d")
-        push_d()
-        self.asm.instr("RTN")
-
         # push constant
         for value in (0, 1):
             self.asm.label(f"VM.push_constant_{value}")
-            # self.asm.instr(f"D={value}")
-            # self.asm.instr("@VM._push_d")
-            # self.asm.instr(f"0;JMP")
             self.asm.instr("@SP")
             self.asm.instr("M=M+1")
             self.asm.instr("A=M-1")
@@ -464,13 +455,13 @@ class Translator:
             self.asm.label(f"VM.push_constant_{value}")
             self.asm.instr(f"@{value}")
             self.asm.instr("D=A")
-            self.asm.instr("@VM._push_d")
-            self.asm.instr("0;JMP")
+            push_d()
+            self.asm.instr("RTN")
 
         self.asm.label("VM.push_constant")
         self.asm.instr("D=A")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
+        push_d()
+        self.asm.instr("RTN")
 
 
         # Push from one of the memory segments:
@@ -479,30 +470,30 @@ class Translator:
                 self.asm.instr(f"@{segment_ptr}")
                 self.asm.instr("A=M")
                 self.asm.instr("D=M")
-                self.asm.instr("@VM._push_d")
-                self.asm.instr("0;JMP")
+                push_d()
+                self.asm.instr("RTN")
             elif index == 1:
                 self.asm.instr(f"@{segment_ptr}")
                 self.asm.instr("A=M+1")
                 self.asm.instr("D=M")
-                self.asm.instr("@VM._push_d")
-                self.asm.instr("0;JMP")
+                push_d()
+                self.asm.instr("RTN")
             else:
                 self.asm.instr(f"@{index}")
                 self.asm.instr("D=A")
                 self.asm.instr(f"@{segment_ptr}")
                 self.asm.instr("A=D+M")
                 self.asm.instr("D=M")
-                self.asm.instr("@VM._push_d")
-                self.asm.instr("0;JMP")
+                push_d()
+                self.asm.instr("RTN")
 
         def push_segment_a(segment_ptr):
             self.asm.instr("D=A")
             self.asm.instr(f"@{segment_ptr}")
             self.asm.instr("A=D+M")
             self.asm.instr("D=M")
-            self.asm.instr("@VM._push_d")
-            self.asm.instr("0;JMP")
+            push_d()
+            self.asm.instr("RTN")
         
         for index in range(self.SPECIALIZED_MAX_PUSH_SEGMENT+1):
             self.asm.label(f"VM.push_local_{index}")
@@ -571,8 +562,8 @@ class Translator:
             self.asm.label(f"VM.push_temp_{index}")
             self.asm.instr(f"@R{5+index}")
             self.asm.instr("D=M")
-            self.asm.instr("@VM._push_d")
-            self.asm.instr("0;JMP")
+            push_d()
+            self.asm.instr("RTN")
 
         for index in range(8):
             self.asm.label(f"VM.pop_temp_{index}")
@@ -587,14 +578,14 @@ class Translator:
         self.asm.label("VM.push_pointer_0")
         self.asm.instr("@THIS")
         self.asm.instr("D=M")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
+        push_d()
+        self.asm.instr("RTN")
 
         self.asm.label("VM.push_pointer_1")
         self.asm.instr("@THAT")
         self.asm.instr("D=M")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
+        push_d()
+        self.asm.instr("RTN")
 
         self.asm.label("VM.pop_pointer_0")
         pop_d()
@@ -613,8 +604,8 @@ class Translator:
         
         self.asm.label("VM.push_static")
         self.asm.instr("D=M")
-        self.asm.instr("@VM._push_d")
-        self.asm.instr("0;JMP")
+        push_d()
+        self.asm.instr("RTN")
         
         self.asm.label("VM.pop_static")
         self.asm.instr("D=A")
