@@ -337,6 +337,20 @@ class Translator:
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr(f"CALL VM.push_static")
 
+    def label(self, name):
+        self.asm.start(f"label {name}")
+        self.asm.label(f"{self.function_namespace}${name}")
+    
+    def if_goto(self, name):
+        self.asm.start(f"if-goto {name}")
+        self.asm.instr(f"@{self.function_namespace}${name}")
+        self.asm.instr(f"CALL VM.if_goto")
+
+    def goto(self, name):
+        self.asm.start(f"goto {name}")
+        self.asm.instr(f"@{self.function_namespace}${name}")
+        self.asm.instr("0;JMP")
+
     def call(self, class_name, function_name, num_args):
         """Callee address in A. num_args in R13 if not specialized.
         """
@@ -354,6 +368,7 @@ class Translator:
         
             self.asm.instr(f"@{class_name}.{function_name}")
             self.asm.instr(f"CALL VM.call")
+
 
     def _library(self):
 
@@ -564,6 +579,24 @@ class Translator:
         compare("LT")
         self.asm.label(f"VM.gt")
         compare("GT")
+        
+        
+        # if-goto:
+        not_taken_label = self.asm.next_label("not_taken")
+        self.asm.label(f"VM.if_goto")
+        self.asm.instr("D=A")
+        self.asm.instr("@R15")  # R15 = target address
+        self.asm.instr("M=D")
+        pop_d()
+        self.asm.instr(f"@{not_taken_label}")
+        self.asm.instr("D;JEQ")
+        
+        self.asm.instr("@R15")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+        
+        self.asm.label(not_taken_label)
+        self.asm.instr("RTN")
         
         
         # call
