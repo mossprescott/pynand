@@ -10,39 +10,6 @@ binary is roughly the number of opcodes in the VM source, plus the fixed library
 A register is added to hold the return address, leaving D and A available for arguments, although 
 practically speaking the handler always needs to clobber one register or the other.
 
-CALL [symbol]
-- bit pattern: 10xx_xxxx_xxxx_xxxx
-- symbol is resolved to a location in ROM, which must be non-zero and fit in 14 bits (the first half of ROM).
-- RA <- the address of the next instruction (i.e. PC+1)
-- PC <- the resolved address for symbol from instr[0..14]
-
-RTN
-- bit pattern: 1000_0000_0000_0000
-- PC <- RA
-
-Typical use:
-  @10
-  CALL VM.push_constant
-  @3
-  CALL VM.push_local
-  CALL VM.add
-  CALL VM.pop_local_0  # Probably special-case some common arguments
-
-Interpreter example:
-(VM.push_constant)
-  // move arg to D
-  D=A
-  // familiar push_d sequence:
-  @SP
-  M=M+1
-  A=M-1
-  M=D
-  // return
-  RTN
-
-That's 2 instructions in ROM and 8 at runtime for pushing a large constant. Compare to 6 each in the standard VM.
-For small values, down to 1 (6 at runtime) from 4.
-
 The result is dramatically smaller executables, which run slower:
 - gates: about 1,550 (+23% from 1,262), but could probably be improved
 - instruction count for Pong: 8.7k (-70% from 29.5k)
@@ -67,7 +34,8 @@ from nand.solutions import solved_07
 
 
 # Compare two 16-bit values. Another thing that's easy to simulate in codegen, and seems like it 
-# _should_ have a reasonably efficient representation in Nands, even if this isn't it.
+# _should_ have a reasonably efficient representation in Nands, even if this isn't it (e.g. a couple 
+# of many-input Nands.)
 # Note: this simplifies to Zero16, if one of the inputs is 0, so maybe should just implement this 
 # in project_02 instead.
 def mkEq16(inputs, outputs):
@@ -103,6 +71,45 @@ Mask15 = build(mkMask15)
 
 
 def mkThreadedCPU(inputs, outputs):
+    """Backwards-compatible with the Hack CPU, with two additional instructions and a new register
+    storing a return address written by CALL and read by RTN.
+    
+    CALL [symbol]
+    - bit pattern: 10xx_xxxx_xxxx_xxxx
+    - symbol is resolved to a location in ROM, which must be non-zero and fit in 14 bits (the first 
+        half of ROM). Note: the translator actually only needs about 1,000 words for the library, so 
+        10 or 11 bits would actually be sufficient.)
+    - RA <- the address of the next instruction (i.e. PC+1)
+    - PC <- the resolved address for symbol from instr[0..14]
+
+    RTN
+    - bit pattern: 1000_0000_0000_0000
+    - PC <- RA
+
+    Typical use:
+      @10
+      CALL VM.push_constant
+      @3
+      CALL VM.push_local
+      CALL VM.add
+      CALL VM.pop_local_0  # Probably special-case some common arguments
+
+    Interpreter example:
+    (VM.push_constant)
+      // move arg to D
+      D=A
+      // familiar push_d sequence:
+      @SP
+      M=M+1
+      A=M-1
+      M=D
+      // return
+      RTN
+
+    That's 2 instructions in ROM and 8 at runtime for pushing a large constant. Compare to 6 each in the standard VM.
+    For small values, down to 1 (6 at runtime) from 4.
+    """
+    
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
