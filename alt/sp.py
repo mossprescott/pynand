@@ -177,7 +177,7 @@ def mkSPComputer(inputs, outputs):
 SPComputer = build(mkSPComputer)
 
 
-def parse_op(string):
+def parse_op(string, symbols={}):
     m = re.match(r"([ADM]+)=--SP", string)
     if m:
         dest_a = 'A' in m.group(1)
@@ -192,7 +192,7 @@ def parse_op(string):
         if alu is not None:
             return (1 << 15) | (alu << 6)
     
-    return solved_06.parse_op(string)
+    return solved_06.parse_op(string, symbols)
 
 
 def assemble(lines):
@@ -358,7 +358,7 @@ class Translator(solved_07.Translator):
         return label
 
 
-    # TODO: improve the common sequences for _call and _return.
+    # TODO: improve the common sequence for `return`.
 
 
 if __name__ == "__main__":

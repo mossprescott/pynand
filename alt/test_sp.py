@@ -79,7 +79,7 @@ def test_read_sp():
 
 def test_computer_gates():
     assert gate_count(SPComputer) == {
-        'nands': -1,  # ??? compare to 1262
+        'nands': 1_876,  # ? compare to 1262
         'dffs': 64,  # 4 registers
         'roms': 1,
         'rams': 2,
