@@ -36,8 +36,7 @@ from nand import *
 from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Not, Not16, Mux16
-from nand.solutions.solved_02 import Inc16, ALU
-from nand.solutions.solved_02 import Zero16  # HACK: should be defined in project_02?
+from nand.solutions.solved_02 import Inc16, Zero16, ALU
 from nand.solutions.solved_03 import Register
 from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06
