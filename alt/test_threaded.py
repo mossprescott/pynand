@@ -154,6 +154,7 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ThreadedComputer, assemble=assemble, translator=Translator)
 
 
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
 
@@ -161,6 +162,7 @@ def test_vm_pong_instructions():
     assert instruction_count < -1  # ~8_700
 
 
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(ThreadedComputer, assemble, Translator)
 

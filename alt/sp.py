@@ -8,7 +8,7 @@ The VM translator is specialized to use the new instructions for push and pop op
 advantage of them not overwriting the A register.
 
 The result is significant, but not quite mind-blowing:
-- gates: about 1,800 (+50% from 1,262), but could probably be improved
+- gates: about 1,800 (+40% from 1,262), but could probably be improved
 - instruction count for Pong: 15.7k (-47% from 29.5k)
 - cycles in Sys.init: 2.61m (-34% from 3.97m)
 
@@ -22,6 +22,12 @@ order for the RAM to be read in time. The original design does have that propert
 is _always_ A (from the previous cycle). That could be put right by pipelining the processor so that
 instruction decoding is one cycle ahead of execution. Of course, there would be more registers (or at 
 least more state to save,) and probably a one-cycle penalty on taken branches.
+
+There is a temptation to add a few more instruction types, which would further complicate decoding but 
+not require any new state:
+- immediate loads and stores (e.g. A=@LCL, @LCL=A), for frame save/restore and access to temps
+- load constant to D, to save an instruction and also avoid clobbering A in some cases.
+See notes in Translator below on some places these would help.
 """
 
 import re

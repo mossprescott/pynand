@@ -65,6 +65,7 @@ Note: if you want to run any programs, you'll have to figure out how to get them
 your new chip's instruction format. One way to do that is to implement a new VM-assembly
 translator, and find some VM programs to run on both chips for comparison.
 
+Some experiments can be found in this repo under [alt/](alt/README.md).
 
 ### Your Language
 

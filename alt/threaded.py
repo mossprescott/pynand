@@ -2,8 +2,8 @@
 making a simple non-recursive call/return cost only one instruction in ROM per occurrence. With that,
 a "threaded" interpreter is much more compact (and readable).
 
-Essentially the binary consists of two parts: a fixed "library" if opcode handlers, written using the 
-usual Hack machine instructions, and the actual program, which is now just a sequence of calls into 
+Essentially the binary consists of two parts: a fixed "library" of opcode handlers written using the 
+usual Hack machine instructions, and the actual program which is now just a sequence of CALLs into 
 the opcode handlers. Most of these calls are just a single instruction, so the overall size of the 
 binary is roughly the number of opcodes in the VM source, plus the fixed library (roughly 1k).
 
@@ -59,7 +59,7 @@ from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Not, Xor, Not16, Mux16
 from nand.solutions.solved_02 import Inc16, ALU
-from nand.solutions.solved_02 import Zero16  # HACK: should be defined in project_02?
+from nand.solutions.solved_02 import Zero16
 from nand.solutions.solved_03 import Register
 from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06
