@@ -32,6 +32,8 @@ def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, tran
     translate.if_goto("LOOP_START")  # If counter > 0, goto LOOP_START
     translate.push_local(0)
 
+    translate.finish()
+
     computer = run(chip, simulator='codegen')
 
     test_07.init_sp(computer)
@@ -92,6 +94,8 @@ def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble
     
     translate.label("END_PROGRAM")
 
+    translate.finish()
+
     computer = run(chip, simulator='codegen')
 
     test_07.init_sp(computer)
@@ -124,6 +128,8 @@ def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble,
     translate.push_argument(1)
     translate.sub()
     translate.return_op()
+
+    translate.finish()
 
     computer = run(chip, simulator='codegen')
 
@@ -219,6 +225,8 @@ def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, tra
     translate.add()
     translate.return_op()
 
+    translate.finish()
+
 
     computer = run(chip, simulator='codegen')
 
@@ -297,6 +305,8 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     translate.label("WHILE")
     translate.goto("WHILE")                  # loops infinitely
 
+    translate.finish()
+
 
     computer = run(chip, simulator='codegen')
 
@@ -351,6 +361,8 @@ def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.as
         translate.push_static(1)
         translate.sub()
         translate.return_op()
+
+    translate.finish()
 
 
     computer = run(chip, simulator='codegen')

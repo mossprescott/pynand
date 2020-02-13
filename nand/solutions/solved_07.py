@@ -54,28 +54,22 @@ class Translator:
             self._push_d()
 
     def add(self):
-        self.asm.start("add")
-        self._binary("D+M")
+        self._binary("add", "D+M")
         
     def sub(self):
-        self.asm.start("sub")
-        self._binary("M-D")
+        self._binary("sub", "M-D")
 
     def neg(self):
-        self.asm.start("neg")
-        self._unary("-M")
+        self._unary("neg", "-M")
 
     def and_op(self):
-        self.asm.start("and")
-        self._binary("D&M")
+        self._binary("and", "D&M")
 
     def or_op(self):
-        self.asm.start("or")
-        self._binary("D|M")
+        self._binary("or", "D|M")
 
     def not_op(self):
-        self.asm.start("not")
-        self._unary("!M")
+        self._unary("not", "!M")
 
     def eq(self):
         # A short sequence that jumps to the common impl and returns, which costs only 4 instructions
@@ -332,7 +326,7 @@ class Translator:
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
         end_label = self.asm.next_label(f"{op.lower()}_common$end")
-        self.asm.start(f"{op.lower()}_common")
+        # self.asm.start(f"{op.lower()}_common")  # usually don't want to see this detail in traces
         self.asm.label(label)
         self.asm.instr("@R15")    # R15 = D (the return address)
         self.asm.instr("M=D")
@@ -376,8 +370,9 @@ class Translator:
         self.asm.instr("AM=M-1")
         self.asm.instr("D=M")
 
-    def _binary(self, op):
+    def _binary(self, opcode, op):
         """Pop two, combine, and push, but update SP only once."""
+        self.asm.start(opcode)
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")  # update SP
         self.asm.instr("D=M")     # D = top
@@ -385,8 +380,9 @@ class Translator:
 
         self.asm.instr(f"M={op}")   
         
-    def _unary(self, op):
+    def _unary(self, opcode,  op):
         """Modify the top item on the stack without updating SP."""
+        self.asm.start(opcode)
         self.asm.instr("@SP")
         self.asm.instr("A=M-1")
         self.asm.instr(f"M={op}")
@@ -498,6 +494,11 @@ class Translator:
         self.asm.instr("0;JMP")
         
         return label
+
+
+    def prologue():
+        """Called after all opcodes are processed, in case the translator needs to say any last words."""
+        pass
 
 
     def rewrite_ops(self, ops):

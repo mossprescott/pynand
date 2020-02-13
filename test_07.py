@@ -17,6 +17,8 @@ def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, tran
     translate.push_constant(8)
     translate.add()
 
+    translate.finish()
+
     computer = run(chip, simulator='codegen')
     init_sp(computer)
 
@@ -79,6 +81,8 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
     translate.or_op()
     translate.not_op()
 
+    translate.finish()
+
     computer = run(chip, simulator='codegen')
 
     init_sp(computer)
@@ -128,6 +132,8 @@ def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assem
     translate.push_temp(6)
     translate.add()
 
+    translate.finish()
+
     computer = run(chip, simulator='codegen')
 
     init_sp(computer)
@@ -168,6 +174,8 @@ def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.ass
     translate.sub()
     translate.push_that(6)
     translate.add()
+
+    translate.finish()
     
     computer = run(chip, simulator='codegen')
 
@@ -197,6 +205,8 @@ def test_memory_access_static(chip=project_05.Computer, assemble=project_06.asse
     translate.sub()
     translate.push_static(8)
     translate.add()
+
+    translate.finish()
 
     computer = run(chip, simulator='codegen')
 
