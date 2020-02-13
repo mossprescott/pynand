@@ -155,6 +155,20 @@ class Translator(solved_07.Translator):
         solved_07.Translator.goto(self, name)
 
 
+    def function(self, class_name, function_name, num_vars):
+        assert not self.top_in_d
+        solved_07.Translator.function(self, class_name, function_name, num_vars)
+
+    def return_op(self):
+        # TODO: an alt. return handler?
+        self._fix_stack()
+        solved_07.Translator.return_op(self)
+
+    def call(self, class_name, function_name, num_args):
+        self._fix_stack()
+        solved_07.Translator.call(self, class_name, function_name, num_args)
+
+
     def _fix_stack(self):
         if self.top_in_d:
             self._push_d()
