@@ -10,8 +10,8 @@ is omitted, the stack just looks wrong in the trace.
 """
 
 
-from nand.translate import AssemblySource
-from nand.solutions import solved_07
+from nand.translate import AssemblySource, translate_dir
+from nand.solutions import solved_05, solved_06, solved_07
 
 
 class Translator(solved_07.Translator):
@@ -141,3 +141,26 @@ class Translator(solved_07.Translator):
         if self.top_in_d:
             self._push_d()
             self.top_in_d = False
+
+
+
+if __name__ == "__main__":
+    TRACE = False
+
+    import sys
+    import computer
+
+    translate = Translator()
+    
+    translate.preamble()
+    
+    translate_dir(translate, solved_07.parse_line, sys.argv[1])
+    translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+    
+    if TRACE:
+        for instr in translate.asm:
+            print(instr)
+
+    computer.run(solved_06.assemble(translate.asm), chip=solved_05.Computer, src_map=translate.asm.src_map if TRACE else None)
+
+
