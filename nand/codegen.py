@@ -72,6 +72,8 @@ PRIMITIVES = set([
     "MemorySystem",  # Needed for Computer
     # Additional components used in the exercises, but not typically used in a full computer sim:
     "DMux", "DMux8Way", "Mux8Way16",
+    # Additonal for alternative CPUs:
+    "Dec16", "Eq16", "Mask15",
 ])
 
 
@@ -108,7 +110,12 @@ def generate_python(ic, inline=True):
             return False
 
     def output_name(comp):
-        return f"_{all_comps.index(comp)}_out"
+        if comp.label == "DFF":
+            return f"_{all_comps.index(comp)}_dff"
+        elif comp.label == "Register":
+            return f"_{all_comps.index(comp)}_reg"
+        else:
+            return f"_{all_comps.index(comp)}_out"
 
     def src_one(comp, name, bit=0):
         conn = ic.wires[Connection(comp, name, bit)]
@@ -122,12 +129,16 @@ def generate_python(ic, inline=True):
             expr = component_expr(conn.comp)
             if expr:
                 value = f"({expr})"
-            elif conn.comp.label in ("DFF", "Register"):
-                value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
+            elif conn.comp.label == "DFF":
+                value = f"_{all_comps.index(conn.comp)}_dff"
+            elif conn.comp.label == "Register":
+                value = f"_{all_comps.index(conn.comp)}_reg"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
-        elif conn.comp.label in ("DFF", "Register"):
-            value = f"self._{all_comps.index(conn.comp)}_{conn.name}"
+        elif conn.comp.label == "DFF":
+            value = f"_{all_comps.index(conn.comp)}_dff"
+        elif conn.comp.label == "Register":
+            value = f"_{all_comps.index(conn.comp)}_reg"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -155,7 +166,7 @@ def generate_python(ic, inline=True):
             if conn.comp == root:
                 return f"self._{conn.name}"
             elif conn.comp.label == "Register":
-                return f"self._{all_comps.index(conn.comp)}_{conn.name}"
+                return f"_{all_comps.index(conn.comp)}_reg"
             elif inlinable(conn.comp):
                 expr = component_expr(conn.comp)
                 if expr:
@@ -205,10 +216,18 @@ def generate_python(ic, inline=True):
                 return binary16(comp, f"{{b}} if {sel} else {{a}}")
         elif comp.label == 'Zero16':
             return unary16(comp, "{} == 0")
+        elif comp.label == 'Eq16':
+            return binary16(comp, "({a} & 0xffff) == ({b} & 0xffff)")
         elif comp.label == 'Neg16':
             return unary16(comp, "{} < 0")
         elif comp.label == 'Inc16':
             return None
+        elif comp.label == 'Dec16':
+            return None
+        elif comp.label == 'Mask15':
+            # So, yeah, this isn't really all that general in application. Need some way to 
+            # represent arbitrary mask/shift/rotate operations?
+            return unary16(comp, "{} & 0x7fff", bits=15)
         elif comp.label == 'DMux':
             return None  # note: multiple outputs doesn't really inline
         elif comp.label == 'DMux8Way':
@@ -241,13 +260,17 @@ def generate_python(ic, inline=True):
         l(2, f"self._{name} = 0  # output")
     for comp in all_comps:
         if isinstance(comp, IC) and comp.label == "Register":
-            l(2, f"self.{output_name(comp)} = 0  # register")
+            l(2, f"self.{output_name(comp)} = 0")
         elif isinstance(comp, DFF):
-            l(2, f"self.{output_name(comp)} = False  # dff")
+            l(2, f"self.{output_name(comp)} = False")
     l(0, "")
 
     l(1, f"def _eval(self, update_state, cycles=1):")
     l(2,   f"for _ in range(cycles):")
+    for comp in all_comps:
+        if comp.label in ("DFF", "Register"):
+            comp_name = output_name(comp)
+            l(3, f"{comp_name} = self.{comp_name}")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
@@ -300,6 +323,10 @@ def generate_python(ic, inline=True):
             out_name = output_name(comp)
             l(3, f"{out_name} = {src_many(comp, 'in_')} + 1")
             l(3, f"if {out_name} > 32767: {out_name} -= 65536")
+        elif comp.label == "Dec16":
+            out_name = output_name(comp)
+            l(3, f"{out_name} = {src_many(comp, 'in_')} - 1")
+            l(3, f"if {out_name} < -32768: {out_name} += 65536")
         elif not inlinable(comp):
             expr = component_expr(comp)
             if expr:
@@ -319,9 +346,6 @@ def generate_python(ic, inline=True):
         if isinstance(comp, DFF):
             l(4, f"self.{output_name(comp)} = {src_one(comp, 'in_')}")
             any_state = True
-        elif not isinstance(comp, IC) or comp.label in ('Not', 'And', 'Or', 'Not16', 'And16', 'Add16', 'Mux16', 'Zero16', 'Neg16', 'Inc16', 'DMux', 'DMux8Way', 'Mux8Way16'):
-            # All combinational components: nothing to do here
-            pass
         elif comp.label == "Register":
             load = src_one(comp, 'load')
             # TODO: simplify the IC to eliminate these constants instead
@@ -343,6 +367,11 @@ def generate_python(ic, inline=True):
             l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
             l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
             any_state = True
+        elif isinstance(comp, (Const, ROM)):
+            pass
+        elif comp.label in PRIMITIVES:
+            # All combinational components: nothing to do here
+            pass
         else:
             # print(f"TODO: {comp.label}")
             raise Exception(f"Unrecognized primitive: {comp}")
@@ -451,19 +480,25 @@ class SOC(Chip):
     def peek(self, address):
         """Read a value from the main RAM. Address must be between 0x000 and 0x3FFF."""
         return self._ram[address]
-    
+
     def poke(self, address, value):
         """Write a value to the main RAM. Address must be between 0x000 and 0x3FFF."""
         self._ram[address] = extend_sign(value)
-    
+
     def peek_screen(self, address):
         """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
         return self._screen[address]
-    
+
     def poke_screen(self, address, value):
         """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
         self._screen[address] = extend_sign(value)
-    
+
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard = keycode
+
+    # Tricky: SP might get special treatment in some implementations, so provide a named property
+    # That subclasses can override.
+    @property
+    def sp(self):
+        return self._ram[0]

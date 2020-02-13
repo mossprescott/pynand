@@ -153,10 +153,14 @@ def mkPC(inputs, outputs):
     reseted = lazy()
     pc = Register(in_=reseted.out, load=1)
     
-    inced = Mux16(a=pc.out, b=Inc16(in_=pc.out).out, sel=inc)
+    nxt = Inc16(in_=pc.out).out
+    inced = Mux16(a=pc.out, b=nxt, sel=inc)
     loaded = Mux16(a=inced.out, b=in_, sel=load)
     reseted.set(Mux16(a=loaded.out, b=0, sel=reset))
     
     outputs.out = pc.out
+    # Note: the address of the next instruction may be useful even if we're not going there,
+    # so expose it in case some other component wants to use it.
+    outputs.nxt = nxt
 
 PC = build(mkPC)

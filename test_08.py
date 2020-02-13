@@ -1,18 +1,18 @@
 import itertools
 
 from nand import run
-from project_05 import Computer
-from project_06 import assemble
 
-from project_08 import *
+import project_05, project_06, test_07
+
+import project_08
 
 
 # TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
 # coverage, but they don't isolate problems well for debugging.
 
 
-def test_basic_loop():
-    translate = Translator()
+def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+    translate = translator()
     
     # Computes the sum 1 + 2 + ... + argument[0] and pushes the 
     # result onto the stack. Argument[0] is initialized by the test 
@@ -32,21 +32,21 @@ def test_basic_loop():
     translate.if_goto("LOOP_START")  # If counter > 0, goto LOOP_START
     translate.push_local(0)
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
-    computer.poke(0, 256)
+    test_07.init_sp(computer)
     computer.poke(1, 300)
     computer.poke(2, 400)
     computer.poke(400, 3)
 
     translate.asm.run(assemble, computer, stop_cycles=600, debug=True)
 
-    assert computer.peek(0) == 257
+    assert computer.sp == 257
     assert computer.peek(256) == 6
 
 
-def test_fibonacci_series():
-    translate = Translator()
+def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+    translate = translator()
     
     # Puts the first argument[0] elements of the Fibonacci series
     # in the memory, starting in the address given in argument[1].
@@ -92,9 +92,9 @@ def test_fibonacci_series():
     
     translate.label("END_PROGRAM")
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
-    computer.poke(0, 256)
+    test_07.init_sp(computer)
     computer.poke(1, 300)
     computer.poke(2, 400)
     computer.poke(400, 6)
@@ -110,8 +110,8 @@ def test_fibonacci_series():
     assert computer.peek(3005) == 5
 
 
-def test_simple_function():
-    translate = Translator()
+def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+    translate = translator()
 
     # Performs a simple calculation and returns the result.
     translate.function("SimpleFunction", "test", 2)
@@ -125,9 +125,9 @@ def test_simple_function():
     translate.sub()
     translate.return_op()
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
-    computer.poke(0, 317)
+    test_07.init_sp(computer, 317)
     computer.poke(1, 317)
     computer.poke(2, 310)
     computer.poke(3, 3000)
@@ -142,7 +142,7 @@ def test_simple_function():
 
     translate.asm.run(assemble, computer, debug=True)
 
-    assert computer.peek(0) == 311
+    assert computer.sp == 311
     assert computer.peek(1) == 305
     assert computer.peek(2) == 300
     assert computer.peek(3) == 3010
@@ -150,11 +150,11 @@ def test_simple_function():
     assert computer.peek(310) == 1196
 
 
-def test_nested_call():
+def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
     """Multiple function calls, with and without arguments.
     """
     
-    translate = Translator()
+    translate = translator()
 
     # Performs a simple calculation and returns the result.
     # Sys.init()
@@ -220,9 +220,9 @@ def test_nested_call():
     translate.return_op()
 
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
-    computer.poke(0, 261)
+    test_07.init_sp(computer, 261)
     computer.poke(1, 261)
     computer.poke(2, 256)
     computer.poke(3, -3)
@@ -241,7 +241,7 @@ def test_nested_call():
 
     translate.asm.run(assemble, computer, stop_cycles=4000, debug=True)
 
-    assert computer.peek(0) == 261
+    assert computer.sp == 261
     assert computer.peek(1) == 261
     assert computer.peek(2) == 256
     assert computer.peek(3) == 4000
@@ -250,12 +250,12 @@ def test_nested_call():
     assert computer.peek(6) == 246
 
 
-def test_fibonacci_element():
+def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
     """Sys.init, declared out of sequence, requiring the translator to supply initialization and then 
     call Sys.init. This is finally a fully legitimate VM program, executed in the normal way.
     """
     
-    translate = Translator()
+    translate = translator()
   
     # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
     translate.preamble()
@@ -298,17 +298,17 @@ def test_fibonacci_element():
     translate.goto("WHILE")                  # loops infinitely
 
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
     # Note: no initialization this time
     
     translate.asm.run(assemble, computer, stop_cycles=2000, debug=True)
 
-    assert computer.peek(0) == 262
+    assert computer.sp == 262
     assert computer.peek(261) == 3
 
 
-def test_statics_multiple_files():
+def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
     """Tests that different functions, stored in two different classes, manipulate the static 
     segment correctly. 
     
@@ -316,7 +316,7 @@ def test_statics_multiple_files():
     of this language there's a one-to-one correspondence.
     """
     
-    translate = Translator()
+    translate = translator()
   
     # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
     translate.preamble()
@@ -353,12 +353,12 @@ def test_statics_multiple_files():
         translate.return_op()
 
 
-    computer = run(Computer, simulator='codegen')
+    computer = run(chip, simulator='codegen')
 
     # Note: no initialization this time
 
     translate.asm.run(assemble, computer, stop_cycles=2500, debug=True)
 
-    assert computer.peek(0) == 263
+    assert computer.sp == 263
     assert computer.peek(261) == -2
     assert computer.peek(262) == 8

@@ -55,6 +55,12 @@ def test_add16():
     assert unsigned(run(Add16, a=0x3CC3, b=0x0FF0).out) == 0x4CB3
     assert unsigned(run(Add16, a=0x1234, b=0x9876).out) == 0xAAAA
 
+def test_zero16():
+    assert run(Zero16, in_=0).out == True
+    assert run(Zero16, in_=12345).out == False
+    for i in range(16):
+        assert run(Zero16, in_=(1 << i)).out == False
+
 def test_alu_nostat():
     alu = run(ALU)
     

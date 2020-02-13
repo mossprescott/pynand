@@ -57,6 +57,17 @@ def mkAdd16(inputs, outputs):
 Add16 = build(mkAdd16)
 
 
+def mkZero16(inputs, outputs):
+    in_ = inputs.in_
+
+    # SOLVERS: replace this with one or more Nands and/or components defined above
+    n1 = solved_02.Zero16(in_=in_)
+
+    outputs.out = n1.out
+
+Zero16 = build(mkZero16)
+
+
 def mkALU(inputs, outputs):
     x = inputs.x
     y = inputs.y

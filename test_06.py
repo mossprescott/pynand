@@ -1,35 +1,36 @@
 from nand import run
-from project_06 import *
-from test_05 import CPU, ADD_PROGRAM, MAX_PROGRAM
+from project_05 import CPU
+from test_05 import ADD_PROGRAM, MAX_PROGRAM
+import project_06
 
-def test_asm_ops_add():
+def test_asm_ops_add(parse_op=project_06.parse_op):
     ADD_ASM = [
         "@2",
         "D=A",
         "@3",
         "D=D+A",
-        "@0",
+        "@1",
         "M=D",
     ]
     for string, word in zip(ADD_ASM, ADD_PROGRAM):
         assert parse_op(string) == word
 
 
-def test_asm_ops_max():
+def test_asm_ops_max(parse_op=project_06.parse_op):
     MAX_ASM = [
-        "@0",
-        "D=M",
         "@1",
+        "D=M",
+        "@2",
         "D=D-M",
         "@10",
         "D;JGT",
-        "@1",
+        "@2",
         "D=M",
         "@12",
         "0;JMP",
-        "@0",
+        "@1",
         "D=M",
-        "@2",
+        "@3",
         "M=D",
         "@14",
         "0;JMP",
@@ -38,7 +39,7 @@ def test_asm_ops_max():
         assert parse_op(string) == word
 
 
-def test_ops():
+def test_ops(parse_op=project_06.parse_op):
     """Test generated opcodes against the actual simulated CPU."""
     
     cpu = run(CPU)
@@ -83,29 +84,29 @@ def test_ops():
 
 def test_load_add():
     with open("examples/Add.asm") as f:
-        add = assemble(f)
+        add = project_06.assemble(f)
     assert add == ADD_PROGRAM
 
 
 def test_load_max_no_symbols():
     with open("examples/MaxL.asm") as f:
-        max_ = assemble(f)
+        max_ = project_06.assemble(f)
     assert max_ == MAX_PROGRAM
 
 
 def test_load_max():
     with open("examples/Max.asm") as f:
-        max_ = assemble(f)
+        max_ = project_06.assemble(f)
     assert max_ == MAX_PROGRAM
 
 
 def test_load_rect():
     with open("examples/RectL.asm") as f:
-        rect1 = assemble(f)
+        rect1 = project_06.assemble(f)
     assert len(rect1) == 25
 
     with open("examples/Rect.asm") as f:
-        rect2 = assemble(f)
+        rect2 = project_06.assemble(f)
     assert len(rect2) == 25
 
     assert rect2 == rect1
@@ -113,11 +114,11 @@ def test_load_rect():
 
 def test_load_pong():
     with open("examples/PongL.asm") as f:
-        pong1 = assemble(f)
+        pong1 = project_06.assemble(f)
     assert len(pong1) == 27483
 
     with open("examples/Pong.asm") as f:
-        pong2 = assemble(f)
+        pong2 = project_06.assemble(f)
     assert len(pong2) == 27483
 
     assert pong2 == pong1

@@ -55,11 +55,15 @@ BUILTIN_SYMBOLS = {
 }
 
 
-def parse_op(string):
+def parse_op(string, symbols=None):
     """Parse a single assembly op directly to the corresponding Hack instruction word.
     
     The op may be a numeric symbol (an A-command) or a C-command, but not a reference
     to a symbol or variable.
+    
+    :param symbols: a dictionary mapping symbol names to addresses (of labels in the code
+    and memory locations allocated for "static" variables.) Note: not used in this implementation,
+    but included in the signature in so that other compatible parsers can use it.
     """
     
     m = re.match(r"@((?:0x)?\d+)", string)
@@ -97,7 +101,7 @@ def parse_op(string):
             raise Exception(f"unrecognized: {string}")
 
 
-def assemble(lines):
+def assemble(lines, parse_op=parse_op):
     """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
     
@@ -142,5 +146,5 @@ def assemble(lines):
                     next_variable += 1
                 ops.append(symbols[symbol_str])
             else:
-                ops.append(parse_op(line))
+                ops.append(parse_op(line, symbols))
     return ops
