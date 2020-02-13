@@ -28,9 +28,14 @@ class Translator(solved_07.Translator):
     def push_constant(self, value):
         self._fix_stack()
 
+        # TODO: this is _costing_ one instruction when the following instr. can't take it 
+        # from D, by doing D=0/1 ... M=D instead of folding the constant in.
         self.asm.start(f"push constant {value}")
-        self.asm.instr(f"@{value}")
-        self.asm.instr(f"D=A")
+        if value <= 1:
+            self.asm.instr(f"D={value}")
+        else:
+            self.asm.instr(f"@{value}")
+            self.asm.instr(f"D=A")
         self.top_in_d = True
 
     def lt(self):
@@ -65,10 +70,22 @@ class Translator(solved_07.Translator):
             solved_07.Translator._unary(self, opcode, op)
 
     def _pop_segment(self, segment_name, segment_ptr, index):
-        # TODO: pull it from D for small args for sure
-        # also for non-small by stashing D in R13?
-        self._fix_stack()
-        solved_07.Translator._pop_segment(self, segment_name, segment_ptr, index)
+        # Believe it or not, using this unrolled loop for indexes all the way to 13
+        # makes the code smaller overall (empirically determined.)
+        if self.top_in_d and index <= 13:
+            self.asm.start(f"pop {segment_name} {index} (from D)")
+            self.asm.instr(f"@{segment_ptr}")
+            if index == 0:
+                self.asm.instr("A=M")
+            else:
+                self.asm.instr("A=M+1")
+                for _ in range(index-1):
+                    self.asm.instr("A=A+1")
+            self.asm.instr("M=D")
+            self.top_in_d = False
+        else:
+            self._fix_stack()
+            solved_07.Translator._pop_segment(self, segment_name, segment_ptr, index)
 
     def pop_temp(self, index):
         assert 0 <= index < 8

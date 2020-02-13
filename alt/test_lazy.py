@@ -46,17 +46,17 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(translator=Translator)
 
 
-# @pytest.mark.skip(reason="Sources aren't in the repo yet")
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
     
     # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # 15_749
+    assert instruction_count == 25_929
 
 
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(solved_05.Computer, assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(solved_05.Computer, solved_06.assemble, Translator)
 
     # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # 2_612_707
+    assert cycles == 3_255_166
