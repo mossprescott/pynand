@@ -888,6 +888,10 @@ class Translator:
         self.asm.instr("RTN")
 
 
+    def finish(self):
+        pass
+
+
 if __name__ == "__main__":
     TRACE = False
 
