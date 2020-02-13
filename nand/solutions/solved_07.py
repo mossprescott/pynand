@@ -105,20 +105,16 @@ class Translator:
         self.asm.label(return_label)
             
     def pop_local(self, index):
-        self.asm.start(f"pop local {index}")
-        self._pop_segment("LCL", index)
+        self._pop_segment("local", "LCL", index)
         
     def pop_argument(self, index):
-        self.asm.start(f"pop argument {index}")
-        self._pop_segment("ARG", index)
+        self._pop_segment("argument", "ARG", index)
         
     def pop_this(self, index):
-        self.asm.start(f"pop this {index}")
-        self._pop_segment("THIS", index)
+        self._pop_segment("this", "THIS", index)
         
     def pop_that(self, index):
-        self.asm.start(f"pop that {index}")
-        self._pop_segment("THAT", index)
+        self._pop_segment("that", "THAT", index)
     
     def pop_temp(self, index):
         assert 0 <= index < 8
@@ -127,7 +123,8 @@ class Translator:
         self.asm.instr(f"@R{5+index}")
         self.asm.instr("M=D")
     
-    def _pop_segment(self, segment_ptr, index):
+    def _pop_segment(self, segment_name, segment_ptr, index):
+        self.asm.start(f"pop {segment_name} {index}")
         if index <= 6:
             self._pop_d()
             
@@ -153,30 +150,19 @@ class Translator:
             self.asm.instr("M=D")
 
     def push_local(self, index):
-        self.asm.start(f"push local {index}")
-        return self._push_segment("LCL", index)
+        return self._push_segment("local", "LCL", index)
 
     def push_argument(self, index):
-        self.asm.start(f"push argument {index}")
-        return self._push_segment("ARG", index)
+        return self._push_segment("argument", "ARG", index)
 
     def push_this(self, index):
-        self.asm.start(f"push this {index}")
-        return self._push_segment("THIS", index)
+        return self._push_segment("this", "THIS", index)
 
     def push_that(self, index):
-        self.asm.start(f"push that {index}")
-        return self._push_segment("THAT", index)
+        return self._push_segment("that", "THAT", index)
 
-    def push_temp(self, index):
-        assert 0 <= index < 8
-        self.asm.start(f"push temp {index}")
-        self.asm.instr(f"@R{5+index}")
-        self.asm.instr("D=M")
-        self._push_d()
-        
-
-    def _push_segment(self, segment_ptr, index):
+    def _push_segment(self, segment_name, segment_ptr, index):
+        self.asm.start(f"push {segment_name} {index}")
         if index == 0:
             self.asm.instr(f"@{segment_ptr}")
             self.asm.instr("A=M")
@@ -198,6 +184,14 @@ class Translator:
             self.asm.instr("D=M")
         self._push_d()
 
+
+    def push_temp(self, index):
+        assert 0 <= index < 8
+        self.asm.start(f"push temp {index}")
+        self.asm.instr(f"@R{5+index}")
+        self.asm.instr("D=M")
+        self._push_d()
+        
 
     def pop_pointer(self, index):
         self.asm.start(f"pop pointer {index}")

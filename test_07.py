@@ -143,6 +143,10 @@ def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assem
     computer.poke(4, 3010)  # base address of the that segment
 
     translate.asm.run(assemble, computer, debug=True)
+    
+    # Note for debugging: this tests puts the stack in a funky state. LCL and ARG are _above_ SP, 
+    # which actually makes no sense and as a result the trace is confusing.
+    # For sensible tracing, use ARG = 247 nd LCL = 255
 
     assert computer.peek(256) == 472
     assert computer.peek(300) == 10
