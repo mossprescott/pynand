@@ -120,12 +120,7 @@ class Translator(solved_07.Translator):
     def pop_pointer(self, index):
         if self.top_in_d:
             self.asm.start(f"pop pointer {index} (from D)")
-            if index == 0:
-                segment_ptr = "THIS"
-            elif index == 1:
-                segment_ptr = "THAT"
-            else:
-                raise SyntaxError(f"Invalid index for pop pointer: {index!r}")
+            segment_ptr = ("THIS", "THAT")[index]
             self.asm.instr(f"@{segment_ptr}")
             self.asm.instr("M=D")
             self.top_in_d = False
@@ -136,12 +131,7 @@ class Translator(solved_07.Translator):
         self._fix_stack()
         
         self.asm.start(f"push pointer {index}")
-        if index == 0:
-            segment_ptr = "THIS"
-        elif index == 1:
-            segment_ptr = "THAT"
-        else:
-            raise SyntaxError(f"Invalid index for push pointer: {index}")
+        segment_ptr = ("THIS", "THAT")[index]
         self.asm.instr(f"@{segment_ptr}")
         self.asm.instr("D=M")
         self.top_in_d = True
