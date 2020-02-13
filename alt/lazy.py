@@ -125,7 +125,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("M=D")
             self.top_in_d = False
         else:
-            solved_07.Translator.pop_pointer(index)
+            solved_07.Translator.pop_pointer(self, index)
 
     def push_pointer(self, index):
         self._fix_stack()
