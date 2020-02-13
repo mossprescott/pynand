@@ -265,7 +265,7 @@ class Translator(solved_07.Translator):
         self.asm.instr("A=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'A')}")
 
-    def _unary(self, op):
+    def _unary(self, opcode, op):
         self.asm.start(opcode)
         self.asm.instr("D=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'D')}")
