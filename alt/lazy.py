@@ -137,6 +137,24 @@ class Translator(solved_07.Translator):
         self.top_in_d = True
 
 
+    def label(self, name):
+        self._fix_stack()
+        solved_07.Translator.label(self, name)
+
+    def if_goto(self, name):
+        if self.top_in_d:
+            self.asm.start(f"if-goto {name} (from D)")
+            self.asm.instr(f"@{self.function_namespace}${name}")
+            self.asm.instr("D;JNE")
+            self.top_in_d = False
+        else:
+            solved_07.Translator.if_goto(self, name)
+
+    def goto(self, name):
+        self._fix_stack()
+        solved_07.Translator.goto(self, name)
+
+
     def _fix_stack(self):
         if self.top_in_d:
             self._push_d()
