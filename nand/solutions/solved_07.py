@@ -209,13 +209,13 @@ class Translator:
 
 
     def pop_static(self, index):
-        self.asm.start(f"push static {index}")
+        self.asm.start(f"pop static {index}")
         self._pop_d()
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr("M=D")
         
     def push_static(self, index):
-        self.asm.start(f"pop static {index}")
+        self.asm.start(f"push static {index}")
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr("D=M")
         self._push_d()
