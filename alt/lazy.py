@@ -137,6 +137,24 @@ class Translator(solved_07.Translator):
         self.top_in_d = True
 
 
+    def pop_static(self, index):
+        if self.top_in_d:
+            self.asm.start(f"push static {index} (from D)")
+            self.asm.instr(f"@{self.class_namespace}.static{index}")
+            self.asm.instr("M=D")
+            self.top_in_d = False
+        else:
+            solved_07.Translator.pop_static(self, index)
+        
+    def push_static(self, index):
+        self._fix_stack()
+
+        self.asm.start(f"push static {index}")
+        self.asm.instr(f"@{self.class_namespace}.static{index}")
+        self.asm.instr("D=M")
+        self.top_in_d = True
+
+
     def label(self, name):
         self._fix_stack()
         solved_07.Translator.label(self, name)
