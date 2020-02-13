@@ -905,8 +905,7 @@ if __name__ == "__main__":
     translate_dir(translate, solved_07.parse_line, sys.argv[1])
     translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
     
-    # if TRACE:
-    if True:
+    if TRACE:
         for instr in translate.asm:
             print(instr)
 
