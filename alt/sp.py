@@ -35,17 +35,36 @@ import re
 from nand import *
 from nand.translate import AssemblySource, translate_dir
 
-from nand.solutions.solved_01 import And, Or, Not, Not16, Mux16
+from nand.solutions.solved_01 import And, Or, Xor, Not, Not16, Mux16
 from nand.solutions.solved_02 import Inc16, Zero16, ALU
 from nand.solutions.solved_03 import Register
 from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06
 from nand.solutions import solved_07
 
+
 def mkDec16(inputs, outputs):
-    """Decrement for 16-bit values, by inverting and incrementing.
-    """
-    outputs.out = Not16(in_=Inc16(in_=Not16(in_=inputs.in_).out).out).out
+    def mkHalfSub(inputs, outputs):
+        """This is the same trick as HalfAdder, with the second input and the output inverted.
+        """
+        
+        a = inputs.a
+        neg_b = inputs.neg_b
+        
+        nand = Nand(a=a, b=neg_b).out
+        not_a_or_not_b = Nand(a=a, b=nand).out
+        a_or_b = Nand(a=nand, b=neg_b).out
+        
+        outputs.sum = Nand(a=not_a_or_not_b, b=a_or_b).out
+        outputs.neg_carry = Not(in_=a_or_b).out
+
+    HalfSub = build(mkHalfSub)
+    
+    neg_carry = outputs.out[0] = Not(in_=inputs.in_[0]).out
+    for i in range(1, 16):
+        sub = HalfSub(a=inputs.in_[i], neg_b=neg_carry)
+        outputs.out[i] = sub.sum
+        neg_carry = sub.neg_carry
     
 Dec16 = build(mkDec16)
 

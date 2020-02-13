@@ -39,7 +39,7 @@ def test_dec16():
     assert run(Dec16, in_=-23456).out == -23457
     assert run(Dec16, in_=-32768).out == 32767
     
-    assert gate_count(Dec16) == {'nands': 16+76+16}
+    assert gate_count(Dec16) == {'nands': 76}
 
 
 #
@@ -81,7 +81,7 @@ def test_read_sp():
 
 def test_computer_gates():
     assert gate_count(SPComputer) == {
-        'nands': 1_876,  # ? compare to 1262
+        'nands': 1_844,  # ? compare to 1262
         'dffs': 64,  # 4 registers
         'roms': 1,
         'rams': 2,
