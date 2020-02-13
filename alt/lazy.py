@@ -116,6 +116,37 @@ class Translator(solved_07.Translator):
         self.asm.instr("D=M")
         self.top_in_d = True
 
+
+    def pop_pointer(self, index):
+        if self.top_in_d:
+            self.asm.start(f"pop pointer {index} (from D)")
+            if index == 0:
+                segment_ptr = "THIS"
+            elif index == 1:
+                segment_ptr = "THAT"
+            else:
+                raise SyntaxError(f"Invalid index for pop pointer: {index!r}")
+            self.asm.instr(f"@{segment_ptr}")
+            self.asm.instr("M=D")
+            self.top_in_d = False
+        else:
+            solved_07.Translator.pop_pointer(index)
+
+    def push_pointer(self, index):
+        self._fix_stack()
+        
+        self.asm.start(f"push pointer {index}")
+        if index == 0:
+            segment_ptr = "THIS"
+        elif index == 1:
+            segment_ptr = "THAT"
+        else:
+            raise SyntaxError(f"Invalid index for push pointer: {index}")
+        self.asm.instr(f"@{segment_ptr}")
+        self.asm.instr("D=M")
+        self.top_in_d = True
+
+
     def _fix_stack(self):
         if self.top_in_d:
             self._push_d()
