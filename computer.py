@@ -19,8 +19,8 @@ import time
 
 import nand.component
 import nand.syntax
-import project_05
-import project_06
+from nand.translate import translate_dir
+import project_05, project_06, project_07, project_08
 
 
 EVENT_INTERVAL = 1/10
@@ -30,10 +30,31 @@ CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
+TRACE = False
+PRINT_ASM = False
+
+
 def main():
-    with open(sys.argv[1], mode='r') as f:
-        prg = project_06.assemble(f)
-    run(prg)
+    path = sys.argv[1]
+    
+    if os.path.splitext(path)[1] == '.asm':
+        print(f"Reading assembly from file: {path}")
+        with open(sys.argv[1], mode='r') as f:
+            prg = project_06.assemble(f)
+        src_map = None
+    else:
+        translate = project_08.Translator()
+        translate.preamble()
+        translate_dir(translate, project_07.parse_line, path)
+        translate_dir(translate, project_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+        prg = project_06.assemble(translate.asm)
+        src_map = translate.asm.src_map
+
+        if PRINT_ASM:
+            for instr in translate.asm:
+                print(instr)
+
+    run(prg, src_map=src_map if TRACE else None)
 
 
 COLORS = [0xFFFFFF, 0x000000]
