@@ -4,6 +4,8 @@ SPOILER ALERT: this files contains a complete VM translator.
 If you want to write this on your own, stop reading now!
 """
 
+import re
+
 
 class Translator:
     """Translate all VM opcodes to assembly instructions. 
@@ -502,7 +504,14 @@ def parse_line(line):
     imposing any structure at all, but munging the input into a shape that fits Translator.
     """
 
-    words = line.strip().split()
+    m = re.match(r"([^/]*)(?://.*)?", line)
+    if m:
+        string = m.group(1).strip()
+    else:
+        string = line.strip()
+    
+    words = string.split()
+    
     if not words:
         return None
     elif words[0] == "function":
