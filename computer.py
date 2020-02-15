@@ -11,6 +11,7 @@ Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a 
 $ pip3 install pygame==2.0.0dev6
 """
 
+import argparse
 import os
 import pygame
 from pygame import Surface, Color, PixelArray
@@ -30,31 +31,40 @@ CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
-TRACE = False
-PRINT_ASM = False
+parser = argparse.ArgumentParser(description="Run assembly or VM source with display and keyboard")
+parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm files.")
+parser.add_argument("--vector", action="store_true", help="Use the slower, but more precise, bit-vector-based runtime.")
+parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization.")
+parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
 
 
 def main():
-    path = sys.argv[1]
-    
+    args = parser.parse_args()
+
+    prg, src_map = load(args.path, args.print)
+
+    run(prg, 
+        simulator='vector' if args.vector else 'codegen',
+        src_map=src_map if args.trace else None)
+
+
+def load(path, print_asm=False, assemble=project_06.assemble):
     if os.path.splitext(path)[1] == '.asm':
         print(f"Reading assembly from file: {path}")
         with open(sys.argv[1], mode='r') as f:
             prg = project_06.assemble(f)
-        src_map = None
+        return prg, None
     else:
         translate = project_08.Translator()
         translate.preamble()
         translate_dir(translate, project_07.parse_line, path)
         translate_dir(translate, project_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
-        prg = project_06.assemble(translate.asm)
-        src_map = translate.asm.src_map
 
-        if PRINT_ASM:
+        if print_asm:
             for instr in translate.asm:
                 print(instr)
 
-    run(prg, src_map=src_map if TRACE else None)
+        return project_06.assemble(translate.asm), translate.asm.src_map
 
 
 COLORS = [0xFFFFFF, 0x000000]
@@ -130,8 +140,8 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip=project_05.Computer, src_map=None):
-    computer = nand.syntax.run(chip, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
+def run(program, chip=project_05.Computer, simulator='codegen', src_map=None):
+    computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
     
     kvm = KVM(sys.argv[1], 512, 256)
@@ -149,7 +159,7 @@ def run(program, chip=project_05.Computer, src_map=None):
 
             op = src_map.get(computer.pc) if src_map else None
             if op and op.startswith("call") and (
-                'Screen' in op or 'Main' in op or 'init' in op):
+                'Main' in op or 'init' in op):
                 print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
         
         # Note: check the time only every few frames to reduce the overhead of timing
