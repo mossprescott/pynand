@@ -54,28 +54,22 @@ class Translator:
             self._push_d()
 
     def add(self):
-        self.asm.start("add")
-        self._binary("D+M")
+        self._binary("add", "D+M")
         
     def sub(self):
-        self.asm.start("sub")
-        self._binary("M-D")
+        self._binary("sub", "M-D")
 
     def neg(self):
-        self.asm.start("neg")
-        self._unary("-M")
+        self._unary("neg", "-M")
 
     def and_op(self):
-        self.asm.start("and")
-        self._binary("D&M")
+        self._binary("and", "D&M")
 
     def or_op(self):
-        self.asm.start("or")
-        self._binary("D|M")
+        self._binary("or", "D|M")
 
     def not_op(self):
-        self.asm.start("not")
-        self._unary("!M")
+        self._unary("not", "!M")
 
     def eq(self):
         # A short sequence that jumps to the common impl and returns, which costs only 4 instructions
@@ -111,20 +105,16 @@ class Translator:
         self.asm.label(return_label)
             
     def pop_local(self, index):
-        self.asm.start(f"pop local {index}")
-        self._pop_segment("LCL", index)
+        self._pop_segment("local", "LCL", index)
         
     def pop_argument(self, index):
-        self.asm.start(f"pop argument {index}")
-        self._pop_segment("ARG", index)
+        self._pop_segment("argument", "ARG", index)
         
     def pop_this(self, index):
-        self.asm.start(f"pop this {index}")
-        self._pop_segment("THIS", index)
+        self._pop_segment("this", "THIS", index)
         
     def pop_that(self, index):
-        self.asm.start(f"pop that {index}")
-        self._pop_segment("THAT", index)
+        self._pop_segment("that", "THAT", index)
     
     def pop_temp(self, index):
         assert 0 <= index < 8
@@ -133,7 +123,8 @@ class Translator:
         self.asm.instr(f"@R{5+index}")
         self.asm.instr("M=D")
     
-    def _pop_segment(self, segment_ptr, index):
+    def _pop_segment(self, segment_name, segment_ptr, index):
+        self.asm.start(f"pop {segment_name} {index}")
         if index <= 6:
             self._pop_d()
             
@@ -159,30 +150,19 @@ class Translator:
             self.asm.instr("M=D")
 
     def push_local(self, index):
-        self.asm.start(f"push local {index}")
-        return self._push_segment("LCL", index)
+        return self._push_segment("local", "LCL", index)
 
     def push_argument(self, index):
-        self.asm.start(f"push argument {index}")
-        return self._push_segment("ARG", index)
+        return self._push_segment("argument", "ARG", index)
 
     def push_this(self, index):
-        self.asm.start(f"push this {index}")
-        return self._push_segment("THIS", index)
+        return self._push_segment("this", "THIS", index)
 
     def push_that(self, index):
-        self.asm.start(f"push that {index}")
-        return self._push_segment("THAT", index)
+        return self._push_segment("that", "THAT", index)
 
-    def push_temp(self, index):
-        assert 0 <= index < 8
-        self.asm.start(f"push temp {index}")
-        self.asm.instr(f"@R{5+index}")
-        self.asm.instr("D=M")
-        self._push_d()
-        
-
-    def _push_segment(self, segment_ptr, index):
+    def _push_segment(self, segment_name, segment_ptr, index):
+        self.asm.start(f"push {segment_name} {index}")
         if index == 0:
             self.asm.instr(f"@{segment_ptr}")
             self.asm.instr("A=M")
@@ -205,39 +185,37 @@ class Translator:
         self._push_d()
 
 
+    def push_temp(self, index):
+        assert 0 <= index < 8
+        self.asm.start(f"push temp {index}")
+        self.asm.instr(f"@R{5+index}")
+        self.asm.instr("D=M")
+        self._push_d()
+        
+
     def pop_pointer(self, index):
         self.asm.start(f"pop pointer {index}")
-        if index == 0:
-            segment_ptr = "THIS"
-        elif index == 1:
-            segment_ptr = "THAT"
-        else:
-            raise SyntaxError(f"Invalid index for pop pointer: {index!r}")
+        segment_ptr = ("THIS", "THAT")[index]
         self._pop_d()
         self.asm.instr(f"@{segment_ptr}")
         self.asm.instr("M=D")
 
     def push_pointer(self, index):
         self.asm.start(f"push pointer {index}")
-        if index == 0:
-            segment_ptr = "THIS"
-        elif index == 1:
-            segment_ptr = "THAT"
-        else:
-            raise SyntaxError(f"Invalid index for push pointer: {index}")
+        segment_ptr = ("THIS", "THAT")[index]
         self.asm.instr(f"@{segment_ptr}")
         self.asm.instr("D=M")
         self._push_d()
 
 
     def pop_static(self, index):
-        self.asm.start(f"push static {index}")
+        self.asm.start(f"pop static {index}")
         self._pop_d()
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr("M=D")
         
     def push_static(self, index):
-        self.asm.start(f"pop static {index}")
+        self.asm.start(f"push static {index}")
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr("D=M")
         self._push_d()
@@ -332,7 +310,7 @@ class Translator:
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
         end_label = self.asm.next_label(f"{op.lower()}_common$end")
-        self.asm.start(f"{op.lower()}_common")
+        # self.asm.start(f"{op.lower()}_common")  # usually don't want to see this detail in traces
         self.asm.label(label)
         self.asm.instr("@R15")    # R15 = D (the return address)
         self.asm.instr("M=D")
@@ -376,8 +354,9 @@ class Translator:
         self.asm.instr("AM=M-1")
         self.asm.instr("D=M")
 
-    def _binary(self, op):
+    def _binary(self, opcode, op):
         """Pop two, combine, and push, but update SP only once."""
+        self.asm.start(opcode)
         self.asm.instr("@SP")
         self.asm.instr("AM=M-1")  # update SP
         self.asm.instr("D=M")     # D = top
@@ -385,8 +364,9 @@ class Translator:
 
         self.asm.instr(f"M={op}")   
         
-    def _unary(self, op):
+    def _unary(self, opcode,  op):
         """Modify the top item on the stack without updating SP."""
+        self.asm.start(opcode)
         self.asm.instr("@SP")
         self.asm.instr("A=M-1")
         self.asm.instr(f"M={op}")
@@ -498,6 +478,11 @@ class Translator:
         self.asm.instr("0;JMP")
         
         return label
+
+
+    def prologue():
+        """Called after all opcodes are processed, in case the translator needs to say any last words."""
+        pass
 
 
     def rewrite_ops(self, ops):

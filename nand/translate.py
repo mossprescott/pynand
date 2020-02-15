@@ -118,4 +118,5 @@ def translate_dir(translator, parse_line, dir_path):
             better_ops = translator.rewrite_ops(ops)
             for op, args in better_ops:
                 translator.__getattribute__(op)(*args)
+    translator.finish()
 

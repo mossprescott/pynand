@@ -148,6 +148,14 @@ class Translator:
 
     
     #
+    # (Optional) Cleanup:
+    #
+    def finish(self):
+        """Called after all opcodes are processed, in case the translator needs to say any last words."""
+        pass
+
+
+    #
     # (Optional) Optimization:
     #
     def rewrite_ops(self, ops):

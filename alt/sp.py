@@ -234,7 +234,8 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"@{value}")
             self.asm.instr(f"SP++=A")
 
-    def _pop_segment(self, segment_ptr, index):
+    def _pop_segment(self, segment_name, segment_ptr, index):
+        self.asm.start(f"pop {segment_name} {index}")
         # Since pop doesn't overwrite A, a much simpler sequence works:
         if index == 0:
             self.asm.instr(f"@{segment_ptr}")
@@ -258,12 +259,14 @@ class Translator(solved_07.Translator):
         # TODO: no need for this as soon as everything's switched to use SP++ directly?
         self.asm.instr("D=--SP")
 
-    def _binary(self, op):
+    def _binary(self, opcode, op):
+        self.asm.start(opcode)
         self.asm.instr("D=--SP")
         self.asm.instr("A=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'A')}")
 
-    def _unary(self, op):
+    def _unary(self, opcode, op):
+        self.asm.start(opcode)
         self.asm.instr("D=--SP")
         self.asm.instr(f"SP++={op.replace('M', 'D')}")
 
@@ -377,6 +380,10 @@ class Translator(solved_07.Translator):
 
 
     # TODO: improve the common sequence for `return`.
+
+
+    def finish(self):
+        pass
 
 
 if __name__ == "__main__":
