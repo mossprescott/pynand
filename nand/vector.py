@@ -475,10 +475,11 @@ class NandVectorWrapper:
             self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
         self._vector._flop()
 
-    def ticktock(self):
+    def ticktock(self, cycles=1):
         """Raise and then lower the common `clock` signal."""
-        self.tick()
-        self.tock()
+        for _ in range(cycles):
+            self.tick()
+            self.tock()
 
     def __getattr__(self, name):
         """Get the value of a single- or multiple-bit output."""
