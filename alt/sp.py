@@ -279,8 +279,14 @@ class Translator(solved_07.Translator):
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.asm.label(f"{self.function_namespace}")
 
-        for _ in range(num_vars):
-            self.asm.instr("SP++=0")
+        if num_vars == 0:
+            # Tricky: this instruction has no effect; it's just here to take up space in the ROM and ensure that the
+            # "function" op has a unique address assigned to it, so that it can appear in tracing and profiling. Yes, 
+            # that is dumb.
+            self.asm.instr("0")
+        else:
+            for _ in range(num_vars):
+                self.asm.instr("SP++=0")
 
     def _compare(self, op):
         # Saves about 4 instuctions each time, or a few % at runtime.
@@ -392,17 +398,19 @@ if __name__ == "__main__":
     import sys
     import computer
 
+    path = sys.argv[1]
+
     translate = Translator()
     
     translate.preamble()
     
-    translate_dir(translate, solved_07.parse_line, sys.argv[1])
+    translate_dir(translate, solved_07.parse_line, path)
     translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
     
     if TRACE:
         for instr in translate.asm:
             print(instr)
 
-    computer.run(assemble(translate.asm), chip=SPComputer, src_map=translate.asm.src_map if TRACE else None)
+    computer.run(assemble(translate.asm), chip=SPComputer, name=path, src_map=translate.asm.src_map if TRACE else None)
 
 
