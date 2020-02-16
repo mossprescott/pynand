@@ -36,22 +36,24 @@ parser.add_argument("path", help="Path to source, either one file with assembly 
 parser.add_argument("--vector", action="store_true", help="Use the slower, but more precise, bit-vector-based runtime.")
 parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization.")
 parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
+parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
 
 
 def main():
     args = parser.parse_args()
 
-    prg, src_map = load(args.path, args.print)
+    prg, src_map = load(args.path, print_asm=args.print, no_waiting=args.no_waiting)
 
-    run(prg, 
+    run(prg,
+        name=args.path,
         simulator='vector' if args.vector else 'codegen',
         src_map=src_map if args.trace else None)
 
 
-def load(path, print_asm=False, assemble=project_06.assemble):
+def load(path, assemble=project_06.assemble, print_asm=False, no_waiting=False):
     if os.path.splitext(path)[1] == '.asm':
         print(f"Reading assembly from file: {path}")
-        with open(sys.argv[1], mode='r') as f:
+        with open(path, mode='r') as f:
             prg = project_06.assemble(f)
         return prg, None
     else:
@@ -59,6 +61,11 @@ def load(path, print_asm=False, assemble=project_06.assemble):
         translate.preamble()
         translate_dir(translate, project_07.parse_line, path)
         translate_dir(translate, project_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+
+        if no_waiting:
+            translate.function("Sys", "wait", 0)
+            translate.push_constant(0)
+            translate.return_op()
 
         if print_asm:
             for instr in translate.asm:
@@ -140,11 +147,11 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip=project_05.Computer, simulator='codegen', src_map=None):
+def run(program, chip=project_05.Computer, name="Nand!", simulator='codegen', src_map=None):
     computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
     
-    kvm = KVM(sys.argv[1], 512, 256)
+    kvm = KVM(name, 512, 256)
 
     last_cycle_time = last_event_time = last_display_time = now = time.monotonic()
     
@@ -178,7 +185,7 @@ def run(program, chip=project_05.Computer, simulator='codegen', src_map=None):
 
             if now >= last_cycle_time + CYCLE_INTERVAL:
                 cps = (cycles - last_cycle_count)/(now - last_cycle_time)
-                pygame.display.set_caption(f"{sys.argv[1]}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
+                pygame.display.set_caption(f"{name}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
                 last_cycle_time = now
                 last_cycle_count = cycles
             
