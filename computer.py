@@ -50,7 +50,8 @@ def main():
         src_map=src_map if args.trace else None)
 
 
-def load(path, assemble=project_06.assemble, print_asm=False, no_waiting=False):
+# TODO: make assemble, parse_line, and translator params?
+def load(path, print_asm=False, no_waiting=False):
     if os.path.splitext(path)[1] == '.asm':
         print(f"Reading assembly from file: {path}")
         with open(path, mode='r') as f:
