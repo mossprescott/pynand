@@ -199,7 +199,7 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ShiftComputer, assemble=assemble, translator=Translator)
 
 
-# @pytest.mark.skip(reason="Sources aren't in the repo yet")
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
     
@@ -207,7 +207,14 @@ def test_vm_pong_instructions():
     assert instruction_count < -1  # 15_749
 
 
-# @pytest.mark.skip(reason="Sources aren't in the repo yet")
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
+def test_pong_first_iteration():
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(ShiftComputer, assemble, Translator)
+
+    assert cycles < 1  #?
+
+
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(ShiftComputer, assemble, Translator)
 
