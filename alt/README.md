@@ -22,5 +22,5 @@ sources.
 *Cycles per frame* is the number of cycles to run the first iteration of the Pong game loop. 
 Specifically, this includes `Bat.move` and `PongGame.moveBall`, and _not_ `Sys.wait`.
 
-*Cycles for init* is the number of cycles from start to reaching "call Main.main 0". That is,
+*Cycles for init* is the number of cycles from start to reaching `call Main.main 0`. That is,
 the number of cycles to execute all of the common setup code in `Sys.init`.
