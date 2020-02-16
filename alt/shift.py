@@ -1,15 +1,13 @@
 """An alternative CPU which is backward compatible with the Nand to Tetris design, adding the ability to 
 shift the ALU's result to the right by one bit.
 
-This is pretty cheap: 
+This is pretty cheap: about 50 additional gates to check a bit and select the shifted or un-shifted result.
 
 The VM translator rewrites division by a constant power of 2 to a (series of) "shiftr" opcode(s), and substitutes
 a more efficient implementation of Math.multiply that uses it.
 
-The result is:
-- gates: about 1,311 (+4% from 1,262), a trivial increase.
-- instruction count for Pong: ? (-?% from 29.5k)
-- cycles in Sys.init: ? (-?% from 3.97m)
+The result is about 40% few cycles to run the Pong game loop, and essentially no difference in simulation speed, 
+since the only change is a single, conditional `>> 1` expression.
 
 """
 
