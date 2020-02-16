@@ -63,6 +63,7 @@ def synthesize(ic):
         (name, bit): 1 << all_bits[Connection(root, name, bit)]
         for name, bits in ic._inputs.items()
         for bit in range(bits)
+        if Connection(root, name, bit) in all_bits  # Not all input bits are necessarily connected.
     }
     
     if any_clock_references:
