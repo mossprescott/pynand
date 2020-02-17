@@ -12,6 +12,7 @@ $ pip3 install pygame==2.0.0dev6
 """
 
 import argparse
+import collections
 import os
 import pygame
 from pygame import Surface, Color, PixelArray
@@ -34,34 +35,45 @@ CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tra
 parser = argparse.ArgumentParser(description="Run assembly or VM source with display and keyboard")
 parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm files.")
 parser.add_argument("--vector", action="store_true", help="Use the slower, but more precise, bit-vector-based runtime.")
-parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization.")
+parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization. Note: runs almost 3x slower.")
 parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
 parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
 
 
-def main():
-    args = parser.parse_args()
+Platform = collections.namedtuple("Platform", ["chip", "assemble", "parse_line", "translator"])
 
-    prg, src_map = load(args.path, print_asm=args.print, no_waiting=args.no_waiting)
+HACK_PLATFORM = Platform(
+    chip=project_05.Computer,
+    assemble=project_06.assemble,
+    parse_line=project_07.parse_line,
+    translator=project_08.Translator)
+
+
+def main(platform=HACK_PLATFORM):
+    args = parser.parse_args()
+    
+    print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
+
+    prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
 
     run(prg,
+        chip=platform.chip,
         name=args.path,
         simulator='vector' if args.vector else 'codegen',
         src_map=src_map if args.trace else None)
 
 
-# TODO: make assemble, parse_line, and translator params?
-def load(path, print_asm=False, no_waiting=False):
+def load(platform, path, print_asm=False, no_waiting=False):
     if os.path.splitext(path)[1] == '.asm':
         print(f"Reading assembly from file: {path}")
         with open(path, mode='r') as f:
-            prg = project_06.assemble(f)
+            prg = platform.assemble(f)
         return prg, None
     else:
-        translate = project_08.Translator()
+        translate = platform.translator()
         translate.preamble()
-        translate_dir(translate, project_07.parse_line, path)
-        translate_dir(translate, project_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+        translate_dir(translate, platform.parse_line, path)
+        translate_dir(translate, platform.parse_line, "nand2tetris/tools/OS")  # HACK not committed
 
         if no_waiting:
             translate.function("Sys", "wait", 0)
@@ -72,7 +84,7 @@ def load(path, print_asm=False, no_waiting=False):
             for instr in translate.asm:
                 print(instr)
 
-        return project_06.assemble(translate.asm), translate.asm.src_map
+        return platform.assemble(translate.asm), translate.asm.src_map
 
 
 COLORS = [0xFFFFFF, 0x000000]
@@ -148,7 +160,7 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip=project_05.Computer, name="Nand!", simulator='codegen', src_map=None):
+def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
     computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
     

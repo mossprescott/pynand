@@ -892,21 +892,13 @@ class Translator:
         pass
 
 
+import computer
+
+THREADED_PLATFORM = computer.Platform(
+    chip=ThreadedComputer,
+    assemble=assemble,
+    parse_line=solved_07.parse_line,
+    translator=Translator)
+
 if __name__ == "__main__":
-    TRACE = False
-
-    import sys
-    import computer
-
-    translate = Translator()
-    
-    translate.preamble()
-    
-    translate_dir(translate, solved_07.parse_line, sys.argv[1])
-    translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
-    
-    if TRACE:
-        for instr in translate.asm:
-            print(instr)
-
-    computer.run(assemble(translate.asm), chip=ThreadedComputer, src_map=translate.asm.src_map if TRACE else None)
+    computer.main(THREADED_PLATFORM)

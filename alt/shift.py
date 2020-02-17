@@ -145,38 +145,28 @@ class Translator(solved_07.Translator):
         # TODO: "push constant 16" -> "shiftr" x4, etc.
         result = []
         while ops:
+            # TODO: the same for other powers of two
             if len(ops) >= 2 and ops[0] == ('push_constant', (16,)) and ops[1] == ('call', ("Math", "divide", 2)):
                 result.append(("shiftr", ()))
                 result.append(("shiftr", ()))
                 result.append(("shiftr", ()))
                 result.append(("shiftr", ()))
                 ops = ops[2:]
-                print("rewrote divide by 16")
+                # print("rewrote divide by 16")
+            # TODO: similar for multiply, but use "pop temp 1"; "push temp 1" "push temp 1" "add"?
             else:
                 result.append(ops[0])
                 ops = ops[1:]
         return result
 
 
+import computer
+
+SHIFT_PLATFORM = computer.Platform(
+    chip=ShiftComputer,
+    assemble=assemble,
+    parse_line=solved_07.parse_line,
+    translator=Translator)
+
 if __name__ == "__main__":
-    TRACE = False
-
-    import sys
-    import computer
-
-    path = sys.argv[1]
-
-    translate = Translator()
-    
-    translate.preamble()
-    
-    translate_dir(translate, solved_07.parse_line, path)
-    translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
-    
-    if TRACE:
-        for instr in translate.asm:
-            print(instr)
-
-    computer.run(assemble(translate.asm), chip=ShiftComputer, name=path, src_map=translate.asm.src_map if TRACE else None)
-
-
+    computer.main(SHIFT_PLATFORM)
