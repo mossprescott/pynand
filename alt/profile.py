@@ -1,21 +1,20 @@
 """VM-level profiler, tracking the number of cycles by: instruction, opcode, function (self), function (total).
 
-First discoveries:
+This immediately revealed that Math.divide is a huge problem, and in particular dividing by 16. So 
+I added the shift.py implementation which eliminates those calls, for the biggest improvement yet.
 
+Second discovery: 67% of the time (post-initialization) was in Sys.wait(). That was easy to hack 
+around.
+
+Now:
 40% of the time (initialization) is in Memory.alloc(), which is unexpected.
-30% is in Math.multiply, which is more than I expected in this phase.
+20% is still in Math.multiply, even after making it a bit quicker with "shiftr".
+2% is Math.abs, but despite the small number I wonder how much it would help to inline it since it 
+would be quite simple to translate directly to assembly.
 
-67% of the time (post-initialization) was in Sys.wait(). That was easy to hack around.
-
-After fixing that:
-38% is Math.divide().
-27% is Math.multiply().
-This is no great surprise and represents an opportunity. Doing 16-bit multiply/divide without even 
-shift/mask is just hard, and the included implementation may not even be good. Probably time to try 
-a new CPU with one or two shift instructions, and implement them both using that.
-
-"call" and "return" ops only account for about 10% each. That's a lot, but less than I expected.
-"push local" is the only one higher: more than 13%.
+"call" and "return" ops only account for about 5% each. A lot less than expected.
+"lt" and "push local" are higher: around 13%. "lt" could be improved a lot in the translator by 
+fusing it with "not/if-goto".
 """
 
 import collections
