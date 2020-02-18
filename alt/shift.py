@@ -99,25 +99,9 @@ ShiftComputer = build(mkShiftComputer)
 
 
 def parse_op(string, symbols={}):
-    # m = re.match(r"([ADM]+)=--SP", string)
-    # if m:
-    #     dest_a = 'A' in m.group(1)
-    #     dest_d = 'D' in m.group(1)
-    #     if 'M' in m.group(1):
-    #         raise SyntaxError(f"M not allowed as a destination for pop: {string}")
-    #     return (1 << 15) | (0b1_110000 << 6) | (dest_a << 5) | (dest_d << 4)
-    #
-    # m = re.match(r"SP\+\+=([^;]+)", string)
-    # if m:
-    #     alu = solved_06.ALU_CONTROL.get(m.group(1))
-    #     if alu is not None:
-    #         return (1 << 15) | (alu << 6)
-
-    # TODO: strip off ">>1" and parse with the regular parser?
-    
-    # HACK:
-    if string == "M=M>>1":
-        return 0xdfff & solved_06.parse_op("M=M", symbols)
+    m = re.match(r"(.+)>>1", string)
+    if m:
+        return 0xdfff & solved_06.parse_op(m.group(1), symbols)
     
     return solved_06.parse_op(string, symbols)
 

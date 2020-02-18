@@ -26,7 +26,7 @@ def test_backward_compatible_computer_max():
 def test_backward_compatible_speed():
     cps = test_05.cycles_per_second(ShiftComputer)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
-    assert cps > 750
+    assert cps > 1_000
 
 
 #
@@ -53,42 +53,47 @@ def test_shiftR16():
 # Now some tests of added stuff:
 #
 
-# def test_write_sp():
-#     """Writing to address 0 using Hack instructions updates SP."""
-#
-#     cpu = run(ShiftCPU)
-#
-#     init_sp(cpu)
-#
-#     assert cpu.writeM == False  # to avoid confusion, the RAM is not also written
-#     assert cpu.sp == 256
-#
-#
-# def test_read_sp():
-#     """The value of SP is used when reading from address 0."""
-#
-#     cpu = run(ShiftCPU)
-#
-#     init_sp(cpu)
-#
-#     ASM = [
-#         # Now read the value back into A:
-#         "A=-1",
-#         "@0",
-#         "A=M",
-#     ]
-#     for instr in ASM:
-#         cpu.instruction = parse_op(instr)
-#         cpu.ticktock()
-#
-#     cpu.inM = 12345  # Nonense value, not used
-#     cpu.instruction = parse_op("D=M")  # Put the value of A on the address lines
-#     assert cpu.addressM == 256
+def test_shift_instr():
+    cpu = run(ShiftCPU)
+    
+    cpu.instruction = parse_op("@4")
+    cpu.ticktock()
+    
+    cpu.instruction = parse_op("A=A>>1")
+    cpu.ticktock()
+    assert cpu.addressM == 2
+    
+    cpu.ticktock()    
+    assert cpu.addressM == 1
+    
+    cpu.ticktock()    
+    assert cpu.addressM == 0
+    
+    cpu.ticktock()    
+    assert cpu.addressM == 0
+    
+    cpu.instruction = parse_op("@6")
+    cpu.ticktock()
+    cpu.instruction = parse_op("D=-A")
+    cpu.ticktock()
+    assert cpu.outM == -6
+    
+    cpu.instruction = parse_op("D=D>>1")
+    assert cpu.outM == -3
+    cpu.ticktock()
+
+    assert cpu.outM == -2  # Note: this is _floor_ division.
+    cpu.ticktock()
+
+    assert cpu.outM == -1
+    cpu.ticktock()
+
+    assert cpu.outM == -1
 
 
 def test_computer_gates():
     assert gate_count(ShiftComputer) == {
-        'nands': 1_311,  # ? compare to 1262
+        'nands': 1_311,  # compare to 1262
         'dffs': 48,
         'roms': 1,
         'rams': 2,
@@ -111,53 +116,12 @@ def test_backward_compatible_ops():
 
 
 #
-# Test SP-modifying instructions:
+# Test shift instructions:
 #
 
-# def test_assemble_sp_ops():
-#     assert unsigned(parse_op("D=--SP"))  == 0b100_1_110000_010_000
-#     assert unsigned(parse_op("A=--SP"))  == 0b100_1_110000_100_000
-#     assert unsigned(parse_op("AD=--SP")) == 0b100_1_110000_110_000
-#     with pytest.raises(SyntaxError) as exc_info:
-#         parse_op("M=--SP")
-#     assert str(exc_info.value).startswith("M not allowed as a destination for pop")
-#
-#     assert unsigned(parse_op("SP++=0")) == 0b100_0_101010_000_000
-#     assert unsigned(parse_op("SP++=D+1")) == 0b100_0_011111_000_000
-#     with pytest.raises(Exception) as exc_info:
-#         parse_op("SP++=M")
-#     assert str(exc_info.value).startswith("unrecognized alu op")
-#
-#
-# def test_push_constant():
-#     cpu = run(ShiftCPU)
-#
-#     init_sp(cpu)
-#
-#     cpu.instruction = parse_op("SP++=-1")
-#     assert cpu.outM == -1
-#     assert cpu.writeM == True
-#     assert cpu.addressM == 256
-#
-#     cpu.ticktock()
-#
-#     assert cpu.sp == 257
-#
-# def test_pop_to_a():
-#     cpu = run(ShiftCPU)
-#
-#     init_sp(cpu)
-#
-#     cpu.instruction = parse_op("A=--SP")
-#     assert cpu.writeM == False
-#     assert cpu.addressM == 255
-#     cpu.inM = 12345
-#
-#     cpu.ticktock()
-#
-#     cpu.instruction = parse_op("D=M")  # Put A on the address lines
-#     assert cpu.sp == 255
-#     assert cpu.addressM == 12345
+def test_assemble_shift_ops():
+    assert unsigned(parse_op("D=D>>1")) == solved_06.parse_op("D=D") & ~0b001_0_000000_000_000
+    assert unsigned(parse_op("A=D+M>>1")) == solved_06.parse_op("A=D+M") & ~0b001_0_000000_000_000
 
 
 #
@@ -204,14 +168,15 @@ def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
     
     # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # 15_749
+    assert instruction_count < 28_300
 
 
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
     cycles = test_optimal_08.count_pong_cycles_first_iteration(ShiftComputer, assemble, Translator)
 
-    assert cycles < 1  #?
+    # compare to the project_08 solution (about 34k)
+    assert cycles < 20_000
 
 
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
@@ -219,16 +184,4 @@ def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(ShiftComputer, assemble, Translator)
 
     # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # 2_612_707
-    
-#
-# def init_sp(cpu):
-#     ASM = [
-#         "@256",
-#         "D=A",
-#         "@0",
-#         "M=D",
-#     ]
-#     for instr in ASM:
-#         cpu.instruction = parse_op(instr)
-#         cpu.ticktock()
+    assert cycles < 3_970_000
