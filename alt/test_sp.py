@@ -201,6 +201,13 @@ def test_vm_pong_instructions():
 
 
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
+def test_pong_first_iteration():
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(SPComputer, assemble, Translator)
+
+    assert cycles < 1  #?
+
+
+@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(SPComputer, assemble, Translator)
 

@@ -73,7 +73,7 @@ PRIMITIVES = set([
     # Additional components used in the exercises, but not typically used in a full computer sim:
     "DMux", "DMux8Way", "Mux8Way16",
     # Additonal for alternative CPUs:
-    "Dec16", "Eq16", "Mask15",
+    "Dec16", "Eq16", "Mask15", "ShiftR16",
 ])
 
 
@@ -228,6 +228,10 @@ def generate_python(ic, inline=True):
             # So, yeah, this isn't really all that general in application. Need some way to 
             # represent arbitrary mask/shift/rotate operations?
             return unary16(comp, "{} & 0x7fff", bits=15)
+        elif comp.label == 'ShiftR16':
+            # So, yeah, this isn't really all that general in application. Need some way to 
+            # represent arbitrary mask/shift/rotate operations?
+            return unary16(comp, "{} >> 1")
         elif comp.label == 'DMux':
             return None  # note: multiple outputs doesn't really inline
         elif comp.label == 'DMux8Way':

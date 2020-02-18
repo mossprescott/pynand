@@ -4,6 +4,8 @@ SPOILER ALERT: this files contains a complete VM translator.
 If you want to write this on your own, stop reading now!
 """
 
+import re
+
 
 class Translator:
     """Translate all VM opcodes to assembly instructions. 
@@ -244,14 +246,39 @@ class Translator:
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.asm.label(f"{self.function_namespace}")
 
-        self.asm.instr("@SP")
-        self.asm.instr("A=M")
-        for _ in range(num_vars):
+        if num_vars == 0:
+            # Note: a lot of functions have no locals, so skipping this has some impact.
+            # Tricky: this instruction has no effect; it's just here to take up space in the ROM and ensure that the
+            # "function" op has a unique address assigned to it, so that it can appear in tracing and profiling. Yes, 
+            # that is dumb.
+            self.asm.instr("0")
+        elif num_vars == 1:
+            # 5 instr.
+            self.asm.instr("@SP")
+            self.asm.instr("A=M")
+            self.asm.instr("M=0")
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+        elif num_vars == 2:
+            # 8 instr.
+            self.asm.instr("@SP")
+            self.asm.instr("A=M")
             self.asm.instr("M=0")
             self.asm.instr("A=A+1")
-        self.asm.instr("D=A")
-        self.asm.instr("@SP")
-        self.asm.instr("M=D")
+            self.asm.instr("M=0")
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("M=M+1")
+        else:
+            # 5 + 2*(num_vars) instr.
+            self.asm.instr("@SP")
+            self.asm.instr("A=M")
+            for _ in range(num_vars):
+                self.asm.instr("M=0")
+                self.asm.instr("A=A+1")
+            self.asm.instr("D=A")
+            self.asm.instr("@SP")
+            self.asm.instr("M=D")
 
     def return_op(self):
         # A short sequence that jumps to the common impl, which costs only 2 instructions in ROM per
@@ -381,7 +408,7 @@ class Translator:
         
         label = self.asm.next_label("call_common")
 
-        self.asm.start(f"call_common")
+        # self.asm.start(f"call_common")
         self.asm.label(label)
 
         # R15 = SP - (D + 1) (which will be the new ARG)
@@ -428,7 +455,7 @@ class Translator:
     def _return(self):
         label = self.asm.next_label("return_common")
         
-        self.asm.start(f"return_common")
+        # self.asm.start(f"return_common")
         self.asm.label(label)
         
         # R13 = result
@@ -502,7 +529,14 @@ def parse_line(line):
     imposing any structure at all, but munging the input into a shape that fits Translator.
     """
 
-    words = line.strip().split()
+    m = re.match(r"([^/]*)(?://.*)?", line)
+    if m:
+        string = m.group(1).strip()
+    else:
+        string = line.strip()
+    
+    words = string.split()
+    
     if not words:
         return None
     elif words[0] == "function":

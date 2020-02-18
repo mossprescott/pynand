@@ -11,6 +11,8 @@ Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a 
 $ pip3 install pygame==2.0.0dev6
 """
 
+import argparse
+import collections
 import os
 import pygame
 from pygame import Surface, Color, PixelArray
@@ -19,8 +21,8 @@ import time
 
 import nand.component
 import nand.syntax
-import project_05
-import project_06
+from nand.translate import translate_dir
+import project_05, project_06, project_07, project_08
 
 
 EVENT_INTERVAL = 1/10
@@ -30,10 +32,59 @@ CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
-def main():
-    with open(sys.argv[1], mode='r') as f:
-        prg = project_06.assemble(f)
-    run(prg)
+parser = argparse.ArgumentParser(description="Run assembly or VM source with display and keyboard")
+parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm files.")
+parser.add_argument("--vector", action="store_true", help="Use the slower, but more precise, bit-vector-based runtime.")
+parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization. Note: runs almost 3x slower.")
+parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
+parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
+
+
+Platform = collections.namedtuple("Platform", ["chip", "assemble", "parse_line", "translator"])
+
+HACK_PLATFORM = Platform(
+    chip=project_05.Computer,
+    assemble=project_06.assemble,
+    parse_line=project_07.parse_line,
+    translator=project_08.Translator)
+
+
+def main(platform=HACK_PLATFORM):
+    args = parser.parse_args()
+    
+    print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
+
+    prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
+
+    run(prg,
+        chip=platform.chip,
+        name=args.path,
+        simulator='vector' if args.vector else 'codegen',
+        src_map=src_map if args.trace else None)
+
+
+def load(platform, path, print_asm=False, no_waiting=False):
+    if os.path.splitext(path)[1] == '.asm':
+        print(f"Reading assembly from file: {path}")
+        with open(path, mode='r') as f:
+            prg = platform.assemble(f)
+        return prg, None
+    else:
+        translate = platform.translator()
+        translate.preamble()
+        translate_dir(translate, platform.parse_line, path)
+        translate_dir(translate, platform.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+
+        if no_waiting:
+            translate.function("Sys", "wait", 0)
+            translate.push_constant(0)
+            translate.return_op()
+
+        if print_asm:
+            for instr in translate.asm:
+                print(instr)
+
+        return platform.assemble(translate.asm), translate.asm.src_map
 
 
 COLORS = [0xFFFFFF, 0x000000]
@@ -109,11 +160,11 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip=project_05.Computer, src_map=None):
-    computer = nand.syntax.run(chip, simulator=os.environ.get("PYNAND_SIMULATOR") or 'codegen')
+def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
+    computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
     
-    kvm = KVM(sys.argv[1], 512, 256)
+    kvm = KVM(name, 512, 256)
 
     last_cycle_time = last_event_time = last_display_time = now = time.monotonic()
     
@@ -128,7 +179,7 @@ def run(program, chip=project_05.Computer, src_map=None):
 
             op = src_map.get(computer.pc) if src_map else None
             if op and op.startswith("call") and (
-                'Screen' in op or 'Main' in op or 'init' in op):
+                'Main' in op or 'init' in op):
                 print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
         
         # Note: check the time only every few frames to reduce the overhead of timing
@@ -147,7 +198,7 @@ def run(program, chip=project_05.Computer, src_map=None):
 
             if now >= last_cycle_time + CYCLE_INTERVAL:
                 cps = (cycles - last_cycle_count)/(now - last_cycle_time)
-                pygame.display.set_caption(f"{sys.argv[1]}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
+                pygame.display.set_caption(f"{name}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
                 last_cycle_time = now
                 last_cycle_count = cycles
             

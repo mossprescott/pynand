@@ -63,6 +63,7 @@ def synthesize(ic):
         (name, bit): 1 << all_bits[Connection(root, name, bit)]
         for name, bits in ic._inputs.items()
         for bit in range(bits)
+        if Connection(root, name, bit) in all_bits  # Not all input bits are necessarily connected.
     }
     
     if any_clock_references:
@@ -475,10 +476,11 @@ class NandVectorWrapper:
             self._vector.set(('common.clock', 0), 0)  # TODO: first check that it was high
         self._vector._flop()
 
-    def ticktock(self):
+    def ticktock(self, cycles=1):
         """Raise and then lower the common `clock` signal."""
-        self.tick()
-        self.tock()
+        for _ in range(cycles):
+            self.tick()
+            self.tock()
 
     def __getattr__(self, name):
         """Get the value of a single- or multiple-bit output."""
