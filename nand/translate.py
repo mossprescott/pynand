@@ -112,7 +112,7 @@ class AssemblySource:
 def translate_dir(translator, parse_line, dir_path):
     for fn in os.listdir(dir_path):
         if fn.endswith(".vm"):
-            print(f"// Loading VM source: {dir_path}/{fn}")
+            # print(f"// Loading VM source: {dir_path}/{fn}")
             with open(f"{dir_path}/{fn}", mode='r') as f:
                 ops = [parse_line(l) for l in f if parse_line(l) is not None]
             better_ops = translator.rewrite_ops(ops)
