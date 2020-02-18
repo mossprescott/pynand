@@ -66,6 +66,8 @@ def main(platform=HACK_PLATFORM):
     print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
 
     prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
+    
+    print(f"Size in ROM: {len(prg):0,d}")
 
     run(prg,
         chip=platform.chip,
