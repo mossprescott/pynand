@@ -110,6 +110,99 @@ def assemble(lines):
     return solved_06.assemble(lines, parse_op)
 
 
+# Math.multiply from the included library, rewritten to use shiftr to rotate the bits of y into the 
+# low bit, rather than using a table and a separate local variable to tell when to stop.
+FAST_MULTIPLY = """
+    function Math.multiply 5
+    // local 0: acc/result
+    // local 1: tmp for swapping x/y
+    // local 2: negate result?
+
+    push argument 0
+    push constant 0
+    lt
+    push argument 1
+    push constant 0
+    gt
+    and
+    push argument 0
+    push constant 0
+    gt
+    push argument 1
+    push constant 0
+    lt
+    and
+    or
+    pop local 2  // (x < 0 and y > 0) or (x > 0 and y < 0)
+
+    push argument 0
+    call Math.abs 1
+    pop argument 0  // x = abs(x)
+    push argument 1
+    call Math.abs 1
+    pop argument 1  // y = abs(y)
+
+    push argument 0
+    push argument 1
+    lt
+    if-goto IF_TRUE0
+    goto IF_FALSE0
+    label IF_TRUE0  // x < y
+    push argument 0
+    pop local 1
+    push argument 1
+    pop argument 0
+    push local 1
+    pop argument 1  // swap x and y
+
+    label IF_FALSE0  // x > y
+    label WHILE_EXP0
+    push argument 1
+    push constant 0
+    eq
+    if-goto WHILE_END0   // y == 0  -> exit
+    push argument 1
+    push constant 1
+    and
+    if-goto IF_TRUE1  // (y & 0x0001) != 0
+    goto IF_FALSE1
+    label IF_TRUE1
+    push local 0
+    push argument 0
+    add
+    pop local 0  // a = a + x
+
+    label IF_FALSE1
+    push argument 0
+    push argument 0
+    add
+    pop argument 0  // x = x + x
+    push argument 1
+    shiftr
+    pop argument 1  // y = y/2
+    goto WHILE_EXP0
+
+    label WHILE_END0
+    push local 2
+    if-goto IF_TRUE2
+    goto IF_FALSE2
+
+    label IF_TRUE2
+    push local 0
+    neg
+    pop local 0
+    label IF_FALSE2
+    push local 0
+    return
+""".split('\n')
+
+INFINITE_LOOP = """
+    // Included for the sake of tests that want to run off the end.
+    label SHIFT_VM_HALT
+    goto SHIFT_VM_HALT
+""".split('\n')
+
+
 class Translator(solved_07.Translator):
     """Re-use the standard translator, adding a single new opcode: "shiftr".
     """
@@ -122,11 +215,13 @@ class Translator(solved_07.Translator):
         self._unary("shiftr", "M>>1")
 
     def finish(self):
-        # TODO: insert replacement Math.multiply
-        pass
+        for line in INFINITE_LOOP + FAST_MULTIPLY:
+            t = solved_07.parse_line(line)
+            if t:
+                op, args = t
+                self.__getattribute__(op)(*args)
         
     def rewrite_ops(self, ops):
-        # TODO: "push constant 16" -> "shiftr" x4, etc.
         result = []
         while ops:
             # TODO: the same for other powers of two

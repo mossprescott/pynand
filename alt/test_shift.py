@@ -163,6 +163,55 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ShiftComputer, assemble=assemble, translator=Translator)
 
 
+#
+# Test modified Math.multiply:
+#
+
+def test_multiply():
+    translate = Translator()
+    
+    translate.push_constant(123)
+    translate.push_constant(34)
+    translate.neg()
+    translate.call("Math", "multiply", 2)
+    
+    translate.finish()
+    
+    # Include Math.abs here just so we don't have to load the entire library. Might end up 
+    # implementing it as an opcode anyway.
+    abs_ops = """
+        function Math.abs 0
+        push argument 0
+        push constant 0
+        lt
+        if-goto IF_TRUE0
+        goto IF_FALSE0
+        label IF_TRUE0
+        push argument 0
+        neg
+        pop argument 0
+        label IF_FALSE0
+        push argument 0
+        return
+        """
+    for line in abs_ops.split('\n'):
+        t = solved_07.parse_line(line)
+        if t:
+            print(t)
+            op, args = t
+            translate.__getattribute__(op)(*args)
+    
+    computer = run(ShiftComputer, simulator="codegen")
+    asm = assemble(translate.asm)
+    computer.init_rom(asm)
+    
+    computer.poke(0, 256)
+    translate.asm.run(assemble, computer, stop_cycles=1500, debug=True)
+    
+    assert computer.peek(0) == 257
+    assert computer.peek(256) == -4182
+
+
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
