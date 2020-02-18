@@ -27,27 +27,27 @@ import project_05, project_06, project_07, project_08
 
 def main():
     path = sys.argv[1]
-
-    chip = project_05.Computer
-    assemble = project_06.assemble
-    parse_line = project_07.parse_line
-    translate = project_08.Translator()
-    # import alt.lazy
-    # translate = alt.lazy.Translator()
     
+    import alt.shift
+    platform = alt.shift.SHIFT_PLATFORM
+    # import alt.threaded
+    # platform = alt.threaded.THREADED_PLATFORM
+
+    translate = platform.translator()
+
     
     # initialization:
-    # SKIP_CYCLES = 0
-    # CYCLES = 4_000_000
+    SKIP_CYCLES = 0
+    CYCLES = 5_000_000
 
-    # skip initialization:
-    SKIP_CYCLES = 4_000_000
-    CYCLES = 4_000_000
+    # # skip initialization:
+    # SKIP_CYCLES = 5_000_000
+    # CYCLES = 4_000_000
     
     
     translate.preamble()
-    nand.translate.translate_dir(translate, parse_line, path)
-    nand.translate.translate_dir(translate, parse_line, "nand2tetris/tools/OS")  # HACK not committed
+    nand.translate.translate_dir(translate, platform.parse_line, path)
+    nand.translate.translate_dir(translate, platform.parse_line, "nand2tetris/tools/OS")  # HACK not committed
     
     # Substitute implementation for Sys.wait(), which returns immediately. This take precedence
     # just because it appears later in the assembly stream, so it's address will appear in the symbol map.
@@ -57,14 +57,16 @@ def main():
     translate.push_constant(0)
     translate.return_op()
     
+    translate.finish()
+    
     # for l in translate.asm:
     #     print(l)
 
-    prg = assemble(translate.asm)
+    prg = platform.assemble(translate.asm)
     src_map = translate.asm.src_map
     # print(list(src_map.items())[:10])
     
-    computer = nand.syntax.run(chip, simulator="codegen")
+    computer = nand.syntax.run(platform.chip, simulator="codegen")
     computer.init_rom(prg)
 
 
@@ -83,8 +85,8 @@ def main():
     # computer.ticktock(SKIP_CYCLES)
 
     for cycle in range(SKIP_CYCLES + CYCLES):
-        if cycle % 1000 == 0:
-            if cycle >= SKIP_CYCLES and (cycle - 1000) < SKIP_CYCLES:
+        if cycle % 5000 == 0:
+            if cycle >= SKIP_CYCLES and (cycle - 5000) < SKIP_CYCLES:
                 print()
                 print(f"Running {CYCLES:,d} cycles")
             print(".", end="", flush=True)
@@ -108,6 +110,7 @@ def main():
             # this issue (while making the program just slightly slower.)
             # Need to make src_map a multi-map.
             if op.startswith("function "):
+            # if op.startswith("call "):
                 fn_stack.append(pc)
                 # print('; '.join(("start" if addr == 0 else src_map[addr]) for addr in fn_stack))
                 if cycle > SKIP_CYCLES:
