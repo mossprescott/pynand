@@ -2,10 +2,11 @@
 
 """Run the full computer with display and keyboard connected via pygame.
 
-The program to run must be in Hack assembly form (.asm), and is specified by sys.argv[1].
-The `codegen` simulator is used unless env var `PYNAND_SIMULATOR` is set to "vector":
+The program to run must be in the form of Hack assembly (.asm) or VM opcodes (a directory 
+of .vm files) and is specified by sys.argv[1].
+The `codegen` simulator is used unless --vector is used.
 
-$ python computer.py examples/Blink.asm
+$ ./computer.py examples/Blink.asm
 
 Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
 $ pip3 install pygame==2.0.0dev6
