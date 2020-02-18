@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 """Run the full computer with display and keyboard connected via pygame.
 
