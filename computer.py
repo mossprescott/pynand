@@ -152,7 +152,12 @@ class KVM:
         elif keys[pygame.K_RETURN]:
             key = NEWLINE
         else:
-            key = None
+            for c in range(ord('a'), ord('z')+1):
+                if keys[c]:
+                    key = c
+                    break
+            else:
+                key = None
         return key
 
     def update_display(self, get_pixel):
