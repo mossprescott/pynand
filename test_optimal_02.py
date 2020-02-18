@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 """Tests of the efficiency/optimality of each component. Run these tests only if you're interested
 in using the minimum number of gates and/or making the (theoretically) fastest circuits.
 """

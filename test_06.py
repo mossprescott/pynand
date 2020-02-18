@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 from nand import run
 from project_05 import CPU
 from test_05 import ADD_PROGRAM, MAX_PROGRAM

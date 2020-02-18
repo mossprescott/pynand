@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """A more efficient VM translator for the book's CPU.
 
 Uses a single trick: when an opcode is encountered, if the opcode pushes a value on to the stack, 

@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 from nand import run, unsigned
 # Note: using the included implementations, so you can work on the projects in any order
 from nand.solutions.solved_05 import Computer

@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 import itertools
 
 from nand import run

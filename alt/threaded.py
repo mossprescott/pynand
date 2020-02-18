@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """An alternative CPU which enables _much_ smaller binaries, and therefore much larger programs, by 
 making a simple non-recursive call/return cost only one instruction in ROM per occurrence. With that,
 a "threaded" interpreter is much more compact (and readable).

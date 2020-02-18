@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 from nand import run
 import nand.component
 import project_05
