@@ -210,24 +210,13 @@ class Translator(solved_07.Translator):
             self.top_in_d = False
 
 
+import computer
+
+LAZY_PLATFORM = computer.Platform(
+    chip=solved_05.Computer,
+    assemble=solved_06.assemble,
+    parse_line=solved_07.parse_line,
+    translator=Translator)
 
 if __name__ == "__main__":
-    TRACE = False
-
-    import sys
-    import computer
-
-    translate = Translator()
-    
-    translate.preamble()
-    
-    translate_dir(translate, solved_07.parse_line, sys.argv[1])
-    translate_dir(translate, solved_07.parse_line, "nand2tetris/tools/OS")  # HACK not committed
-    
-    if TRACE:
-        for instr in translate.asm:
-            print(instr)
-
-    computer.run(solved_06.assemble(translate.asm), chip=solved_05.Computer, src_map=translate.asm.src_map if TRACE else None)
-
-
+    computer.main(LAZY_PLATFORM)
