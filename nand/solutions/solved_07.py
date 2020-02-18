@@ -6,6 +6,7 @@ If you want to write this on your own, stop reading now!
 
 import re
 
+from nand.translate import AssemblySource
 
 class Translator:
     """Translate all VM opcodes to assembly instructions. 
@@ -13,8 +14,8 @@ class Translator:
     Note: this implementation is not broken out into separate classes for projects 07 and 08.
     """
     
-    def __init__(self, asm):
-        self.asm = asm
+    def __init__(self, asm=None):
+        self.asm = asm if asm else AssemblySource()
         self.class_namespace = "static"
         self.function_namespace = "_"
         
@@ -507,7 +508,7 @@ class Translator:
         return label
 
 
-    def prologue():
+    def finish(self):
         """Called after all opcodes are processed, in case the translator needs to say any last words."""
         pass
 
