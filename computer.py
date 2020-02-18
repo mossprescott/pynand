@@ -22,8 +22,8 @@ import time
 import nand.component
 import nand.syntax
 from nand.translate import translate_dir
+from nand.solutions import solved_05, solved_06, solved_07
 import project_05, project_06, project_07, project_08
-
 
 EVENT_INTERVAL = 1/10
 DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
@@ -41,13 +41,23 @@ parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substit
 
 
 Platform = collections.namedtuple("Platform", ["chip", "assemble", "parse_line", "translator"])
+"""Package of a chip and the assembler and translator needed to run VM programs on it."""
+
 
 HACK_PLATFORM = Platform(
     chip=project_05.Computer,
     assemble=project_06.assemble,
     parse_line=project_07.parse_line,
     translator=project_08.Translator)
+"""The default chip and associated tools, defined in the project_0x.py modules."""
 
+
+STANDARD_PLATFORM = Platform(
+    chip=solved_05.Computer,
+    assemble=solved_06.assemble,
+    parse_line=solved_07.parse_line,
+    translator=solved_07.Translator)
+"""The included chip and tools; for comparison with the current solution."""
 
 def main(platform=HACK_PLATFORM):
     args = parser.parse_args()
