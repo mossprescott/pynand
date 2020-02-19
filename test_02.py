@@ -116,8 +116,8 @@ def test_alu_nostat():
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1; assert unsigned(alu.out) == 0x5FF2 # X | Y
 
 
-def test_alu():
-    alu = run(ALU)
+def test_alu(chip=ALU):
+    alu = run(chip)
 
     alu.x = 0
     alu.y = -1 
