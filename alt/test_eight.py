@@ -277,6 +277,123 @@ def test_gates_alu():
 
 # Project 03:
 
+def test_register8():
+    reg = run(Register8)
+
+    reg.in_ = 0
+    reg.load = 0
+    reg.tick(); reg.tock()
+    assert reg.out == 0
+
+    reg.load = 1
+    reg.tick(); reg.tock()
+    assert reg.out == 0
+
+    reg.in_ = 123
+    reg.load = 0
+    reg.tick(); reg.tock()
+    assert reg.out == 0
+
+    reg.in_ = 111
+    reg.load = 0
+    reg.tick(); reg.tock()
+    assert reg.out == 0
+
+    reg.in_ = 123
+    reg.load = 1
+    reg.tick(); reg.tock()
+    assert reg.out == 123
+
+    reg.load = 0
+    reg.tick(); reg.tock()
+    assert reg.out == 123
+
+    reg.in_ = -1
+    reg.tick(); reg.tock()
+    assert reg.out == 123
+
+def test_pc8():
+    pc = run(PC8)
+
+    def top():
+        pc.top_half = True
+        pc.bottom_half = False
+        pc.ticktock()
+    def bottom():
+        pc.top_half = False
+        pc.bottom_half = True
+        pc.ticktock()
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 0
+    top()
+    assert pc.out == 0  # No change on the first half-cycle
+    bottom()
+    assert pc.out == 1  # Now we go forward one word
+
+    pc.in_ = -32123
+    top(); bottom()
+    assert pc.out == 2
+
+    pc.load = 1
+    top(); bottom()
+    assert pc.out == -32123
+
+    pc.load = 0
+    top(); bottom()
+    assert pc.out == -32122
+
+    top(); bottom()
+    assert pc.out == -32121
+
+    pc.in_ = 12345; pc.load = 1
+    top(); bottom()
+    assert pc.out == 12345
+
+    pc.reset = 1
+    top(); bottom()
+    assert pc.out == 0  # reset overrides load/in_
+
+    pc.reset = 0
+    top(); bottom()
+    assert pc.out == 12345  # load/in_ still set from before
+
+    pc.reset = 1
+    top(); bottom()
+    assert pc.out == 0
+
+    pc.reset = 0; pc.load = 0
+    top(); bottom()
+    assert pc.out == 1
+
+    pc.reset = 1
+    top(); bottom()
+    assert pc.out == 0
+
+    pc.in_ = 0; pc.reset = 0; pc.load = 1
+    top(); bottom()
+    assert pc.out == 0
+
+    pc.load = 0
+    top(); bottom()
+    assert pc.out == 1
+
+    pc.in_ = 22222; pc.reset = 1
+    top(); bottom()
+    assert pc.out == 0
+
+
+def test_gates_register8():
+    assert gate_count(Register8) == {
+        'nands': 32,  # ?
+        'dffs': 8
+    }
+
+def test_gates_pc8():
+    assert gate_count(PC8) == {
+        'nands': 242,  # Compare to 287. Not much savings here.
+        'dffs': 24,    # This is actually 8 _more_.
+    }
+
 
 #
 # First test that the new CPU executes all Hack instructions as expected:

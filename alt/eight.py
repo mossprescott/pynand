@@ -142,22 +142,43 @@ def mkRegister8(inputs, outputs):
 
 Register8 = build(mkRegister8)
 
+
 def mkPC8(inputs, outputs):
+    """15-bit PC, built from two 8-bit registers and a single Inc8.
+    
+    On the first half-cycle, the low half-word is incremented, but the output 
+    is not yet updated. On the second half-cycle, the high half-word is 
+    incremented, and then the two half-words appear together at the same time.
+    
+    That way, the address presented to the ROM is consistently correct, and the 
+    instruction word can be read in both half-cycles.
+    """
+
+    top_half = inputs.top_half
+    bottom_half = inputs.bottom_half
+
     in_ = inputs.in_
     load = inputs.load
-    inc = inputs.inc
     reset = inputs.reset
     
+    in_split = Split(in_=in_)
+    in_lo = in_split.lo
+    in_hi = in_split.hi
+    
     reseted = lazy()
-    pc = Register8(in_=reseted.out, load=1)
+
+    pc_lo_next = Register8(in_=reseted.out, load=top_half)
+    pc_lo = Register8(in_=pc_lo_next.out, load=bottom_half)
+    pc_hi = Register8(in_=reseted.out, load=bottom_half)
+
+    # Clever? Can tell if overflow happened by inspecting the high bits of the old and new low words.
+    carry_in = And(a=pc_lo.out[7], b=Not(in_=pc_lo_next.out[7]).out).out
     
-    nxt = Inc8(in_=pc.out).out
-    inced = Mux8(a=pc.out, b=nxt, sel=inc)
-    loaded = Mux8(a=inced.out, b=in_, sel=load)
+    inced =     Inc8(in_=Mux8(a=pc_lo.out, b=pc_hi.out, sel=bottom_half).out, carry_in=Or(a=top_half, b=carry_in).out)
+    loaded =    Mux8(a=inced.out, b=Mux8(a=in_lo, b=in_hi, sel=bottom_half).out, sel=load)
     reseted.set(Mux8(a=loaded.out, b=0, sel=reset))
-    
-    outputs.out = pc.out
-    output.carry_out = And(a=And(a_=Not(in_=load).out, b=Not(in_=reset).out), b=inced.carry_out).out
+
+    outputs.out = Splice(lo=pc_lo.out, hi=pc_hi.out).out  # 16 bits
 
 PC8 = build(mkPC8)
 
@@ -167,6 +188,9 @@ PC8 = build(mkPC8)
 
 
 def mkEightCPU(inputs, outputs):
+    """Implement the 16-bit Hack instruction set using a single 8-bit ALU and 8-bit 
+    """
+    
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
@@ -222,6 +246,22 @@ def mkEightComputer(inputs, outputs):
 EightComputer = build(mkEightComputer)
 
 
+# 8-bit adapters:
+
+def mkSplice(inputs, outputs):
+    for i in range(8):
+        outputs.out[i] = inputs.lo[i]
+        outputs.out[i+8] = inputs.hi[i]
+Splice = build(mkSplice)
+
+def mkSplit(inputs, outputs):
+    for i in range(8):
+        outputs.lo[i] = inputs.in_[i]
+        outputs.hi[i] = inputs.in_[i+8]
+Split = build(mkSplit)
+
+
+# Main:
 
 import computer
 
