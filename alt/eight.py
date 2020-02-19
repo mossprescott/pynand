@@ -130,6 +130,7 @@ def mkEightALU(inputs, outputs):
     
     # Note: need one more output to track overflow from the low half-word.
     outputs.carry_out = And(a=f, b=added.carry_out).out
+    outputs.carry_out = added.carry_out
 
 EightALU = build(mkEightALU)
 
