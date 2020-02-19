@@ -1,13 +1,25 @@
 """An attempt at a _smaller_ CPU, by reducing the ALU and data paths to only 8 bits, and taking 
 two cycles for every instruction. This is the classic "low-cost" CPU move (examples include the 
-Motorola 68000), promising compatibility with fancier architectures, and then delivering 
-seriously compromised performance, or conversely, locking users into an architecture so they can
-later be upsold to more expensive models.
+Motorola 68000, and various 4/8- and 8/16-bit CPUs before that), promising compatibility with 
+fancier architectures, and then delivering seriously compromised performance, or conversely, 
+locking users into an architecture so they can later be upsold to more expensive models.
 
 To that end, 8-bit versions of all the components are defined, plus components to pack/unpack 
 them into 16-bit values for communication with the ROM and memory (which are shared with the 
 normal chip.) Some of the 8-bit components have additional inputs and outputs to allow for 
 propagating carry bits from one word the the next.
+
+In a real design, the memory bus, etc. would also be reduced in width since there is now only 
+one address/data word to move every two cycles, but to keep things simple the idea here is that
+the chip has exactly the same external interface.
+
+The question is: how close can this get to 50% smaller? No doubt there will be some overhead to
+keep track of half-cycles, and to propagate carries, etc.
+
+Note: this implementation defines _only_ a new CPU/Computer, which implements exactly the same 
+instruction set as the standard Hack CPU, so the same assembler and VM translator can be used. 
+The only way to tell them apart from the outside is to notice that each cycle makes half as 
+much progress.
 """
 
 import re
@@ -99,6 +111,13 @@ Neg8 = build(mkNeg8)
 
 
 def mkEightALU(inputs, outputs):
+    """Eight-bit ALU, with one addition:
+    
+    The single low bit carry_in is added along with x and y, and the carry_out from that operation
+    is exposed. Note that carry_out reflects the result of addition, whether or not the sum is used 
+    (f) and whether or not the result is negated (no).
+    """
+
     x = inputs.x
     y = inputs.y
     carry_in = inputs.carry_in
@@ -127,9 +146,6 @@ def mkEightALU(inputs, outputs):
     outputs.out = out
     outputs.zr = Zero8(in_=out).out
     outputs.ng = Neg8(in_=out).out
-    
-    # Note: need one more output to track overflow from the low half-word.
-    outputs.carry_out = And(a=f, b=added.carry_out).out
     outputs.carry_out = added.carry_out
 
 EightALU = build(mkEightALU)
@@ -145,14 +161,17 @@ Register8 = build(mkRegister8)
 
 
 def mkPC8(inputs, outputs):
-    """15-bit PC, built from two 8-bit registers and a single Inc8.
+    """16-bit PC, built from two 8-bit registers and a single Inc8.
+
+    On the first half-cycle, the low half-word is incremented, but the output is not yet updated. 
+    On the second half-cycle, the high half-word is incremented, and then the two half-words 
+    appear together at the same time.
+
+    That way, the address presented to the ROM is consistently correct, and the instruction word 
+    can be read in both half-cycles.
     
-    On the first half-cycle, the low half-word is incremented, but the output 
-    is not yet updated. On the second half-cycle, the high half-word is 
-    incremented, and then the two half-words appear together at the same time.
-    
-    That way, the address presented to the ROM is consistently correct, and the 
-    instruction word can be read in both half-cycles.
+    Note: all that fanciness means that this component doesn't save much compared to the normal 
+    PC. It might be better to just use that and only increment it on every other cycle.
     """
 
     top_half = inputs.top_half
@@ -161,7 +180,7 @@ def mkPC8(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     reset = inputs.reset
-    
+
     in_split = Split(in_=in_)
     in_lo = in_split.lo
     in_hi = in_split.hi
@@ -174,12 +193,12 @@ def mkPC8(inputs, outputs):
 
     # Clever? Can tell if overflow happened by inspecting the high bits of the old and new low words.
     carry_in = And(a=pc_lo.out[7], b=Not(in_=pc_lo_next.out[7]).out).out
-    
+
     inced =     Inc8(in_=Mux8(a=pc_lo.out, b=pc_hi.out, sel=bottom_half).out, carry_in=Or(a=top_half, b=carry_in).out)
     loaded =    Mux8(a=inced.out, b=Mux8(a=in_lo, b=in_hi, sel=bottom_half).out, sel=load)
     reseted.set(Mux8(a=loaded.out, b=0, sel=reset))
 
-    outputs.out = Splice(lo=pc_lo.out, hi=pc_hi.out).out  # 16 bits
+    outputs.out = Splice(lo=pc_lo.out, hi=pc_hi.out).out
 
 PC8 = build(mkPC8)
 
