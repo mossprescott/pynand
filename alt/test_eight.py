@@ -1,6 +1,7 @@
 import pytest
 
 from nand import run, gate_count #, unsigned
+import test_02
 import test_05
 import test_07
 import test_08
@@ -13,15 +14,25 @@ from alt.eight import *
 # Components:
 #
 
+# TODO: put this somewhere common:
+def parametrize_simulators(f):
+    def vector(chip, **args):
+        return run(chip, simulator="vector", **args)
+    def codegen(chip, **args):
+        return run(chip, simulator="codegen", **args)
+    return pytest.mark.parametrize("run", [vector, codegen])(f)
 
-def test_not8():
+
+@parametrize_simulators
+def test_not8(run):
     assert unsigned(run(Not8, in_=0b0000_0000).out) == 0b1111_1111
     assert unsigned(run(Not8, in_=0b1111_1111).out) == 0b0000_0000
     assert unsigned(run(Not8, in_=0b1010_1010).out) == 0b0101_0101
     assert unsigned(run(Not8, in_=0b1100_0011).out) == 0b0011_1100
     assert unsigned(run(Not8, in_=0b0011_0100).out) == 0b1100_1011
 
-def test_and8():
+@parametrize_simulators
+def test_and8(run):
     assert unsigned(run(And8, a=0b0000_0000, b=0b0000_0000).out) == 0b0000_0000
     assert unsigned(run(And8, a=0b0000_0000, b=0b1111_1111).out) == 0b0000_0000
     assert unsigned(run(And8, a=0b1111_1111, b=0b1111_1111).out) == 0b1111_1111
@@ -29,7 +40,8 @@ def test_and8():
     assert unsigned(run(And8, a=0b1100_0011, b=0b1111_0000).out) == 0b1100_0000
     assert unsigned(run(And8, a=0b0011_0100, b=0b0111_0110).out) == 0b0011_0100
 
-def test_mux8():
+@parametrize_simulators
+def test_mux8(run):
     assert unsigned(run(Mux8, a=0b0000_0000, b=0b0000_0000, sel=0).out) == 0b0000_0000
     assert unsigned(run(Mux8, a=0b0000_0000, b=0b0000_0000, sel=1).out) == 0b0000_0000
     assert unsigned(run(Mux8, a=0b0000_0000, b=0b0011_0100, sel=0).out) == 0b0000_0000
@@ -52,48 +64,49 @@ def test_gates_mux8():
 
 # Project 02:
 
-@pytest.mark.parametrize("simulator", ["vector", "codegen"])
-def test_inc8(simulator):
-    assert run(Inc8, in_=  0, carry_in=0, simulator=simulator).out == 0
-    assert run(Inc8, in_=  5, carry_in=0, simulator=simulator).out == 5
-    assert run(Inc8, in_=255, carry_in=0, simulator=simulator).out == 255
-    assert run(Inc8, in_=  0, carry_in=1, simulator=simulator).out == 1
-    assert run(Inc8, in_=  5, carry_in=1, simulator=simulator).out == 6
-    assert run(Inc8, in_=255, carry_in=1, simulator=simulator).out == 0
+@parametrize_simulators
+def test_inc8(run):
+    assert run(Inc8, in_=  0, carry_in=0).out == 0
+    assert run(Inc8, in_=  5, carry_in=0).out == 5
+    assert run(Inc8, in_=255, carry_in=0).out == 255
+    assert run(Inc8, in_=  0, carry_in=1).out == 1
+    assert run(Inc8, in_=  5, carry_in=1).out == 6
+    assert run(Inc8, in_=255, carry_in=1).out == 0
 
     # TODO: what to do with negatives? Probably need to treat these value as unsigned until they're 
     # re-assembled into 16-bits.
-    # assert run(Inc8, in_=-1, simulator=simulator).out ==  0
-    # assert run(Inc8, in_=-5, simulator=simulator).out == -4
+    # assert run(Inc8, in_=-1).out ==  0
+    # assert run(Inc8, in_=-5).out == -4
     
-    assert run(Inc8, in_=  0, carry_in=0, simulator=simulator).carry_out == 0
-    assert run(Inc8, in_=255, carry_in=0, simulator=simulator).carry_out == 0
-    assert run(Inc8, in_=  0, carry_in=1, simulator=simulator).carry_out == 0
-    assert run(Inc8, in_=255, carry_in=1, simulator=simulator).carry_out == 1
+    assert run(Inc8, in_=  0, carry_in=0).carry_out == 0
+    assert run(Inc8, in_=255, carry_in=0).carry_out == 0
+    assert run(Inc8, in_=  0, carry_in=1).carry_out == 0
+    assert run(Inc8, in_=255, carry_in=1).carry_out == 1
     
-@pytest.mark.parametrize("simulator", ["vector", "codegen"])
-def test_add8(simulator):
-    assert run(Add8, a=  0, b=  0, carry_in=0, simulator=simulator).out ==   0
-    assert run(Add8, a=255, b=255, carry_in=0, simulator=simulator).out == 254
-    assert run(Add8, a=  0, b=  0, carry_in=1, simulator=simulator).out ==   1
-    assert run(Add8, a=255, b=255, carry_in=1, simulator=simulator).out == 255
-    
-    assert run(Add8, a=  0, b=  0, carry_in=0, simulator=simulator).carry_out == False
-    assert run(Add8, a=255, b=255, carry_in=0, simulator=simulator).carry_out == True
-    assert run(Add8, a=  0, b=  0, carry_in=1, simulator=simulator).carry_out == False
-    assert run(Add8, a=255, b=255, carry_in=1, simulator=simulator).carry_out == True
+@parametrize_simulators
+def test_add8(run):
+    assert run(Add8, a=  0, b=  0, carry_in=0).out ==   0
+    assert run(Add8, a=255, b=255, carry_in=0).out == 254
+    assert run(Add8, a=  0, b=  0, carry_in=1).out ==   1
+    assert run(Add8, a=255, b=255, carry_in=1).out == 255
 
-@pytest.mark.parametrize("simulator", ["vector", "codegen"])
-def test_zero8(simulator):
-    assert run(Zero8, in_=0, simulator=simulator).out == True
+    assert run(Add8, a=  0, b=  0, carry_in=0).carry_out == False
+    assert run(Add8, a=255, b=255, carry_in=0).carry_out == True
+    assert run(Add8, a=  0, b=  0, carry_in=1).carry_out == False
+    assert run(Add8, a=255, b=255, carry_in=1).carry_out == True
+
+@parametrize_simulators
+def test_zero8(run):
+    assert run(Zero8, in_=0).out == True
     
-    z = run(Zero8, simulator=simulator)
+    z = run(Zero8)
     for i in range(1, 256):
         z.in_ = i
         assert z.out == False
 
 
-def test_alu_nostat():
+@parametrize_simulators
+def test_alu_nostat(run):
     alu = run(EightALU)
     
     alu.x = 0
@@ -142,12 +155,12 @@ def test_alu_nostat():
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1; assert alu.out == 0x3F # X | Y
 
 
-# TODO: Need to sort out what happens with negatives here
-def test_alu():
+@parametrize_simulators
+def test_alu(run):
     alu = run(EightALU)
 
     alu.x = 0
-    alu.y = -1 
+    alu.y = 255
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
@@ -156,25 +169,25 @@ def test_alu():
     assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.carry_out == 1 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
+    assert alu.out == 0 and alu.carry_out == 1 and alu.zr == 1 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
+    assert alu.out == 1 and alu.carry_out == 1 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
     assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
@@ -183,25 +196,25 @@ def test_alu():
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 0  # X - 1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # Y - 1
-    assert alu.out == -2 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 254 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # X + Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # X - Y
     assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 255 and alu.zr == 0 and alu.ng == 1
 
 
     alu.x = 17
@@ -214,7 +227,7 @@ def test_alu():
     assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-1 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
     assert alu.out == 17 and alu.zr == 0 and alu.ng == 0
@@ -223,16 +236,16 @@ def test_alu():
     assert alu.out == 3 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
-    assert alu.out == -18 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-18 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
-    assert alu.out == -4 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-4 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
-    assert alu.out == -17 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-17 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
-    assert alu.out == -3 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-3 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
     assert alu.out == 18 and alu.zr == 0 and alu.ng == 0
@@ -253,13 +266,33 @@ def test_alu():
     assert alu.out == 14 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
-    assert alu.out == -14 and alu.zr == 0 and alu.ng == 1
+    assert alu.out == 256-14 and alu.zr == 0 and alu.ng == 1
 
     alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
     assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
 
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
     assert alu.out == 19 and alu.zr == 0 and alu.ng == 0
+
+def test_alu_chained():
+    """Test sequential application of the 8-bit ALU by connecting two separate ALUs, with the 
+    carry bit wired between them.
+    """
+    def mkChainedALU(inputs, outputs):
+        x_split = Split(in_=inputs.x)
+        y_split = Split(in_=inputs.y)
+        alu_lo = EightALU(x=x_split.lo, y=y_split.lo, 
+                    zx=inputs.zx, nx=inputs.nx, zy=inputs.zy, ny=inputs.ny, f=inputs.f, no=inputs.no,
+                    carry_in=0)
+        alu_hi = EightALU(x=x_split.hi, y=y_split.hi, 
+                    zx=inputs.zx, nx=inputs.nx, zy=inputs.zy, ny=inputs.ny, f=inputs.f, no=inputs.no,
+                    carry_in=alu_lo.carry_out)
+        outputs.out = Splice(lo=alu_lo.out, hi=alu_hi.out).out
+        outputs.zr = And(a=alu_lo.zr, b=alu_hi.zr).out
+        outputs.ng = alu_hi.ng
+    ChainedALU = build(mkChainedALU)
+
+    test_02.test_alu(ChainedALU)
 
 
 def test_gates_inc8():
@@ -272,12 +305,13 @@ def test_gates_zero8():
     assert gate_count(Zero8)['nands'] == 22  # gate_count(Zero16)/2 - 1
 
 def test_gates_alu():
-    assert gate_count(EightALU)['nands'] == 286  # gate_count(ALU)/2 + 6
+    assert gate_count(EightALU)['nands'] == 284  # gate_count(ALU)/2 + 4
     
 
 # Project 03:
 
-def test_register8():
+@parametrize_simulators
+def test_register8(run):
     reg = run(Register8)
 
     reg.in_ = 0
@@ -312,7 +346,8 @@ def test_register8():
     reg.tick(); reg.tock()
     assert reg.out == 123
 
-def test_pc8():
+@parametrize_simulators
+def test_pc8(run):
     pc = run(PC8)
 
     def top():
