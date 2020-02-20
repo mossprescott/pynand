@@ -364,7 +364,7 @@ MAX_PROGRAM = [
     0b1110101010000111,  # 15: JMP    ; infinite loop
 ]
 
-def test_computer_max(chip=project_05.Computer):
+def test_computer_max(chip=project_05.Computer, cycles_per_instr=1):
     computer = run(chip)
 
     computer.init_rom(MAX_PROGRAM)
@@ -372,8 +372,8 @@ def test_computer_max(chip=project_05.Computer):
     # first run: compute max(3,5)
     computer.poke(1, 3)
     computer.poke(2, 5)
-    for _ in range(14):
-        computer.ticktock()    
+    for _ in range(14*cycles_per_instr):
+        computer.ticktock()
     assert computer.peek(3) == 5
 
     # second run: compute max(23456,12345)
@@ -381,8 +381,8 @@ def test_computer_max(chip=project_05.Computer):
     computer.poke(1, 23456)
     computer.poke(2, 12345)
     # The run on these inputs needs less cycles (different branching)
-    for _ in range(10):
-        computer.ticktock()    
+    for _ in range(10*cycles_per_instr):
+        computer.ticktock()
     assert computer.peek(3) == 23456
 
  

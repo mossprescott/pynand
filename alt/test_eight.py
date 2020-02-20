@@ -413,7 +413,7 @@ def test_pc8(run):
     assert pc.out == 1
 
     pc.in_ = 22222; pc.reset = 1
-    top(); bottom()
+    top()   # Note: reset is effective immediately, without waiting for bottom_half
     assert pc.out == 0
 
 
@@ -441,7 +441,7 @@ def test_backward_compatible_computer_add():
     test_05.test_computer_add(EightComputer)
     
 def test_backward_compatible_computer_max():
-    test_05.test_computer_max(EightComputer)
+    test_05.test_computer_max(EightComputer, cycles_per_instr=2)
     
 def test_backward_compatible_speed():
     test_05.test_speed(EightComputer)

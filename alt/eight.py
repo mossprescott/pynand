@@ -27,7 +27,7 @@ import re
 from nand import *
 from nand.translate import AssemblySource, translate_dir
 
-from nand.solutions.solved_01 import And, Or, Not, Xor
+from nand.solutions.solved_01 import And, Or, Not, Xor, Mux, Mux16
 from nand.solutions.solved_02 import HalfAdder, FullAdder
 from nand.solutions.solved_03 import Bit
 from nand.solutions.solved_05 import MemorySystem
@@ -188,7 +188,7 @@ def mkPC8(inputs, outputs):
     reseted = lazy()
 
     pc_lo_next = Register8(in_=reseted.out, load=top_half)
-    pc_lo = Register8(in_=pc_lo_next.out, load=bottom_half)
+    pc_lo = Register8(in_=Mux8(a=pc_lo_next.out, b=0, sel=reset).out, load=Or_(bottom_half, reset))  # Note: want reset to happen immediately, but this way probably means some duplication
     pc_hi = Register8(in_=reseted.out, load=bottom_half)
 
     # Clever? Can tell if overflow happened by inspecting the high bits of the old and new low words.
@@ -205,12 +205,37 @@ PC8 = build(mkPC8)
 
 # Project 05:
 
+# TODO: move to nand.syntax? project_01?
+def And_(x, *xs):
+    if not xs:
+        return x
+    else :
+        return And(a=x, b=And_(xs[0], *xs[1:])).out
+
+# TODO: move to nand.syntax? project_01?
+def Or_(x, *xs):
+    if not xs:
+        return x
+    else:
+        return Or(a=x, b=Or_(xs[0], *xs[1:])).out
+
+# TODO: move to nand.syntax? project_01?
+# Or just make it support this syntax somehow
+def Not_(x):
+    return Not(in_=x).out
 
 
 def mkEightCPU(inputs, outputs):
-    """Implement the 16-bit Hack instruction set using a single 8-bit ALU and 8-bit 
-    """
+    """Implement the 16-bit Hack instruction set using a single 8-bit ALU and a pair of 8-bit 
+    registers for each architectural register, plus some extra flip-flops to keep track of state
+    in between two "half"-cycles.
     
+    In the first cycle, the low half-word of results is computed. In the second cycle, the high 
+    word is computed, and when appropriate, the full word is presented to the memory. Note: on
+    instructions that write to the memory, the address and data words may be only half-updated 
+    on the first cycle (but writeM is not asserted then.)
+    """
+
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
@@ -219,38 +244,70 @@ def mkEightCPU(inputs, outputs):
 
     i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
 
-    # not_i = Not(in_=i).out
-   
+    not_i = Not_(i)
+
+    split_instr = Split(in_=instruction)
+
+    # A DFF to split each pair of cycles into two halves:
+    # top_half is True in the first half-cycle, when the low half-words are being computed.
+    # bottom_half is True in the second half-cycles, when the high half-words are in action
+    #  and outputs are provided.
+    # The DFF stores bottom_half (= !top_half), so that we start in top_half.
+    half_cycle = lazy()
+    top_half = Not_(half_cycle.out)
+    half_cycle.set(DFF(in_=Mux(a=top_half, b=0, sel=reset).out))
+    bottom_half = half_cycle.out
+
     alu = lazy()
-    # a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
-    # d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
-    # jump_lt = And(a=alu.ng, b=jlt).out
-    # jump_eq = And(a=alu.zr, b=jeq).out
-    # jump_gt = And(a=And(a=Not(in_=alu.ng).out, b=Not(in_=alu.zr).out).out, b=jgt).out
-    # jump = And(a=i,
-    #            b=Or(a=jump_lt, b=Or(a=jump_eq, b=jump_gt).out).out
-    #           ).out
-    # pc = PC(in_=a_reg.out, load=jump, inc=1, reset=reset)
-    a_lo_reg = Register8(in_=0, load=0)
-    a_hi_reg = Register8(in_=0, load=0)
-    d_lo_reg = Register8(in_=0, load=0)
-    d_hi_reg = Register8(in_=0, load=0)
-    
-    alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
-                zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
+    alu_saved = lazy()   # This is needed to be able to write a 16-bit ALU result to the memory, mainly.
+    alu_zr_saved = lazy()
+    alu_carry_saved = lazy()
 
+    # For convenience, each half-word in a separate 8-bit register:
+    load_a = And_(Or_(not_i, da), bottom_half)
+    a_lo_reg = Register8(in_=Mux8(a=split_instr.lo, b=alu_saved.out, sel=i).out, 
+                         load=Or_(not_i, da))
+    a_hi_reg = Register8(in_=Mux8(a=split_instr.hi, b=alu.out, sel=i).out, 
+                         load=load_a)
+    a_both_reg = Splice(hi=a_hi_reg.out, lo=a_lo_reg.out).out
 
-    outputs.outM = alu.out                   # M value output
-    outputs.writeM = And(a=dm, b=i).out      # Write to M?
-    outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
-    outputs.pc = pc.out                      # address of next instruction (latched)
+    load_d = And_(i, dd, bottom_half)
+    d_lo_reg = Register8(in_=alu_saved.out, load=load_d)
+    d_hi_reg = Register8(in_=alu.out, load=load_d)
+
+    jump_lt = And_(alu.ng, jlt)
+    alu_both_zr = And_(alu.zr, alu_zr_saved.out)
+    jump_eq = And_(alu_both_zr, jeq)
+    jump_gt = And_(Not_(alu.ng), Not_(alu_both_zr), jgt)
+    jump = And_(i, Or_(jump_lt, jump_eq, jump_gt))
+    pc = PC8(top_half=top_half, bottom_half=bottom_half, in_=a_both_reg, load=jump, reset=reset)
+
+    y_parts = Split(in_=Mux16(a=a_both_reg, b=inM, sel=a).out)
+    alu.set(EightALU(x=Mux8(a=d_lo_reg.out, b=d_hi_reg.out, sel=bottom_half).out,
+                     y=Mux8(a=y_parts.lo, b=y_parts.hi, sel=bottom_half).out,
+                     zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0,
+                     carry_in=And_(alu_carry_saved.out, bottom_half)))
+    alu_saved.set(Register8(in_=alu.out, load=top_half))  # Note: 8 DFFs would do it, don't need to load logic
+    alu_zr_saved.set(DFF(in_=alu.zr))
+    alu_carry_saved.set(DFF(in_=alu.carry_out))
+
+    outputs.outM = Splice(hi=alu.out, lo=alu_saved.out).out  # M value output
+    outputs.writeM = And_(dm, i, bottom_half)                # Write to M?
+    outputs.addressM = a_both_reg                            # Address in data memory (of M) (latched)
+    outputs.pc = pc.out                                      # address of next instruction (latched)
     
+    # HACK:
+    outputs.top_half = top_half
+    outputs.bottom_half = bottom_half
+    outputs.i = i
+    outputs.dm = dm
+
 EightCPU = build(mkEightCPU)
 
 
 def mkEightComputer(inputs, outputs):
     reset = inputs.reset
-    
+
     cpu = lazy()
 
     rom = ROM(15)(address=cpu.pc)
@@ -262,7 +319,7 @@ def mkEightComputer(inputs, outputs):
     # HACK: need some dependency to force the whole thing to be synthesized.
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
-    
+
 EightComputer = build(mkEightComputer)
 
 
