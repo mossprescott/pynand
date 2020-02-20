@@ -425,7 +425,7 @@ def test_gates_register8():
 
 def test_gates_pc8():
     assert gate_count(PC8) == {
-        'nands': 242,  # Compare to 287. Not much savings here.
+        'nands': 270,  # Compare to 287. Not much savings here.
         'dffs': 24,    # This is actually 8 _more_.
     }
 
@@ -450,8 +450,8 @@ def test_backward_compatible_speed():
 
 def test_computer_gates():
    assert gate_count(EightComputer) == {
-       'nands': 1262,  # ??? compare to 1262
-       'dffs': 64,  # 4 registers
+       'nands': 1070,  # ??? compare to 1262
+       'dffs': 67,  # 3*16 bits (as in the standard CPU), plus two more half-words to hold results between half-cycle, plus a handful more to track some odd bits
        'roms': 1,
        'rams': 2,
        'inputs': 1,
