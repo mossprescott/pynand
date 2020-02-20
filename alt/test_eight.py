@@ -435,7 +435,7 @@ def test_gates_pc8():
 #
 
 def test_backward_compatible_cpu():
-    test_05.test_cpu(EightCPU)
+    test_05.test_cpu(EightCPU, cycles_per_instr=2)
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(EightComputer)
@@ -444,7 +444,7 @@ def test_backward_compatible_computer_max():
     test_05.test_computer_max(EightComputer, cycles_per_instr=2)
     
 def test_backward_compatible_speed():
-    test_05.test_speed(EightComputer)
+    test_05.test_speed(EightComputer, cycles_per_instr=2)
 
 
 
