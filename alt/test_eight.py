@@ -435,7 +435,247 @@ def test_gates_pc8():
 #
 
 def test_backward_compatible_cpu():
-    test_05.test_cpu(EightCPU, cycles_per_instr=2)
+    """This is test_05.test_cpu, but accounting for signals showing up in the bottom half-cycle, 
+    but the PC being updated after.
+    """
+    
+    cpu = run(EightCPU)
+    cycles_per_instr = 2
+
+    cpu.instruction = 0b0011000000111001  # @12345
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 12345 and cpu.pc == 1 # and DRegister == 0
+
+    cpu.instruction = 0b1110110000010000  # D=A
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 12345 and cpu.pc == 2 # and DRegister == 12345
+
+    cpu.instruction = 0b0101101110100000  # @23456
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 23456 and cpu.pc == 3 # and DRegister == 12345
+
+    cpu.instruction = 0b1110000111010000  # D=A-D
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 23456 and cpu.pc == 4 # and DRegister == 11111
+
+    cpu.instruction = 0b0000001111101000  # @1000
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 5 # and DRegister == 11111
+
+    cpu.instruction = 0b1110001100001000  # M=D
+    cpu.ticktock()
+    assert cpu.outM == 11111 and cpu.writeM == 1 and cpu.addressM == 1000  # and DRegister == 11111
+    cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.pc == 6 # and DRegister == 11111
+
+    cpu.instruction = 0b0000001111101001  # @1001
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1001 and cpu.pc == 7 # and DRegister == 11111
+
+    # Note confusing timing here: outM has the value to be written to memory when the clock falls. Afterward,
+    # outM has a nonsense value.
+    # TODO: always assert outM and writeM before tick/tock?
+    cpu.instruction = 0b1110001110011000  # MD=D-1
+    cpu.ticktock()
+    assert cpu.outM == 11110 and cpu.writeM == 1 and cpu.addressM == 1001 # and DRegister == 11111
+    cpu.ticktock()
+    assert cpu.pc == 8 # and DRegister == 11110
+
+    cpu.instruction = 0b0000001111101000  # @1000
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 9 # and DRegister == 11110
+
+    cpu.instruction = 0b1111010011010000  # D=D-M
+    cpu.inM = 11111
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 10 # and DRegister == -1
+
+    cpu.instruction = 0b0000000000001110  # @14
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 11 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000100  # D;jlt
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 14 # and DRegister == -1
+
+    cpu.instruction = 0b0000001111100111  # @999
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 999 and cpu.pc == 15 # and DRegister == -1
+
+    cpu.instruction = 0b1110110111100000  # A=A+1
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 16 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100001000  # M=D
+    cpu.ticktock()
+    assert cpu.outM == -1 and cpu.writeM == 1 and cpu.addressM == 1000 # and DRegister == -1
+    cpu.ticktock()
+    assert cpu.pc == 17 # and DRegister == -1
+
+    cpu.instruction = 0b0000000000010101  # @21
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 21 and cpu.pc == 18 # and DRegister == -1
+
+    cpu.instruction = 0b1110011111000010  # D+1;jeq
+    cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 21 # and DRegister == -1
+    cpu.ticktock()
+    assert cpu.pc == 21 # and DRegister == -1
+
+    cpu.instruction = 0b0000000000000010  # @2
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 22 # and DRegister == -1
+
+    cpu.instruction = 0b1110000010010000  # D=D+A
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 23 # and DRegister == 1
+
+    cpu.instruction = 0b0000001111101000  # @1000
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 24 # and DRegister == -1
+
+    cpu.instruction = 0b1110111010010000  # D=-1
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 25 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 26 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 27 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 28 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+
+    cpu.instruction = 0b1110101010010000  # D=0
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+
+    cpu.instruction = 0b1110111111010000  # D=1
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+
+
+    # Negative value with "positive" low byte:
+    cpu.instruction = solved_06.parse_op("@32767")
+    for _ in range(cycles_per_instr): cpu.ticktock()  # pc = 1001
+    cpu.instruction = solved_06.parse_op("D=A+1")
+    for _ in range(cycles_per_instr): cpu.ticktock()  # pc = 1002
+    cpu.instruction = solved_06.parse_op("@1000")
+    for _ in range(cycles_per_instr): cpu.ticktock()  # pc = 1003
+
+    cpu.instruction = 0b1110001100000001  # D;JGT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1004 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000010  # D;JEQ
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1005 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000011  # D;JGE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1006 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000100  # D;JLT
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000101  # D;JNE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000110  # D;JLE
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -32768
+
+    cpu.instruction = 0b1110001100000111  # D;JMP
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -32768
+
+    cpu.reset = 1
+    cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 0 # and DRegister == 1
+
+    cpu.instruction = 0b0111111111111111  # @32767
+    cpu.reset = 0
+    for _ in range(cycles_per_instr): cpu.ticktock()
+    assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
+
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(EightComputer)

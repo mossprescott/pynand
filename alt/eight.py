@@ -30,7 +30,7 @@ from nand.translate import AssemblySource, translate_dir
 from nand.solutions.solved_01 import And, Or, Not, Xor, Mux, Mux16
 from nand.solutions.solved_02 import HalfAdder, FullAdder
 from nand.solutions.solved_03 import Bit
-from nand.solutions.solved_05 import MemorySystem
+from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06
 from nand.solutions import solved_07
 
@@ -277,18 +277,20 @@ def mkEightCPU(inputs, outputs):
     d_hi_reg = Register8(in_=alu.out, load=load_d)
 
     jump_lt = And_(alu.ng, jlt)
-    alu_both_zr = And_(alu.zr, alu_zr_saved.out)
-    jump_eq = And_(alu_both_zr, jeq)
-    jump_gt = And_(Not_(alu.ng), Not_(alu_both_zr), jgt)
+    not_alu_both_zr = Nand(a=alu.zr, b=alu_zr_saved.out).out
+    jump_eq = And_(Not_(not_alu_both_zr), jeq)
+    jump_gt = And_(Not_(alu.ng), not_alu_both_zr, jgt)
     jump = And_(i, Or_(jump_lt, jump_eq, jump_gt))
-    pc = PC8(top_half=top_half, bottom_half=bottom_half, in_=a_both_reg, load=jump, reset=reset)
+    # pc = PC8(top_half=top_half, bottom_half=bottom_half, in_=a_both_reg, load=jump, reset=reset)
+    # TODO: get the split-cycle PC to do jumps
+    pc = PC(in_=a_both_reg, load=And_(bottom_half, jump), reset=reset, inc=bottom_half)
 
     y_parts = Split(in_=Mux16(a=a_both_reg, b=inM, sel=a).out)
     alu.set(EightALU(x=Mux8(a=d_lo_reg.out, b=d_hi_reg.out, sel=bottom_half).out,
                      y=Mux8(a=y_parts.lo, b=y_parts.hi, sel=bottom_half).out,
                      zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0,
                      carry_in=And_(alu_carry_saved.out, bottom_half)))
-    alu_saved.set(Register8(in_=alu.out, load=top_half))  # Note: 8 DFFs would do it, don't need to load logic
+    alu_saved.set(Register8(in_=alu.out, load=top_half))  # Note: 8 DFFs would do it, don't need the load logic
     alu_zr_saved.set(DFF(in_=alu.zr))
     alu_carry_saved.set(DFF(in_=alu.carry_out))
 
