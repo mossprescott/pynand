@@ -380,8 +380,10 @@ def test_pc8(run):
     top(); bottom()
     assert pc.out == -32121
 
+    # Tricky: jump target shows up in the bottom half and has to overwrite both halves of the PC
+    top()
     pc.in_ = 12345; pc.load = 1
-    top(); bottom()
+    bottom()
     assert pc.out == 12345
 
     pc.reset = 1
