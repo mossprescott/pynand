@@ -230,7 +230,9 @@ class RAMOps(VectorOps):
         def write(traces):
             load_val = tst_trace(load[0], traces)
             if load_val:
-                in_val = get_multiple_traces(in_, traces)
+                # Tricky: sign extension was never needed here until eight.py, and it will 
+                # hurt performance slightly.
+                in_val = extend_sign(get_multiple_traces(in_, traces))
                 address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
             return traces
