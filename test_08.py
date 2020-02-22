@@ -11,7 +11,7 @@ import project_08
 # coverage, but they don't isolate problems well for debugging.
 
 
-def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     translate = translator()
     
     # Computes the sum 1 + 2 + ... + argument[0] and pushes the 
@@ -34,7 +34,7 @@ def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, tran
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     test_07.init_sp(computer)
     computer.poke(1, 300)
@@ -47,7 +47,7 @@ def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, tran
     assert computer.peek(256) == 6
 
 
-def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     translate = translator()
     
     # Puts the first argument[0] elements of the Fibonacci series
@@ -96,7 +96,7 @@ def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     test_07.init_sp(computer)
     computer.poke(1, 300)
@@ -114,7 +114,7 @@ def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble
     assert computer.peek(3005) == 5
 
 
-def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     translate = translator()
 
     # Performs a simple calculation and returns the result.
@@ -131,7 +131,7 @@ def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble,
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     test_07.init_sp(computer, 317)
     computer.poke(1, 317)
@@ -156,7 +156,7 @@ def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble,
     assert computer.peek(310) == 1196
 
 
-def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     """Multiple function calls, with and without arguments.
     """
     
@@ -228,7 +228,7 @@ def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, tra
     translate.finish()
 
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     test_07.init_sp(computer, 261)
     computer.poke(1, 261)
@@ -258,7 +258,7 @@ def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, tra
     assert computer.peek(6) == 246
 
 
-def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     """Sys.init, declared out of sequence, requiring the translator to supply initialization and then 
     call Sys.init. This is finally a fully legitimate VM program, executed in the normal way.
     """
@@ -308,7 +308,7 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     translate.finish()
 
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     # Note: no initialization this time
     
@@ -318,7 +318,7 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     assert computer.peek(261) == 3
 
 
-def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator):
+def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     """Tests that different functions, stored in two different classes, manipulate the static 
     segment correctly. 
     
@@ -365,7 +365,7 @@ def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.as
     translate.finish()
 
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     # Note: no initialization this time
 

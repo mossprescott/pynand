@@ -700,6 +700,44 @@ def test_computer_gates():
    }
 
 
+#
+# VM translator:
+#
+
+def test_vm_simple_add():
+    test_07.test_simple_add(chip=EightComputer, simulator='vector')
+
+def test_vm_stack_ops():
+    test_07.test_stack_ops(chip=EightComputer, simulator='vector')
+
+def test_vm_memory_access_basic():
+    test_07.test_memory_access_basic(chip=EightComputer, simulator='vector')
+
+def test_vm_memory_access_pointer():
+    test_07.test_memory_access_pointer(chip=EightComputer, simulator='vector')
+
+def test_vm_memory_access_static():
+    test_07.test_memory_access_static(chip=EightComputer, simulator='vector')
+
+
+def test_vm_basic_loop():
+    test_08.test_basic_loop(chip=EightComputer, simulator='vector')
+
+def test_vm_fibonacci_series():
+    test_08.test_fibonacci_series(chip=EightComputer, simulator='vector')
+    
+def test_vm_simple_function():
+    test_08.test_simple_function(chip=EightComputer, simulator='vector')
+    
+def test_vm_nested_call():
+    test_08.test_nested_call(chip=EightComputer, simulator='vector')
+
+def test_vm_fibonacci_element():
+    test_08.test_fibonacci_element(chip=EightComputer, simulator='vector')
+
+def test_vm_statics_multiple_files():
+    test_08.test_statics_multiple_files(chip=EightComputer, simulator='vector')
+
 
 #
 # Performance. TL;DR, it's worse.
