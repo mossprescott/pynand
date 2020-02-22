@@ -267,7 +267,7 @@ def mkEightCPU(inputs, outputs):
     # For convenience, each half-word in a separate 8-bit register:
     load_a = And_(Or_(not_i, da), bottom_half)
     a_lo_reg = Register8(in_=Mux8(a=split_instr.lo, b=alu_saved.out, sel=i).out, 
-                         load=Or_(not_i, da))
+                         load=load_a)
     a_hi_reg = Register8(in_=Mux8(a=split_instr.hi, b=alu.out, sel=i).out, 
                          load=load_a)
     a_both_reg = Splice(hi=a_hi_reg.out, lo=a_lo_reg.out).out
