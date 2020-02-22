@@ -589,3 +589,9 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard.value = keycode
+
+    # Tricky: SP might get special treatment in some implementations, so provide a named property
+    # that subclasses can override.
+    @property
+    def sp(self):
+        return self.peek(0)
