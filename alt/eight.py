@@ -163,7 +163,7 @@ Register8 = build(mkRegister8)
 def mkPC8(inputs, outputs):
     """16-bit PC, built from two 8-bit registers and a single Inc8.
 
-    On the first half-cycle, the low half-word is incremented, but the output is not yet updated. 
+    On the first half-cycle, the low half-word is incremented but not yet stored.
     On the second half-cycle, the high half-word is incremented, and then the two half-words 
     appear together at the same time.
 
