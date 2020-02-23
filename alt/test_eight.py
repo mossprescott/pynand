@@ -694,7 +694,7 @@ def test_backward_compatible_speed():
 def test_computer_gates():
    assert gate_count(EightComputer) == {
        'nands': 1032,  # ??? compare to 1262
-       'dffs': 67,  # 3*16 bits (as in the standard CPU), plus two more half-words to hold results between half-cycle, plus a handful more to track some odd bits
+       'dffs': 67,  # 3*16 bits (as in the standard CPU), plus two more half-words to hold results between half-cycles, plus a handful more to track some odd bits
        'roms': 1,
        'rams': 2,
        'inputs': 1,

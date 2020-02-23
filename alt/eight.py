@@ -16,15 +16,23 @@ the chip has exactly the same external interface.
 The question is: how close can this get to 50% smaller? No doubt there will be some overhead to
 keep track of half-cycles, and to propagate carries, etc.
 
+And the result so far suggests that it's hard to get anywhere near 50% savings. The ALU, which 
+accounts for almost 45% of the gates in the original design, does get virtually 50% smaller.
+However, there are DFFs to keep track of two bytes of intermediate results (on each for PC and 
+ALU), and a bunch of extra Mux8s to select one or the other input.
+
 Note: this implementation defines _only_ a new CPU/Computer, which implements exactly the same 
 instruction set as the standard Hack CPU, so the same assembler and VM translator can be used. 
-The only way to tell them apart from the outside is to notice that each cycle makes half as 
-much progress.
+The only way to tell them apart from the outside is to notice that every other cycle doesn't 
+seem to make any progress.
 
 Note: some instructions _could_ be completed in a single cycle:
 - @xxx: about 30% of instructions (so, 15% savings), and decoding is simple
 - [A][D][M]=A|D|M (any time the ALU isn't actually needed): also almost 30%, but harder to 
     decode (need a PLA)
+- in fact, any instruction not using the ALU's add function (f=1) could be done in a single cycle
+    if the ALU's functions were separated. With some cooperation from the assembler, that might 
+    account for a large fraction.
 But this would almost certainly add some gates, so for now just focus on keeping it small and 
 don't worry about speed.
 """
@@ -302,7 +310,8 @@ def mkEightCPU(inputs, outputs):
                      y=Mux8(a=y_parts.lo, b=y_parts.hi, sel=bottom_half).out,
                      zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0,
                      carry_in=And_(alu_carry_saved.out, bottom_half)))
-    alu_saved.set(Latch8(in_=alu.out))  # Note: 8 DFFs would do it, don't need the load logic
+    # Save results from ALU between top- and bottom-half. Note: just DFF/Latch to save Muxes.
+    alu_saved.set(Latch8(in_=alu.out))
     alu_zr_saved.set(DFF(in_=alu.zr))
     alu_carry_saved.set(DFF(in_=alu.carry_out))
 
