@@ -46,8 +46,8 @@ from nand.solutions.solved_01 import And, Or, Not, Xor, Mux, Mux16
 from nand.solutions.solved_02 import HalfAdder, FullAdder
 from nand.solutions.solved_03 import Bit
 from nand.solutions.solved_05 import MemorySystem, PC
-from nand.solutions import solved_06
-from nand.solutions import solved_07
+from nand.solutions import solved_06, solved_07
+import project_08
 
 
 # Project 01:
@@ -366,7 +366,7 @@ EIGHT_PLATFORM = computer.Platform(
     chip=EightComputer,
     assemble=solved_06.assemble,
     parse_line=solved_07.parse_line,
-    translator=solved_07.Translator)
+    translator=project_08.Translator)  # Note: solved_07.Translator doesn't work when used this way.
 
 if __name__ == "__main__":
     computer.main(EIGHT_PLATFORM)
