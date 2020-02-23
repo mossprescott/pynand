@@ -281,9 +281,7 @@ def mkEightCPU(inputs, outputs):
     jump_eq = And_(Not_(not_alu_both_zr), jeq)
     jump_gt = And_(Not_(alu.ng), not_alu_both_zr, jgt)
     jump = And_(i, Or_(jump_lt, jump_eq, jump_gt))
-    # pc = PC8(top_half=top_half, bottom_half=bottom_half, in_=a_both_reg, load=jump, reset=reset)
-    # TODO: get the split-cycle PC to do jumps
-    pc = PC(in_=a_both_reg, load=And_(bottom_half, jump), reset=reset, inc=bottom_half)
+    pc = PC8(top_half=top_half, bottom_half=bottom_half, in_=a_both_reg, load=And_(bottom_half, jump), reset=reset)
 
     y_parts = Split(in_=Mux16(a=a_both_reg, b=inM, sel=a).out)
     alu.set(EightALU(x=Mux8(a=d_lo_reg.out, b=d_hi_reg.out, sel=bottom_half).out,
