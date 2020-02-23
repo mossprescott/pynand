@@ -156,8 +156,15 @@ EightALU = build(mkEightALU)
 def mkRegister8(inputs, outputs):
     for i in range(8):
         outputs.out[i] = Bit(in_=inputs.in_[i], load=inputs.load).out
-
 Register8 = build(mkRegister8)
+
+
+def mkLatch8(inputs, outputs):
+    """Just 8 DFFs, for cases where we need to latch a half-word between top and bottom half-cycles.
+    """    
+    for i in range(8):
+        outputs.out[i] = DFF(in_=inputs.in_[i]).out
+Latch8 = build(mkLatch8)
 
 
 def mkPC8(inputs, outputs):
@@ -187,7 +194,7 @@ def mkPC8(inputs, outputs):
     
     reseted = lazy()
 
-    pc_lo_next = Register8(in_=reseted.out, load=top_half)
+    pc_lo_next = Latch8(in_=reseted.out)
     # Note: want reset to happen immediately, but this way probably means some duplication
     pc_lo = Register8(in_=Mux8(a=Mux8(a=pc_lo_next.out, b=in_lo, sel=load).out, b=0, sel=reset).out, load=Or_(bottom_half, reset))
     pc_hi = Register8(in_=reseted.out, load=Or_(bottom_half, reset))
@@ -288,7 +295,7 @@ def mkEightCPU(inputs, outputs):
                      y=Mux8(a=y_parts.lo, b=y_parts.hi, sel=bottom_half).out,
                      zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0,
                      carry_in=And_(alu_carry_saved.out, bottom_half)))
-    alu_saved.set(Register8(in_=alu.out, load=top_half))  # Note: 8 DFFs would do it, don't need the load logic
+    alu_saved.set(Latch8(in_=alu.out))  # Note: 8 DFFs would do it, don't need the load logic
     alu_zr_saved.set(DFF(in_=alu.zr))
     alu_carry_saved.set(DFF(in_=alu.carry_out))
 

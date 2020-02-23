@@ -427,7 +427,7 @@ def test_gates_register8():
 
 def test_gates_pc8():
     assert gate_count(PC8) == {
-        'nands': 270,  # Compare to 287. Not much savings here.
+        'nands': 266,  # Compare to 287. Not much savings here.
         'dffs': 24,    # This is actually 8 _more_.
     }
 
@@ -669,6 +669,7 @@ def test_backward_compatible_cpu():
     for _ in range(cycles_per_instr): cpu.ticktock()
     assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -32768
 
+    # Reset is effective in a single clock:
     cpu.reset = 1
     cpu.ticktock()
     assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 0 # and DRegister == 1
@@ -692,7 +693,7 @@ def test_backward_compatible_speed():
 
 def test_computer_gates():
    assert gate_count(EightComputer) == {
-       'nands': 1070,  # ??? compare to 1262
+       'nands': 1032,  # ??? compare to 1262
        'dffs': 67,  # 3*16 bits (as in the standard CPU), plus two more half-words to hold results between half-cycle, plus a handful more to track some odd bits
        'roms': 1,
        'rams': 2,
