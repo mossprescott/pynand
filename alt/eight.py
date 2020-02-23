@@ -20,6 +20,13 @@ Note: this implementation defines _only_ a new CPU/Computer, which implements ex
 instruction set as the standard Hack CPU, so the same assembler and VM translator can be used. 
 The only way to tell them apart from the outside is to notice that each cycle makes half as 
 much progress.
+
+Note: some instructions _could_ be completed in a single cycle:
+- @xxx: about 30% of instructions (so, 15% savings), and decoding is simple
+- [A][D][M]=A|D|M (any time the ALU isn't actually needed): also almost 30%, but harder to 
+    decode (need a PLA)
+But this would almost certainly add some gates, so for now just focus on keeping it small and 
+don't worry about speed.
 """
 
 import re
