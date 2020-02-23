@@ -335,12 +335,14 @@ EightComputer = build(mkEightComputer)
 # 8-bit adapters:
 
 def mkSplice(inputs, outputs):
+    """Wiring only: assemble two 8-bit signals into a 16-bit signal."""
     for i in range(8):
         outputs.out[i] = inputs.lo[i]
         outputs.out[i+8] = inputs.hi[i]
 Splice = build(mkSplice)
 
 def mkSplit(inputs, outputs):
+    """Wiring only: extract two 8-bit signals from a 16-bit signal."""
     for i in range(8):
         outputs.lo[i] = inputs.in_[i]
         outputs.hi[i] = inputs.in_[i+8]
