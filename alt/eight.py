@@ -310,12 +310,6 @@ def mkEightCPU(inputs, outputs):
     outputs.writeM = And_(dm, i, bottom_half)                # Write to M?
     outputs.addressM = a_both_reg                            # Address in data memory (of M) (latched)
     outputs.pc = pc.out                                      # address of next instruction (latched)
-    
-    # HACK:
-    outputs.top_half = top_half
-    outputs.bottom_half = bottom_half
-    outputs.i = i
-    outputs.dm = dm
 
 EightCPU = build(mkEightCPU)
 
