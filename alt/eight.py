@@ -189,8 +189,8 @@ def mkPC8(inputs, outputs):
 
     pc_lo_next = Register8(in_=reseted.out, load=top_half)
     # Note: want reset to happen immediately, but this way probably means some duplication
-    pc_lo = Register8(in_=Mux8(a=Mux8(a=pc_lo_next.out, b=in_lo, sel=load).out, b=0, sel=reset).out, load=Or_(bottom_half, reset, load))
-    pc_hi = Register8(in_=reseted.out, load=bottom_half)
+    pc_lo = Register8(in_=Mux8(a=Mux8(a=pc_lo_next.out, b=in_lo, sel=load).out, b=0, sel=reset).out, load=Or_(bottom_half, reset))
+    pc_hi = Register8(in_=reseted.out, load=Or_(bottom_half, reset))
 
     # Clever? Can tell if overflow happened by inspecting the high bits of the old and new low words.
     carry_in = And(a=pc_lo.out[7], b=Not(in_=pc_lo_next.out[7]).out).out
