@@ -10,8 +10,7 @@ import project_05, project_06, project_07
 # TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
 # coverage, but they don't isolate problems well for debugging.
 
-
-def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator):
+def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
 
     # Pushes and adds two constants
@@ -21,7 +20,7 @@ def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, tran
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
     init_sp(computer)
 
     translate.asm.run(assemble, computer, debug=True)
@@ -30,7 +29,7 @@ def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, tran
     assert computer.peek(256) == 15
 
 
-def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator):
+def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
     
     # Executes a sequence of arithmetic and logical operations
@@ -85,7 +84,7 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     init_sp(computer)
 
@@ -104,7 +103,7 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
     assert computer.peek(265) == -91
 
 
-def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator):
+def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
     
     # Executes pop and push commands using the virtual memory segments.
@@ -136,31 +135,31 @@ def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assem
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     init_sp(computer)
-    computer.poke(1, 300)   # base address of the local segment
-    computer.poke(2, 400)   # base address of the argument segment
+    computer.poke(1, 255)   # base address of the local segment
+    computer.poke(2, 247)   # base address of the argument segment
     computer.poke(3, 3000)  # base address of the this segment
     computer.poke(4, 3010)  # base address of the that segment
 
     translate.asm.run(assemble, computer, debug=True)
     
-    # Note for debugging: this tests puts the stack in a funky state. LCL and ARG are _above_ SP, 
-    # which actually makes no sense and as a result the trace is confusing.
-    # For sensible tracing, use ARG = 247 nd LCL = 255
+    # Note: the original test put the stack in a funky state with LCL and ARG are _above_ SP, 
+    # which actually makes no sense and as a result the trace was confusing, so here they're 
+    # set to realistic values.
 
     assert computer.peek(256) == 472
-    assert computer.peek(300) == 10
-    assert computer.peek(401) == 21
-    assert computer.peek(402) == 22
+    assert computer.peek(255) == 10
+    assert computer.peek(248) == 21
+    assert computer.peek(249) == 22
     assert computer.peek(3006) == 36
     assert computer.peek(3012) == 42
     assert computer.peek(3015) == 45
     assert computer.peek(11) == 510
 
 
-def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator):
+def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
     
     # Executes pop and push commands using the
@@ -183,7 +182,7 @@ def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.ass
 
     translate.finish()
     
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     init_sp(computer)
 
@@ -196,7 +195,7 @@ def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.ass
     assert computer.peek(3046) == 46
     
     
-def test_memory_access_static(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator):
+def test_memory_access_static(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
     
     # Executes pop and push commands using the static segment.
@@ -214,7 +213,7 @@ def test_memory_access_static(chip=project_05.Computer, assemble=project_06.asse
 
     translate.finish()
 
-    computer = run(chip, simulator='codegen')
+    computer = run(chip, simulator=simulator)
 
     init_sp(computer)
 
@@ -236,7 +235,7 @@ def init_sp(computer, address=256):
         "M=D",
     ])
     computer.init_rom(pgm)
-    for i_ in range(len(pgm)):
+    while computer.pc < len(pgm):
         computer.ticktock()
 
     computer.reset = True

@@ -230,7 +230,9 @@ class RAMOps(VectorOps):
         def write(traces):
             load_val = tst_trace(load[0], traces)
             if load_val:
-                in_val = get_multiple_traces(in_, traces)
+                # Tricky: sign extension was never needed here until eight.py, and it will 
+                # hurt performance slightly.
+                in_val = extend_sign(get_multiple_traces(in_, traces))
                 address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
             return traces
@@ -589,3 +591,9 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard.value = keycode
+
+    # Tricky: SP might get special treatment in some implementations, so provide a named property
+    # that subclasses can override.
+    @property
+    def sp(self):
+        return self.peek(0)

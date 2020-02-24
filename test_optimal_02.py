@@ -22,5 +22,8 @@ def test_add16():
 def test_zero16():
     assert gate_count(Zero16)['nands'] == 46  # ?
 
+def test_neg16():
+    assert gate_count(Neg16).get('nands') is None  # No gates; just wiring.
+
 def test_alu():
     assert gate_count(ALU)['nands'] == 560  # ?
