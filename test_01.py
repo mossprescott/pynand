@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 from nand import run, unsigned
 from project_01 import *
 

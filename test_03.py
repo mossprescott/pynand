@@ -1,3 +1,5 @@
+#! /usr/bin/env pytest
+
 import pytest
 
 from nand import DFF, run, gate_count

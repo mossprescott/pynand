@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """An alternative CPU which is backward compatible with the Nand to Tetris design, adding the ability to 
 shift the ALU's result to the right by one bit.
 

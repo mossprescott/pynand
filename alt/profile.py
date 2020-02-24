@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """VM-level profiler, tracking the number of cycles by: instruction, opcode, function (self), function (total).
 
 This immediately revealed that Math.divide is a huge problem, and in particular dividing by 16. So 
@@ -24,30 +26,43 @@ import nand.syntax, nand.translate
 import project_05, project_06, project_07, project_08
 
 
+# initialization:
+SKIP_CYCLES = 0
+CYCLES = 1_000_000
+# CYCLES = 5_000_000
+
+# # skip initialization:
+# SKIP_CYCLES = 5_000_000
+# CYCLES = 4_000_000
+
+CALL_SITES = False
+"""If True, time is charged to each particular call, otherwise, all calls to the same function are
+ aggregated."""
+
+# TODO:
+# CALL_TREES = True
+# """If True, aggregate time in functions according to the call chain."""
+
+
 def main():
-    path = sys.argv[1]
-    
-    import alt.shift
-    platform = alt.shift.SHIFT_PLATFORM
+    path = sys.argv[1] if len(sys.argv) == 2 else "examples/Pong"
+
+
+    # platform = computer.HACK_PLATFORM
     # import alt.threaded
     # platform = alt.threaded.THREADED_PLATFORM
+    import alt.lazy
+    platform = alt.lazy.LAZY_PLATFORM
+    # import alt.shift
+    # platform = alt.shift.SHIFT_PLATFORM
+
 
     translate = platform.translator()
 
-    
-    # initialization:
-    SKIP_CYCLES = 0
-    CYCLES = 5_000_000
-
-    # # skip initialization:
-    # SKIP_CYCLES = 5_000_000
-    # CYCLES = 4_000_000
-    
-    
     translate.preamble()
     nand.translate.translate_dir(translate, platform.parse_line, path)
     nand.translate.translate_dir(translate, platform.parse_line, "nand2tetris/tools/OS")  # HACK not committed
-    
+
     # Substitute implementation for Sys.wait(), which returns immediately. This take precedence
     # just because it appears later in the assembly stream, so it's address will appear in the symbol map.
     # TODO: make this some kind of system trap, along with Sys.halt and Sys.error, that signals the 
@@ -55,16 +70,16 @@ def main():
     translate.function("Sys", "wait", 0)
     translate.push_constant(0)
     translate.return_op()
-    
+
     translate.finish()
-    
+
     # for l in translate.asm:
     #     print(l)
 
     prg = platform.assemble(translate.asm)
     src_map = translate.asm.src_map
     # print(list(src_map.items())[:10])
-    
+
     computer = nand.syntax.run(platform.chip, simulator="codegen")
     computer.init_rom(prg)
 
@@ -79,7 +94,9 @@ def main():
     current_opcode = None
     fn_stack = [0]
     fns[0] = 1
-    
+
+    fn_prefix = "call " if CALL_SITES else "function "
+
     print(f"Skipping {SKIP_CYCLES:,d} cycles")
     # computer.ticktock(SKIP_CYCLES)
 
@@ -92,7 +109,7 @@ def main():
 
         pc = computer.pc
         # raw_instructions[pc] += 1
-        
+
         op = src_map.get(pc)
         if op:
             current_instr = pc
@@ -101,23 +118,19 @@ def main():
             if current_opcode in ("push", "pop"):
                 current_opcode = " ".join(op.split()[:2])
 
-            # Note: can't use "function" because functions with no locals don't generate any 
-            # instructions for the "function" opcode (that is, their first opcode overwrites the 
-            # "function" opcode in the source map, since it has the same instruction address.)
-            # But this is not what you want most of the time because it's counting _call sites_.
+            # Note: functions with no locals don't actually need to generate any instructions for 
+            # the "function" opcode, but if they didn't, their first opcode would overwrite the 
+            # "function" opcode in the source map, since it has the same instruction address.
             # HACK: for now, generating a no-op instruction for these function opcodes works around 
             # this issue (while making the program just slightly slower.)
             # Need to make src_map a multi-map.
-            if op.startswith("function "):
-            # if op.startswith("call "):
+            if op.startswith(fn_prefix):
                 fn_stack.append(pc)
-                # print('; '.join(("start" if addr == 0 else src_map[addr]) for addr in fn_stack))
                 if cycle > SKIP_CYCLES:
                     fns[pc] += 1
             elif op.startswith("return") and len(fn_stack) > 1:
                 # TODO: wait to pop _after_ this op, so the return is charged to the function (not the caller)
                 fn_stack.pop()
-                # print('; '.join(("start" if addr == 0 else src_map[addr]) for addr in fn_stack))
 
         if cycle > SKIP_CYCLES:
             if current_instr:
@@ -134,15 +147,15 @@ def main():
 
     # print(raw_instructions.most_common(50))
 
-    print("Instructions (top 50):")
-    for addr, count in instructions.most_common(50):
+    print("Instructions (top 20):")
+    for addr, count in instructions.most_common(20):
         print(f"  {100*count/CYCLES:0.2f}%: {src_map[addr]} @ {addr}")
-    print()    
+    print()
 
-    print("Opcodes (top 50):")
-    for op, count in opcodes.most_common(50):
+    print("Opcodes:")
+    for op, count in opcodes.most_common():
         print(f"  {100*count/CYCLES:0.2f}%: {op}")
-    print()    
+    print()
 
     print("Functions (top 20):")
     for addr, count in fn_instructions.most_common(20):

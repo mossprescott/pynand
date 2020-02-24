@@ -55,7 +55,7 @@ def translate(ic):
     class_name, lines = generate_python(ic)
     
     # print(ic)
-    print_lines(lines)
+    # print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",

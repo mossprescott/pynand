@@ -1,11 +1,12 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 """Run the full computer with display and keyboard connected via pygame.
 
-The program to run must be in Hack assembly form (.asm), and is specified by sys.argv[1].
-The `codegen` simulator is used unless env var `PYNAND_SIMULATOR` is set to "vector":
+The program to run must be in the form of Hack assembly (.asm) or VM opcodes (a directory 
+of .vm files) and is specified by sys.argv[1].
+The `codegen` simulator is used unless --vector is used.
 
-$ python computer.py examples/Blink.asm
+$ ./computer.py examples/Blink.asm
 
 Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
 $ pip3 install pygame==2.0.0dev6
@@ -22,8 +23,8 @@ import time
 import nand.component
 import nand.syntax
 from nand.translate import translate_dir
+from nand.solutions import solved_05, solved_06, solved_07
 import project_05, project_06, project_07, project_08
-
 
 EVENT_INTERVAL = 1/10
 DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
@@ -41,13 +42,23 @@ parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substit
 
 
 Platform = collections.namedtuple("Platform", ["chip", "assemble", "parse_line", "translator"])
+"""Package of a chip and the assembler and translator needed to run VM programs on it."""
+
 
 HACK_PLATFORM = Platform(
     chip=project_05.Computer,
     assemble=project_06.assemble,
     parse_line=project_07.parse_line,
     translator=project_08.Translator)
+"""The default chip and associated tools, defined in the project_0x.py modules."""
 
+
+STANDARD_PLATFORM = Platform(
+    chip=solved_05.Computer,
+    assemble=solved_06.assemble,
+    parse_line=solved_07.parse_line,
+    translator=solved_07.Translator)
+"""The included chip and tools; for comparison with the current solution."""
 
 def main(platform=HACK_PLATFORM):
     args = parser.parse_args()
@@ -55,6 +66,8 @@ def main(platform=HACK_PLATFORM):
     print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
 
     prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
+    
+    print(f"Size in ROM: {len(prg):0,d}")
 
     run(prg,
         chip=platform.chip,
@@ -141,7 +154,12 @@ class KVM:
         elif keys[pygame.K_RETURN]:
             key = NEWLINE
         else:
-            key = None
+            for c in range(ord('a'), ord('z')+1):
+                if keys[c]:
+                    key = c
+                    break
+            else:
+                key = None
         return key
 
     def update_display(self, get_pixel):

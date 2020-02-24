@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """An attempt at a _smaller_ CPU, by reducing the ALU and data paths to only 8 bits, and taking 
 two cycles for every instruction. This is the classic "low-cost" CPU move (examples include the 
 Motorola 68000, and various 4/8- and 8/16-bit CPUs before that), promising compatibility with 
@@ -47,7 +49,6 @@ from nand.solutions.solved_02 import HalfAdder, FullAdder
 from nand.solutions.solved_03 import Bit
 from nand.solutions.solved_05 import MemorySystem, PC
 from nand.solutions import solved_06, solved_07
-import project_08
 
 
 # Project 01:
@@ -366,7 +367,7 @@ EIGHT_PLATFORM = computer.Platform(
     chip=EightComputer,
     assemble=solved_06.assemble,
     parse_line=solved_07.parse_line,
-    translator=project_08.Translator)  # Note: solved_07.Translator doesn't work when used this way.
+    translator=solved_07.Translator)
 
 if __name__ == "__main__":
     computer.main(EIGHT_PLATFORM)
