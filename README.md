@@ -29,7 +29,7 @@ Now open [project_01.py](project_01.py) in a text editor, find the `mkNot` funct
 with `solved_01.Not`. Replace that with `Nand(a=..., b=...)` using the inputs so that it computes
 the expected result.
 
-Run `pytest test_01.py`. If `test_not` passes, you can move on to the next component.
+Run `./test_01.py`. If `test_not` passes, you can move on to the next component.
 
 When you're all done, delete the line `from nand.solutions import solved_01` at the top of the
 file to be sure you didn't miss anything. Actually, if you prefer you can _start_ by deleting that
@@ -40,12 +40,12 @@ That's it for the first chapter. Now move on to `test_02.py`…
 
 ## Step 2: Enjoy
 
-Run `python computer.py examples/Pong.asm`. Bask in the glory of a CPU you built from scratch.
+Run `./computer.py examples/Pong.asm`. Bask in the glory of a CPU you built from scratch.
 Note: the awesomeness starts after about 5 million cycles.
 
 ![Pong screenshot](examples/Pong.png)
 
-You can also run VM programs with `python computer.py [dir]`, but for the time being you'll have to 
+You can also run VM programs with `./computer.py [dir]`, but for the time being you'll have to 
 find your own. Tip: download the nand2tetris tools, use the included Jack compiler to generate
 ".vm" files, and use the included "OS" implementation.
 
