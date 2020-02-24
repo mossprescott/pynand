@@ -41,10 +41,10 @@ def print_relative_result(name, std, t):
     def fmt_pct(new, old):
         return f"{100*(new - old)/old:+0.1f}%"
     print(f"{name}:")
-    print(f"  Nands: {nands:0,d} ({fmt_pct(nands, std_nands)})")
-    print(f"  ROM size (Pong): {pong:0,d} ({fmt_pct(pong, std_pong)})")
-    print(f"  Cycles for one frame (Pong): {frame:0,d} ({fmt_pct(frame, std_frame)})")
-    print(f"  Cycles for initialization: {init:0,d} ({fmt_pct(init, std_init)})")
+    print(f"  Nands:               {nands:0,d} ({fmt_pct(nands, std_nands)})")
+    print(f"  ROM size (Pong):     {pong:0,d} ({fmt_pct(pong, std_pong)})")
+    print(f"  Cycles/frame (Pong): {frame:0,d} ({fmt_pct(frame, std_frame)})")
+    print(f"  Cycles for init.:    {init:0,d} ({fmt_pct(init, std_init)})")
 
 
 def measure(platform):
