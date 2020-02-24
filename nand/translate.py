@@ -66,6 +66,7 @@ class AssemblySource:
 
         if stop_cycles is None:
             stop_cycles = self.instruction_count
+        stop_cycles *= 2
 
         if debug:
             # print_lines(self.lines)

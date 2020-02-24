@@ -35,6 +35,8 @@ FullAdder = build(mkFullAdder)
 
 
 def mkInc16(inputs, outputs):
+    """Add one to a single 16-bit input, ignoring overflow."""
+
     in_ = inputs.in_
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
@@ -46,6 +48,8 @@ Inc16 = build(mkInc16)
 
 
 def mkAdd16(inputs, outputs):
+    """Add two 16-bit inputs, ignoring overflow."""
+
     a = inputs.a
     b = inputs.b
 
@@ -58,6 +62,8 @@ Add16 = build(mkAdd16)
 
 
 def mkZero16(inputs, outputs):
+    """Test whether a single 16-bit input has the value 0."""
+
     in_ = inputs.in_
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
@@ -68,22 +74,39 @@ def mkZero16(inputs, outputs):
 Zero16 = build(mkZero16)
 
 
+def mkNeg16(inputs, outputs):
+    """Test whether a single 16-bit input is negative."""
+    
+    in_ = inputs.in_
+
+    # SOLVERS: replace this with one or more Nands and/or components defined above
+    n1 = solved_02.Neg16(in_=in_)
+
+    outputs.out = n1.out
+
+Neg16 = build(mkNeg16)
+
+
 def mkALU(inputs, outputs):
+    """Combine two 16-bit inputs according to six control bits, producing a 16-bit result and two 
+    condition codes.
+    """
+    
     x = inputs.x
     y = inputs.y
 
-    zx = inputs.zx
-    nx = inputs.nx
-    zy = inputs.zy
-    ny = inputs.ny
-    f  = inputs.f
-    no = inputs.no
+    zx = inputs.zx  # X is replaced by 0
+    nx = inputs.nx  # X (or 0) is negated
+    zy = inputs.zy  # Y is replaced by 0
+    ny = inputs.ny  # Y (or 0) is negated
+    f  = inputs.f   # if True, combine inputs with Add, otherwise, And
+    no = inputs.no  # negate the output
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
     n1 = solved_02.ALU(x=x, y=y, zx=zx, nx=nx, zy=zy, ny=ny, f=f, no=no)
 
-    outputs.out = n1.out
-    outputs.zr = n1.zr
-    outputs.ng = n1.ng
+    outputs.out = n1.out  # the resulting value
+    outputs.zr = n1.zr    # is the output equal to 0?
+    outputs.ng = n1.ng    # is the output negative?
     
 ALU = build(mkALU)
