@@ -8,9 +8,8 @@ This is pretty cheap: about 50 additional gates to check a bit and select the sh
 The VM translator rewrites division by a constant power of 2 to a (series of) "shiftr" opcode(s), and substitutes
 a more efficient implementation of Math.multiply that uses it.
 
-The result is about 40% few cycles to run the Pong game loop, and essentially no difference in simulation speed, 
+The result is about 50% fewer cycles to run the Pong game loop, and essentially no difference in simulation speed, 
 since the only change is a single, conditional `>> 1` expression.
-
 """
 
 import re
@@ -241,13 +240,14 @@ class Translator(solved_07.Translator):
         return result
 
 
-import computer
-
-SHIFT_PLATFORM = computer.Platform(
-    chip=ShiftComputer,
-    assemble=assemble,
-    parse_line=solved_07.parse_line,
-    translator=Translator)
-
 if __name__ == "__main__":
+    # Note: this import requires pygame; putting it here allows the tests to import the module
+    import computer
+
+    SHIFT_PLATFORM = computer.Platform(
+        chip=ShiftComputer,
+        assemble=assemble,
+        parse_line=solved_07.parse_line,
+        translator=Translator)
+
     computer.main(SHIFT_PLATFORM)

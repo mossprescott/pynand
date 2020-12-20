@@ -894,13 +894,14 @@ class Translator:
         pass
 
 
-import computer
-
-THREADED_PLATFORM = computer.Platform(
-    chip=ThreadedComputer,
-    assemble=assemble,
-    parse_line=solved_07.parse_line,
-    translator=Translator)
-
 if __name__ == "__main__":
+    # Note: this import requires pygame; putting it here allows the tests to import the module
+    import computer
+
+    THREADED_PLATFORM = computer.Platform(
+        chip=ThreadedComputer,
+        assemble=assemble,
+        parse_line=solved_07.parse_line,
+        translator=Translator)
+
     computer.main(THREADED_PLATFORM)

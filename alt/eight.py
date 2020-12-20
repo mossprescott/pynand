@@ -361,13 +361,14 @@ Split = build(mkSplit)
 
 # Main:
 
-import computer
-
-EIGHT_PLATFORM = computer.Platform(
-    chip=EightComputer,
-    assemble=solved_06.assemble,
-    parse_line=solved_07.parse_line,
-    translator=solved_07.Translator)
-
 if __name__ == "__main__":
+    # Note: this import requires pygame; putting it here allows the tests to import the module
+    import computer
+
+    EIGHT_PLATFORM = computer.Platform(
+        chip=EightComputer,
+        assemble=solved_06.assemble,
+        parse_line=solved_07.parse_line,
+        translator=solved_07.Translator)
+
     computer.main(EIGHT_PLATFORM)
