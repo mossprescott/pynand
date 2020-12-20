@@ -394,13 +394,14 @@ class Translator(solved_07.Translator):
         pass
 
 
-import computer
-
-SP_PLATFORM = computer.Platform(
-    chip=SPComputer,
-    assemble=assemble,
-    parse_line=solved_07.parse_line,
-    translator=Translator)
-
 if __name__ == "__main__":
+    # Note: this import requires pygame; putting it here allows the tests to import the module
+    import computer
+
+    SP_PLATFORM = computer.Platform(
+        chip=SPComputer,
+        assemble=assemble,
+        parse_line=solved_07.parse_line,
+        translator=Translator)
+
     computer.main(SP_PLATFORM)
