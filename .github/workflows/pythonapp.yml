@@ -9,7 +9,7 @@ jobs:
 
     strategy:
         matrix:
-            python: [3.6, 3.7]  # note: omitting 3.8 for now since pygame won't install
+            python: [3.6, 3.7, 3.8]
 
     steps:
     - uses: actions/checkout@v2
