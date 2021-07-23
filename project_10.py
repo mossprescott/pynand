@@ -15,11 +15,24 @@ def lex(string):
     """Break the text of Jack source code into a list of tokens.
 
     White space and comments are ignored. Each token is converted to a tuple of (token-type, chars).
-    
     """
 
-    # SOLVERS: replace this with code to parse a single assembly instruction string, producing
-    # a machine instruction as a 16-bit int
+    # SOLVERS: replace this with code to break the input string into a sequence of tokens
     tokens = solved_10.lex(string)
 
     return tokens
+
+
+def parse_class(token_list):
+    """Analyze a stream of tokens and assemble them into an Abstract Syntax Tree representing the program.
+
+    Each node is a tuple consisting of a token-type label and zero or more arguments. Within nodes,
+    tokens are represented by the tuples form the input. That is,
+
+    See the tests for the expected
+    """
+
+    # SOLVERS: replace this with code to analyze the token stream
+    ast = solved_10.parse_class(token_list)
+
+    return ast
