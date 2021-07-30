@@ -158,7 +158,7 @@ def _indented_list(lst):
 #             f"args={_indented_list(self.args)}",
 #         ])) + ")",
 #     ])
-# SubroutineCall.__repr__ = _SubroutineCall_repr
+# SubroutineCall.__repr__ = _SubroutineCall_repr  # type: ignore
 
 def _WhileStatement_repr(self):
     return "\n".join([
@@ -167,7 +167,7 @@ def _WhileStatement_repr(self):
             f"cond={repr(self.cond)},\n"
             f"body={_indented_list(self.body)})")
     ])
-WhileStatement.__repr__ = _WhileStatement_repr
+WhileStatement.__repr__ = _WhileStatement_repr  # type: ignore
 
 def _SubroutineBody_repr(self):
     return "\n".join([
@@ -176,7 +176,7 @@ def _SubroutineBody_repr(self):
             f"varDecs={_indented_list(self.varDecs)},\n"
             f"statements={_indented_list(self.statements)})")
     ])
-SubroutineBody.__repr__ = _SubroutineBody_repr
+SubroutineBody.__repr__ = _SubroutineBody_repr  # type: ignore
 
 def _Class_repr(self):
     return "\n".join([
@@ -185,4 +185,4 @@ def _Class_repr(self):
             f"varDecs={_indented_list(self.varDecs)},\n"
             f"subroutineDecs={_indented_list(self.subroutineDecs)})")
     ])
-Class.__repr__ = _Class_repr
+Class.__repr__ = _Class_repr  # type: ignore
