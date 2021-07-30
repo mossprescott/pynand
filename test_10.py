@@ -1,7 +1,15 @@
 #! /usr/bin/env pytest
 
+import pytest
+
+from nand.jack_ast import *
+from nand import parsing
+
 import project_10
 
+#
+# Lexing:
+#
 
 # TODO: add fine-grained tests for each token type. These tests ported from nand2tetris provide good
 # coverage, but they don't isolate problems well for debugging.
@@ -19,7 +27,7 @@ def test_identifier():
     assert tokens == [("identifier", "done")]
 
 
-def test_identifier():
+def test_symbol():
     tokens = project_10.lex("+")
 
     assert tokens == [("symbol", "+")]
@@ -27,7 +35,9 @@ def test_identifier():
 def test_integerConstant():
     tokens = project_10.lex("012345")
 
-    assert tokens == [("integerConstant", 12345)]
+    # Note: the odd formatting surivives the lexer, just because it makes the behavior more
+    # consistent. In this case, it's not a problem for the parser to deal with it.
+    assert tokens == [("integerConstant", "012345")]
 
 def test_integer_overflow():
     try:
@@ -60,13 +70,12 @@ def test_comment_multiline():
 
 def test_simple_statement():
     tokens = project_10.lex("let x = 10;")
-    print(tokens)
 
     assert tokens == [
         ("keyword", "let"),
         ("identifier", "x"),
         ("symbol", "="),
-        ("integerConstant", 10),
+        ("integerConstant", "10"),
         ("symbol", ";"),
     ]
 
@@ -167,7 +176,7 @@ def test_lex_array_test():
         ("keyword", "let"),
         ("identifier", "i"),
         ("symbol", "="),
-        ("integerConstant", 0),
+        ("integerConstant", "0"),
         ("symbol", ";"),
         ("keyword", "while"),
         ("symbol", "("),
@@ -197,19 +206,19 @@ def test_lex_array_test():
         ("symbol", "="),
         ("identifier", "i"),
         ("symbol", "+"),
-        ("integerConstant", 1),
+        ("integerConstant", "1"),
         ("symbol", ";"),
         ("symbol", "}"),
         ("keyword", "let"),
         ("identifier", "i"),
         ("symbol", "="),
-        ("integerConstant", 0),
+        ("integerConstant", "0"),
         # 80
         ("symbol", ";"),
         ("keyword", "let"),
         ("identifier", "sum"),
         ("symbol", "="),
-        ("integerConstant", 0),
+        ("integerConstant", "0"),
         ("symbol", ";"),
         ("keyword", "while"),
         ("symbol", "("),
@@ -235,7 +244,7 @@ def test_lex_array_test():
         ("symbol", "="),
         ("identifier", "i"),
         ("symbol", "+"),
-        ("integerConstant", 1),
+        ("integerConstant", "1"),
         ("symbol", ";"),
         # 110
         ("symbol", "}"),
@@ -273,292 +282,221 @@ def test_lex_array_test():
     ]
 
 
-def test_parse_arraytest():
+#
+# Parsing:
+#
+
+def test_parse_keyword_constant():
+    assert project_10.KeywordConstantP.parse([('keyword', 'true')]) == KeywordConstant(True)
+    assert project_10.KeywordConstantP.parse([('keyword', 'false')]) == KeywordConstant(False)
+    assert project_10.KeywordConstantP.parse([('keyword', 'null')]) == KeywordConstant(None)
+    assert project_10.KeywordConstantP.parse([('keyword', 'this')]) == KeywordConstant("this")
+
+    with pytest.raises(parsing.ParseFailure):
+        project_10.KeywordConstantP.parse([('keyword', 'while')])
+
+def test_parse_unary_op():
+    assert project_10.UnaryOpP.parse([('symbol', '-')]) == Op("-")
+    assert project_10.UnaryOpP.parse([('symbol', '~')]) == Op("~")
+
+    with pytest.raises(parsing.ParseFailure):
+        project_10.UnaryOpP.parse([('symbol', '+')])
+
+def test_parse_binary_op():
+    assert project_10.BinaryOpP.parse([('symbol', '+')]) == Op("+")
+    assert project_10.BinaryOpP.parse([('symbol', '-')]) == Op("-")
+    assert project_10.BinaryOpP.parse([('symbol', '*')]) == Op("*")
+    assert project_10.BinaryOpP.parse([('symbol', '/')]) == Op("/")
+    assert project_10.BinaryOpP.parse([('symbol', '&')]) == Op("&")
+    assert project_10.BinaryOpP.parse([('symbol', '|')]) == Op("|")
+    assert project_10.BinaryOpP.parse([('symbol', '<')]) == Op("<")
+    assert project_10.BinaryOpP.parse([('symbol', '>')]) == Op(">")
+    assert project_10.BinaryOpP.parse([('symbol', '=')]) == Op("=")
+
+    with pytest.raises(parsing.ParseFailure):
+        project_10.BinaryOpP.parse([('symbol', '~')])
+
+    with pytest.raises(parsing.ParseFailure):
+        project_10.BinaryOpP.parse([('symbol', '//')])
+
+def test_parse_other_constants():
+    assert project_10.IntegerConstantP.parse([('integerConstant', "12345")]) == IntegerConstant(12345)
+    assert (project_10.StringConstantP.parse([('stringConstant', "Hello, \"world\"!")])
+            == StringConstant("Hello, \"world\"!"))
+
+def test_parse_var_ref():
+    assert project_10.VarNameP.parse([('identifier', 'x')]) == VarRef("x")
+    assert (project_10.VarNameP.parse([('identifier', '_a_very_long_name_is_fine_too_123')])
+            == VarRef("_a_very_long_name_is_fine_too_123"))
+
+def test_parse_array_ref():
+    assert (project_10.VarNameAndArrayIndexP.parse([('identifier', 'x'), ('symbol', '['), ('integerConstant', '0'), ('symbol', ']')])
+            == ArrayRef("x", IntegerConstant(0)))
+
+def test_parse_terms():
+    assert (project_10.ExpressionP.parse(project_10.lex("x + 1"))
+            == BinaryExpression(VarRef("x"), Op("+"), IntegerConstant(1)))
+
+    # Note: all operators associate to the right, which is almost definitely *not* what you want
+    assert (project_10.ExpressionP.parse(project_10.lex("x + y + z"))
+            == BinaryExpression(
+                VarRef("x"),
+                Op("+"),
+                (BinaryExpression(VarRef("y"), Op("+"), VarRef("z")))))
+
+    # Parens required here.
+    assert (project_10.ExpressionP.parse(project_10.lex("(x - y) + z"))
+            == BinaryExpression(
+                (BinaryExpression(VarRef("x"), Op("-"), VarRef("y"))),
+                Op("+"),
+                VarRef("z")))
+
+
+def test_parse_do_statements():
+    assert (project_10.DoStatementP.parse(project_10.lex("do Output.printInt(42);"))
+            == DoStatement(SubroutineCall(class_name="Output", var_name=None, sub_name="printInt", args=[IntegerConstant(42)])))
+
+def test_parse_return_statements():
+    assert (project_10.ReturnStatementP.parse(project_10.lex("return;"))
+            == ReturnStatement(None))
+
+    assert (project_10.ReturnStatementP.parse(project_10.lex("return 137;"))
+            == ReturnStatement(IntegerConstant(137)))
+
+def test_parse_let_statements():
+    assert (project_10.LetStatementP.parse(project_10.lex("let x = 1;"))
+            == LetStatement("x", None, IntegerConstant(1)))
+
+    assert (project_10.LetStatementP.parse(project_10.lex("let a[0] = x + 1;"))
+            == LetStatement("a", IntegerConstant(0), BinaryExpression(VarRef("x"), Op("+"), IntegerConstant(1))))
+
+def test_parse_if_statements():
+    assert (project_10.IfStatementP.parse(project_10.lex("if (debugEnabled) { do Output.printString(\"got here\"); }"))
+            == IfStatement(
+                VarRef("debugEnabled"),
+                [DoStatement(SubroutineCall(class_name="Output", var_name=None, sub_name="printString", args=[StringConstant("got here")]))],
+                None))
+
+    assert (project_10.IfStatementP.parse(project_10.lex("if (true) { } else { do firstThing(); do secondThing(); }"))
+            == IfStatement(
+                KeywordConstant(True),
+                [],
+                [
+                    DoStatement(SubroutineCall(class_name=None, var_name=None, sub_name="firstThing", args=[])),
+                    DoStatement(SubroutineCall(class_name=None, var_name=None, sub_name="secondThing", args=[])),
+                ]))
+
+def test_parse_while_statements():
+    assert (project_10.WhileStatementP.parse(project_10.lex("while (x > 1) { let x = x - 1; }"))
+            == WhileStatement(
+                BinaryExpression(VarRef("x"), Op(">"), IntegerConstant(1)),
+                [ LetStatement("x", None, BinaryExpression(VarRef("x"), Op("-"), IntegerConstant(1)))]))
+
+
+def test_parse_types():
+    assert project_10.TypeP.parse(project_10.lex("int")) == Type("int")
+    assert project_10.TypeP.parse(project_10.lex("char")) == Type("char")
+    assert project_10.TypeP.parse(project_10.lex("boolean")) == Type("boolean")
+    assert project_10.TypeP.parse(project_10.lex("MyClass")) == Type("MyClass")
+
+    with pytest.raises(parsing.ParseFailure):
+        project_10.TypeP.parse(project_10.lex("text"))
+
+def test_parse_var_decs():
+    assert project_10.VarDecP.parse(project_10.lex("var int x;")) == VarDec(Type("int"), ["x"])
+    assert project_10.VarDecP.parse(project_10.lex("var boolean isBlue, isOvine;")) == VarDec(Type("boolean"), ["isBlue", "isOvine"])
+
+def test_parse_subroutine_decs():
+    assert (project_10.SubroutineDecP.parse(project_10.lex(
+                "function void foo() { }"))
+            == SubroutineDec("function", None, "foo", [], SubroutineBody([], [])))
+
+    assert (project_10.SubroutineDecP.parse(project_10.lex(
+                "constructor Thing new(int width, int height) { let area = width*height; return this; }"))
+            == SubroutineDec("constructor", Type("Thing"), "new",
+                [Parameter(Type("int"), "width"), Parameter(Type("int"), "height")],
+                SubroutineBody(
+                    [],
+                    [
+                      LetStatement("area", None, BinaryExpression(VarRef("width"), Op("*"), VarRef("height"))),
+                      ReturnStatement(KeywordConstant("this")),
+                  ])))
+
+def test_parse_class_var_decs():
+    assert (project_10.ClassVarDecP.parse(project_10.lex("static Game instance;"))
+            == ClassVarDec(static=True, type=Type("Game"), names=["instance"]))
+
+    assert (project_10.ClassVarDecP.parse(project_10.lex("field int count, limit;"))
+            == ClassVarDec(static=False, type=Type("int"), names=["count", "limit"]))
+
+def test_parse_classes():
+  assert (project_10.ClassP.parse(project_10.lex("class Foo {}"))
+            == Class("Foo", [], []))
+
+  assert (project_10.ClassP.parse(project_10.lex(
+              "class Counter { field int value; method void reset() { let value = 0; } }"))
+            == Class("Counter",
+                [ClassVarDec(False, Type("int"), ["value"])],
+                [SubroutineDec("method", None, "reset", [],
+                    SubroutineBody([], [LetStatement("value", None, IntegerConstant(0))]))]))
+
+
+def test_parse_array_test():
     ast = project_10.parse_class(project_10.lex(ARRAY_TEST))
+
     print(ast)
-    assert ast == ("class", [
-          ("keyword", "class"),
-          ("identifier", "Main"),
-          ("symbol", "{"),
-          ("subroutineDec", [
-            ("keyword", "function"),
-            ("keyword", "void"),
-            ("identifier", "main"),
-            ("symbol", "("),
-            ("parameterList", [
-            ]),
-            ("symbol", ")"),
-            ("subroutineBody", [
-              ("symbol", "{"),
-              ("varDec", [
-                ("keyword", "var"),
-                ("identifier", "Array"),
-                ("identifier", "a"),
-                ("symbol", ";"),
-              ]),
-              ("varDec", [
-                ("keyword", "var"),
-                ("keyword", "int"),
-                ("identifier", "length"),
-                ("symbol", ";"),
-              ]),
-              ("varDec", [
-                ("keyword", "var"),
-                ("keyword", "int"),
-                ("identifier", "i"),
-                ("symbol", ","),
-                ("identifier", "sum"),
-                ("symbol", ";"),
-              ]),
-              ("statements", [
-                ("letStatement", [
-                  ("keyword", "let"),
-                  ("identifier", "length"),
-                  ("symbol", "="),
-                  ("expression", [
-                    ("term", [
-                      ("identifier", "Keyboard"),
-                      ("symbol", "."),
-                      ("identifier", "readInt"),
-                      ("symbol", "("),
-                      ("expressionList", [
-                        ("expression", [
-                          ("term", [
-                            ("stringConstant", "HOW MANY NUMBERS? "),
-                          ]),
-                        ]),
-                      ]),
-                      ("symbol", ")"),
-                    ]),
+
+    expected = Class("Main",
+        [],
+        [
+          SubroutineDec("function", None, "main", [],
+            SubroutineBody(
+              [
+                VarDec(Type("Array"), ["a"]),
+                VarDec(Type("int"), ["length"]),
+                VarDec(Type("int"), ["i", "sum"]),
+              ],
+              [
+                LetStatement("length", None,
+                  SubroutineCall(class_name="Keyboard", var_name=None, sub_name="readInt", args=[
+                    StringConstant("HOW MANY NUMBERS? ")
+                  ])),
+                LetStatement("a", None,
+                  SubroutineCall(class_name="Array", var_name=None, sub_name="new", args=[
+                    VarRef("length")
+                  ])),
+                LetStatement("i", None, IntegerConstant(0)),
+                WhileStatement(
+                  BinaryExpression(VarRef("i"), Op("<"), VarRef("length")),
+                  [
+                    LetStatement("a", VarRef("i"),
+                      SubroutineCall(class_name="Keyboard", var_name=None, sub_name="readInt", args=[
+                        StringConstant("ENTER THE NEXT NUMBER: ")
+                      ])),
+                    LetStatement("i", None, BinaryExpression(VarRef("i"), Op("+"), IntegerConstant(1))),
                   ]),
-                  ("symbol", ";"),
+                LetStatement("i", None, IntegerConstant(0)),
+                LetStatement("sum", None, IntegerConstant(0)),
+                WhileStatement(
+                  BinaryExpression(VarRef("i"), Op("<"), VarRef("length")),
+                  [
+                    LetStatement("sum", None, BinaryExpression(VarRef("sum"), Op("+"), ArrayRef("a", VarRef("i")))),
+                    LetStatement("i", None, BinaryExpression(VarRef("i"), Op("+"), IntegerConstant(1))),
                 ]),
-                ("letStatement", [
-                  ("keyword", "let"),
-                  ("identifier", "a"),
-                  ("symbol", "="),
-                  ("expression", [
-                    ("term", [
-                      ("identifier", "Array"),
-                      ("symbol", "."),
-                      ("identifier", "new"),
-                      ("symbol", "("),
-                      ("expressionList", [
-                        ("expression", [
-                          ("term", [
-                            ("identifier", "length"),
-                          ]),
-                        ]),
-                      ]),
-                      ("symbol", ")"),
-                    ]),
-                  ]),
-                  ("symbol", ";"),
-                ]),
-                ("letStatement", [
-                  ("keyword", "let"),
-                  ("identifier", "i"),
-                  ("symbol", "="),
-                  ("expression", [
-                    ("term", [
-                      ("integerConstant", 0),
-                    ]),
-                  ]),
-                  ("symbol", ";"),
-                ]),
-                ("whileStatement", [
-                  ("keyword", "while"),
-                  ("symbol", "("),
-                  ("expression", [
-                    ("term", [
-                      ("identifier", "i"),
-                    ]),
-                    ("symbol", "<"),
-                    ("term", [
-                      ("identifier", "length"),
-                    ]),
-                  ]),
-                  ("symbol", ")"),
-                  ("symbol", "{"),
-                  ("statements", [
-                    ("letStatement", [
-                      ("keyword", "let"),
-                      ("identifier", "a"),
-                      ("symbol", "["),
-                      ("expression", [
-                        ("term", [
-                          ("identifier", "i"),
-                        ]),
-                      ]),
-                      ("symbol", "]"),
-                      ("symbol", "="),
-                      ("expression", [
-                        ("term", [
-                          ("identifier", "Keyboard"),
-                          ("symbol", "."),
-                          ("identifier", "readInt"),
-                          ("symbol", "("),
-                          ("expressionList", [
-                            ("expression", [
-                              ("term", [
-                                ("stringConstant", "ENTER THE NEXT NUMBER: "),
-                              ]),
-                            ]),
-                          ]),
-                          ("symbol", ")"),
-                        ]),
-                      ]),
-                      ("symbol", ";"),
-                    ]),
-                    ("letStatement", [
-                      ("keyword", "let"),
-                      ("identifier", "i"),
-                      ("symbol", "="),
-                      ("expression", [
-                        ("term", [
-                          ("identifier", "i"),
-                        ]),
-                        ("symbol", "+"),
-                        ("term", [
-                          ("integerConstant", 1),
-                        ]),
-                      ]),
-                      ("symbol", ";"),
-                    ]),
-                  ]),
-                  ("symbol", "}"),
-                ]),
-                ("letStatement", [
-                  ("keyword", "let"),
-                  ("identifier", "i"),
-                  ("symbol", "="),
-                  ("expression", [
-                    ("term", [
-                      ("integerConstant", 0),
-                    ]),
-                  ]),
-                  ("symbol", ";"),
-                ]),
-                ("letStatement", [
-                  ("keyword", "let"),
-                  ("identifier", "sum"),
-                  ("symbol", "="),
-                  ("expression", [
-                    ("term", [
-                      ("integerConstant", 0),
-                    ]),
-                  ]),
-                  ("symbol", ";"),
-                ]),
-                ("whileStatement", [
-                  ("keyword", "while"),
-                  ("symbol", "("),
-                  ("expression", [
-                    ("term", [
-                      ("identifier", "i"),
-                    ]),
-                    ("symbol", "<"),
-                    ("term", [
-                      ("identifier", "length"),
-                    ]),
-                  ]),
-                  ("symbol", ")"),
-                  ("symbol", "{"),
-                  ("statements", [
-                    ("letStatement", [
-                      ("keyword", "let"),
-                      ("identifier", "sum"),
-                      ("symbol", "="),
-                      ("expression", [
-                        ("term", [
-                          ("identifier", "sum"),
-                        ]),
-                        ("symbol", "+"),
-                        ("term", [
-                          ("identifier", "a"),
-                          ("symbol", "["),
-                          ("expression", [
-                            ("term", [
-                              ("identifier", "i"),
-                            ]),
-                          ]),
-                          ("symbol", "]"),
-                        ]),
-                      ]),
-                      ("symbol", ";"),
-                    ]),
-                    ("letStatement", [
-                      ("keyword", "let"),
-                      ("identifier", "i"),
-                      ("symbol", "="),
-                      ("expression", [
-                        ("term", [
-                          ("identifier", "i"),
-                        ]),
-                        ("symbol", "+"),
-                        ("term", [
-                          ("integerConstant", 1),
-                        ]),
-                      ]),
-                      ("symbol", ";"),
-                    ]),
-                  ]),
-                  ("symbol", "}"),
-                ]),
-                ("doStatement", [
-                  ("keyword", "do"),
-                  ("identifier", "Output"),
-                  ("symbol", "."),
-                  ("identifier", "printString"),
-                  ("symbol", "("),
-                  ("expressionList", [
-                    ("expression", [
-                      ("term", [
-                        ("stringConstant", "THE AVERAGE IS: "),
-                      ]),
-                    ]),
-                  ]),
-                  ("symbol", ")"),
-                  ("symbol", ";"),
-                ]),
-                ("doStatement", [
-                  ("keyword", "do"),
-                  ("identifier", "Output"),
-                  ("symbol", "."),
-                  ("identifier", "printInt"),
-                  ("symbol", "("),
-                  ("expressionList", [
-                    ("expression", [
-                      ("term", [
-                        ("identifier", "sum"),
-                      ]),
-                      ("symbol", "/"),
-                      ("term", [
-                        ("identifier", "length"),
-                      ]),
-                    ]),
-                  ]),
-                  ("symbol", ")"),
-                  ("symbol", ";"),
-                ]),
-                ("doStatement", [
-                  ("keyword", "do"),
-                  ("identifier", "Output"),
-                  ("symbol", "."),
-                  ("identifier", "println"),
-                  ("symbol", "("),
-                  ("expressionList", [
-                  ]),
-                  ("symbol", ")"),
-                  ("symbol", ";"),
-                ]),
-                ("returnStatement", [
-                  ("keyword", "return"),
-                  ("symbol", ";"),
-                ]),
-              ]),
-              ("symbol", "}"),
-            ]),
-          ]),
-          ("symbol", "}"),
+                DoStatement(
+                  SubroutineCall(class_name="Output", var_name=None, sub_name="printString", args=[
+                    StringConstant("THE AVERAGE IS: ")
+                  ])),
+                DoStatement(
+                  SubroutineCall(class_name="Output", var_name=None, sub_name="printInt", args=[
+                    BinaryExpression(VarRef("sum"), Op("/"), VarRef("length"))
+                  ])),
+                DoStatement(expr=
+                  SubroutineCall(class_name="Output", var_name=None, sub_name="println", args=[])),
+                ReturnStatement(expr=None),
+              ]
+            ),
+          ),
         ])
+
+    assert ast == expected

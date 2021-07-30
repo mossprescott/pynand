@@ -1,5 +1,8 @@
 import re
 
+from nand import jack_ast
+from nand.parsing import *
+
 # integerConstant: a decimal number in the range 0 ... 32767
 # stringConstant: '"', a sequence of Unicode characters, not including double quote or newline, '"'
 # identifier: a sequence of letters, digits, and underscore ( '_' ) not starting with a digit.
@@ -26,7 +29,7 @@ def lex(string):
             int_val = int(token_str)
             if not (0 <= int_val <= 32767):
                 raise Exception(f"Integer constant out of range: {int_val}")
-            tokens.append(("integerConstant", int_val))
+            tokens.append(("integerConstant", token_str))
             string = string[len(token_str):]
             continue
 
@@ -70,424 +73,284 @@ def lex(string):
 
     return tokens
 
-#
-# Simple parser combinators:
-#
 
-class ParseLocation:
-    """Keep track of a list of tokens and the current position within it,
-    with non-destructive update (by making a new instance each time the position
-    advances, referring to the same underlying list.)
-    """
-
-    def __init__(self, tokens, pos=0):
-        self.tokens = tokens
-        self.pos = pos
-
-    def current_token(self):
-        if not self.at_eof():
-            return self.tokens[self.pos]
-
-    def at_eof(self):
-        return self.pos == len(self.tokens)
-
-    def advance(self):
-        return ParseLocation(self.tokens, self.pos+1)
-
-    def __str__(self):
-        return f"ParseLocation: pos = {self.pos}; next token = {self.current_token()}"
-
-
-class ParseFailure(Exception):
-    def __init__(self, expected, loc):
-        self.expected = expected
-        self.loc = loc
-
-    def __str__(self):
-        return f"ParseFailure: expected {self.expected} at {self.loc}"
-
-
-def parse(parser, token_list):
-    """Apply a parser to a list of tokens, producing a single result if the parser
-    succeeds and consumes the entire stream.
-
-    The actual values in the stream can be anything.
-
-    :param parser: A function which inspects the token stream. If it matches, return
-        a tuple containing a result value and a new position in the stream. Otherwise,
-        raise ParseFailure.
-    """
-
-    val, loc = parser(ParseLocation(token_list))
-    # if not loc.at_eof():
-    #     raise Exception("Parsing incomplete")
-    # else:
-    #     return val
-    return val  # TEMP
-
-def or_p(*parsers):
-    """Apply each parser in turn to the same location, until one of them succeeds.
-    Fail if they all fail.
-    """
-    def f(loc):
-        for p in parsers:
-            try:
-                # print(f"try {p} at {loc}")
-                return p(loc)
-            except ParseFailure as x:
-                # print(f"failed: {x}")
-                pass
-        raise ParseFailure(f"one of {parsers}", loc)
-
-    return f
-
-def seq_p(*parsers):
-    """Apply each parser in turn to successive positions, returning a (flattened) list of results.
-    Fail if any parser fails.
-    """
-
-    def f(loc):
-        vals = []
-        for p in parsers:
-            val, loc = p(loc)
-            if isinstance(val, list):
-                vals.extend(val)
-            else:
-                vals.append(val)
-        return (vals, loc)
-
-    return f
-
-def many_p(parser):
-    """Apply a parser repeatedly as long as it succeeds, returning a list of results.
-    Never fail."""
-
-    def f(loc):
-        vals = []
-        while True:
-            try:
-                val, loc = parser(loc)
-                vals.append(val)
-            except ParseFailure:
-                return vals, loc
-    return f
-
-def sep_by_p(parser, sep_parser):
-    """Apply a parser repeatedly, also consuming separators in between values.
-    Fail if a separator is not followed by a parsable entity.
-    """
-
-    def f(loc):
-        vals = []
-
-        try:
-            val, loc = parser(loc)
-            vals.append(val)
-        except ParseFailure:
-            # Early exit: no values is ok
-            return vals, loc
-
-        while True:
-            try:
-                val, loc = sep_parser(loc)
-                vals.append(val)
-            except ParseFailure:
-                # No separator: we're done
-                return vals, loc
-
-            # Element required after a separator has been consumed:
-            val, loc = parser(loc)
-            vals.append(val)
-
-    return f
-
-def sep_by_1_p(parser, sep_parser):
-    """Apply a parser repeatedly, also consuming separators in between values.
-    Fail if a separator is not followed by a parsable entity.
-    """
-
-    def f(loc):
-        vals = []
-
-        val, loc = parser(loc)
-        vals.append(val)
-
-        while True:
-            try:
-                val, loc = sep_parser(loc)
-                vals.append(val)
-            except ParseFailure:
-                # No separator: we're done
-                return vals, loc
-
-            # Element required after a separator has been consumed:
-            val, loc = parser(loc)
-            vals.append(val)
-
-    return f
 
 #
 # Now, parsers for Jack:
 #
 
-# Wrap the top-level parser so the caller doesn't need to know about parser combinators
-def parse_class(token_list):
-    return parse(class_p(), token_list)
+TT = Tuple[str, str]
+"""Type for tokens: a type (which is "keyword", etc.), and the string that was matched."""
 
-def class_p():
-    return nest_p("class",
-        seq_p(
-            keyword_p("class"),
-            className_p(),
-            symbol_p("{"),
-            subroutineDec_p(),
-            symbol_p("}"),
-        ))
 
-def subroutineDec_p():
-    return nest_p("subroutineDec",
-        seq_p(
-            keyword_p("function"),  # method/constructor
-            keyword_p("void"),  # or any type
-            subroutineName_p(),
-            symbol_p("("),
-            parameterList_p(),
-            symbol_p(")"),
-            subroutineBody_p(),
-        ))
+def ByTypeP(token_type: str) -> Parser[TT, str]:
+    """Match any token having the given type, producing the token itself."""
 
-def parameterList_p():
-    return nest_p("parameterList",
-        sep_by_p(
-            seq_p(
-                type_p(),
-                varName_p(),
-            ),
-            symbol_p(",")))
+    any = AnyP()  # type: Parser[TT, TT]
+    return any.filter(lambda t: t[0] == token_type).map(lambda t: t[1])
 
-def subroutineBody_p():
-    return nest_p("subroutineBody",
-        seq_p(
-            symbol_p("{"),
-            many_p(varDec_p()),
-            statements_p(),
-            symbol_p("}"),
-        ))
+# Note: slightly improved error messages this way, but I'm trying to avoid subclassing
+# Parser in this module.
+#
+# class ByTypeP(Parser[TT, str]):
+#     def __init__(self, token_type: str):
+#         self.token_type = token_type
+#     def __call__(self, loc: ParseLocation[TT]) -> Tuple[str, ParseLocation[TT]]:
+#         typ, val = loc.current_token()
+#         if typ == self.token_type:
+#             return val, loc.advance()
+#         else:
+#             raise ParseFailure(self.token_type, loc)
 
-def varDec_p():
-    return nest_p("varDec",
-        seq_p(
-            keyword_p("var"),
-            type_p(),
-            sep_by_1_p(varName_p(), symbol_p(",")),
-            symbol_p(";"),
-        ))
 
-def statements_p():
-    return nest_p("statements",
-        many_p(statement_p()))
+def KeywordP(kw: str) -> Parser[TT, None]:
+    """Match a specific keyword (e.g. "class"), producing no value."""
 
-def statement_p():
-    return or_p(
-        letStatement_p(),
-        # ifStatement_p(),
-        whileStatement_p(),
-        doStatement_p(),
-        returnStatement_p(),
-    )
+    return TokenP(('keyword', kw), None)
 
-def letStatement_p():
-    return nest_p("letStatement",
-        or_p(
-            seq_p(
-                keyword_p("let"),
-                varName_p(),
-                symbol_p("["),
-                expression_p(),
-                symbol_p("]"),
-                symbol_p("="),
-                expression_p(),
-                symbol_p(";")
-            ),
-            seq_p(
-                keyword_p("let"),
-                varName_p(),
-                symbol_p("="),
-                expression_p(),
-                symbol_p(";")
-            ),
-        ))
 
-def whileStatement_p():
-    return nest_p("whileStatement",
-        seq_p(
-            keyword_p("while"),
-            symbol_p("("),
-            expression_p(),
-            symbol_p(")"),
-            symbol_p("{"),
-            lazy(statements_p),
-            symbol_p("}"),
-        ))
+def SymbolP(sym: str) -> Parser[TT, None]:
+    """Match a specific symbol (e.g. "+"), producing no value."""
 
-def doStatement_p():
-    return nest_p("doStatement",
-        seq_p(
-            keyword_p("do"),
-            subroutineCall_p(),
-            symbol_p(";"),
-        ))
+    return TokenP(("symbol", sym), None)
 
-def returnStatement_p():
-    return nest_p("returnStatement",
-        or_p(
-            # TODO: optional_p
-            seq_p(
-                keyword_p("return"),
-                symbol_p(";"),
-            ),
-            seq_p(
-                keyword_p("return"),
-                expression_p(),
-                symbol_p(";"),
-            ),
-        ))
 
-def expression_p():
-    return nest_p("expression",
-        sep_by_1_p(term_p(), op_p()))
+def unflatten(f):
+    """Helper for use with Parser.map. Takes a function with multiple args, wraps it in
+    a function that accepts the same args in a list.
 
-def lazy(parser_f):
-    """Defer constructing a parser to avoid recursion when composing parsers."""
-    def f(loc):
-        return parser_f()(loc)
-    return f
+    TODO: push this into Parser.map in some way.
+    """
+    return lambda args: f(*args)
 
-def term_p():
-    return nest_p("term",
-        or_p(
-            seq_p(integerConstant_p()),  # Tricky: seq_p just to embed in a list
-            seq_p(stringConstant_p()),
-            seq_p(keywordConstant_p()),
-            subroutineCall_p(),  # disambiguate by trying this earlier
-            # varName_p(),
-            seq_p(
-                varName_p(),
-                symbol_p("["),
-                lazy(expression_p),
-                symbol_p("]"),
-            ),
-            seq_p(varName_p()),  # disambiguate by trying this later
-            # subroutineCall_p(),
-            seq_p(
-                symbol_p("("),
-                lazy(expression_p),
-                symbol_p(")"),
-            ),
-            seq_p(
-                unaryOp_p(),
-                lazy(expression_p),
-            ),
-        ))
 
-def subroutineCall_p():
-    return or_p(
-        # seq_p(
-        #     subroutineName_p(),
-        #     symbol_p("("),
-        #     expressionList_p(),
-        #     symbol_p(")"),
-        # ),
-        seq_p(
-            or_p(
-                className_p(),
-                varName_p(),
-            ),
-            symbol_p("."),
-            subroutineName_p(),
-            symbol_p("("),
-            expressionList_p(),
-            symbol_p(")"),
+#
+# Expressions:
+#
+
+ExpressionP = DeferP("ExpressionP")  # type: DeferP[TT, jack_ast.Expression]
+
+
+BinaryOpP = OrP(*[SymbolP(sym).const(jack_ast.Op(sym)) for sym in "+-*/&|<>="])
+
+UnaryOpP = OrP(*[SymbolP(sym).const(jack_ast.Op(sym)) for sym in "-~"])
+
+IdentifierP = ByTypeP("identifier")
+
+VarNameP = IdentifierP.map(jack_ast.VarRef)
+
+VarNameAndArrayIndexP = SeqP(
+    IdentifierP,
+    BracketP(
+        SymbolP("["),
+        ExpressionP,
+        SymbolP("]"),
+    )).map(unflatten(jack_ast.ArrayRef))
+
+IntegerConstantP = ByTypeP("integerConstant").map(lambda str: jack_ast.IntegerConstant(int(str)))
+
+StringConstantP = ByTypeP("stringConstant").map(jack_ast.StringConstant)
+
+KeywordConstantP = OrP(
+    TokenP(("keyword", "true"),  jack_ast.KeywordConstant(True)),
+    TokenP(("keyword", "false"), jack_ast.KeywordConstant(False)),
+    TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None)),
+    TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this")),
+)
+# (not checked) type: Parser[TT, KeywordConstant]
+
+
+def _unpack_subroutineCall(qual: Optional[List[str]], name: str, exprs: List[jack_ast.Expression]):
+    class_name = None
+    var_name = None
+    if qual is not None:
+        qual_name, _ = qual
+        if qual_name[0].isupper():
+            class_name = qual_name
+        else:
+            var_name = qual_name
+    return jack_ast.SubroutineCall(class_name=class_name, var_name=var_name, sub_name=name, args=exprs)
+
+SubroutineCallP = SeqP(
+    OptionalP(SeqP(IdentifierP, SymbolP("."))),
+    IdentifierP,
+    BracketP(
+        SymbolP("("),
+        SepByP(ExpressionP, SymbolP(",")),
+        SymbolP(")"),
+    )).map(unflatten(_unpack_subroutineCall))
+
+
+TermP = DeferP("Term")  # type: DeferP[TT, jack_ast.Expression]
+
+TermP.set(OrP(
+    IntegerConstantP,
+    StringConstantP,
+    KeywordConstantP,
+    SubroutineCallP,
+    VarNameAndArrayIndexP,
+    VarNameP,
+    BracketP(SymbolP("("), ExpressionP, SymbolP(")")),
+    SeqP(UnaryOpP, TermP).map(unflatten(jack_ast.UnaryExpression)),
+))
+
+
+# TODO: SepBy1P? Probably, because this doesn't work for left-associative operators.
+ExpressionP.set(OrP(
+    SeqP(TermP, BinaryOpP, ExpressionP).map(unflatten(jack_ast.BinaryExpression)),  # Bug: *right* associative
+    TermP,
+))
+
+
+#
+# Statements:
+#
+
+StatementP = DeferP("Statement")
+
+LetStatementP = SeqP(
+    KeywordP("let"),
+    IdentifierP,
+    OptionalP(BracketP(
+        SymbolP("["),
+        ExpressionP,
+        SymbolP("]"))),
+    SymbolP("="),
+    ExpressionP,
+    SymbolP(";")
+).map(lambda vals: jack_ast.LetStatement(vals[1], vals[2], vals[4])) # (unchecked) type: Parser[TT, jack_ast.LetStatement]
+
+IfStatementP = SeqP(
+    BracketP(
+        SeqP(
+            KeywordP("if"),
+            SymbolP("("),
         ),
-    )
+        ExpressionP,
+        SymbolP(")")),
+    BracketP(
+        SymbolP("{"),
+        ManyP(StatementP),
+        SymbolP("}")),
+    OptionalP(
+        BracketP(
+            SeqP(
+                KeywordP("else"),
+                SymbolP("{"),
+            ),
+            ManyP(StatementP),
+            SymbolP("}"))),
+).map(unflatten(jack_ast.IfStatement))
 
-def expressionList_p():
-    return nest_p("expressionList",
-        sep_by_p(lazy(expression_p), symbol_p(",")))
+WhileStatementP = BracketP(
+    KeywordP("while"),
+    SeqP(
+        BracketP(
+            SymbolP("("),
+            ExpressionP,
+            SymbolP(")"),
+        ),
+        BracketP(
+            SymbolP("{"),
+            ManyP(StatementP),
+            SymbolP("}"),
+        ),
+    ),
+    SeqP()  # Hack: match nothing, just so I can use BracketP to drop the keyword.
+).map(unflatten(jack_ast.WhileStatement))
 
-def op_p():
-    return or_p(*[symbol_p(op)
-        for op in "+-*/&|<>="])
+DoStatementP = BracketP(KeywordP("do"), SubroutineCallP, SymbolP(";")).map(jack_ast.DoStatement)
 
-def unaryOp_p():
-    return or_p(*[symbol_p(op)
-        for op in "-~"])
+ReturnStatementP = BracketP(
+    KeywordP("return"),
+    OptionalP(ExpressionP),
+    SymbolP(";"),
+).map(jack_ast.ReturnStatement)
 
-def nest_p(name, parser):
-    """Apply a parser, then wrap the result in a new tuple with the given name/type."""
-    def f(loc):
-        val, loc = parser(loc)
-        return ((name, val), loc)
-    return f
+StatementP.set(OrP(
+    LetStatementP,
+    IfStatementP,
+    WhileStatementP,
+    DoStatementP,
+    ReturnStatementP,
+))
 
 
-def type_p():
-    return or_p(
-        keyword_p("int"),
-        keyword_p("char"),
-        keyword_p("boolean"),
-        className_p(),
-    )
+#
+# Program Structure:
+#
 
-def className_p():
-    return identifier_p()
+TypeP = OrP(
+    KeywordP("int").const("int"),
+    KeywordP("char").const("char"),
+    KeywordP("boolean").const("boolean"),
+    IdentifierP.filter(lambda str: str[0].isupper())
+).map(jack_ast.Type)
 
-def subroutineName_p():
-    return identifier_p()
 
-def varName_p():
-    return identifier_p()
+VarDecP = BracketP(
+    KeywordP("var"),
+    SeqP(
+        TypeP,
+        SepByP(
+            IdentifierP,
+            SymbolP(","),
+            one_or_more=True)
+    ),
+    SymbolP(";")).map(unflatten(jack_ast.VarDec))
 
-def keyword_p(kw):
-    def f(loc):
-        typ, val = loc.current_token()
-        if typ == "keyword" and val == kw:
-            return ((typ, val), loc.advance())
-        else:
-            raise ParseFailure(f"keyword: {kw}", loc)
-    return f
 
-def identifier_p():
-    return any_p("identifier")
+SubroutineBodyP = BracketP(
+    SymbolP("{"),
+    SeqP(
+        ManyP(VarDecP),
+        ManyP(StatementP),
+    ),
+    SymbolP("}")
+).map(unflatten(jack_ast.SubroutineBody))
 
-def symbol_p(sym):
-    def f(loc):
-        typ, val = loc.current_token()
-        if typ == "symbol" and val == sym:
-            return ((typ, val), loc.advance())
-        else:
-            raise ParseFailure(f"symbol: {repr(sym)}", loc)
-    return f
+ParameterP = SeqP(
+    TypeP,
+    IdentifierP,
+).map(unflatten(jack_ast.Parameter))
 
-def integerConstant_p():
-    return any_p("integerConstant")
+SubroutineDecP = SeqP(
+    OrP(
+        KeywordP("constructor").const("constructor"),
+        KeywordP("function").const("function"),
+        KeywordP("method").const("method"),
+    ),
+    OrP(
+        KeywordP("void"),
+        TypeP,
+    ),
+    IdentifierP,
+    BracketP(
+        SymbolP("("),
+        SepByP(ParameterP, SymbolP(",")),
+        SymbolP(")")
+    ),
+    SubroutineBodyP,
+).map(unflatten(jack_ast.SubroutineDec))
 
-def stringConstant_p():
-    return any_p("stringConstant")
+ClassVarDecP = BracketP(
+    SeqP(),  # Hack: match nothing, just so I can use BracketP to drop the keyword.
+    SeqP(
+        OrP(
+            KeywordP("static").const(True),
+            KeywordP("field").const(False),
+        ),
+        TypeP,
+        SepByP(IdentifierP, SymbolP(","), one_or_more=True),
+    ),
+    SymbolP(";")
+).map(unflatten(jack_ast.ClassVarDec))
 
-def keywordConstant_p():
-    return or_p(
-        keyword_p("true"),
-        keyword_p("false"),
-        keyword_p("null"),
-        keyword_p("this"),
-    )
-
-def any_p(token_type):
-    def f(loc):
-        typ, val = loc.current_token()
-        if typ == token_type:
-            return ((typ, val), loc.advance())
-        else:
-            raise ParseFailure(token_type, loc)
-    return f
+ClassP = SeqP(
+    KeywordP("class"),
+    IdentifierP,
+    SymbolP("{"),
+    ManyP(ClassVarDecP),
+    ManyP(SubroutineDecP),
+    SymbolP("}"),
+).map(lambda vals: jack_ast.Class(vals[1], vals[3], vals[4]))
