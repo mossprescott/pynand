@@ -7,7 +7,7 @@ Each NamedTuple corresponds to one of the productions of the Jack grammar as see
 materials (e.g. Chapter 10 lecture notes, slide 84).
 """
 
-from typing import NamedTuple, List, Optional, Union
+from typing import NamedTuple, Optional, Sequence, Union
 
 
 Type = str
@@ -38,7 +38,7 @@ class SubroutineCall(NamedTuple):
     class_name: Optional[str]
     var_name: Optional[str]
     sub_name: str
-    args: List["ExpressionRec"]
+    args: Sequence["ExpressionRec"]
 
 class Op(NamedTuple):
     symbol: str
@@ -75,12 +75,12 @@ class LetStatement(NamedTuple):
 
 class IfStatement(NamedTuple):
     cond: Expression
-    when_true: List["StatementRec"]
-    when_false: Optional[List["StatementRec"]] = None
+    when_true: Sequence["StatementRec"]
+    when_false: Optional[Sequence["StatementRec"]] = None
 
 class WhileStatement(NamedTuple):
     cond: Expression
-    body: List["StatementRec"]
+    body: Sequence["StatementRec"]
 
 class DoStatement(NamedTuple):
     expr: SubroutineCall
@@ -100,11 +100,11 @@ StatementRec = object
 
 class VarDec(NamedTuple):
     type: Type
-    names: List[str]
+    names: Sequence[str]
 
 class SubroutineBody(NamedTuple):
-    varDecs: List[VarDec]
-    statements: List[Statement]
+    varDecs: Sequence[VarDec]
+    statements: Sequence[Statement]
 
 class Parameter(NamedTuple):
     type: Type
@@ -114,18 +114,18 @@ class SubroutineDec(NamedTuple):
     kind: str  # 'constructor', 'function', or 'method'
     result: Optional[Type]  # Note: None means "void" here
     name: str
-    params: List[Parameter]
+    params: Sequence[Parameter]
     body: SubroutineBody
 
 class ClassVarDec(NamedTuple):
     static: bool
     type: Type
-    names: List[str]
+    names: Sequence[str]
 
 class Class(NamedTuple):
     name: str
-    varDecs: List[ClassVarDec]
-    subroutineDecs: List[SubroutineDec]
+    varDecs: Sequence[ClassVarDec]
+    subroutineDecs: Sequence[SubroutineDec]
 
 
 

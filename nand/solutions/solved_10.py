@@ -1,4 +1,5 @@
 import re
+from typing import Sequence
 
 from nand import jack_ast
 from nand.parsing import *
@@ -160,7 +161,7 @@ KeywordConstantP = OrP(
 # (not checked) type: Parser[TT, KeywordConstant]
 
 
-def _unpack_subroutineCall(qual: Optional[List[str]], name: str, exprs: List[jack_ast.Expression]):
+def _unpack_subroutineCall(qual: Optional[Sequence[str]], name: str, exprs: Sequence[jack_ast.Expression]):
     class_name = None
     var_name = None
     if qual is not None:
