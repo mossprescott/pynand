@@ -52,12 +52,11 @@ def parse_class(tokens):
 #
 
 # Example: match one of the keywords that represents a simple constant value (or the "this" reference)
-KeywordConstantP = OrP(
-    TokenP(("keyword", "true"),  jack_ast.KeywordConstant(True)),
-    TokenP(("keyword", "false"), jack_ast.KeywordConstant(False)),
-    TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None)),
-    TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this")),
-)
+KeywordConstantP = (
+    TokenP(("keyword", "true"),  jack_ast.KeywordConstant(True))
+    | TokenP(("keyword", "false"), jack_ast.KeywordConstant(False))
+    | TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None))
+    | TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this")))
 
 # SOLVERS: replace this with a parser built up from the combinators in nand.parsing
 # (or your own class that provides parse(tokens) -> jack_ast.Op`).
