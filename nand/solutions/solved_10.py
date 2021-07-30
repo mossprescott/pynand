@@ -104,25 +104,16 @@ def ByTypeP(token_type: str) -> Parser[TT, str]:
 #             raise ParseFailure(self.token_type, loc)
 
 
-def KeywordP(kw: str) -> Parser[TT, None]:
-    """Match a specific keyword (e.g. "class"), producing no value."""
+def KeywordP(kw: str) -> Parser[TT, str]:
+    """Match a specific keyword (e.g. "class"), and yield the value (because we sometimes use it)."""
 
-    return TokenP(('keyword', kw), None)
+    return TokenP(('keyword', kw), kw)
 
 
 def SymbolP(sym: str) -> Parser[TT, None]:
     """Match a specific symbol (e.g. "+"), producing no value."""
 
     return TokenP(("symbol", sym), None)
-
-
-def unflatten(f):
-    """Helper for use with Parser.map. Takes a function with multiple args, wraps it in
-    a function that accepts the same args in a list.
-
-    TODO: push this into Parser.map in some way.
-    """
-    return lambda args: f(*args)
 
 
 #
@@ -140,65 +131,63 @@ IdentifierP = ByTypeP("identifier")
 
 VarNameP = IdentifierP.map(jack_ast.VarRef)
 
-VarNameAndArrayIndexP = SeqP(
-    IdentifierP,
-    BracketP(
+VarNameAndArrayIndexP = (
+    IdentifierP
+    & BracketP(
         SymbolP("["),
         ExpressionP,
-        SymbolP("]"),
-    )).map(unflatten(jack_ast.ArrayRef))
+        SymbolP("]"))
+).mapConstr(jack_ast.ArrayRef)
 
-IntegerConstantP = ByTypeP("integerConstant").map(lambda str: jack_ast.IntegerConstant(int(str)))
+IntegerConstantP: Parser[TT, jack_ast.Expression] = ByTypeP("integerConstant").map(lambda str: jack_ast.IntegerConstant(int(str)))
 
 StringConstantP = ByTypeP("stringConstant").map(jack_ast.StringConstant)
 
-KeywordConstantP = OrP(
-    TokenP(("keyword", "true"),  jack_ast.KeywordConstant(True)),
-    TokenP(("keyword", "false"), jack_ast.KeywordConstant(False)),
-    TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None)),
-    TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this")),
+KeywordConstantP = (
+    TokenP(("keyword", "true"),  jack_ast.KeywordConstant(True))
+    | TokenP(("keyword", "false"), jack_ast.KeywordConstant(False))
+    | TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None))
+    | TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this"))
 )
-# (not checked) type: Parser[TT, KeywordConstant]
 
 
-def _unpack_subroutineCall(qual: Optional[Sequence[str]], name: str, exprs: Sequence[jack_ast.Expression]):
+def _unpack_subroutineCall(qual_name: Optional[str], name: str, exprs: Sequence[jack_ast.Expression]):
     class_name = None
     var_name = None
-    if qual is not None:
-        qual_name, _ = qual
+    if qual_name is not None:
         if qual_name[0].isupper():
             class_name = qual_name
         else:
             var_name = qual_name
     return jack_ast.SubroutineCall(class_name=class_name, var_name=var_name, sub_name=name, args=exprs)
 
-SubroutineCallP = SeqP(
-    OptionalP(SeqP(IdentifierP, SymbolP("."))),
-    IdentifierP,
-    BracketP(
+SubroutineCallP = (
+    OptionalP((IdentifierP >> SymbolP(".")))
+    & IdentifierP
+    & BracketP(
         SymbolP("("),
         SepByP(ExpressionP, SymbolP(",")),
-        SymbolP(")"),
-    )).map(unflatten(_unpack_subroutineCall))
+        SymbolP(")"))
+).mapConstr(_unpack_subroutineCall)
 
 
 TermP: DeferP[TT, jack_ast.Expression] = DeferP("Term")
 
-TermP.set(OrP(
-    IntegerConstantP,
-    StringConstantP,
-    KeywordConstantP,
-    SubroutineCallP,
-    VarNameAndArrayIndexP,
-    VarNameP,
-    BracketP(SymbolP("("), ExpressionP, SymbolP(")")),
-    SeqP(UnaryOpP, TermP).map(unflatten(jack_ast.UnaryExpression)),
-))
+TermP.set(
+    IntegerConstantP
+    | StringConstantP
+    | KeywordConstantP
+    | SubroutineCallP
+    | VarNameAndArrayIndexP
+    | VarNameP
+    | BracketP(SymbolP("("), ExpressionP, SymbolP(")"))
+    | (UnaryOpP & TermP).mapConstr(jack_ast.UnaryExpression)
+)
 
 
 # TODO: SepBy1P? Probably, because this doesn't work for left-associative operators.
 ExpressionP.set(OrP(
-    SeqP(TermP, BinaryOpP, ExpressionP).map(unflatten(jack_ast.BinaryExpression)),  # Bug: *right* associative
+    (TermP & BinaryOpP & ExpressionP).mapConstr(jack_ast.BinaryExpression),  # Bug: *right* associative
     TermP,
 ))
 
@@ -209,58 +198,51 @@ ExpressionP.set(OrP(
 
 StatementP: DeferP[TT, jack_ast.Statement] = DeferP("Statement")
 
-LetStatementP = SeqP(
-    KeywordP("let"),
-    IdentifierP,
-    OptionalP(BracketP(
+LetStatementP: Parser[TT, jack_ast.Statement] = (
+    KeywordP("let")
+    & IdentifierP
+    & OptionalP(BracketP(
         SymbolP("["),
         ExpressionP,
-        SymbolP("]"))),
-    SymbolP("="),
-    ExpressionP,
-    SymbolP(";")
-).map(lambda vals: jack_ast.LetStatement(vals[1], vals[2], vals[4])) # (unchecked) type: Parser[TT, jack_ast.LetStatement]
+        SymbolP("]")))
+    & SymbolP("=")
+    & ExpressionP
+    & SymbolP(";")
+).mapConstr(jack_ast.LetStatement, [1, 2, 4])
 
-IfStatementP = SeqP(
-    BracketP(
-        SeqP(
-            KeywordP("if"),
-            SymbolP("("),
-        ),
+IfStatementP = (
+    KeywordP("if")
+    & BracketP(
+        SymbolP("("),
         ExpressionP,
-        SymbolP(")")),
-    BracketP(
+        SymbolP(")"))
+    & BracketP(
         SymbolP("{"),
         ManyP(StatementP),
-        SymbolP("}")),
-    OptionalP(
+        SymbolP("}"))
+    & OptionalP(
         BracketP(
-            SeqP(
-                KeywordP("else"),
-                SymbolP("{"),
-            ),
+            ( KeywordP("else")
+            & SymbolP("{")),
             ManyP(StatementP),
-            SymbolP("}"))),
-).map(unflatten(jack_ast.IfStatement))
+            SymbolP("}")))
+).mapConstr(jack_ast.IfStatement, [1, 2, 3])
 
-WhileStatementP = BracketP(
-    KeywordP("while"),
-    SeqP(
-        BracketP(
-            SymbolP("("),
-            ExpressionP,
-            SymbolP(")"),
-        ),
-        BracketP(
-            SymbolP("{"),
-            ManyP(StatementP),
-            SymbolP("}"),
-        ),
-    ),
-    SeqP()  # Hack: match nothing, just so I can use BracketP to drop the keyword.
-).map(unflatten(jack_ast.WhileStatement))
+WhileStatementP = (
+    KeywordP("while")
+    & SymbolP("(")
+    & ExpressionP
+    & SymbolP(")")
+    & SymbolP("{")
+    & ManyP(StatementP)
+    & SymbolP("}")
+).mapConstr(jack_ast.WhileStatement, [2, 5])
 
-DoStatementP = BracketP(KeywordP("do"), SubroutineCallP, SymbolP(";")).map(jack_ast.DoStatement)
+DoStatementP = BracketP(
+    KeywordP("do"),
+    SubroutineCallP,
+    SymbolP(";")
+).map(jack_ast.DoStatement)
 
 ReturnStatementP = BracketP(
     KeywordP("return"),
@@ -268,90 +250,85 @@ ReturnStatementP = BracketP(
     SymbolP(";"),
 ).map(jack_ast.ReturnStatement)
 
-StatementP.set(OrP(
-    LetStatementP,
-    IfStatementP,
-    WhileStatementP,
-    DoStatementP,
-    ReturnStatementP,
-))
+
+StatementP.set(
+    LetStatementP
+    | IfStatementP
+    | WhileStatementP
+    | DoStatementP
+    | ReturnStatementP
+)
 
 
 #
 # Program Structure:
 #
 
-TypeP = OrP(
-    KeywordP("int").const("int"),
-    KeywordP("char").const("char"),
-    KeywordP("boolean").const("boolean"),
-    IdentifierP.filter(lambda str: str[0].isupper())
+TypeP = (
+    KeywordP("int")
+    | KeywordP("char")
+    | KeywordP("boolean")
+    | IdentifierP.filter(lambda str: str[0].isupper())
 ).map(jack_ast.Type)
 
-
-VarDecP = BracketP(
-    KeywordP("var"),
-    SeqP(
-        TypeP,
-        SepByP(
-            IdentifierP,
-            SymbolP(","),
-            one_or_more=True)
-    ),
-    SymbolP(";")).map(unflatten(jack_ast.VarDec))
-
+VarDecP = (
+    KeywordP("var")
+    & TypeP
+    & SepByP(
+        IdentifierP,
+        SymbolP(","),
+        one_or_more=True)
+    & SymbolP(";")
+).mapConstr(jack_ast.VarDec, [1, 2])
 
 SubroutineBodyP = BracketP(
     SymbolP("{"),
-    SeqP(
-        ManyP(VarDecP),
-        ManyP(StatementP),
+    ( ManyP(VarDecP)
+      & ManyP(StatementP)
     ),
     SymbolP("}")
-).map(unflatten(jack_ast.SubroutineBody))
+).mapConstr(jack_ast.SubroutineBody)
 
-ParameterP = SeqP(
-    TypeP,
-    IdentifierP,
-).map(unflatten(jack_ast.Parameter))
+ParameterP = (
+    TypeP
+    & IdentifierP
+).mapConstr(jack_ast.Parameter)
 
-SubroutineDecP = SeqP(
-    OrP(
-        KeywordP("constructor").const("constructor"),
-        KeywordP("function").const("function"),
-        KeywordP("method").const("method"),
-    ),
-    OrP(
-        KeywordP("void"),
-        TypeP,
-    ),
-    IdentifierP,
-    BracketP(
+ResultTypeP: Parser[TT, Optional[jack_ast.Type]] = OrP(KeywordP("void").const(None), TypeP)
+
+SubroutineDecP = (
+    ( KeywordP("constructor")
+      | KeywordP("function")
+      | KeywordP("method"))
+    & ResultTypeP
+    & IdentifierP
+    & BracketP(
         SymbolP("("),
         SepByP(ParameterP, SymbolP(",")),
-        SymbolP(")")
-    ),
-    SubroutineBodyP,
-).map(unflatten(jack_ast.SubroutineDec))
+        SymbolP(")"))
+    & SubroutineBodyP
+).mapConstr(jack_ast.SubroutineDec)
 
-ClassVarDecP = BracketP(
-    SeqP(),  # Hack: match nothing, just so I can use BracketP to drop the keyword.
-    SeqP(
-        OrP(
-            KeywordP("static").const(True),
-            KeywordP("field").const(False),
-        ),
-        TypeP,
-        SepByP(IdentifierP, SymbolP(","), one_or_more=True),
-    ),
-    SymbolP(";")
-).map(unflatten(jack_ast.ClassVarDec))
+ClassVarDecP = (
+    ( KeywordP("static").const(True)
+      | KeywordP("field").const(False))
+    & TypeP
+    & SepByP(IdentifierP, SymbolP(","), one_or_more=True)
+    & SymbolP(";")
+).mapConstr(jack_ast.ClassVarDec, [0, 1, 2])
 
-ClassP = SeqP(
-    KeywordP("class"),
-    IdentifierP,
-    SymbolP("{"),
-    ManyP(ClassVarDecP),
-    ManyP(SubroutineDecP),
-    SymbolP("}"),
-).map(lambda vals: jack_ast.Class(vals[1], vals[3], vals[4]))
+ClassP = (
+    KeywordP("class")
+    & IdentifierP
+    & SymbolP("{")
+    & ManyP(ClassVarDecP)
+    & ManyP(SubroutineDecP)
+    & SymbolP("}")
+).mapConstr(jack_ast.Class, [1, 3, 4])
+
+  # Uglier, no?
+# ClassP = (
+#     KeywordP("class") <<
+#     IdentifierP &
+#         (SymbolP("{") << ManyP(ClassVarDecP) & ManyP(SubroutineDecP) >> SymbolP("}"))
+# ).mapConstr(jack_ast.Class)

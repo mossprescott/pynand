@@ -91,6 +91,78 @@ class Parser(Generic[T, V]):
         return FilterP(self, predicate)
 
 
+    @final
+    def mapConstr(self, constr: Callable[..., W], indexes: Optional[Sequence[int]] = None) -> "Parser[T, W]":
+        """Apply a constructor (actually, any function) to the result, after flattening the tuple
+        constructed by successive `&` or Seq2P compositions.
+        If `indexes` is present, it gives the locations of parameters to be extracted from the result;
+        otherwise, all results are used.
+        The arity of the constructor must match the number of results available (or the number of indexes.)
+
+        Note: if one of the values being collected here can ever be an ordinary tuple, chaos ensues.
+        """
+
+        def flatten(t):
+            # Note: *not* using isinstance(t, tuple), because NamedTuples are tuple!
+            if type(t) == tuple:
+                return [d for c in t for d in flatten(c)]
+            else:
+                return [t]
+
+        def munge(lft):
+            vals = flatten(lft)
+            # print(constr)
+            # for v in vals: print(v)
+            if indexes is not None:
+                args = [vals[i] for i in indexes]
+            else:
+                args = vals
+            return constr(*args)
+
+        return MapP(self, munge)
+
+
+    #
+    # And now, for some outrageous syntax sugar:
+    #
+
+    # Note: the inferred type here is worse than OrP's in some cases (because it's based only on the left parser?)
+    @final
+    def __or__(self, rhs: "Parser[T, V]") -> "Parser[T, V]":
+        """Match one or the other; see OrP."""
+
+        return OrP(self, rhs)
+
+    @final
+    def __and__(self, rhs: "Parser[T, W]") -> "Parser[T, Tuple[V, W]]":
+        """Match one, then the other; see Seq2P."""
+        return Seq2P(self, rhs)
+
+    @final
+    def __lshift__(self, rhs: "Parser[T, W]") -> "Parser[T, W]":
+        """Apply two parsers and ignore the result on the left.
+
+        Best used sparingly.
+
+        >>> p = TokenP("a", 1) << TokenP("b", 2)
+        >>> p.parse("ab")
+        2
+        """
+        return Seq2P(self, rhs).map(lambda t: t[1])
+
+    @final
+    def __rshift__(self, rhs: "Parser[T, W]") -> "Parser[T, V]":
+        """Apply two parsers and ignore the result on the right.
+
+        Best used sparingly.
+
+        >>> p = TokenP("a", 1) >> TokenP("b", 2)
+        >>> p.parse("ab")
+        1
+        """
+        return Seq2P(self, rhs).map(lambda t: t[0])
+
+
 class ParseLocation(Generic[T]):
     """Keep track of a list of tokens and the current position within it,
     with non-destructive update (by making a new instance each time the position
@@ -122,7 +194,7 @@ class ParseFailure(Exception, Generic[T]):
         self.loc = loc
 
     def __str__(self):
-        return f"ParseFailure: expected {self.expected} at {self.loc}"
+        return f"Expected {self.expected} at {self.loc}"
 
 
 #
@@ -156,12 +228,12 @@ class TokenP(Parser[T, V]):
     >>> one_a.parse("q")
     Traceback (most recent call last):
     ...
-    nand.parsing.ParseFailure: ParseFailure: expected 'a' at ParseLocation(pos: 0; next token: 'q')
+    nand.parsing.ParseFailure: Expected 'a' at ParseLocation(pos: 0; next token: 'q')
 
     >>> one_a.parse("abc")
     Traceback (most recent call last):
     ...
-    nand.parsing.ParseFailure: ParseFailure: expected eof at ParseLocation(pos: 1; next token: 'b')
+    nand.parsing.ParseFailure: Expected eof at ParseLocation(pos: 1; next token: 'b')
     """
 
     def __init__(self, token: T, value: V):
@@ -239,16 +311,18 @@ class SepByP(Parser[T, Sequence[V]]):
             vals.append(val)
 
 
-# TODO: figure out how to make the sub-parsers properly (co)variant.
 class OrP(Parser[T, V]):
     """Try a series of parsers until one matches, and return its result.
 
-    >>> one_a = OrP(TokenP("a", "Nice!"), TokenP("b", "Great!"))
+    >>> a_or_b = OrP(TokenP("a", "Nice!"), TokenP("b", "Great!"))
 
-    >>> one_a.parse("a")
+    >>> a_or_b.parse("a")
     'Nice!'
 
-    >>> one_a.parse("b")
+    Note: the '|' operator is another way to construct the same parser:
+
+    >>> a_or_b = TokenP("a", "Nice!") | TokenP("b", "Great!")
+    >>> a_or_b.parse("b")
     'Great!'
     """
 
@@ -264,27 +338,32 @@ class OrP(Parser[T, V]):
         raise ParseFailure(f"one of {self.parsers}", loc)
 
 
-# TODO: a specific type is never going to work here if you want to use this in a general way;
-# each parser is going to produce a different type of value and that's just not a Sequence.
-# Probably need to just have Seq2P (and so on) and properly type the result as a Tuple.
-class SeqP(Parser[T, Sequence[V]]):
-    """Apply a series of parsers and return a list with the result from each one.
+V1 = TypeVar("V1", covariant=True)
+V2 = TypeVar("V2", covariant=True)
 
-    >>> one_a = SeqP(TokenP("a", "Nice!"), TokenP("b", "Great!"))
+class Seq2P(Parser[T, Tuple[V1, V2]]):
+    """Apply two parsers and assemble their results into a tuple.
 
-    >>> one_a.parse("ab")
-    ['Nice!', 'Great!']
+    >>> a_and_b = Seq2P(TokenP("a", "Nice!"), TokenP("b", "Great!"))
+
+    >>> a_and_b.parse("ab")
+    ('Nice!', 'Great!')
+
+    Note: the '&' operator is another way to construct the same parser:
+
+    >>> a_and_b = TokenP("a", "Nice!") & TokenP("b", "Great!")
+    >>> a_and_b.parse("ab")
+    ('Nice!', 'Great!')
     """
 
-    def __init__(self, *parsers: Parser[T, V]):
-        self.parsers = parsers
+    def __init__(self, first: Parser[T, V1], second: Parser[T, V2]):
+        self.first = first
+        self.second = second
 
-    def __call__(self, loc) -> Tuple[Sequence[V], ParseLocation[T]]:
-        vals = []
-        for p in self.parsers:
-            val, loc = p(loc)
-            vals.append(val)
-        return vals, loc
+    def __call__(self, loc) -> Tuple[Tuple[V1, V2], ParseLocation[T]]:
+        v1, loc = self.first(loc)
+        v2, loc = self.second(loc)
+        return (v1, v2), loc
 
 
 class BracketP(Parser[T, V]):
