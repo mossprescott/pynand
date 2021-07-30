@@ -33,13 +33,13 @@ package (based on Haskell's famous (simlarly-named library)[https://hackage.hask
 Or just google "Parser Combinators".
 """
 
-from typing import Callable, Generic, List, Optional, Tuple, TypeVar, final
+from typing import Callable, Generic, Sequence, Optional, Tuple, TypeVar, final
 
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 """The type of each token, e.g. `str` or `Tuple[str, str]`, but any type can be used."""
 
-V = TypeVar("V")
+V = TypeVar("V", covariant=True)
 """The type of the value produced by a parser."""
 
 W = TypeVar("W")
@@ -49,8 +49,11 @@ W = TypeVar("W")
 class Parser(Generic[T, V]):
     """Base class for parsers."""
 
+    # TODO: this is bogus. You should be able to define a "parser" as just a plain function
+    # if you want to. But the you need this function to be defined separately. And since it's
+    # final there's no real reason for it to be in this class.
     @final
-    def parse(self, tokens: List[T]) -> V:
+    def parse(self, tokens: Sequence[T]) -> V:
         """Apply this parser to a list of tokens. If it matches the entire stream, a result is returned.
         If it doesn't match, or matches only a prefix, a ParseFailure is raised.
 
@@ -81,7 +84,7 @@ class Parser(Generic[T, V]):
     @final
     def const(self, value: W) -> "Parser[T, W]":
         """When the parser succeeds, substitute a new, constant value."""
-        return MapP(self, lambda _: value)
+        return MapP(self, lambda _: value)  # type: ignore   # (not actually using the parameter here)
 
     @final
     def filter(self, predicate: Callable[[V], bool]) -> "Parser[T, V]":
@@ -94,7 +97,7 @@ class ParseLocation(Generic[T]):
     advances, referring to the same underlying list.)
     """
 
-    def __init__(self, tokens: List[T], pos=0):
+    def __init__(self, tokens: Sequence[T], pos=0):
         self.tokens = tokens
         self.pos = pos
 
@@ -186,13 +189,13 @@ class OptionalP(Parser[T, Optional[V]]):
             return None, loc
 
 
-class ManyP(Parser[T, List[V]]):
+class ManyP(Parser[T, Sequence[V]]):
     """Apply a parser repeatedly until it fails, producing a list of values."""
 
     def __init__(self, parser: Parser[T, V]):
         self.parser = parser
 
-    def __call__(self, loc) -> Tuple[List[V], ParseLocation[T]]:
+    def __call__(self, loc) -> Tuple[Sequence[V], ParseLocation[T]]:
         vals = []
         while True:
             try:
@@ -202,7 +205,7 @@ class ManyP(Parser[T, List[V]]):
                 return vals, loc
 
 
-class SepByP(Parser[T, List[V]]):
+class SepByP(Parser[T, Sequence[V]]):
     """Apply a parser repeatedly until it fails, matching (and discarding) a separator between each, and
     producing a list of values.
     """
@@ -212,7 +215,7 @@ class SepByP(Parser[T, List[V]]):
         self.separator = separator
         self.one_or_more = one_or_more
 
-    def __call__(self, loc) -> Tuple[List[V], ParseLocation[T]]:
+    def __call__(self, loc) -> Tuple[Sequence[V], ParseLocation[T]]:
         vals = []
 
         try:
@@ -262,9 +265,9 @@ class OrP(Parser[T, V]):
 
 
 # TODO: a specific type is never going to work here if you want to use this in a general way;
-# each parser is going to produce a different type of value and that's just not a List.
+# each parser is going to produce a different type of value and that's just not a Sequence.
 # Probably need to just have Seq2P (and so on) and properly type the result as a Tuple.
-class SeqP(Parser[T, List[V]]):
+class SeqP(Parser[T, Sequence[V]]):
     """Apply a series of parsers and return a list with the result from each one.
 
     >>> one_a = SeqP(TokenP("a", "Nice!"), TokenP("b", "Great!"))
@@ -276,7 +279,7 @@ class SeqP(Parser[T, List[V]]):
     def __init__(self, *parsers: Parser[T, V]):
         self.parsers = parsers
 
-    def __call__(self, loc) -> Tuple[List[V], ParseLocation[T]]:
+    def __call__(self, loc) -> Tuple[Sequence[V], ParseLocation[T]]:
         vals = []
         for p in self.parsers:
             val, loc = p(loc)
@@ -295,7 +298,7 @@ class BracketP(Parser[T, V]):
 
     # TODO: fix these types; no need to constrain left and right at all, but "None" is
     # sometimes used, because it forces you to be explicit about not using those values.
-    def __init__(self, left: Parser[T, W], parser: Parser[T, V], right: Parser[T, W]):
+    def __init__(self, left: Parser[T, object], parser: Parser[T, V], right: Parser[T, object]):
         self.left = left
         self.parser = parser
         self.right = right
@@ -307,18 +310,18 @@ class BracketP(Parser[T, V]):
         return val, loc
 
 
-class MapP(Parser[T, W]):
+class MapP(Parser[T, V]):
     """Apply a parser, then transform the value it produced.
 
     Note: the transform function always applies to a single value (possible a list) produced
     by the original parser. That's not always convenient, but it's easy to understand.
     """
 
-    def __init__(self, parser: Parser[T, V], transform: Callable[[V], W]):
+    def __init__(self, parser: Parser[T, W], transform: Callable[[W], V]):
         self.parser = parser
         self.transform = transform
 
-    def __call__(self, loc) -> Tuple[W, ParseLocation[T]]:
+    def __call__(self, loc) -> Tuple[V, ParseLocation[T]]:
         val, loc = self.parser(loc)
         return self.transform(val), loc
 
