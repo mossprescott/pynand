@@ -87,7 +87,7 @@ TT = Tuple[str, str]
 def ByTypeP(token_type: str) -> Parser[TT, str]:
     """Match any token having the given type, producing the token itself."""
 
-    any = AnyP()  # type: Parser[TT, TT]
+    any: Parser[TT, TT] = AnyP()
     return any.filter(lambda t: t[0] == token_type).map(lambda t: t[1])
 
 # Note: slightly improved error messages this way, but I'm trying to avoid subclassing
@@ -129,7 +129,7 @@ def unflatten(f):
 # Expressions:
 #
 
-ExpressionP = DeferP("ExpressionP")  # type: DeferP[TT, jack_ast.Expression]
+ExpressionP: DeferP[TT, jack_ast.Expression] = DeferP("ExpressionP")
 
 
 BinaryOpP = OrP(*[SymbolP(sym).const(jack_ast.Op(sym)) for sym in "+-*/&|<>="])
@@ -182,7 +182,7 @@ SubroutineCallP = SeqP(
     )).map(unflatten(_unpack_subroutineCall))
 
 
-TermP = DeferP("Term")  # type: DeferP[TT, jack_ast.Expression]
+TermP: DeferP[TT, jack_ast.Expression] = DeferP("Term")
 
 TermP.set(OrP(
     IntegerConstantP,
@@ -207,7 +207,7 @@ ExpressionP.set(OrP(
 # Statements:
 #
 
-StatementP = DeferP("Statement")
+StatementP: DeferP[TT, jack_ast.Statement] = DeferP("Statement")
 
 LetStatementP = SeqP(
     KeywordP("let"),
