@@ -31,6 +31,90 @@ A possibly more robust implementation of a similar idea is the [parsec](https://
 package (based on Haskell's famous (simlarly-named library)[https://hackage.haskell.org/package/parsec].
 
 Or just google "Parser Combinators".
+
+
+A few examples to get started:
+
+>>> aP = TokenP("a", 1)
+>>> bP = TokenP("b", 2)
+>>> aP.parse("a")
+1
+>>> bP.parse("b")
+2
+
+
+These parsers only match these *exact* strings. If you apply them to anything else, a ParseFailure
+is raised:
+
+>>> aP.parse("table")
+Traceback (most recent call last):
+...
+nand.parsing.ParseFailure: Expected 'a' at ParseLocation(pos: 0; next token: 't')
+
+
+You can match one of a set of alternatives by combining parsers with the '|' operator:
+
+>>> a_or_bP = aP | bP
+>>> a_or_bP.parse("a")
+1
+>>> a_or_bP.parse("b")
+2
+>>> ManyP(a_or_bP).parse("abba")
+[1, 2, 2, 1]
+
+
+Similarly, you can match a sequence of tokens using '&'. The results get wrapped in a tuple:
+
+>>> (aP & bP).parse("ab")
+(1, 2)
+
+
+This gets unwieldy when you string together a longer sequence (a common need), so you can use
+`.mapConstr()` to unpack them and apply whatever function you like:
+
+>>> def three_things(x, y, z):
+...     return [x, y, z]
+>>> (aP & bP & bP).mapConstr(three_things).parse("abb")
+[1, 2, 2]
+
+
+You can also use functions to modify the values you get back, or to control what can match in
+arbitrary ways:
+
+>>> a_or_bP.map(str).parse("b")
+'2'
+>>> AnyP().filter(str.isupper).parse("A")
+'A'
+
+
+And there's more:
+
+>>> (OptionalP(aP) & bP).parse("b")
+(None, 2)
+
+>>> BracketP(
+...     TokenP("[", "ignored"),
+...     aP,
+...     TokenP("]", "who cares?")
+... ).parse("[a]")
+1
+
+>>> SepByP(a_or_bP, TokenP(",", None)).parse("a,b,b,a")
+[1, 2, 2, 1]
+
+
+If you can't define your parser because it needs to refer to itself, DeferP can save the day.
+Here's a tricky parser that also shows how you can use transformation of the parsed values
+to do arbitrary computation:
+
+>>> depthP = DeferP("depth")
+>>> depthP.set(
+...     BracketP(TokenP("[", None), depthP, TokenP("]", None))
+...         .map(lambda x: x+1)
+...     | a_or_bP
+...         .const(0))
+>>> depthP.parse("[[a]]")
+2
 """
 
 from typing import Callable, Generic, Sequence, Optional, Tuple, TypeVar, final
