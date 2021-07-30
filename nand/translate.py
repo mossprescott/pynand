@@ -13,7 +13,7 @@ class AssemblySource:
         self.instruction_count = 0
         self.lines = []
         self.src_map = {}
-        
+
 
     def next_label(self, name):
         """Generate a unique label starting with `name`.
@@ -49,18 +49,22 @@ class AssemblySource:
         self.instruction_count += 1
 
 
+    def blank(self):
+        self.lines.append("")
+
+
     def __iter__(self):
         return self.lines.__iter__()
 
 
     def run(self, assembler, computer, stop_cycles=None, debug=False):
-        """Step through the execution of the generated program, using the provided assembler and 
+        """Step through the execution of the generated program, using the provided assembler and
         computer.
-        
-        If `debug` is True, print the source op and a summary of the machine state before beginning 
+
+        If `debug` is True, print the source op and a summary of the machine state before beginning
         each source op.
 
-        This assumes the assembler doesn't do anything clever with the instructions, so they 
+        This assumes the assembler doesn't do anything clever with the instructions, so they
         map one-to-one with the instructions emitted here.
         """
 
@@ -72,7 +76,7 @@ class AssemblySource:
             # print_lines(self.lines)
             print('\n'.join(self.lines))
             print()
-    
+
         asm = assembler(self)
         computer.init_rom(asm)
 
@@ -120,4 +124,3 @@ def translate_dir(translator, parse_line, dir_path):
             for op, args in better_ops:
                 translator.__getattribute__(op)(*args)
     translator.finish()
-
