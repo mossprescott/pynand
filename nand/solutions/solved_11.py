@@ -194,8 +194,7 @@ def compile_let_statement(ast, symbol_table, asm):
     if ast.array_index is not None:
         # First compute the destination address:
         compile_expression(ast.array_index, symbol_table, asm)
-        # asm.instr(f"push {symbol_table.kind_of(ast.name)} {symbol_table.index_of(ast.name)}")
-        compile_expression(VarRef(ast.name))
+        compile_expression(VarRef(ast.name), symbol_table, asm)
         asm.instr("add")
 
         # Now the right hand side:
