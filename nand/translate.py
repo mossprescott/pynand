@@ -115,12 +115,34 @@ class AssemblySource:
 
 
 def translate_dir(translator, parse_line, dir_path):
+    def translate_ops(ops):
+        better_ops = translator.rewrite_ops(ops)
+        for op, args in better_ops:
+            translator.__getattribute__(op)(*args)
+
     for fn in os.listdir(dir_path):
         if fn.endswith(".vm"):
             # print(f"// Loading VM source: {dir_path}/{fn}")
             with open(f"{dir_path}/{fn}", mode='r') as f:
                 ops = [parse_line(l) for l in f if parse_line(l) is not None]
-            better_ops = translator.rewrite_ops(ops)
-            for op, args in better_ops:
-                translator.__getattribute__(op)(*args)
+            translate_ops(ops)
+
+        elif fn.endswith(".jack"):
+            import project_10, project_11  # HACK
+            print(f"// Loading Jack source: {dir_path}/{fn}")
+            with open(f"{dir_path}/{fn}", mode='r') as f:
+                chars = "\n".join(f.readlines())
+
+                tokens = project_10.lex(chars)
+                ast = project_10.parse_class(tokens)
+                # print(f"  parsed class: {ast.name}")
+
+                asm = AssemblySource()
+                project_11.compile_class(ast, asm)
+                # for l in asm.lines: print("    " + l)
+
+                ops = [parse_line(l) for l in asm.lines if parse_line(l) is not None]
+
+                translate_ops(ops)
+
     translator.finish()
