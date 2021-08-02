@@ -10,9 +10,9 @@ from nand.solutions import solved_11
 
 
 class SymbolTable:
-    def __init__(self):
+    def __init__(self, class_name):
         # SOLVERS: delete this line and add your implementation here
-        self.solved = solved_11.SymbolTable()
+        self.solved = solved_11.SymbolTable(class_name)
 
     def start_subroutine(self):
         """Start a new subroutine scope (i.e. remove all "arg" and "var" definitions.)
@@ -99,6 +99,6 @@ def compile_expression(ast, symbol_table, asm):
     solved_11.compile_expression(ast, symbol_table, asm)
 
 
-def compile_class(ast, symbol_table, asm):
+def compile_class(ast, asm):
     # SOLVERS: replace this with your own implementation
-    solved_11.compile_class(ast, symbol_table, asm)
+    solved_11.compile_class(ast, asm)
