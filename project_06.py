@@ -1,3 +1,5 @@
+# Assembler
+#
 # See https://www.nand2tetris.org/project06
 
 # SOLVERS: remove this import to get started
@@ -27,6 +29,6 @@ def assemble(lines):
     After comments and white space are stripped, blank lines are ignored.
     """
 
-    # SOLVERS: replace this with code to parse a sequence of lines, using parse_op 
+    # SOLVERS: replace this with code to parse a sequence of lines, using parse_op
     # to handle the individual instructions found within it.
     return solved_06.assemble(lines)

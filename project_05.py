@@ -1,3 +1,5 @@
+# Computer Architecture
+#
 # See https://www.nand2tetris.org/project05
 
 from nand import RAM, ROM, Input, build, lazy
@@ -43,7 +45,7 @@ CPU = build(mkCPU)
 
 def mkComputer(inputs, outputs):
     reset = inputs.reset
-    
+
     # SOLVERS: replace this with one or more Nands and/or components defined above
     n1 = solved_05.Computer(reset=reset)
 
