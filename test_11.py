@@ -7,7 +7,7 @@ import project_11
 
 
 def test_symbols_statics():
-    st = project_11.SymbolTable()
+    st = project_11.SymbolTable("Main")
 
     st.define("x", "int", "static")
     st.define("y", "int", "static")
@@ -18,29 +18,29 @@ def test_symbols_statics():
     assert st.index_of("x") == 0
 
 def test_symbols_fields():
-    st = project_11.SymbolTable()
+    st = project_11.SymbolTable("Main")
 
-    st.define("width", "int", "field")
-    st.define("height", "int", "field")
+    st.define("width", "int", "this")
+    st.define("height", "int", "this")
 
-    assert st.count("field") == 2
-    assert st.kind_of("width") == "field"
+    assert st.count("this") == 2
+    assert st.kind_of("width") == "this"
     assert st.type_of("height") == "int"
     assert st.index_of("height") == 1
 
 def test_symbols_args():
-    st = project_11.SymbolTable()
+    st = project_11.SymbolTable("Main")
 
-    st.define("name", "string", "arg")
-    st.define("isCool", "bool", "arg")
+    st.define("name", "string", "argument")
+    st.define("isCool", "bool", "argument")
 
-    assert st.count("arg") == 2
-    assert st.kind_of("name") == "arg"
+    assert st.count("argument") == 2
+    assert st.kind_of("name") == "argument"
     assert st.type_of("isCool") == "bool"
     assert st.index_of("name") == 0
 
 def test_symbols_locals():
-    st = project_11.SymbolTable()
+    st = project_11.SymbolTable("Main")
 
     st.define("i", "int", "local")
     st.define("j", "int", "local")
@@ -55,7 +55,7 @@ def test_symbols_shadow():
     """A local variable *shadows* a static with the same.
     """
 
-    st = project_11.SymbolTable()
+    st = project_11.SymbolTable("Main")
 
     st.define("x", "int", "static")
 
@@ -69,7 +69,7 @@ def test_symbols_shadow():
 def test_trivial_expression():
     ast = project_10.ExpressionP.parse(project_10.lex("1 + 2"))
 
-    symbol_table = project_11.SymbolTable()
+    symbol_table = project_11.SymbolTable("Main")
 
     asm = AssemblySource()
 
@@ -87,11 +87,9 @@ def test_program_seven():
 
     ast = project_10.parse_class(project_10.lex(src))
 
-    symbol_table = project_11.SymbolTable()
-
     asm = AssemblySource()
 
-    project_11.compile_class(ast, symbol_table, asm)
+    project_11.compile_class(ast, asm)
 
     expected = """
   function Main.main 1
@@ -116,14 +114,12 @@ def test_program_average():
 
     ast = project_10.parse_class(project_10.lex(src))
 
-    symbol_table = project_11.SymbolTable()
-
     # TODO: just construct the symbol table and verify it's as expected:
     # a: 0, length: 1, i: 2, sum: 3
 
     asm = AssemblySource()
 
-    project_11.compile_class(ast, symbol_table, asm)
+    project_11.compile_class(ast, asm)
 
     # Note: this is the exact output of the Java compiler, modulo label numbering
     expected = """
