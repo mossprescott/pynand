@@ -63,9 +63,19 @@ def test_comment_simple():
     assert tokens == []
 
 def test_comment_multiline():
-    tokens = project_10.lex("/** A comment that  \n spans more than\n one line.\n */")
+    tokens = project_10.lex("""
+/** A comment that
+ * spans more than
+ * one line.
+ */
+ class Foo {
+   /* Another
+    multi-line
+    comment. */
+ }
+ """)
 
-    assert tokens == []
+    assert tokens == [("keyword", "class"), ("identifier", "Foo"), ("symbol", "{"), ("symbol", "}")]
 
 
 def test_simple_statement():

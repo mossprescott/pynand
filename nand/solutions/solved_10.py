@@ -51,12 +51,15 @@ def lex(string):
             string = string[len(token_str):]
             continue
 
+        # Single-line comments:
         m = re.match(r"^(//[^\n]*)", string)
         if m is not None:
             string = string[len(m.group(1)):]
             continue
 
-        m = re.match(r"^(/\*.*\*/)", string, re.DOTALL)
+        # Multi-line comments:
+        # Note the non-greedy match.
+        m = re.match(r"^(/\*.*?\*/)", string, re.DOTALL)
         if m is not None:
             string = string[len(m.group(1)):]
             continue
@@ -66,6 +69,7 @@ def lex(string):
             string = string[1:]
             continue
 
+        # White space is simply dropped:
         if string[0] in " \t\n":
             string = string[1:]
             continue
