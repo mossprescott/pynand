@@ -134,7 +134,7 @@ class Parser(Generic[T, V]):
     """Base class for parsers."""
 
     # TODO: this is bogus. You should be able to define a "parser" as just a plain function
-    # if you want to. But the you need this function to be defined separately. And since it's
+    # if you want to. But then you need this function to be defined separately. And since it's
     # final there's no real reason for it to be in this class.
     @final
     def parse(self, tokens: Sequence[T]) -> V:
@@ -144,7 +144,7 @@ class Parser(Generic[T, V]):
         This method can be used on any parser to parse a fragment of code. It never needs to be overridden.
         """
 
-        val, loc = self.__call__(ParseLocation(tokens))
+        val, loc = self.__call__(ParseLocation(tokens, pos=0))
         if loc.at_eof():
             return val
         else:
@@ -253,7 +253,7 @@ class ParseLocation(Generic[T]):
     advances, referring to the same underlying list.)
     """
 
-    def __init__(self, tokens: Sequence[T], pos=0):
+    def __init__(self, tokens: Sequence[T], pos):
         self.tokens = tokens
         self.pos = pos
 
