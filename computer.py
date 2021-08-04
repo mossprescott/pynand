@@ -35,7 +35,7 @@ CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tra
 
 parser = argparse.ArgumentParser(description="Run assembly or VM source with display and keyboard")
 parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm files.")
-parser.add_argument("--vector", action="store_true", help="Use the slower, but more precise, bit-vector-based runtime.")
+parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
 parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization. Note: runs almost 3x slower.")
 parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
 parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
@@ -72,7 +72,7 @@ def main(platform=HACK_PLATFORM):
     run(prg,
         chip=platform.chip,
         name=args.path,
-        simulator='vector' if args.vector else 'codegen',
+        simulator=args.simulator,
         src_map=src_map if args.trace else None)
 
 
