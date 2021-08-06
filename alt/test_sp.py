@@ -94,6 +94,7 @@ def test_computer_gates():
         'roms': 1,
         'rams': 2,
         'inputs': 1,
+        'outputs': 1,
     }
 
    

@@ -338,6 +338,7 @@ def mkEightComputer(inputs, outputs):
     # HACK: need some dependency to force the whole thing to be synthesized.
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
+    outputs.tty_ready = mem.tty_ready
 
 EightComputer = build(mkEightComputer)
 
