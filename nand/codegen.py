@@ -19,7 +19,7 @@ chips:
 - DMux
 - DMux8Way
 - Mux8Way16
-- TODO: RAM
+- TODO: RAM, separately from MemorySystem
 
 Any other ICs that appear are flattened to combinations of these. The downside is that a
 moderate amount of flattening will have a significant impact on simulation speed. For example,
@@ -187,6 +187,11 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             value = f"_{all_comps.index(conn.comp)}_dff"
         elif conn.comp.label == "Register":
             value = f"_{all_comps.index(conn.comp)}_reg"
+        elif conn.comp.label == "MemorySystem" and conn.name == "tty_ready":
+            # Tricky: this seems pretty bogus. MemorySystem is the first primitive
+            # which has more than one output, and it can be computed from the
+            # special state.
+            value = f"self._tty == 0"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -296,7 +301,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             return None
         elif comp.label == "MemorySystem":
             # Note: the source of address better not be a big computation. At the moment it's always
-            # register A (so, saved in self)
+            # register A (so, saved in self). But is that true for chips that add more ways to access
+            # the RAM?
             address = src_many(comp, 'address', 14)
             return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
         else:
@@ -437,6 +443,9 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             l(6,     f"self._ram[{address_expr}] = {in_name}")
             l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
             l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            l(5,   f"elif {address_expr} == 0x6000:")
+            l(6,     f"self._tty = {in_name}")
+            l(6,     f"self._tty_ready = {in_name} != 0")
             any_state = True
         elif isinstance(comp, (Const, ROM)):
             pass
@@ -498,13 +507,14 @@ class Chip:
 
 
 class SOC(Chip):
-    """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
+    """Super for chips that include a full computer with ROM, RAM, keyboard input, and "TTY" output."""
 
     def __init__(self):
         self._rom = []
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0
+        self._tty = 0
 
         self.__dirty = True
 
@@ -567,6 +577,12 @@ class SOC(Chip):
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard = keycode
+
+    def get_tty(self):
+        """Read one word of output which has been written to the tty port, and reset it to 0."""
+        val = self._tty
+        self._tty = 0
+        return val
 
     # Tricky: SP might get special treatment in some implementations, so provide a named property
     # That subclasses can override.

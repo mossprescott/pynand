@@ -14,7 +14,7 @@ so there's a lot of low-level bit slicing tricks being employed here. Compare wi
 faster, but more limited simulator in codegen.py.
 """
 
-from nand.component import Nand, Const, DFF, RAM, ROM, Input
+from nand.component import Nand, Const, DFF, RAM, ROM, Input, Output
 from nand.integration import Connection, root, clock
 from nand.optimize import simplify
 
@@ -37,7 +37,8 @@ def run(ic, optimize = True):
 def synthesize(ic):
     """Compile the chip down to traces and ops for evaluation.
 
-    Returns a NandVector and a list of stateful components (e.g. RAMs).
+    Returns a NandVector and a list of custom components (e.g. RAMs; anything other than
+    Nand, DFF, and Const.)
     """
     ic = ic.flatten()
             
@@ -92,10 +93,14 @@ def synthesize(ic):
         for name, bits in comp.outputs().items():
             traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
         ops = component_ops(comp)
-        initialize_ops += ops.initialize(**traces)
-        combine_ops += ops.combine(**traces)
-        sequence_ops += ops.sequence(**traces)
-        stateful.append(ops)
+        init_ops = ops.initialize(**traces)
+        comb_ops = ops.combine(**traces)
+        seq_ops = ops.sequence(**traces)
+        initialize_ops += init_ops
+        combine_ops += comb_ops
+        sequence_ops += seq_ops
+        if not isinstance(ops, (NandOps, ConstOps, DFFOps)):
+            stateful.append(ops)
 
     back_edge_from_components = set()
     for to_input, from_output in ic.wires.items():
@@ -110,7 +115,9 @@ def synthesize(ic):
         if conn.comp not in back_edge_from_components:
             non_back_edge_mask |= 1 << bit
 
-    return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask), stateful
+    return (NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask),
+            stateful)
+
 
     
 def component_ops(comp):
@@ -126,6 +133,8 @@ def component_ops(comp):
         return RAMOps(comp)
     elif isinstance(comp, Input):
         return InputOps(comp)
+    elif isinstance(comp, Output):
+        return OutputOps(comp)
     else:
         raise Exception(f"unrecognized component: {comp}")
 
@@ -252,6 +261,43 @@ class InputOps(VectorOps):
         def read(traces):
             return set_multiple_traces(out, self.value, traces)
         return [custom_op(read)]
+
+
+class OutputOps(VectorOps):
+    """Note: to the chip, an Output looks like a pure sink, but internally it holds onto the last
+    value it received until it has been consumed.
+
+    Not so fast. The way wiring works required the component to have _some_ output, so now
+    it produces "ready" which is true whenever the value has been reset (or indeed, if someone
+    tried to write the value 0.)
+    """
+    def __init__(self, comp):
+        self.comp = comp
+        self.value = 0
+
+    def read(self):
+        """Consume the last-written value, if any, and reset to 0."""
+        tmp = self.value
+        self.value = 0
+        return tmp
+
+    def combine(self, ready, **unused):
+        """Note: not using the inputs at all."""
+        assert len(ready) == 1
+        def read(traces):
+            return set_trace(ready[0], self.value == 0, traces)
+        return [custom_op(read)]
+
+    def sequence(self, in_, load, ready):
+        assert len(in_) == 16 and len(load) == 1 and len(ready) == 1
+        def write(traces):
+            load_val = tst_trace(load[0], traces)
+            if load_val:
+                in_val = extend_sign(get_multiple_traces(in_, traces))
+                self.value = in_val
+                set_trace(ready[0], in_val == 0, traces)
+            return traces
+        return [custom_op(write)]
 
 
 class NandVector:
@@ -535,6 +581,7 @@ class NandVectorComputerWrapper(NandVectorWrapper):
         self._mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
         self._screen, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 13]
         self._keyboard, = [c for c in self._stateful if isinstance(c, InputOps)]
+        self._tty, = [c for c in self._stateful if isinstance(c, OutputOps)]
 
     def run_program(self, instructions):
         """Install and run a sequence of instructions, stopping when pc runs off the end."""
@@ -590,10 +637,18 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
-        self._keyboard.value = keycode
+        self._keyboard.set(keycode)
+
+    def get_tty(self):
+        """Read one word of output which has been written to the tty port, and reset it to 0."""
+
+        # Tricky: clearing the value in the Output component flips its `ready` output, most of the time.
+        self._vector.dirty = True
+        return self._tty.read()
 
     # Tricky: SP might get special treatment in some implementations, so provide a named property
     # that subclasses can override.
     @property
     def sp(self):
+        """Read the current value of the stack pointer, which is normally stored at RAM[0]."""
         return self.peek(0)

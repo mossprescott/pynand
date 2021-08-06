@@ -58,11 +58,11 @@ def test_and3():
 
 def test_alu():
     alu = run(project_02.ALU.constr())
-    
+
     # HACK: copied verbatim from test_02
-    
+
     alu.x = 0
-    alu.y = -1 
+    alu.y = -1
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
@@ -120,7 +120,7 @@ def test_alu():
 
 
     alu.x = 17
-    alu.y = 3 
+    alu.y = 3
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
@@ -440,25 +440,25 @@ def test_cpu():
 
 def test_computer_add():
     computer = run(project_05.Computer.constr())
-    
+
     # First run (at the beginning PC=0)
     computer.run_program(test_05.ADD_PROGRAM)
-    
+
     assert computer.peek(1) == 5
-    
+
 
     # Reset the PC
     computer.reset = 1
     computer.ticktock()
     assert computer.pc == 0
-    
+
     # Second run, to check that the PC was reset correctly.
     computer.poke(0, 12345)
-    computer.reset = 0    
+    computer.reset = 0
     while computer.pc < len(test_05.ADD_PROGRAM):
         computer.ticktock()
 
-    assert computer.peek(1) == 5        
+    assert computer.peek(1) == 5
 
 
 def test_computer_max():
@@ -470,7 +470,7 @@ def test_computer_max():
     computer.poke(1, 3)
     computer.poke(2, 5)
     for _ in range(14):
-        computer.tick(); computer.tock()    
+        computer.tick(); computer.tock()
     assert computer.peek(3) == 5
 
     # second run: compute max(23456,12345)
@@ -479,17 +479,24 @@ def test_computer_max():
     computer.poke(2, 12345)
     # The run on these inputs needs less cycles (different branching)
     for _ in range(10):
-        computer.ticktock()    
+        computer.ticktock()
     assert computer.peek(3) == 23456
+
+
+def test_computer_keyboard():
+    test_05.test_computer_keyboard(simulator="codegen")
+
+def test_computer_tty():
+    test_05.test_computer_tty(simulator="codegen")
 
 
 def cycles_per_second():
     """Estimate the speed of CPU simulation by running Max repeatedly with random input.
     """
-    
+
     import random
     import timeit
-    
+
     computer = run(project_05.Computer.constr())
 
     computer.init_rom(test_05.MAX_PROGRAM)

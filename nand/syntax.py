@@ -338,3 +338,4 @@ def ROM(address_bits):
 def RAM(address_bits):
     return Chip(lambda: nand.component.RAM(address_bits))
 Input = Chip(nand.component.Input)
+Output = Chip(nand.component.Output)

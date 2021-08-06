@@ -12,6 +12,7 @@ def test_memory_system():
         'nands': 163,  # ?
         'rams': 2,
         'inputs': 1,
+        'outputs': 1,
     }
 
 def test_cpu():
@@ -27,4 +28,5 @@ def test_computer():
         'roms': 1,
         'rams': 2,
         'inputs': 1,
+        'outputs': 1,
     }
