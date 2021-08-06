@@ -24,7 +24,13 @@ def test_backward_compatible_computer_add():
     
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(ThreadedComputer)
-    
+
+def test_backward_compatible_keyboard():
+    test_05.test_computer_keyboard(ThreadedComputer)
+
+def test_backward_compatible_tty():
+    test_05.test_computer_tty(ThreadedComputer)
+
 def test_backward_compatible_speed():
     test_05.test_speed(ThreadedComputer)
 

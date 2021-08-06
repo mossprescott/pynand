@@ -687,7 +687,13 @@ def test_backward_compatible_computer_add():
     
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(EightComputer, cycles_per_instr=2)
-    
+
+def test_backward_compatible_keyboard():
+    test_05.test_computer_keyboard(EightComputer, cycles_per_instr=2)
+
+def test_backward_compatible_tty():
+    test_05.test_computer_tty(EightComputer, cycles_per_instr=2)
+
 def test_backward_compatible_speed():
     test_05.test_speed(EightComputer, cycles_per_instr=2)
 

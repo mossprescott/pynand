@@ -24,7 +24,13 @@ def test_backward_compatible_computer_add():
     
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(SPComputer)
-    
+
+def test_backward_compatible_keyboard():
+    test_05.test_computer_keyboard(SPComputer)
+
+def test_backward_compatible_tty():
+    test_05.test_computer_tty(SPComputer)
+
 def test_backward_compatible_speed():
     cps = test_05.cycles_per_second(SPComputer)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
