@@ -14,16 +14,18 @@ class SymbolTable:
         # SOLVERS: delete this line and add your implementation here
         self.solved = solved_11.SymbolTable(class_name)
 
-    def start_subroutine(self):
-        """Start a new subroutine scope (i.e. remove all "arg" and "var" definitions.)
+    def start_subroutine(self, name, kind):
+        """Start a new subroutine scope (i.e. remove all "argument" and "local" definitions.),
+        and track the name and the kind of subroutine being defined ("function", "method", or
+        "constructor"), for reporting the context when something goes wrong.
         """
 
         # SOLVERS: delete this line and add your implementation here
-        self.solved.start_subroutine()
+        self.solved.start_subroutine(name, kind)
 
     def define(self, name, type_, kind):
         """Record the definition of a new identifier, and assign it a running index.
-        If `kind` is "static" or "field", record it in class scope, if "arg" or "var",
+        If `kind` is "static" or "this", record it in class scope, if "argument" or "local",
         record it in subroutine scope."""
 
         # SOLVERS: delete this line and add your implementation here
@@ -38,7 +40,7 @@ class SymbolTable:
         return self.solved.count(kind)
 
     def kind_of(self, name):
-        """Look up the kind of an identifier. Return "static", "field", "arg", or "var"; if
+        """Look up the kind of an identifier. Return "static", "field", "argument", or "var"; if
         the identifier has not been defined in the current scope, return None."""
 
         # SOLVERS: delete this line and add your implementation here
@@ -60,6 +62,14 @@ class SymbolTable:
         # SOLVERS: delete this line and add your implementation here
         return self.solved.index_of(name)
 
+    def context(self):
+        """Brief description of the part of the program being analyzed, e.g. "Main.run".
+        Note: this is useful for debugging, but not actually required for the tests or for actually
+        using the compiler.
+        """
+
+        # SOLVERS: delete this line and add your implementation here
+        return self.solved.context()
 
     def __str__(self):
         """A human-readable summary of all definitions in scope.

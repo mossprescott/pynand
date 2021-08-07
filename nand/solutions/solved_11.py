@@ -5,6 +5,8 @@ from nand.translate import AssemblySource
 class SymbolTable:
     def __init__(self, class_name):
         self.class_name = class_name
+        self.subroutine_name = None
+        self.subroutine_kind = None
 
         self.statics = {}
         self.fields = {}
@@ -12,9 +14,14 @@ class SymbolTable:
         self.arguments = {}
         self.locals = {}
 
-    def start_subroutine(self):
-        """Start a new subroutine scope (i.e. remove all "argument" and "local" definitions.)
+    def start_subroutine(self, name, kind):
+        """Start a new subroutine scope (i.e. remove all "argument" and "local" definitions.),
+        and track the name and the kind of subroutine being defined ("function", "method", or
+        "constructor"), for reporting the context when something goes wrong.
         """
+
+        self.subroutine_name = name
+        self.subroutine_kind = kind
 
         self.arguments = {}
         self.locals = {}
@@ -22,7 +29,8 @@ class SymbolTable:
     def define(self, name, type_, kind):
         """Record the definition of a new identifier, and assign it a running index.
         If `kind` is "static" or "this", record it in class scope, if "argument" or "local",
-        record it in subroutine scope."""
+        record it in subroutine scope.
+        """
 
         defs = self._map_for(kind)
         defs[name] = (type_, len(defs))
@@ -35,8 +43,8 @@ class SymbolTable:
         return len(self._map_for(kind))
 
     def kind_of(self, name):
-        """Look up the kind of an identifier. Return "static", "field", "arg", or "local"; if
-        the identifier has not been defined in the current scope, throw."""
+        """Look up the kind of an identifier. Return "static", "this", "argument", or "var"; if
+        the identifier has not been defined in the current scope, return None."""
 
         _, kind = self._find_name(name)
         return kind
@@ -56,6 +64,14 @@ class SymbolTable:
 
         (_, index), _ = self._find_name(name)
         return index
+
+    def context(self):
+        """Brief description of the part of the program being analyzed, e.g. "function Main.main"."""
+
+        if self.subroutine_name is None:
+            return f"class {self.class_name}"
+        else:
+            return f"{self.subroutine_kind} {self.class_name}.{self.subroutine_name}"
 
     def _map_for(self, kind):
         if kind == "static":
@@ -112,10 +128,15 @@ def compile_class(ast: Class, asm: AssemblySource):
 
 
 def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: AssemblySource):
-    symbol_table.start_subroutine()
+    if not _is_terminal_function(ast, symbol_table) and not _has_final_return(ast.body.statements):
+        raise Exception(f'Missing "return" in {symbol_table.class_name}.{ast.name}')
+
+    symbol_table.start_subroutine(ast.name, ast.kind)
 
     if ast.kind == "method":
-        symbol_table.define("this", symbol_table.class_name, "argument")
+        # Note: reserve space on the stack, but this is never actually looked up by name.
+        symbol_table.define("<this>", symbol_table.class_name, "argument")
+
     for p in ast.params:
         symbol_table.define(p.name, p.type, "argument")
 
@@ -130,9 +151,11 @@ def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: As
         num_vars = symbol_table.count("local")
 
         if ast.name != "new":
-            raise Exception(f"Constructor is not named \"new\": {symbol_table.class_name}.{ast.name}")
+            raise Exception(f'Must be named "new": {symbol_table.context()}')
+        elif ast.result != symbol_table.class_name:
+            raise Exception(f'Result type does not match: {symbol_table.context()}')
         elif ast.body.statements[-1] != ReturnStatement(KeywordConstant("this")):
-            raise Exception(f"Missing expected \"return this;\" in constructor: {ast}")
+            raise Exception(f'Does not return "this": {symbol_table.context()}')
 
         asm.instr(f"function {symbol_table.class_name}.{ast.name} {num_vars}")
 
@@ -157,7 +180,7 @@ def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: As
 
         asm.instr(f"function {symbol_table.class_name}.{ast.name} {num_vars}")
 
-        # Stash the (implicit) this argument:
+        # Stash the (implicit) `this` argument:
         asm.instr(f"push argument 0")
         asm.instr(f"pop pointer 0")
 
@@ -168,6 +191,27 @@ def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: As
         raise Exception(f"Unexpected subroutine kind: {ast.kind}")
 
     print(f"  compiled subroutine: {symbol_table.class_name}.{ast.name}")
+
+
+def _is_terminal_function(ast: SubroutineDec, symbol_table: SymbolTable) -> bool:
+    return symbol_table.class_name == "Sys" and ast.name in ("error", "halt")
+
+def _has_final_return(stmts: Sequence[Statement]) -> bool:
+    if len(stmts) == 0:
+        return False
+
+    last = stmts[-1]
+    if isinstance(last, ReturnStatement):
+        return True
+    elif isinstance(last, DoStatement):
+        if last.expr.class_name == "Sys" and last.expr.sub_name in ("error", "halt"):
+            return True
+    elif isinstance(last, IfStatement):
+        if (_has_final_return(last.when_true) and
+                (last.when_false is not None and _has_final_return(last.when_false))):
+            return True
+
+    return False
 
 
 def compile_statement(ast: StatementRec, symbol_table: SymbolTable, asm: AssemblySource):
@@ -286,6 +330,8 @@ def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: Assem
         elif ast.value is None:
             asm.instr("push constant 0")
         elif ast.value == "this":
+            if symbol_table.subroutine_kind not in ("constructor", "method"):
+                raise Exception(f'Undefined "this" in static context: {symbol_table.context()}')
             asm.instr("push pointer 0")
         else:
             raise Exception(f"Unrecognized constant: {ast}")
@@ -302,11 +348,13 @@ def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: Assem
         asm.instr("push that 0")
 
     elif isinstance(ast, SubroutineCall):
+        # Static call (e.g. Sys.error):
         if ast.class_name is not None:
             for arg in ast.args:
                 compile_expression(arg, symbol_table, asm)
             asm.instr(f"call {ast.class_name}.{ast.sub_name} {len(ast.args)}")
 
+        # Method call, on a named object (e.g. str.charAt()):
         elif ast.var_name is not None:
             target_class = symbol_table.type_of(ast.var_name)
             compile_expression(VarRef(ast.var_name), symbol_table, asm)
@@ -314,7 +362,10 @@ def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: Assem
                 compile_expression(arg, symbol_table, asm)
             asm.instr(f"call {target_class}.{ast.sub_name} {len(ast.args)+1}")
 
+        # Method call on the implicit `this` (e.g. draw()):
         else:
+            if symbol_table.subroutine_kind not in ("constructor", "method"):
+                raise Exception(f'Tried to use implicit "this" in static (function) context: {symbol_table.class_name}.{symbol_table.subroutine_name}')
             target_class = symbol_table.class_name
             compile_expression(KeywordConstant("this"), symbol_table, asm)
             for arg in ast.args:

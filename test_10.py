@@ -452,7 +452,7 @@ def test_parse_classes():
 
 
 def test_parse_array_test():
-    ast = project_10.parse_class(project_10.lex(ARRAY_TEST))
+    ast = project_10.parse_class(ARRAY_TEST)
 
     print(ast)
 
