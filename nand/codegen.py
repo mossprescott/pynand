@@ -89,8 +89,8 @@ def run_compiled(ic):
     # Yikes:
     import pyximport
     pyximport.install()
-    exec(f"import pyxtest.{module_name}")
-    chip_class = eval(f"pyxtest.{module_name}.{class_name}")
+    exec(f"import generated.{module_name}")
+    chip_class = eval(f"generated.{module_name}.{class_name}")
 
     print(f"loaded {class_name}")
 
