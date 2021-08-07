@@ -17,15 +17,24 @@ from alt.eight import *
 #
 
 # TODO: put this somewhere common:
-def parametrize_simulators(f):
+def parameterize_simulators(f):
     def vector(chip, **args):
         return run(chip, simulator="vector", **args)
     def codegen(chip, **args):
         return run(chip, simulator="codegen", **args)
     return pytest.mark.parametrize("run", [vector, codegen])(f)
+    # TODO: cython is hanging at the moment
+    # def compiled(chip, **args):
+    #     return run(chip, simulator="compiled", **args)
+    # return pytest.mark.parametrize("run", [vector, codegen, compiled])(f)
+
+def parameterize_simulators_by_name(f):
+    return pytest.mark.parametrize("simulator", ["vector", "codegen"])(f)
+    # TODO: cython is hanging at the moment
+    # return pytest.mark.parametrize("simulator", ["vector", "codegen", "compiled"])(f)
 
 
-@parametrize_simulators
+@parameterize_simulators
 def test_not8(run):
     assert unsigned(run(Not8, in_=0b0000_0000).out) == 0b1111_1111
     assert unsigned(run(Not8, in_=0b1111_1111).out) == 0b0000_0000
@@ -33,7 +42,7 @@ def test_not8(run):
     assert unsigned(run(Not8, in_=0b1100_0011).out) == 0b0011_1100
     assert unsigned(run(Not8, in_=0b0011_0100).out) == 0b1100_1011
 
-@parametrize_simulators
+@parameterize_simulators
 def test_and8(run):
     assert unsigned(run(And8, a=0b0000_0000, b=0b0000_0000).out) == 0b0000_0000
     assert unsigned(run(And8, a=0b0000_0000, b=0b1111_1111).out) == 0b0000_0000
@@ -42,7 +51,7 @@ def test_and8(run):
     assert unsigned(run(And8, a=0b1100_0011, b=0b1111_0000).out) == 0b1100_0000
     assert unsigned(run(And8, a=0b0011_0100, b=0b0111_0110).out) == 0b0011_0100
 
-@parametrize_simulators
+@parameterize_simulators
 def test_mux8(run):
     assert unsigned(run(Mux8, a=0b0000_0000, b=0b0000_0000, sel=0).out) == 0b0000_0000
     assert unsigned(run(Mux8, a=0b0000_0000, b=0b0000_0000, sel=1).out) == 0b0000_0000
@@ -66,7 +75,7 @@ def test_gates_mux8():
 
 # Project 02:
 
-@parametrize_simulators
+@parameterize_simulators
 def test_inc8(run):
     assert run(Inc8, in_=  0, carry_in=0).out == 0
     assert run(Inc8, in_=  5, carry_in=0).out == 5
@@ -75,17 +84,17 @@ def test_inc8(run):
     assert run(Inc8, in_=  5, carry_in=1).out == 6
     assert run(Inc8, in_=255, carry_in=1).out == 0
 
-    # TODO: what to do with negatives? Probably need to treat these value as unsigned until they're 
+    # TODO: what to do with negatives? Probably need to treat these value as unsigned until they're
     # re-assembled into 16-bits.
     # assert run(Inc8, in_=-1).out ==  0
     # assert run(Inc8, in_=-5).out == -4
-    
+
     assert run(Inc8, in_=  0, carry_in=0).carry_out == 0
     assert run(Inc8, in_=255, carry_in=0).carry_out == 0
     assert run(Inc8, in_=  0, carry_in=1).carry_out == 0
     assert run(Inc8, in_=255, carry_in=1).carry_out == 1
-    
-@parametrize_simulators
+
+@parameterize_simulators
 def test_add8(run):
     assert run(Add8, a=  0, b=  0, carry_in=0).out ==   0
     assert run(Add8, a=255, b=255, carry_in=0).out == 254
@@ -97,23 +106,23 @@ def test_add8(run):
     assert run(Add8, a=  0, b=  0, carry_in=1).carry_out == False
     assert run(Add8, a=255, b=255, carry_in=1).carry_out == True
 
-@parametrize_simulators
+@parameterize_simulators
 def test_zero8(run):
     assert run(Zero8, in_=0).out == True
-    
+
     z = run(Zero8)
     for i in range(1, 256):
         z.in_ = i
         assert z.out == False
 
 
-@parametrize_simulators
+@parameterize_simulators
 def test_alu_nostat(run):
     alu = run(EightALU)
-    
+
     alu.x = 0
-    alu.y = -1 
-    
+    alu.y = -1
+
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 0   # 0
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1; assert alu.out == 1   # 1
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 255  # -1
@@ -136,7 +145,7 @@ def test_alu_nostat(run):
 
     alu.x = 23  # 0x17
     alu.y = 45  # 0x2D
-    
+
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 0      # 0
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1; assert alu.out == 1      # 1
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 255     # -1
@@ -157,7 +166,7 @@ def test_alu_nostat(run):
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1; assert alu.out == 0x3F # X | Y
 
 
-@parametrize_simulators
+@parameterize_simulators
 def test_alu(run):
     alu = run(EightALU)
 
@@ -220,7 +229,7 @@ def test_alu(run):
 
 
     alu.x = 17
-    alu.y = 3 
+    alu.y = 3
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
@@ -277,16 +286,16 @@ def test_alu(run):
     assert alu.out == 19 and alu.zr == 0 and alu.ng == 0
 
 def test_alu_chained():
-    """Test sequential application of the 8-bit ALU by connecting two separate ALUs, with the 
+    """Test sequential application of the 8-bit ALU by connecting two separate ALUs, with the
     carry bit wired between them.
     """
     def mkChainedALU(inputs, outputs):
         x_split = Split(in_=inputs.x)
         y_split = Split(in_=inputs.y)
-        alu_lo = EightALU(x=x_split.lo, y=y_split.lo, 
+        alu_lo = EightALU(x=x_split.lo, y=y_split.lo,
                     zx=inputs.zx, nx=inputs.nx, zy=inputs.zy, ny=inputs.ny, f=inputs.f, no=inputs.no,
                     carry_in=0)
-        alu_hi = EightALU(x=x_split.hi, y=y_split.hi, 
+        alu_hi = EightALU(x=x_split.hi, y=y_split.hi,
                     zx=inputs.zx, nx=inputs.nx, zy=inputs.zy, ny=inputs.ny, f=inputs.f, no=inputs.no,
                     carry_in=alu_lo.carry_out)
         outputs.out = Splice(lo=alu_lo.out, hi=alu_hi.out).out
@@ -308,11 +317,11 @@ def test_gates_zero8():
 
 def test_gates_alu():
     assert gate_count(EightALU)['nands'] == 284  # gate_count(ALU)/2 + 4
-    
+
 
 # Project 03:
 
-@parametrize_simulators
+@parameterize_simulators
 def test_register8(run):
     reg = run(Register8)
 
@@ -348,7 +357,7 @@ def test_register8(run):
     reg.tick(); reg.tock()
     assert reg.out == 123
 
-@parametrize_simulators
+@parameterize_simulators
 def test_pc8(run):
     pc = run(PC8)
 
@@ -438,11 +447,12 @@ def test_gates_pc8():
 # First test that the new CPU executes all Hack instructions as expected:
 #
 
-def test_backward_compatible_cpu():
-    """This is test_05.test_cpu, but accounting for signals showing up in the bottom half-cycle, 
+@parameterize_simulators
+def test_backward_compatible_cpu(run):
+    """This is test_05.test_cpu, but accounting for signals showing up in the bottom half-cycle,
     but the PC being updated after.
     """
-    
+
     cpu = run(EightCPU)
     cycles_per_instr = 2
 
@@ -682,19 +692,24 @@ def test_backward_compatible_cpu():
     assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
 
 
-def test_backward_compatible_computer_add():
-    test_05.test_computer_add(EightComputer)
-    
-def test_backward_compatible_computer_max():
-    test_05.test_computer_max(EightComputer, cycles_per_instr=2)
+@parameterize_simulators_by_name
+def test_backward_compatible_computer_add(simulator):
+    test_05.test_computer_add(EightComputer, simulator=simulator)
 
-def test_backward_compatible_keyboard():
-    test_05.test_computer_keyboard(EightComputer, cycles_per_instr=2)
+@parameterize_simulators_by_name
+def test_backward_compatible_computer_max(simulator):
+    test_05.test_computer_max(EightComputer, simulator=simulator, cycles_per_instr=2)
 
-def test_backward_compatible_tty():
-    test_05.test_computer_tty(EightComputer, cycles_per_instr=2)
+@parameterize_simulators_by_name
+def test_backward_compatible_keyboard(simulator):
+    test_05.test_computer_keyboard(EightComputer, simulator=simulator, cycles_per_instr=2)
+
+@parameterize_simulators_by_name
+def test_backward_compatible_tty(simulator):
+    test_05.test_computer_tty(EightComputer, simulator=simulator, cycles_per_instr=2)
 
 def test_backward_compatible_speed():
+    """Note: alyways compared using the (slower, fairer) "vector" simulator."""
     test_05.test_speed(EightComputer, cycles_per_instr=2)
 
 
@@ -735,10 +750,10 @@ def test_vm_basic_loop():
 
 def test_vm_fibonacci_series():
     test_08.test_fibonacci_series(chip=EightComputer, simulator='vector')
-    
+
 def test_vm_simple_function():
     test_08.test_simple_function(chip=EightComputer, simulator='vector')
-    
+
 def test_vm_nested_call():
     test_08.test_nested_call(chip=EightComputer, simulator='vector')
 

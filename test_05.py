@@ -324,8 +324,8 @@ ADD_PROGRAM = [
     0b1110001100001000,  # M=D
 ]
 
-def test_computer_add(chip=project_05.Computer):
-    computer = run(chip)
+def test_computer_add(chip=project_05.Computer, simulator="vector"):
+    computer = run(chip, simulator=simulator)
 
     # First run (at the beginning PC=0)
     computer.run_program(ADD_PROGRAM)
@@ -367,8 +367,8 @@ MAX_PROGRAM = [
     0b1110101010000111,  # 15: JMP    ; infinite loop
 ]
 
-def test_computer_max(chip=project_05.Computer, cycles_per_instr=1):
-    computer = run(chip)
+def test_computer_max(chip=project_05.Computer, simulator="vector", cycles_per_instr=1):
+    computer = run(chip, simulator=simulator)
 
     computer.init_rom(MAX_PROGRAM)
 
