@@ -40,10 +40,10 @@ def lex(string):
     return tokens
 
 
-def parse_class(tokens):
-    """Convenience function which just applies the ClassP parser implemented below.
+def parse_class(string):
+    """Convenience function which just applies the lexer and then the ClassP parser implemented below.
     """
-    return ClassP.parse(tokens)
+    return ClassP.parse(lex(string))
 
 
 
@@ -69,6 +69,12 @@ BinaryOpP = solved_10.BinaryOpP
 # SOLVERS: replace this with a parser built up from the combinators in nand.parsing
 # (or your own class that provides parse(tokens) -> jack_ast.IntegerConstant`).
 IntegerConstantP = solved_10.IntegerConstantP
+# def IntegerConstantP(loc):
+#     typ, str = loc.current_token()
+#     if typ == INT:
+#         return jack_ast.IntegerConstant(int(str)), loc.advance()
+#     else:
+#         raise ParseFailure("int", loc)
 
 # SOLVERS: replace this with a parser built up from the combinators in nand.parsing
 # (or your own class that provides parse(tokens) -> jack_ast.StringConstant`).
