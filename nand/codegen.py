@@ -132,14 +132,9 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         raise NotImplementedError("This simulator cannot handle chips that refer to 'clock' directly.")
 
     if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps):
-        unqualified_super = "SOC"
+        supr = "SOC"
     else:
-        unqualified_super = "Chip"
-
-    if prefix_super:
-        supr = f"nand.codegen.{unqualified_super}"
-    else:
-        supr = unqualified_super
+        supr = "Chip"
 
     lines = []
     def l(indent, str):
@@ -310,7 +305,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
 
     if cython:
         l(0, "import cython")
-        l(0, "import nand.codegen")
+        l(0, "from nand.codegen import *")
         l(0, "")
 
     l(0, f"class {class_name}({supr}):")
