@@ -312,11 +312,6 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         l(0, "import cython")
         l(0, "import nand.codegen")
         l(0, "")
-        # type_annotation_16 = ": cython.int"
-        # type_annotation_1 = ": cython.bool"
-    # else:
-        # type_annotation_16 = ""
-        # type_annotation_1 = ""
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
