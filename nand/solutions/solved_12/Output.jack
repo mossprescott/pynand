@@ -384,7 +384,7 @@ class Output {
         var Array pixelPair;
         var int maskPos, maskNeg;
 
-        var int tmpY;
+        var int tmpY, actualCursorX, tmpX;
 
         // Hand-unrolled multiplication by 352 (= 11*32 = (8 + 2 + 1) << 5)
         let tmpY = cursorY + cursorY;      // 2c
@@ -396,19 +396,25 @@ class Output {
         let tmpY = tmpY + tmpY;            // 176c
         let tmpY = tmpY + tmpY;            // 352c
 
-        // TODO: similarly unroll (cursorX-1)/2. It's between 0 and 63, so something small and clever
-        // should be doable.
+        // Hand-unrolled division: (cursorX-1)/2
+        let actualCursorX = cursorX - 1;
+        let tmpX = 0;
+        if (actualCursorX & 2)  { let tmpX = tmpX | 1; }
+        if (actualCursorX & 4)  { let tmpX = tmpX | 2; }
+        if (actualCursorX & 8)  { let tmpX = tmpX | 4; }
+        if (actualCursorX & 16) { let tmpX = tmpX | 8; }
+        if (actualCursorX & 32) { let tmpX = tmpX | 16; }
 
-        let pixelPair = 16384 + tmpY + ((cursorX-1)/2);
+        let pixelPair = 16384 + tmpY + tmpX;
 
-        if (cursorX & 1) {
-            // Even column: pixels in the low byte
-            let maskPos = 255;
-            let maskNeg = ~255;
-        }
-        else {
+        if (actualCursorX & 1) {
+            // Odd column: pixels in the high byte
             let maskPos = ~255;
             let maskNeg = 255;
+        }
+        else {
+            let maskPos = 255;
+            let maskNeg = ~255;
         }
 
         let pixelPair[0]   = (pixelPair[0]   & maskNeg) | (r1 & maskPos);
