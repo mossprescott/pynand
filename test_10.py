@@ -52,6 +52,12 @@ def test_stringConstant():
 
     assert tokens == [("stringConstant", "abc def")]
 
+def test_stringConstant_escaped():
+    """It's confusing, but this string has two escaped double quotes and an escaped backslash."""
+    tokens = project_10.lex(r'"/ \"Hello\" \\"')
+
+    assert tokens == [("stringConstant", '/ "Hello" \\')]
+
 def test_white_space():
     tokens = project_10.lex(" \n\t\n  ")
 

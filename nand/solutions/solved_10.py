@@ -34,10 +34,10 @@ def lex(string):
             string = string[len(token_str):]
             continue
 
-        m = re.match(r'^"([^"\n]*)"', string)
+        m = re.match(r'^"(((\\.)|[^"\n])*)"', string)
         if m is not None:
             token_str = m.group(1)
-            tokens.append(("stringConstant", token_str))
+            tokens.append(("stringConstant", token_str.replace('\\"', '"').replace('\\\\', '\\')))
             string = string[len(token_str)+2:]
             continue
 
@@ -74,7 +74,7 @@ def lex(string):
             string = string[1:]
             continue
 
-        raise Exception("Unexpected input: {string}")
+        raise Exception(f"Unexpected input: {repr(string)}")
 
     return tokens
 
