@@ -166,6 +166,17 @@ class Translator:
         return ops
 
 
+    def check_references(self):
+        """Check for obvious "linkage" errors: e.g. functions that are referenced but never defined.
+
+        Raises AssertionFailure if there are any obvious problems.
+        """
+
+        # SOLVERS: this is a big help for debugging programs later on, but you can just return None
+        # and nothing will break (except possibly your sanity.)
+        return self.solved.check_references()
+
+
 def parse_line(line):
     # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of
     # the method of Translator which handles the opcode, and a sequence with any arguments.
