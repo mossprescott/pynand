@@ -384,10 +384,25 @@ class Output {
         var Array pixelPair;
         var int maskPos, maskNeg;
 
-        let pixelPair = 16384 + (352 * cursorY) + ((cursorX-1)/2);
+        var int tmpY;
+
+        // Hand-unrolled multiplication by 352 (= 11*32 = (8 + 2 + 1) << 5)
+        let tmpY = cursorY + cursorY;      // 2c
+        let tmpY = tmpY + tmpY + cursorY;  // 2(2c) + c = 5c
+        let tmpY = tmpY + tmpY + cursorY;  // 2(5c) + c = 11c
+        let tmpY = tmpY + tmpY;            // 22c
+        let tmpY = tmpY + tmpY;            // 44c
+        let tmpY = tmpY + tmpY;            // 88c
+        let tmpY = tmpY + tmpY;            // 176c
+        let tmpY = tmpY + tmpY;            // 352c
+
+        // TODO: similarly unroll (cursorX-1)/2. It's between 0 and 63, so something small and clever
+        // should be doable.
+
+        let pixelPair = 16384 + tmpY + ((cursorX-1)/2);
 
         if (cursorX & 1) {
-            // Odd column: pixels in the low byte
+            // Even column: pixels in the low byte
             let maskPos = 255;
             let maskNeg = ~255;
         }
