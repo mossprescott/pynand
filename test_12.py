@@ -191,11 +191,18 @@ def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assembl
     computer = run(chip, simulator=simulator)
 
     # translator.asm.run(assembler, computer, stop_cycles=1_000_000, debug=True)
-    translator.asm.trace(assembler, computer, stop_cycles=10_000_000)
+    translator.asm.trace(assembler, computer, stop_cycles=1_000_000)
 
-    # TODO: spot check the screen RAM
-    assert computer.peek_screen(0*32 + 0) == 1
 
+    # Spot check the screen RAM:
+
+    # A few lines from the A in the upper left:
+    assert computer.peek_screen(0*32 + 0) == 30
+    assert computer.peek_screen(1*32 + 0) == 51
+    assert computer.peek_screen(4*32 + 0) == 63
+
+    # The top line of the adjacent characters "6" and "7":
+    assert computer.peek_screen((2*11)*32 + 3) == (63 << 8) | 28
 
 
 #

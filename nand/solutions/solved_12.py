@@ -221,7 +221,7 @@ def generate_switch(var, bits, content):
 
 def generate_print_char_switch(font=CHAR_MAPS):
     def body_lines(val, rows):
-        args = ", ".join(str(r) for r in rows)
+        args = ", ".join(str((r << 8) | r) for r in rows)
         return [f"do Output._drawChar({args}); return;  /* {hex(val)} = {val} */"]
 
     bodies = { k: body_lines(k, v) for k, v in font.items() if k != 0 }
