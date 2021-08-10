@@ -104,6 +104,34 @@ def test_trivial_expression():
 # Compile: program fragments
 #
 
+@pytest.mark.skip("This isn't part of the spec; might make a great addition.")
+def test_other_instance_field_access():
+    ast = project_10.parse_class("""
+        class BoxedInt {
+            field int value;
+
+            method boolean compare(BoxedInt other) {
+                return value < other.value;
+            }
+        }
+        """)
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    assert asm.lines == [
+        "  function BoxedInt.compare 1",
+        "  push argument 0",
+        "  pop pointer 0",
+        "  push this 0",
+        "  push argument 1",
+        "  pop pointer 1",
+        "  push that 0",
+        "  lt",
+        "  return",
+        "",
+    ]
+
 def test_call_function_from_function_context():
     ast = project_10.parse_class("""
         class Foo {
@@ -150,6 +178,24 @@ def test_call_method_from_method_context():
         "  return",
         "",
     ]
+
+def test_field_in_function_context():
+    """A common error case; referring to an instance member within a function."""
+
+    ast = project_10.parse_class("""
+        class Foo {
+            field int x;
+
+            function int run() {
+                return x;
+            }
+        }
+        """)
+
+    with pytest.raises(Exception) as exc_info:
+        asm = AssemblySource()
+        project_11.compile_class(ast, asm)
+    assert exc_info.value.args == ('Tried to use field "x" in static context: function Foo.run',)
 
 def test_call_method_from_function_context():
     """A common error case; referring to a function using the method-call syntax."""
@@ -276,7 +322,7 @@ def test_no_this():
 # Compile: full programs
 #
 def test_program_seven():
-    with open("project_11/Seven/Main.jack") as f:
+    with open("examples/project_11/Seven/Main.jack") as f:
         src = f.read()
 
     ast = project_10.parse_class(src)
@@ -302,7 +348,7 @@ def test_program_seven():
     assert list(asm.lines) == expected.split("\n")[1:-1]
 
 def test_program_average():
-    with open("project_11/Average/Main.jack") as f:
+    with open("examples/project_11/Average/Main.jack") as f:
         src = f.read()
 
     ast = project_10.parse_class(src)
