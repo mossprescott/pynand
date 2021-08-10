@@ -1,0 +1,140 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Memory.jack
+
+/**
+ * This library provides two services: direct access to the computer's main
+ * memory (RAM), and allocation and recycling of memory blocks. The Hack RAM
+ * consists of 32,768 words, each holding a 16-bit binary number.
+ */
+class Memory {
+    /*
+     Implementation notes:
+
+     This is not the same layout described in the course notes:
+     - The free list head is stored in a known location in memory (2048),
+       because that makes it easier to update the free list.
+     - Only one extra word is reserved for block headers (the block size).
+       The `next` pointer is stored in the first word of the block
+     - The minimum allocation size is 1 word for the block, plus one word
+       for the header, so there will be space to store the `next` pointer
+       when the block is freed.
+    */
+
+    /** Initializes the class. */
+    function void init() {
+        var Array freeHead;
+        var Array block;
+
+        // Store the head ptr at a known location so we can use a pointer to refer to it.
+        let freeHead = 2048;
+        let freeHead[0] = 2049;
+
+        // The free list starts as a single block with the rest of the memory in it.
+        let block = 2049;
+        let block[0] = 14334;  // Block size, not including the size word
+        let block[1] = null;  // Next free block
+
+        return;
+    }
+
+    /** Returns the RAM value at the given address. */
+    function int peek(int address) {
+        var Array ram;
+        let ram = 0;
+        return ram[address];
+    }
+
+    /** Sets the RAM value at the given address to the given value. */
+    function void poke(int address, int value) {
+        var Array ram;
+        let ram = 0;
+        let ram[address] = value;
+        return;
+    }
+
+    /** Finds an available RAM block of the given size and returns
+     *  a reference to its base address. */
+    function int alloc(int size) {
+        // The free list is a singly-linked list of blocks. The first word of each block
+        // is the number of available bytes, not including the "header" word, which is
+        // the block's size. The second word is a pointer to the next free block (or null.)
+
+        var Array blockPtr, block, temp;
+
+        // TODO: round up the allocation size to reduce fragmentation?
+
+        let blockPtr = 2048;      // Location where the pointer to the first block is stored.
+        let block = blockPtr[0];  // Pointer to the current block being inspected.
+
+        while (block > 0) {
+            if ((block[0] - (size + 1)) > 4) {
+                // Enough space to split the block and leave a smaller block on the free list.
+
+                // Replace the current node with a smaller one, skipping past the requested allocation:
+                let temp = block + 1 + size;
+                let temp[0] = block[0] - (1 + size);
+
+                // Update the previous node to point to the new free block:
+                let blockPtr[0] = temp;
+
+                // Update the header in the just-allocated block:
+                let block[0] = size;
+
+                // Return a pointer to the first data word:
+                return block + 1;
+            }
+            else {
+                if ((block[0] - size) > -1) {
+                    // Enough space for the requested size, plus the size word.
+
+                    // Remove the block from the free list (by updating the previous node
+                    // to point to the next block.)
+                    let blockPtr[0] = block[1];
+
+                    // Note: the block size is *not* updated. If there are a few extra words,
+                    // they stay with the block so they can potentially be included in a future
+                    // allocation.
+
+                    // Return a pointer to the first data word:
+                    return block + 1;
+                }
+                else {
+                    // otherwise follow the pointer to the next free block
+                    let blockPtr = block + 1;  // i.e. the address of block[1]
+                    let block = blockPtr[0];
+                }
+            }
+        }
+
+        // TODO: de-frag the heap?
+
+        do Sys.error(1337);  // No suitable block found
+    }
+
+    /** De-allocates the given object (cast as an array) by making
+     *  it available for future allocations. */
+    function void deAlloc(Array arr) {
+        var Array freeHead, block;
+
+        let block = arr - 1;  // The block header precedes the address.
+        if (block[0] < 1) {
+            // Not enough space to even add it to the free list, so just ignore it
+            // (and leak the space.) Note: this doesn't actually happen, since alloc
+            // always allocates enough space, but
+            return;
+        }
+        else {
+            // TODO: insert into the list, sorting by size, so that the next allocation
+            // will take the shortest suitable block (reducing fragmentation).
+
+            // TODO: first search the list for an adjacent block(s) and merge them if found.
+
+            let freeHead = 2048;
+            let block[1] = freeHead[0];
+            let freeHead[0] = block;
+            return;
+        }
+    }
+}
