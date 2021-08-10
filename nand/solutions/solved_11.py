@@ -324,7 +324,10 @@ def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: Assem
 
     elif isinstance(ast, KeywordConstant):
         if ast.value == True:
+            # All bits set: ~0 == -1. The ALU can do M=-1 in one instruction, but the
+            # VM doesn't let you say that.
             asm.instr("push constant 1")
+            asm.instr("neg")
         elif ast.value == False:
             asm.instr("push constant 0")
         elif ast.value is None:
