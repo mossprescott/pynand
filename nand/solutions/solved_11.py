@@ -1,9 +1,13 @@
+from typing import Literal, Tuple
+
 from nand.jack_ast import *
 from nand.translate import AssemblySource
 
+SubKind = Literal["function", "method", "constructor"]
+VarKind = Literal["static", "field", "argument", "local"]
 
 class SymbolTable:
-    def __init__(self, class_name):
+    def __init__(self, class_name: str):
         self.class_name = class_name
         self.subroutine_name = None
         self.subroutine_kind = None
@@ -14,7 +18,7 @@ class SymbolTable:
         self.arguments = {}
         self.locals = {}
 
-    def start_subroutine(self, name, kind):
+    def start_subroutine(self, name: str, kind: SubKind):
         """Start a new subroutine scope (i.e. remove all "argument" and "local" definitions.),
         and track the name and the kind of subroutine being defined ("function", "method", or
         "constructor"), for reporting the context when something goes wrong.
@@ -26,7 +30,7 @@ class SymbolTable:
         self.arguments = {}
         self.locals = {}
 
-    def define(self, name, type_, kind):
+    def define(self, name: str, type_: str, kind: VarKind):
         """Record the definition of a new identifier, and assign it a running index.
         If `kind` is "static" or "this", record it in class scope, if "argument" or "local",
         record it in subroutine scope.
@@ -35,21 +39,21 @@ class SymbolTable:
         defs = self._map_for(kind)
         defs[name] = (type_, len(defs))
 
-    def count(self, kind):
+    def count(self, kind: VarKind) -> int:
         """Number of identifiers of the given kind already defined in the current scope
         (class or subroutine, depending on the kind.)
         """
 
         return len(self._map_for(kind))
 
-    def kind_of(self, name):
-        """Look up the kind of an identifier. Return "static", "this", "argument", or "var"; if
+    def kind_of(self, name: str) -> VarKind:
+        """Look up the kind of an identifier. Return "static", "this", "argument", or "local"; if
         the identifier has not been defined in the current scope, return None."""
 
         _, kind = self._find_name(name)
         return kind
 
-    def type_of(self, name):
+    def type_of(self, name: str) -> str:
         """Look up the type of an identifier. If the identifier has not been defined in the
         current scope, throw.
         """
@@ -57,7 +61,7 @@ class SymbolTable:
         (type_, _), _ = self._find_name(name)
         return type_
 
-    def index_of(self, name):
+    def index_of(self, name) -> int:
         """Look up the index of an identifier. Return an integer which is unique to the given
         identifier in the current scope, counting from 0; if the identifier has not been defined
         in the current scope, throw."""
@@ -65,7 +69,7 @@ class SymbolTable:
         (_, index), _ = self._find_name(name)
         return index
 
-    def context(self):
+    def context(self) -> str:
         """Brief description of the part of the program being analyzed, e.g. "function Main.main"."""
 
         if self.subroutine_name is None:
@@ -85,12 +89,14 @@ class SymbolTable:
         else:
             raise Exception(f"Unrecognized kind: {kind}")
 
-    def _find_name(self, name):
+    def _find_name(self, name) -> Optional[Tuple[Tuple[str, int], VarKind]]:
         if name in self.locals:
             return self.locals[name], "local"
         elif name in self.arguments:
             return self.arguments[name], "argument"
         elif name in self.fields:
+            if self.subroutine_kind == "function":
+                raise Exception(f'Tried to use field "{name}" in static context: {self.context()}')
             return self.fields[name], "this"
         elif name in self.statics:
             return self.statics[name], "static"
@@ -117,32 +123,25 @@ class SymbolTable:
 def compile_class(ast: Class, asm: AssemblySource):
     symbol_table = SymbolTable(ast.name)
 
-    for vd in ast.varDecs:
-        for n in vd.names:
-            kind = "static" if vd.static else "this"
-            symbol_table.define(n, vd.type, kind)
+    handle_class_var_declarations(ast, symbol_table)
 
     for decl in ast.subroutineDecs:
         compile_subroutineDec(decl, symbol_table, asm)
         asm.blank()
 
 
+def handle_class_var_declarations(ast: Class, symbol_table: SymbolTable):
+    for vd in ast.varDecs:
+        for n in vd.names:
+            kind = "static" if vd.static else "this"
+            symbol_table.define(n, vd.type, kind)
+
+
 def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: AssemblySource):
     if not _is_terminal_function(ast, symbol_table) and not _has_final_return(ast.body.statements):
         raise Exception(f'Missing "return" in {symbol_table.class_name}.{ast.name}')
 
-    symbol_table.start_subroutine(ast.name, ast.kind)
-
-    if ast.kind == "method":
-        # Note: reserve space on the stack, but this is never actually looked up by name.
-        symbol_table.define("<this>", symbol_table.class_name, "argument")
-
-    for p in ast.params:
-        symbol_table.define(p.name, p.type, "argument")
-
-    for vd in ast.body.varDecs:
-        for n in vd.names:
-            symbol_table.define(n, vd.type, "local")
+    handle_subroutine_var_declarations(ast, symbol_table)
 
     # print(symbol_table)
 
@@ -212,6 +211,21 @@ def _has_final_return(stmts: Sequence[Statement]) -> bool:
             return True
 
     return False
+
+
+def handle_subroutine_var_declarations(ast: SubroutineDec, symbol_table: SymbolTable):
+    symbol_table.start_subroutine(ast.name, ast.kind)
+
+    if ast.kind == "method":
+        # Note: reserve space on the stack, but this is never actually looked up by name.
+        symbol_table.define("<this>", symbol_table.class_name, "argument")
+
+    for p in ast.params:
+        symbol_table.define(p.name, p.type, "argument")
+
+    for vd in ast.body.varDecs:
+        for n in vd.names:
+            symbol_table.define(n, vd.type, "local")
 
 
 def compile_statement(ast: StatementRec, symbol_table: SymbolTable, asm: AssemblySource):
@@ -343,7 +357,6 @@ def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: Assem
         asm.instr(f"push {symbol_table.kind_of(ast.name)} {symbol_table.index_of(ast.name)}")
 
     elif isinstance(ast, ArrayRef):
-        # TODO: validate this makes any sense at all
         compile_expression(ast.array_index, symbol_table, asm)
         asm.instr(f"push {symbol_table.kind_of(ast.name)} {symbol_table.index_of(ast.name)}")
         asm.instr("add")

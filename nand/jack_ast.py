@@ -40,24 +40,24 @@ class SubroutineCall(NamedTuple):
     sub_name: str
     args: Sequence["ExpressionRec"]
 
-class Op(NamedTuple):
-    symbol: str
-
 class BinaryExpression(NamedTuple):
     left: "ExpressionRec"
-    op: Op
+    op: "Op"
     right: "ExpressionRec"
 
 class UnaryExpression(NamedTuple):
-    op: Op
+    op: "Op"
     expr: "ExpressionRec"
+
+class Op(NamedTuple):
+    symbol: str
 
 # Note: no AST node for sub-expressions wrapped in parens... Just use the expression node.
 
 Expression = Union[
     IntegerConstant, StringConstant, KeywordConstant,
     VarRef, ArrayRef, SubroutineCall,
-    BinaryExpression, UnaryExpression, Op
+    BinaryExpression, UnaryExpression
 ]
 
 ExpressionRec = object
