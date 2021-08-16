@@ -8,6 +8,47 @@ from alt.reg import *
 from alt.reg import _Stmt_str
 
 
+def test_if_liveness():
+    src = """
+class Main {
+    function void main() {
+        var int x, y;
+
+        do Output.println();
+
+        let x = 0;
+        let y = 1;
+
+        // One branch reads x, the other writes it.
+        if (true) {
+            let y = x;
+        }
+        else {
+            let x = 2;
+        }
+
+        do Output.printInt(x);
+        do Output.printInt(y);
+
+        return;
+    }
+}"""
+
+    ast = solved_10.parse_class(src)
+
+    ir = flatten_class(ast)
+
+    liveness = analyze_liveness(ir.subroutines[0].body)
+    for s in liveness:
+        print(_Stmt_str(s))
+
+    if_stmt, = [s for s in liveness if isinstance(s.statement, If)]
+
+    assert if_stmt.before == {"x", "y"}
+    assert all([s.before == {"x"} for s in if_stmt.statement.when_true])
+    assert all([s.before == {"y"} for s in if_stmt.statement.when_false])
+
+
 def test_loop_liveness():
     src = """
 class Main {

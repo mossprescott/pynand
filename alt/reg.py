@@ -404,7 +404,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
             when_false_liveness = None
             live_at_when_false_start = live_at_end
 
-        live_at_body_start = live_at_when_false_start.union(live_at_when_false_start)
+        live_at_body_start = live_at_when_true_start.union(live_at_when_false_start)
 
         live_at_test_end = live_at_body_start.union(refs(stmt.value))
 
