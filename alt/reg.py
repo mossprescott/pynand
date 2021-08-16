@@ -560,6 +560,56 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
 #
 #
 
+V = TypeVar("V")
+
+def color_graph(vertices: Sequence[V], edges: Sequence[Tuple[V, V]]) -> List[Set[V]]:
+    """Given a collection of vertices, and a collection of edges, each connecting
+    two vertices of a graph, assign each vertex a color such that no vertex has the
+    same color as any other vertex with which it shares an edge.
+
+    There may be unconnected vertices, but there must be no edges that refer to
+    vertices that aren't present.
+
+    Return a set of sets, each containing vertices of a particular color. Note:
+    the colors are purely conceptual; there's no actual color value associated with
+    each set.
+
+    In theory, you would want this to return the optimal result: the smallest possible
+    number of colors. At the moment, it doesn't try very hard, but it shouldn't produce
+    a trivially bad result; there won't be any two colors that could be merged together.
+    Beyond that, it tends to put vertices in the first possible set, so the color groups
+    should get smaller as you get further into the result.
+
+    It's also probably not fast. At worst O(v*c + e), v = # of vertices, e = # of edges,
+    c = # of colors.
+
+    >>> color_graph([1,2,3,4], [(1,2), (2,3)])
+    [{1, 3, 4}, {2}]
+    """
+
+    # Set of connected vertices for each vertex (bidirectionally):
+    adjacency: Dict[V, Set[V]] = { v: set() for v in vertices }
+    for x, y in edges:
+        adjacency[x].add(y)
+        adjacency[y].add(x)
+
+    # Visit each vertex in order. Assign each vertex to the lowest-numbered color
+    # which it is still possible for it have, based on the color assignments that have
+    # been made so far. Note: this should always give the same result, when the vertices
+    # are supplied in the same order. The order of edges is irrelevant.
+    prohibited_colors: Dict[V, Set[int]] = { v: set() for v in vertices }
+    color_sets: List[Set[V]] = []
+    for v in vertices:
+        color = [c for c in range(len(color_sets)+1) if (c not in prohibited_colors[v])][0]
+        if color == len(color_sets):
+            color_sets.append(set())
+        color_sets[color].add(v)
+        for a in adjacency[v]:
+            prohibited_colors[a].add(color)
+
+    return color_sets
+
+
 
 """
 Do I want to be able to refer to static/argument/local in arbitrary VM opcodes?
