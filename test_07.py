@@ -103,6 +103,34 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
     assert computer.peek(265) == -91
 
 
+def test_compare_edge_cases(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
+    translate = translator()
+
+    # -1,000 < 2,000: the difference fits in a word
+    translate.push_constant(1000)
+    translate.neg()
+    translate.push_constant(2000)
+    translate.lt()
+
+    # -20,000 < 30,000: the difference overflows
+    translate.push_constant(20000)
+    translate.neg()
+    translate.push_constant(30000)
+    translate.lt()
+
+    translate.finish()
+
+    computer = run(chip, simulator=simulator)
+
+    init_sp(computer)
+
+    translate.asm.run(assemble, computer, stop_cycles=1000, debug=True)
+
+    assert computer.sp == 258
+    assert computer.peek(256) == -1
+    assert computer.peek(257) == -1
+
+
 def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
     
