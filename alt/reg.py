@@ -383,10 +383,89 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
     and during are the same.
     """
 
+    def analyze_if(stmt: If, live_at_end: Set[str]) -> Tuple[Stmt, Set[str]]:
+        """Nothing especially tricky here; it's just a pain that there may or may not
+        be an "else" block to thread the information through.
+        """
+
+        when_true_liveness = analyze_liveness(stmt.when_true, live_at_end=live_at_end)
+        if len(when_true_liveness) > 0:
+            live_at_when_true_start = when_true_liveness[0].before
+        else:
+            live_at_when_true_start = live_at_end
+
+        if stmt.when_false is not None:
+            when_false_liveness = analyze_liveness(stmt.when_false, live_at_end=live_at_end)
+            if len(when_false_liveness) > 0:
+                live_at_when_false_start = when_false_liveness[0].before
+            else:
+                live_at_when_false_start = live_at_end
+        else:
+            when_false_liveness = None
+            live_at_when_false_start = live_at_end
+
+        live_at_body_start = live_at_when_false_start.union(live_at_when_false_start)
+
+        live_at_test_end = live_at_body_start.union(refs(stmt.value))
+
+        test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
+        if len(test_liveness) > 0:
+            live_at_test_start = test_liveness[0].before
+        else:
+            live_at_test_start = live_at_test_end
+
+        stmt = If(test_liveness, stmt.value, stmt.cmp, when_true_liveness, when_false_liveness)
+
+        # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
+        # THis gets fixed when .test goes away.
+        # live_set = live_at_test_start
+        live = live_at_test_start.union(refs(stmt.value))
+
+        return stmt, live
+
+
+    def analyze_while(stmt: While, live_at_end) -> Tuple[Stmt, Set[str]]:
+        """While is tricky because variables that are live at the beginning of the loop
+        therefore are also live at the end, which creates a circularity in the analysis.
+        Fortunately there's not much going on and simply repeating the same analysis should
+        arrive at a fixed point after one more pass.
+
+        Returns the statement with annotated children, and the set of live variables for
+        "before" (which includes the "test" variable, which is a hack)."""
+
+        body_liveness = analyze_liveness(stmt.body, live_at_end=live_at_end)
+        if len(body_liveness) > 0:
+            live_at_body_start = body_liveness[0].before
+        else:
+            live_at_body_start = live_at_end
+
+        live_at_test_end = live_at_body_start.union(refs(stmt.value))
+
+        test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
+        if len(test_liveness) > 0:
+            live_at_test_start = test_liveness[0].before
+        else:
+            live_at_test_start = live_at_body_start
+
+        stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
+
+        # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
+        # It's not clear how to fix this; the workaround means possibly holding onto an
+        # unecessary register during the test.
+        # live = live_at_test_start
+        live = live_at_test_start.union(refs(stmt.value))
+
+        return stmt, live
+
+
     result = []
     live_set = set(live_at_end)
 
     for stmt in reversed(stmts):
+        # Tricky: when analysis is repeated, strip out previous annotations
+        if isinstance(stmt, LiveStmt):
+            stmt = stmt.statement
+
         written = set()
         read = set()
         if isinstance(stmt, Eval):
@@ -398,66 +477,17 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         elif isinstance(stmt, Store):
             read.update(refs(stmt.value))
         elif isinstance(stmt, If):
-            live_at_body_end = live_set
-
-            when_true_liveness = analyze_liveness(stmt.when_true, live_at_end=live_at_body_end)
-            if len(when_true_liveness) > 0:
-                live_at_when_true_start = when_true_liveness[0].before
-            else:
-                live_at_when_true_start = live_at_body_end
-
-            if stmt.when_false is not None:
-                when_false_liveness = analyze_liveness(stmt.when_false, live_at_end=live_at_body_end)
-                if len(when_false_liveness) > 0:
-                    live_at_when_false_start = when_false_liveness[0].before
-                else:
-                    live_at_when_false_start = live_at_body_end
-            else:
-                when_false_liveness = None
-                live_at_when_false_start = live_at_body_end
-
-            live_at_body_start = live_at_when_false_start.union(live_at_when_false_start)
-
-            live_at_test_end = live_at_body_start.union(refs(stmt.value))
-
-            test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
-            if len(test_liveness) > 0:
-                live_at_test_start = test_liveness[0].before
-            else:
-                live_at_test_start = live_at_test_end
-
-            stmt = If(test_liveness, stmt.value, stmt.cmp, when_true_liveness, when_false_liveness)
-
-            # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
-            # THis gets fixed when .test goes away.
-            # live_set = live_at_test_start
-            live_set = live_at_test_start.union(refs(stmt.value))
+            # Note: overwriting stmt (and live_set) here:
+            stmt, live_set = analyze_if(stmt, live_set)
 
         elif isinstance(stmt, While):
-            # TODO: need to do some kind of fixed-point thing in case a
-            # var's lifetime wraps around? What would that look like?
-            # Wouldn't that only matter if it wasn't properly initialized?
-            body_liveness = analyze_liveness(stmt.body, live_at_end=live_set)
-            if len(body_liveness) > 0:
-                live_at_body_start = body_liveness[0].before
-            else:
-                live_at_body_start = live_set
+            stmt1, live_set_at_top1 = analyze_while(stmt, live_set)
+            stmt2, live_set_at_top2 = analyze_while(stmt1, live_set_at_top1)
 
-            live_at_test_end = live_at_body_start.union(refs(stmt.value))
+            assert live_set_at_top2 == live_set_at_top1, "Liveness fixed point not reached"
 
-            test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
-            if len(test_liveness) > 0:
-                live_at_test_start = test_liveness[0].before
-            else:
-                live_at_test_start = live_at_body_start
-
-            stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
-
-            # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
-            # It's not clear how to fix this; the workaround means possibly holding onto an
-            # unecessary register during the test.
-            # live_set = live_at_test_start
-            live_set = live_at_test_start.union(refs(stmt.value))
+            # Note: overwriting stmt (and live_set) here:
+            stmt, live_set = stmt2, live_set_at_top2
 
         elif isinstance(stmt, Return):
             read.update(refs(stmt.value))
