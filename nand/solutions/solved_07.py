@@ -335,6 +335,10 @@ class Translator:
 
 
     def _compare(self, op):
+        # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
+        #    -30,000 > 30,000
+        #    30,000 - (-30,000) = 60,000 = -whatever, which is less than 0
+
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
         end_label = self.asm.next_label(f"{op.lower()}_common$end")
