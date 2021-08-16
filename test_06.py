@@ -43,9 +43,9 @@ def test_asm_ops_max(parse_op=project_06.parse_op):
 
 def test_ops(parse_op=project_06.parse_op):
     """Test generated opcodes against the actual simulated CPU."""
-    
+
     cpu = run(CPU)
-    
+
     cpu.instruction = parse_op("@100")
     cpu.tick(); cpu.tock()
     assert cpu.addressM == 100
@@ -63,7 +63,7 @@ def test_ops(parse_op=project_06.parse_op):
         cpu.tick(); cpu.tock()
         cpu.instruction = parse_op(f"M={expr}")
         return cpu.outM
-    
+
     assert compute("0",   12345, 23456) ==      0
     assert compute("1",   12345, 23456) ==      1
     assert compute("-1",  12345, 23456) ==     -1
