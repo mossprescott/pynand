@@ -80,6 +80,7 @@ class Store(NamedTuple):
 Cmp = Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
 
 class If(NamedTuple):
+    # TODO: no need for test statements to be part of the If node; drop it
     test: Sequence["Stmt"]
     value: "Value"
     cmp: Cmp
@@ -397,8 +398,41 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         elif isinstance(stmt, Store):
             read.update(refs(stmt.value))
         elif isinstance(stmt, If):
-            # TODO: apply to the child blocks and thread properly
-            raise Exception("TODO")
+            live_at_body_end = live_set
+
+            when_true_liveness = analyze_liveness(stmt.when_true, live_at_end=live_at_body_end)
+            if len(when_true_liveness) > 0:
+                live_at_when_true_start = when_true_liveness[0].before
+            else:
+                live_at_when_true_start = live_at_body_end
+
+            if stmt.when_false is not None:
+                when_false_liveness = analyze_liveness(stmt.when_false, live_at_end=live_at_body_end)
+                if len(when_false_liveness) > 0:
+                    live_at_when_false_start = when_false_liveness[0].before
+                else:
+                    live_at_when_false_start = live_at_body_end
+            else:
+                when_false_liveness = None
+                live_at_when_false_start = live_at_body_end
+
+            live_at_body_start = live_at_when_false_start.union(live_at_when_false_start)
+
+            live_at_test_end = live_at_body_start.union(refs(stmt.value))
+
+            test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
+            if len(test_liveness) > 0:
+                live_at_test_start = test_liveness[0].before
+            else:
+                live_at_test_start = live_at_test_end
+
+            stmt = If(test_liveness, stmt.value, stmt.cmp, when_true_liveness, when_false_liveness)
+
+            # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
+            # THis gets fixed when .test goes away.
+            # live_set = live_at_test_start
+            live_set = live_at_test_start.union(refs(stmt.value))
+
         elif isinstance(stmt, While):
             # TODO: need to do some kind of fixed-point thing in case a
             # var's lifetime wraps around? What would that look like?
@@ -408,13 +442,23 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
                 live_at_body_start = body_liveness[0].before
             else:
                 live_at_body_start = live_set
-            test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_body_start)
+
+            live_at_test_end = live_at_body_start.union(refs(stmt.value))
+
+            test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
             if len(test_liveness) > 0:
                 live_at_test_start = test_liveness[0].before
             else:
                 live_at_test_start = live_at_body_start
+
             stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
-            live_set = live_at_test_start
+
+            # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
+            # It's not clear how to fix this; the workaround means possibly holding onto an
+            # unecessary register during the test.
+            # live_set = live_at_test_start
+            live_set = live_at_test_start.union(refs(stmt.value))
+
         elif isinstance(stmt, Return):
             read.update(refs(stmt.value))
         elif isinstance(stmt, Push):
@@ -461,7 +505,7 @@ def need_saving(liveness: Sequence[LiveStmt]) -> Set[str]:
         elif isinstance(l.statement, If):
             result.update(need_saving(l.statement.test))
             result.update(need_saving(l.statement.when_true))
-            if result.when_false is not None:
+            if l.statement.when_false is not None:
                 result.update(need_saving(l.statement.when_false))
         elif isinstance(l.statement, While):
             result.update(need_saving(l.statement.test))
@@ -494,12 +538,14 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         else:
             return [], value
 
-    def rewrite_expr(expr: Expr) -> Tuple[Sequence[Stmt], Expr]:
+    def rewrite_expr(expr: Expr) -> Tuple[List[Stmt], Expr]:
         if isinstance(expr, (CallSub, Const, Location)):
             return [], expr
         elif isinstance(expr, Local):
             if expr in map:
                 return [], map[expr]
+            else:
+                return [], expr
         elif isinstance(expr, Binary):
             left_stmts, left_value = rewrite_value(expr.left)
             right_stmts, right_value = rewrite_value(expr.right)
@@ -513,7 +559,7 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         else:
             raise Exception(f"Unknown Expr: {expr}")
 
-    def rewrite_statement(stmt: Stmt) -> Sequence[Stmt]:
+    def rewrite_statement(stmt: Stmt) -> List[Stmt]:
         if isinstance(stmt, Eval):
             expr_stmts, expr = rewrite_expr(stmt.expr)
             if stmt.dest in map:
@@ -527,16 +573,29 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         elif isinstance(stmt, (IndirectWrite, Store, Return, Discard)):
             return [stmt]
         elif isinstance(stmt, If):
-            raise Exception("TODO")
+            test = rewrite_statements(stmt.test)
+            value_stmts, value = rewrite_expr(stmt.value)
+            when_true = rewrite_statements(stmt.when_true)
+            when_false = rewrite_statements(stmt.when_false)
+            return [If(test + value_stmts, value, stmt.cmp, when_true, when_false)]
         elif isinstance(stmt, While):
-            raise Exception("TODO")
+            test = rewrite_statements(stmt.test)
+            value_stmts, value = rewrite_expr(stmt.value)
+            body = rewrite_statements(stmt.body)
+            return [While(test + value_stmts, value, stmt.cmp, body)]
         elif isinstance(stmt, Push):
             expr_stmts, expr = rewrite_expr(stmt.expr)
             return expr_stmts + [Push(expr)]
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
-    return [rs for s in stmts for rs in rewrite_statement(s)]
+    def rewrite_statements(stmts: Optional[Sequence[Stmt]]) -> Optional[List[Stmt]]:
+        if stmts is not None:
+            return [rs for s in stmts for rs in rewrite_statement(s)]
+        else:
+            return None
+
+    return rewrite_statements(stmts)
 
 
 # Next step: assign variables to locations (aka register allocation)
@@ -646,6 +705,7 @@ def allocate_registers(liveness: Sequence[LiveStmt], reg_count: int = 8) -> Dict
 
     if len(color_sets) > reg_count:
         raise Exception("Unable to fit local variables in {reg_count} registers. Please contact your chip vendor.")
+        # Someday, choose a small color_set and promote its variables (that is, spill them). Repeat as necessary.
 
     return {
         l: Reg(index=c, name=l.name)
@@ -699,13 +759,15 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             return Store(stmt.location, value)
         elif isinstance(stmt, If):
             test = rewrite_statements(stmt.test)
+            value = rewrite_value(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
             when_false = rewrite_statements(stmt.when_false)
-            return If(test, stmt.value, stmt.cmp, when_true, when_false)
+            return If(test, value, stmt.cmp, when_true, when_false)
         elif isinstance(stmt, While):
             test = rewrite_statements(stmt.test)
+            value = rewrite_value(stmt.value)
             body = rewrite_statements(stmt.body)
-            return While(test, stmt.value, stmt.cmp, body)
+            return While(test, value, stmt.cmp, body)
         elif isinstance(stmt, Return):
             value = rewrite_value(stmt.value)
             return Return(value)
@@ -724,7 +786,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
     return rewrite_statements(stmts)
 
 
-def phase_two(ast: Subroutine) -> Subroutine:
+def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
     """The input is IR with all locals represented by Local.
 
     Output has Local eliminated, replaced by Reg where possible, or by Load/Store
@@ -734,20 +796,25 @@ def phase_two(ast: Subroutine) -> Subroutine:
     liveness = analyze_liveness(ast.body)
 
     need_promotion = need_saving(liveness)
-    print(f"need saving: {need_promotion}")
+    # print(f"need saving: {need_promotion}")
 
     promoted = promote_locals(ast.body, { Local(l): Location("local", i, l) for i, l in enumerate(need_promotion) }, "p_")
 
     liveness2 = analyze_liveness(promoted)
     need_promotion2 = need_saving(liveness2)
 
-    for s in liveness2:
-        print(_Stmt_str(s))
-    print(f"need saving after one round: {need_promotion2}")
+    if len(need_promotion2) > 0:
+        for s in liveness2:
+            print(_Stmt_str(s))
+        print(f"need saving after one round: {need_promotion2}")
+        assert False, "More than one round of promotion needed? Hope not."
 
-    assert need_promotion2 == set()
+    reg_map = allocate_registers(liveness2, reg_count)
 
-    reg_map = allocate_registers(liveness2, reg_count = 8)
+    # print(f"reg_map: {reg_map}")
+
+    reg_pressure = 0 if reg_map == {} else max(r.index for r in reg_map.values())
+    print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
 
     reg_body = lock_down_locals(promoted, reg_map)
 
@@ -778,11 +845,17 @@ class Translator(solved_07.Translator):
             self.translate_subroutine(s, class_ast.name)
 
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
+        instr_count_before = self.asm.instruction_count
+
         self.function(class_name, subroutine_ast.name, subroutine_ast.num_vars)
 
         for s in subroutine_ast.body:
             self._handle(s)
         self.asm.blank()
+
+        instr_count_after = self.asm.instruction_count
+
+        print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}")
 
 
     # Statements:
@@ -792,22 +865,27 @@ class Translator(solved_07.Translator):
 
         # Do the update in-place if possible:
         if isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.left.index:
-            self._handle(ast.expr.right)  # D = right
-            self.asm.instr(f"@R{5+ast.dest.index}")
-            op = self.binary_op(ast.expr.op)
-            self.asm.instr(f"M=M{op}D")
+            op = self.binary_op_alu(ast.expr.op)
+            if op is not None:
+                self._handle(ast.expr.right)  # D = right
+                self.asm.instr(f"@R{5+ast.dest.index}")
+                self.asm.instr(f"M=M{op}D")
+                return
         elif isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.right.index:
-            self._handle(ast.expr.left)  # D = left
-            self.asm.instr(f"@R{5+ast.dest.index}")
-            op = self.binary_op(ast.expr.op)
-            self.asm.instr(f"M=D{op}M")
+            op = self.binary_op_alu(ast.expr.op)
+            if op is not None:
+                self._handle(ast.expr.left)  # D = left
+                self.asm.instr(f"@R{5+ast.dest.index}")
+                self.asm.instr(f"M=D{op}M")
+                return
         elif isinstance(ast.expr, Unary) and ast.dest == ast.expr:
             self.asm.instr(f"@R{5+ast.dest.index}")
             self.asm.instr(f"M={self.unary_op(ast.expr.op)}M")
-        else:
-            self._handle(ast.expr)
-            self.asm.instr(f"@R{5+ast.dest.index}")
-            self.asm.instr("M=D")
+            return
+
+        self._handle(ast.expr)
+        self.asm.instr(f"@R{5+ast.dest.index}")
+        self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
         self.asm.start(_Stmt_str(ast))
@@ -856,17 +934,78 @@ class Translator(solved_07.Translator):
                 self.asm.instr("M=D")
 
     def handle_If(self, ast: If):
-        self.asm.start(_Stmt_str(ast))
-        self.asm.instr("TODO")
-        raise Exception("TODO")
+        self.asm.comment("if...")
+
+        # TODO: this goes away
+        for s in ast.test:
+            self._handle(s)
+
+        if ast.when_false is None:
+            # Awesome: when there's no else, and the condition is simple, it turns into a single branch.
+            # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
+            # into the node and compare them directly (which would also fix the overflow bug.)
+
+            end_label = self.asm.next_label("end")
+
+            self.asm.start(f"if {_Expr_str(ast.value)} {ast.cmp} 0?")
+            self._handle(ast.value)
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+
+            for s in ast.when_true:
+                self._handle(s)
+
+            self.asm.label(end_label)
+
+        else:
+            end_label = self.asm.next_label("end")
+            false_label = self.asm.next_label("false")
+
+            self.asm.start(f"if/else {_Expr_str(ast.value)} {ast.cmp} 0?")
+            self._handle(ast.value)
+            self.asm.instr(f"@{false_label}")
+            self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+
+            for s in ast.when_true:
+                self._handle(s)
+
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"0;JMP")
+
+            self.asm.label(false_label)
+            for s in ast.when_false:
+                self._handle(s)
+
+            self.asm.label(end_label)
 
     def handle_While(self, ast):
-        self.asm.start(_Stmt_str(ast))
-        self.asm.instr("TODO")
-        raise Exception("TODO")
+        # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
+        # into the node and compare them directly (which would also fix the overflow bug.)
+
+        self.asm.comment("while...")
+
+        top_label = self.asm.next_label("loop_top")
+        end_label = self.asm.next_label("loop_end")
+
+        self.asm.label(top_label)
+        for s in ast.test:
+            self._handle(s)
+
+        self.asm.start(f"while {_Expr_str(ast.value)} {ast.cmp} 0?")
+        self._handle(ast.value)
+        self.asm.instr(f"@{end_label}")
+        self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+
+        for s in ast.body:
+            self._handle(s)
+
+        self.asm.instr(f"@{top_label}")
+        self.asm.instr(f"0;JMP")
+
+        self.asm.label(end_label)
 
     def handle_Return(self, ast: Return):
-        self.asm.start(_Stmt_str(ast))
+        self.asm.start(f"push {_Expr_str(ast.value)} (for return)")
         self._handle(ast.value)
         self.asm.instr("@SP")
         self.asm.instr("M=M+1")
@@ -876,6 +1015,9 @@ class Translator(solved_07.Translator):
 
     def handle_Push(self, ast):
         self.asm.start(_Stmt_str(ast))
+
+        # TODO: special-case Push CallSub to skip popping the stack
+
         self._handle(ast.expr)
         self.asm.instr("@SP")
         self.asm.instr("M=M+1")
@@ -888,6 +1030,18 @@ class Translator(solved_07.Translator):
         # Pop the stack, not saving the result
         self.asm.instr("@SP")
         self.asm.instr("M=M-1")
+
+    def compare_op(self, cmp: Cmp):
+        if cmp == "!=":
+            return "EQ"
+        else:
+            raise Exception("TODO")
+
+    def compare_op_neg(self, cmp: Cmp):
+        if cmp == "!=":
+            return "NE"
+        else:
+            raise Exception("TODO")
 
 
     # Expressions:
@@ -946,25 +1100,66 @@ class Translator(solved_07.Translator):
         self.asm.instr("D=M")
 
     def handle_Binary(self, ast: Binary):
-        self._handle(ast.left)     # D = left
-        self.value_to_a(ast.right) # A = right
-        self.asm.instr(f"D={self.binary_op(ast.op)}A")
+        alu_op = self.binary_op_alu(ast.op)
+        if alu_op is not None:
+            self._handle(ast.left)     # D = left
+            self.value_to_a(ast.right) # A = right
+            self.asm.instr(f"D=D{alu_op}A")
+            return
 
-    def binary_op(self, op: jack_ast.Op):
+        cmp_op = self.binary_op_cmp(ast.op)
+        if cmp_op is not None:
+            # Massive savings here for this compiler; by pushing the comparison all the way into
+            # the ALU, this is one branch, with a specific condition code, to pick the right result.
+            # But having to leave the result in D kind of spoils the party...
+
+            # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
+            #    -30,000 > 30,000
+            #    30,000 - (-30,000) = 60,000 = -whatever, which is less than 0
+
+            true_label = self.asm.next_label("compare_true")
+            end_label = self.asm.next_label("compare_end")
+
+            self._handle(ast.left)      # D = left
+            self.value_to_a(ast.right)  # A = right
+            self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+
+            self.asm.instr(f"@{true_label}")
+            self.asm.instr(f"D;J{cmp_op}")
+
+            self.asm.instr("D=0")  #  D = false
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr("0;JMP")
+
+            self.asm.label(true_label)
+            self.asm.instr("D=-1")
+            self.asm.label(end_label)
+            return
+
+        raise Exception(f"TODO: {ast}")
+
+    def binary_op_alu(self, op: jack_ast.Op) -> Optional[str]:
         return {
             "+": "+",
             "-": "-",
             "&": "&",
             "|": "|",
-        }[op.symbol]
+        }.get(op.symbol)
+
+    def binary_op_cmp(self, op: jack_ast.Op) -> Optional[str]:
+        return {
+            "<": "LT",
+            ">": "GT",
+            "=": "EQ",
+        }.get(op.symbol)
 
     def handle_Unary(self, ast: Unary):
-        if isinstance(ast.expr, Reg):
+        if isinstance(ast.value, Reg):
             self.asm.instr(f"@R{5+ast.value.index}")
             self.asm.instr(f"D={self.unary_op(ast.op)}M")
         else:
-            # Note: not(Const) isn't being evaluated in the compiler yet, but should be.
-            self._handle(ast.expr)
+            # Note: ~(Const) isn't being evaluated in the compiler yet, but should be.
+            self._handle(ast.value)
             self.asm.instr(f"D={self.unary_op(ast.op)}D")
 
     def unary_op(self, op: jack_ast.Op):
@@ -978,7 +1173,8 @@ class Translator(solved_07.Translator):
     # Helpers:
 
     def value_to_a(self, ast: Union[Reg, Const]):
-        """Load a register or constant value into A, without overwriting D."""
+        """Load a register or constant value into A, without overwriting D, and in one less cycle,
+        is some cases."""
 
         if isinstance(ast, Reg):
             self.asm.instr(f"@R{5+ast.index}")

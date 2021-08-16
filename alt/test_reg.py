@@ -1,9 +1,12 @@
 #! /usr/bin/env pytest
 
+from nand import run
+from nand.solutions import solved_06, solved_10, solved_12
+import test_12
+
 from alt.reg import *
 from alt.reg import _Stmt_str
-from nand.solutions import solved_10, solved_12
-import test_12
+
 
 def test_loop_liveness():
     src = """
@@ -66,7 +69,7 @@ def test_compile_average():
     assert False
 
 
-def test_compile_arraytest():
+def test_compile_arraytest(chip=solved_05.Computer, assembler=solved_06.assemble, simulator="codegen"):
     with open("examples/project_12/ArrayTest.jack") as f:
         src = "\n".join(f.readlines())
         array_test = solved_10.parse_class(src)
@@ -94,6 +97,20 @@ def test_compile_arraytest():
 
     for l in translator.asm:
         print(l)
+
+    translator.check_references()
+
+    computer = run(chip, simulator=simulator)
+    translator.asm.run(assembler, computer, stop_cycles=2_000, debug=True)
+    # translator.asm.trace(assembler, computer, stop_cycles=2_000)
+
+
+    print([computer.peek(addr) for addr in range(8000, 8004)])
+
+    assert computer.peek(8000) == 222
+    assert computer.peek(8001) == 122
+    assert computer.peek(8002) == 100
+    assert computer.peek(8003) == 10
 
     assert False
 
