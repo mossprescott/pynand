@@ -2,8 +2,8 @@
 
 from alt.reg import *
 from alt.reg import _Stmt_str
-from nand.solutions import solved_10
-
+from nand.solutions import solved_10, solved_12
+import test_12
 
 def test_loop_liveness():
     src = """
@@ -71,18 +71,29 @@ def test_compile_arraytest():
         src = "\n".join(f.readlines())
         array_test = solved_10.parse_class(src)
 
-    main = array_test.subroutineDecs[0]
-    print(pprint_subroutine_dec(main))
+    # main = array_test.subroutineDecs[0]
+    # # print(pprint_subroutine_dec(main))
 
-    result = flatten_class(array_test)
-    print(result)
-    # print(pprint_subroutine_dec(result))
+    # result = flatten_class(array_test)
+    # print(result)
+    # # print(pprint_subroutine_dec(result))
 
-    liveness = analyze_liveness(result.subroutines[0].body)
-    for s in liveness:
-        print(_Stmt_str(s))
+    # liveness = analyze_liveness(result.subroutines[0].body)
+    # for s in liveness:
+    #     print(_Stmt_str(s))
 
-    print(f"need saving: {need_saving(liveness)}")
+    # print(f"need saving: {need_saving(liveness)}")
+
+    translator = Translator()
+
+    compile_class(array_test, translator)
+
+    compile_class(solved_12._ARRAY_CLASS, translator)
+    compile_class(solved_12._MEMORY_CLASS, translator)
+    compile_class(test_12.minimal_sys_lib(["Memory"]), translator)
+
+    for l in translator.asm:
+        print(l)
 
     assert False
 
@@ -93,7 +104,7 @@ def test_compile_stringtest():
         string_test = solved_10.parse_class(src)
 
     main = string_test.subroutineDecs[0]
-    print(pprint_subroutine_dec(main))
+    # print(pprint_subroutine_dec(main))
 
     result = flatten_class(string_test)
     print(result)
@@ -112,28 +123,19 @@ def test_compile_mathtest():
         src = "\n".join(f.readlines())
         math_test = solved_10.parse_class(src)
 
-    main = math_test.subroutineDecs[0]
-    # print(pprint_subroutine_dec(main))
-    print(main)
+    # main = math_test.subroutineDecs[0]
 
-    result = flatten_class(math_test)
-    print(result)
-    # print(pprint_subroutine_dec(result))
+    # result = flatten_class(math_test)
 
-    liveness = analyze_liveness(result.subroutines[0].body)
-    for s in liveness:
-        print(_Stmt_str(s))
+    # locked_down = phase_two(result.subroutines[0])
 
-    print(f"need saving: {need_saving(liveness)}")
+    # ready = Class("Main", [locked_down])
 
-    promoted = Subroutine(result.subroutines[0].name,
-        promote_locals(result.subroutines[0].body,
-                        {Local("r"): Location("local", 0, "r")},
-                        "p"))
-    print(promoted)
+    translator = Translator()
 
-    liveness2 = analyze_liveness(promoted.body)
-    for s in liveness2:
-        print(_Stmt_str(s))
+    compile_class(math_test, translator)
+
+    for l in translator.asm:
+        print(l)
 
     assert False
