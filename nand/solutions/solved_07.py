@@ -366,6 +366,7 @@ class Translator:
         # Set result True, optimistically (since A is already loaded with the destination)
         self.asm.instr("M=-1")
         
+        self.asm.instr("M=-1")  # note: true == -1 (all bits set)
         self.asm.instr(f"@{end_label}")
         self.asm.instr(f"D;J{op}")
         
