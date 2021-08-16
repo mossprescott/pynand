@@ -19,6 +19,9 @@ class Translator:
         self.class_namespace = "static"
         self.function_namespace = "_"
         
+        self.defined_functions = []
+        self.referenced_functions = []
+
         # HACK: some code that's always required, even when preamble is not used.
         
         start = self.asm.next_label("start")
@@ -241,6 +244,8 @@ class Translator:
 
 
     def function(self, class_name, function_name, num_vars):
+        self.defined_functions.append(f"{class_name}.{function_name}")
+
         self.class_namespace = class_name.lower()
         self.function_namespace = f"{class_name.lower()}.{function_name}"
 
@@ -290,6 +295,8 @@ class Translator:
 
 
     def call(self, class_name, function_name, num_args):
+        self.referenced_functions.append(f"{class_name}.{function_name}")
+
         # Note: this is currently 13 instructions per occurrence, which is pretty heavy.
         # Can it be shrunk more? Move more work into the common impl somehow?
         
@@ -527,6 +534,19 @@ class Translator:
         
         return ops
         
+    def check_references(self):
+        """Check for obvious "linkage" errors: e.g. functions that are referenced but never defined.
+        """
+
+        defined = set(self.defined_functions)
+        referenced = set(self.referenced_functions)
+
+        assert len(self.defined_functions) == len(defined), "Each function is defined only once"
+
+        unresolved = referenced - defined
+        assert unresolved == set(), "Unresolved references"
+
+
 def parse_line(line):
     """Parse a line into a tuple (op_code, [args]).
 
