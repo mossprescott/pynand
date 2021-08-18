@@ -137,36 +137,69 @@ class Math {
         let br = br+br;  // 16r
         let br = br+br;  // 32r
         let br = br+br;  // 64r
-        let nSq = (rSq + rSq) + (br + br) + 4096;  // n^2 = 2r^2 + 128r + 64^2
+        let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 32;
-        if (~(x < (n*n))) {
+        let br = r+r;    // 2r
+        let br = br+br;  // 4r
+        let br = br+br;  // 8r
+        let br = br+br;  // 16r
+        let br = br+br;  // 32r
+        let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         let n = r + 16;
-        if (~(x < (n*n))) {
+        let br = r+r;    // 2r
+        let br = br+br;  // 4r
+        let br = br+br;  // 8r
+        let br = br+br;  // 16r
+        let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         let n = r + 8;
-        if (~(x < (n*n))) {
+        let br = r+r;    // 2r
+        let br = br+br;  // 4r
+        let br = br+br;  // 8r
+        let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         let n = r + 4;
-        if (~(x < (n*n))) {
+        let br = r+r;    // 2r
+        let br = br+br;  // 4r
+        let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         let n = r + 2;
-        if (~(x < (n*n))) {
+        let br = r+r;    // 2r
+        let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         let n = r + 1;
-        if (~(x < (n*n))) {
+        let nSq = rSq + (r + r) + 1;  // n^2 = r^2 + 2r + 1
+        if (~(x < nSq)) {
             let r = n;
+            let rSq = nSq;
         }
+
         return r;
     }
 
