@@ -262,7 +262,87 @@ MEMORY_CLASS = jack_ast.Class(
 # ./computer.py .../KeyboardTest/
 #
 
-# TODO
+# SOLVERS: if you assume these fields you can implement the methods below one at a time
+KEYBOARD_CLASS_VARS = parse_classVarDecs("""
+""")
+
+KEYBOARD_INIT = solved_12.KEYBOARD_INIT
+# KEYBOARD_INIT = parse_subroutineDec("""
+#     /** Initializes the keyboard. */
+#     function void init() {
+#     }
+# """)
+
+KEYBOARD_KEY_PRESSED = solved_12.KEYBOARD_KEY_PRESSED
+# KEYBOARD_KEY_PRESSED = parse_subroutineDec("""
+#     /**
+#      * Returns the character of the currently pressed key on the keyboard;
+#      * if no key is currently pressed, returns 0.
+#      *
+#      * Recognizes all ASCII characters, as well as the following keys:
+#      * new line = 128 = String.newline()
+#      * backspace = 129 = String.backspace()
+#      * left arrow = 130
+#      * up arrow = 131
+#      * right arrow = 132
+#      * down arrow = 133
+#      * home = 134
+#      * End = 135
+#      * page up = 136
+#      * page down = 137
+#      * insert = 138
+#      * delete = 139
+#      * ESC = 140
+#      * F1 - F12 = 141 - 152
+#      */
+#     function char keyPressed() {
+#     }
+# """)
+
+KEYBOARD_READ_CHAR = solved_12.KEYBOARD_READ_CHAR
+# KEYBOARD_READ_CHAR = parse_subroutineDec("""
+#      /**
+#      * Waits until a key is pressed on the keyboard and released,
+#      * then echoes the key to the screen, and returns the character
+#      * of the pressed key.
+#      */
+#     function char readChar() {
+#     }
+# """)
+
+KEYBOARD_READ_LINE = solved_12.KEYBOARD_READ_LINE
+# KEYBOARD_READ_LINE = parse_subroutineDec("""
+#      /**
+#      * Displays the message on the screen, reads from the keyboard the entered
+#      * text until a newline character is detected, echoes the text to the screen,
+#      * and returns its value. Also handles user backspaces.
+#      */
+#     function String readLine(String message) {
+#     }
+# """)
+
+KEYBOARD_READ_INT = solved_12.KEYBOARD_READ_INT
+# KEYBOARD_READ_INT = parse_subroutineDec("""
+#      /**
+#      * Displays the message on the screen, reads from the keyboard the entered
+#      * text until a newline character is detected, echoes the text to the screen,
+#      * and returns its integer value (until the first non-digit character in the
+#      * entered text is detected). Also handles user backspaces.
+#      */
+#     function int readInt(String message) {
+#     }
+# """)
+
+KEYBOARD_CLASS = jack_ast.Class(
+    name = "Keyboard",
+    varDecs=KEYBOARD_CLASS_VARS,
+    subroutineDecs=[
+        KEYBOARD_INIT,
+        KEYBOARD_KEY_PRESSED,
+        KEYBOARD_READ_CHAR,
+        KEYBOARD_READ_LINE,
+        KEYBOARD_READ_INT,
+    ])
 
 
 #
@@ -283,6 +363,7 @@ OUTPUT_CLASS_VARS = parse_classVarDecs("""
 """)
 
 OUTPUT_INIT = solved_12.OUTPUT_INIT
+# TODO
 OUTPUT_MOVE_CURSOR = solved_12.OUTPUT_MOVE_CURSOR
 OUTPUT_PRINT_CHAR = solved_12.OUTPUT_PRINT_CHAR
 OUTPUT_PRINT_STRING = solved_12.OUTPUT_PRINT_STRING
@@ -290,7 +371,18 @@ OUTPUT_PRINT_INT = solved_12.OUTPUT_PRINT_INT
 OUTPUT_PRINTLN = solved_12.OUTPUT_PRINTLN
 OUTPUT_BACK_SPACE = solved_12.OUTPUT_BACK_SPACE
 
-OUTPUT_CLASS = solved_12._OUTPUT_CLASS  # HACK
+OUTPUT_CLASS = jack_ast.Class(
+    name = "Output",
+    varDecs=OUTPUT_CLASS_VARS,
+    subroutineDecs=[
+        OUTPUT_INIT,
+        OUTPUT_MOVE_CURSOR,
+        OUTPUT_PRINT_CHAR,
+        OUTPUT_PRINT_STRING,
+        OUTPUT_PRINT_INT,
+        OUTPUT_PRINTLN,
+        OUTPUT_BACK_SPACE,
+    ])
 
 
 #
@@ -381,7 +473,74 @@ MATH_CLASS = jack_ast.Class(
 # common "easy" cases to get decent speed.
 #
 
-# TODO
+# SOLVERS: if you assume these fields you can implement the methods below one at a time
+SCREEN_CLASS_VARS = parse_classVarDecs("""
+""")
+
+SCREEN_INIT = solved_12.SCREEN_INIT
+# SCREEN_INIT = parse_subroutineDec("""
+#     /** Initializes the Screen. */
+#     function void init() {
+#     }
+# """)
+
+SCREEN_CLEAR_SCREEN = solved_12.SCREEN_CLEAR_SCREEN
+# SCREEN_CLEAR_SCREEN = parse_subroutineDec("""
+#     /** Erases the entire screen. */
+#     function void clearScreen() {
+#     }
+# """)
+
+SCREEN_SET_COLOR = solved_12.SCREEN_SET_COLOR
+# SCREEN_SET_COLOR = parse_subroutineDec("""
+#     /** Sets the current color, to be used for all subsequent drawXXX commands.
+#      *  Black is represented by true, white by false. */
+#     function void setColor(boolean b) {
+#     }
+# """)
+
+SCREEN_DRAW_PIXEL = solved_12.SCREEN_DRAW_PIXEL
+# SCREEN_DRAW_PIXEL = parse_subroutineDec("""
+#     /** Draws the (x,y) pixel, using the current color. */
+#     function void drawPixel(int x, int y) {
+#     }
+# """)
+
+SCREEN_DRAW_LINE = solved_12.SCREEN_DRAW_LINE
+# SCREEN_DRAW_LINE = parse_subroutineDec("""
+#     /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
+#     function void drawLine(int x1, int y1, int x2, int y2) {
+#     }
+# """)
+
+SCREEN_DRAW_RECTANGLE = solved_12.SCREEN_DRAW_RECTANGLE
+# SCREEN_DRAW_RECTANGLE = parse_subroutineDec("""
+#     /** Draws a filled rectangle whose top left corner is (x1, y1)
+#      * and bottom right corner is (x2,y2), using the current color. */
+#     function void drawRectangle(int x1, int y1, int x2, int y2) {
+#     }
+# """)
+
+SCREEN_DRAW_CIRCLE = solved_12.SCREEN_DRAW_CIRCLE
+# SCREEN_DRAW_CIRCLE = parse_subroutineDec("""
+#     /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
+#     function void drawCircle(int x, int y, int r) {
+#     }
+# """)
+
+# Here's where the pieces get put together into an AST node that the compiler can consume:
+SCREEN_CLASS = jack_ast.Class(
+    name="Screen",
+    varDecs=SCREEN_CLASS_VARS,
+    subroutineDecs=[
+        SCREEN_INIT,
+        SCREEN_CLEAR_SCREEN,
+        SCREEN_SET_COLOR,
+        SCREEN_DRAW_PIXEL,
+        SCREEN_DRAW_LINE,
+        SCREEN_DRAW_RECTANGLE,
+        SCREEN_DRAW_CIRCLE,
+    ])
 
 
 #
@@ -391,15 +550,62 @@ MATH_CLASS = jack_ast.Class(
 # lap.
 #
 
-# TODO
+# SOLVERS: put any static/field variables here, if you need them:
+SYS_CLASS_VARS = parse_classVarDecs("""
+""")
+
+SYS_INIT = solved_12.SYS_INIT
+# SYS_INIT = parse_subroutineDec("""
+#     /** Performs all the initializations required by the OS. */
+#     function void init() {
+#     }
+# """)
+
+
+SYS_HALT = solved_12.SYS_HALT
+# SYS_HALT = parse_subroutineDec("""
+#     /** Halts the program execution. */
+#     function void halt() {
+#     }
+# """)
+
+SYS_WAIT = solved_12.SYS_WAIT
+# SYS_WAIT = parse_subroutineDec("""
+#     /** Waits approximately duration milliseconds and returns.  */
+#     function void wait(int duration) {
+#     }
+# """)
+
+SYS_ERROR = solved_12.SYS_ERROR
+# SYS_ERROR = parse_subroutineDec("""
+#     /** Displays the given error code in the form "ERR<errorCode>",
+#      *  and halts the program's execution. */
+#     function void error(int errorCode) {
+#     }
+# """)
+
+
+# Here's where the pieces get put together into an AST node that the compiler can consume:
+SYS_CLASS = jack_ast.Class(
+    name="Sys",
+    varDecs=SYS_CLASS_VARS,
+    subroutineDecs=[
+        SYS_INIT,
+        SYS_HALT,
+        SYS_WAIT,
+        SYS_ERROR,
+    ])
+
+
+# Put it all together:
 
 OS_CLASSES = [
     ARRAY_CLASS,
     STRING_CLASS,
     MEMORY_CLASS,
-    # KEYBOARD_CLASS,
+    KEYBOARD_CLASS,
     OUTPUT_CLASS,
-    # MATH_CLASS,
-    # SCREEN_CLASS,
-    # SYS_CLASS,
+    MATH_CLASS,
+    SCREEN_CLASS,
+    SYS_CLASS,
 ]

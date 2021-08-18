@@ -60,6 +60,21 @@ MEMORY_DE_ALLOC = _find_subroutine(_MEMORY_CLASS, "deAlloc")
 
 
 ####################
+## Keyboard.jack
+####################
+
+_KEYBOARD_CLASS = _parse_jack_file("Keyboard")
+
+KEYBOARD_VAR_DECS = _KEYBOARD_CLASS.varDecs
+
+KEYBOARD_INIT        = _find_subroutine(_KEYBOARD_CLASS, "init")
+KEYBOARD_KEY_PRESSED = _find_subroutine(_KEYBOARD_CLASS, "keyPressed")
+KEYBOARD_READ_CHAR   = _find_subroutine(_KEYBOARD_CLASS, "readChar")
+KEYBOARD_READ_LINE   = _find_subroutine(_KEYBOARD_CLASS, "readLine")
+KEYBOARD_READ_INT    = _find_subroutine(_KEYBOARD_CLASS, "readInt")
+
+
+####################
 ## Output.jack
 ####################
 
@@ -80,13 +95,40 @@ OUTPUT_BACK_SPACE   = _find_subroutine(_OUTPUT_CLASS, "backSpace")
 
 _MATH_CLASS = _parse_jack_file("Math")
 
-MATH_INIT = _find_subroutine(_MATH_CLASS, "init")
-MATH_ABS = _find_subroutine(_MATH_CLASS, "abs")
+MATH_INIT     = _find_subroutine(_MATH_CLASS, "init")
+MATH_ABS      = _find_subroutine(_MATH_CLASS, "abs")
 MATH_MULTIPLY = _find_subroutine(_MATH_CLASS, "multiply")
-MATH_DIVIDE = _find_subroutine(_MATH_CLASS, "divide")
-MATH_SQRT = _find_subroutine(_MATH_CLASS, "sqrt")
-MATH_MAX = _find_subroutine(_MATH_CLASS, "max")
-MATH_MIN = _find_subroutine(_MATH_CLASS, "min")
+MATH_DIVIDE   = _find_subroutine(_MATH_CLASS, "divide")
+MATH_SQRT     = _find_subroutine(_MATH_CLASS, "sqrt")
+MATH_MAX      = _find_subroutine(_MATH_CLASS, "max")
+MATH_MIN      = _find_subroutine(_MATH_CLASS, "min")
+
+
+####################
+## Screen.jack
+####################
+
+_SCREEN_CLASS = _parse_jack_file("Screen")
+
+SCREEN_INIT           = _find_subroutine(_SCREEN_CLASS, "init")
+SCREEN_CLEAR_SCREEN   = _find_subroutine(_SCREEN_CLASS, "clearScreen")
+SCREEN_SET_COLOR      = _find_subroutine(_SCREEN_CLASS, "setColor")
+SCREEN_DRAW_PIXEL     = _find_subroutine(_SCREEN_CLASS, "drawPixel")
+SCREEN_DRAW_LINE      = _find_subroutine(_SCREEN_CLASS, "drawLine")
+SCREEN_DRAW_RECTANGLE = _find_subroutine(_SCREEN_CLASS, "drawRectangle")
+SCREEN_DRAW_CIRCLE    = _find_subroutine(_SCREEN_CLASS, "drawCircle")
+
+
+####################
+## Sys.jack
+####################
+
+_SYS_CLASS = _parse_jack_file("Sys")
+
+SYS_INIT  = _find_subroutine(_SYS_CLASS, "init")
+SYS_HALT  = _find_subroutine(_SYS_CLASS, "halt")
+SYS_WAIT  = _find_subroutine(_SYS_CLASS, "wait")
+SYS_ERROR = _find_subroutine(_SYS_CLASS, "error")
 
 
 # Used by BUNDLED_PLATFORM
@@ -94,11 +136,11 @@ _OS_CLASSES = [
     _ARRAY_CLASS,
     _STRING_CLASS,
     _MEMORY_CLASS,
-    # _KEYBOARD_CLASS,
+    _KEYBOARD_CLASS,
     _OUTPUT_CLASS,
     _MATH_CLASS,
-    # _SCREEN_CLASS,
-    # _SYS_CLASS,
+    _SCREEN_CLASS,
+    _SYS_CLASS,
 ]
 
 

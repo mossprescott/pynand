@@ -154,6 +154,44 @@ def test_memory_lib_stress():
     pass  # TODO
 
 
+def test_compile_keyboard_lib():
+    """First, just make sure this particular class makes it through the compiler."""
+
+    ast = project_12.KEYBOARD_CLASS
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    assert len(asm.lines) > 0
+
+# def test_keyboard_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+#     # Note: this one's not so useful interactively, but easier to view anyway
+#     keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack")
+
+#     translator = translator_class()
+
+#     translator.preamble()
+
+#     _translate_raw_jack(translator, project_12.KEYBOARD_CLASS)
+
+#     # Dependencies; note: need Sys.init to intialize Memory, but don't want the built-in implementation.
+#     _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
+#     _translate_raw_jack(translator, minimal_sys_lib("Memory"))
+
+#     _translate_raw_jack(translator, keyboard_test)
+
+#     translator.finish()
+
+#     check_references(translator)
+
+#     computer = run(chip, simulator=simulator)
+
+#     # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
+#     translator.asm.trace(assembler, computer, stop_cycles=10_000)
+
+#     # TODO
+
+
 def test_compile_output_lib():
     """First, just make sure this particular class makes it through the compiler."""
 
@@ -173,12 +211,14 @@ def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assembl
     translator.preamble()
 
     _translate_raw_jack(translator, project_12.OUTPUT_CLASS)
+    # TODO: need the "private" helper from solved_12._OUTPUT_CLASS,
+    # if the default impl is used. Get rid of it.
 
     # Dependencies; note: need Sys.init to intialize Output, but don't want the built-in implementation.
     _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
     _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
     _translate_raw_jack(translator, solved_12._STRING_CLASS)
-    _translate_raw_vm(translator, f"nand2tetris/tools/OS/Math.vm")
+    _translate_raw_jack(translator, solved_12._MATH_CLASS)
     _translate_raw_jack(translator, minimal_sys_lib(["Memory", "Math", "Output"]))
 
     _translate_raw_jack(translator, memory_test)
@@ -217,7 +257,7 @@ def test_compile_math_lib():
     assert len(asm.lines) > 0
 
 
-def test_math_lib_debug(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+def test_math_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
     math_test = _parse_jack_file("examples/project_12/MathTest.jack")
 
     translator = translator_class()
@@ -256,6 +296,86 @@ def test_math_lib_debug(chip=project_05.Computer, assembler=project_06.assemble,
     assert computer.peek(8011) == 123,    "max(123, -345)"
     assert computer.peek(8012) == 27,     "abs(27)"
     assert computer.peek(8013) == 32767,  "abs(-32767)"
+
+
+def test_compile_screen_lib():
+    """First, just make sure this particular class makes it through the compiler."""
+
+    ast = project_12.SCREEN_CLASS
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    assert len(asm.lines) > 0
+
+
+def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+    screen_test = _parse_jack_file("examples/project_12/ScreenTest.jack")
+
+    translator = translator_class()
+
+    translator.preamble()
+
+    _translate_raw_jack(translator, project_12.SCREEN_CLASS)
+
+    _translate_raw_jack(translator, minimal_sys_lib([]))
+
+    _translate_raw_jack(translator, screen_test)
+
+    translator.finish()
+
+    check_references(translator)
+
+    computer = run(chip, simulator=simulator)
+
+    # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
+    translator.asm.trace(assembler, computer, stop_cycles=1_000_000)
+
+    # TODO: spot check some pixels
+    assert False
+
+
+def test_compile_sys_lib():
+    """First, just make sure this particular class makes it through the compiler."""
+
+    ast = project_12.SYS_CLASS
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    assert len(asm.lines) > 0
+
+
+def test_sys_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+    sys_test = _parse_jack_file("examples/project_12/SysTest.jack")
+
+    translator = translator_class()
+
+    translator.preamble()
+
+    _translate_raw_jack(translator, project_12.SYS_CLASS)
+
+    _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
+    _translate_raw_jack(translator, solved_12._MATH_CLASS)
+    _translate_raw_jack(translator, solved_12._SCREEN_CLASS)
+    _translate_raw_jack(translator, solved_12._OUTPUT_CLASS)
+    _translate_raw_jack(translator, solved_12._KEYBOARD_CLASS)
+    _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
+    _translate_raw_jack(translator, solved_12._STRING_CLASS)
+
+    _translate_raw_jack(translator, sys_test)
+
+    translator.finish()
+
+    check_references(translator)
+
+    computer = run(chip, simulator=simulator)
+
+    # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
+    translator.asm.trace(assembler, computer, stop_cycles=1_000_000)
+
+    # TODO: assert what?
+    assert False
 
 
 #
