@@ -3,9 +3,7 @@ from nand.solutions import solved_10
 def _parse_jack_file(class_name):
     with open(f"nand/solutions/solved_12/{class_name}.jack") as f:
         src = "\n".join(f.readlines())
-        # raise Exception(src)
-        # raise Exception(solved_10.lex(src))
-        return solved_10.ClassP.parse(solved_10.lex(src))
+        return solved_10.parse_class(src)
 
 def _find_subroutine(class_ast, sub_name):
     for sd in class_ast.subroutineDecs:
@@ -74,6 +72,35 @@ OUTPUT_PRINT_STRING = _find_subroutine(_OUTPUT_CLASS, "printString")
 OUTPUT_PRINT_INT    = _find_subroutine(_OUTPUT_CLASS, "printInt")
 OUTPUT_PRINTLN      = _find_subroutine(_OUTPUT_CLASS, "println")
 OUTPUT_BACK_SPACE   = _find_subroutine(_OUTPUT_CLASS, "backSpace")
+
+
+####################
+## Math.jack
+####################
+
+_MATH_CLASS = _parse_jack_file("Math")
+
+MATH_INIT = _find_subroutine(_MATH_CLASS, "init")
+MATH_ABS = _find_subroutine(_MATH_CLASS, "abs")
+MATH_MULTIPLY = _find_subroutine(_MATH_CLASS, "multiply")
+MATH_DIVIDE = _find_subroutine(_MATH_CLASS, "divide")
+MATH_SQRT = _find_subroutine(_MATH_CLASS, "sqrt")
+MATH_MAX = _find_subroutine(_MATH_CLASS, "max")
+MATH_MIN = _find_subroutine(_MATH_CLASS, "min")
+
+
+# Used by BUNDLED_PLATFORM
+_OS_CLASSES = [
+    _ARRAY_CLASS,
+    _STRING_CLASS,
+    _MEMORY_CLASS,
+    # _KEYBOARD_CLASS,
+    _OUTPUT_CLASS,
+    _MATH_CLASS,
+    # _SCREEN_CLASS,
+    # _SYS_CLASS,
+]
+
 
 
 # A bunch of code follows which is all related to generating an implementation of Output.printChar.

@@ -51,7 +51,7 @@ ARRAY_DISPOSE = parse_subroutineDec("""
     }
 """)
 
-# Here's where the pieces get put together into a
+# Here's where the pieces get put together into an AST node that the compiler can consume:
 ARRAY_CLASS = jack_ast.Class(
     name="Array",
     varDecs=ARRAY_CLASS_VARS,
@@ -299,8 +299,80 @@ OUTPUT_CLASS = solved_12._OUTPUT_CLASS  # HACK
 # Take your time, read carefully, and remember to handle the edge cases!
 #
 
-# TODO
+# SOLVERS: if you assume these fields you can implement the methods below one at a time
+MATH_CLASS_VARS = parse_classVarDecs("""
+""")
 
+MATH_INIT = solved_12.MATH_INIT
+# MATH_INIT = parse_subroutineDec("""
+#     /** Initializes the library. */
+#     function void init() {
+#     }
+# """)
+
+MATH_ABS = solved_12.MATH_ABS
+# MATH_ABS = parse_subroutineDec("""
+#     /** Returns the absolute value of x. */
+#     function int abs(int x) {
+#     }
+# """)
+
+MATH_MULTIPLY = solved_12.MATH_MULTIPLY
+# MATH_MULTIPLY = parse_subroutineDec("""
+#     /** Returns the product of x and y.
+#      *  When a Jack compiler detects the multiplication operator '*' in the
+#      *  program's code, it handles it by invoking this method. In other words,
+#      *  the Jack expressions x*y and Math.multiply(x,y) return the same value.
+#      */
+#     function int multiply(int x, int y) {
+#     }
+# """)
+
+MATH_DIVIDE = solved_12.MATH_DIVIDE
+# MATH_DIVIDE = parse_subroutineDec("""
+#     /** Returns the integer part of x/y.
+#      *  When a Jack compiler detects the multiplication operator '/' in the
+#      *  program's code, it handles it by invoking this method. In other words,
+#      *  the Jack expressions x/y and Math.divide(x,y) return the same value.
+#      */
+#     function int divide(int x, int y) {
+#     }
+# """)
+
+MATH_SQRT = solved_12.MATH_SQRT
+# MATH_SQRT = parse_subroutineDec("""
+#     /** Returns the integer part of the square root of x. */
+#     function int sqrt(int x) {
+#     }
+# """)
+
+MATH_MAX = solved_12.MATH_MAX
+# MATH_MAX = parse_subroutineDec("""
+#     /** Returns the greater number. */
+#     function int max(int a, int b) {
+#     }
+# """)
+
+MATH_MIN = solved_12.MATH_MIN
+# MATH_MIN = parse_subroutineDec("""
+#     /** Returns the smaller number. */
+#     function int min(int a, int b) {
+#     }
+# """)
+
+# Here's where the pieces get put together into an AST node that the compiler can consume:
+MATH_CLASS = jack_ast.Class(
+    name="Math",
+    varDecs=MATH_CLASS_VARS,
+    subroutineDecs=[
+        MATH_INIT,
+        MATH_ABS,
+        MATH_MULTIPLY,
+        MATH_DIVIDE,
+        MATH_SQRT,
+        MATH_MAX,
+        MATH_MIN,
+    ])
 
 #
 # Screen Library
@@ -320,3 +392,14 @@ OUTPUT_CLASS = solved_12._OUTPUT_CLASS  # HACK
 #
 
 # TODO
+
+OS_CLASSES = [
+    ARRAY_CLASS,
+    STRING_CLASS,
+    MEMORY_CLASS,
+    # KEYBOARD_CLASS,
+    OUTPUT_CLASS,
+    # MATH_CLASS,
+    # SCREEN_CLASS,
+    # SYS_CLASS,
+]

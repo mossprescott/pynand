@@ -45,7 +45,6 @@ def test_array_lib(chip=project_05.Computer, assembler=project_06.assemble, tran
     assert computer.peek(8002) == 100
     assert computer.peek(8003) == 10
 
-
 def test_compile_string_lib():
     """First, just make sure this particular class makes it through the compiler."""
 
@@ -203,6 +202,60 @@ def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assembl
 
     # The top line of the adjacent characters "6" and "7":
     assert computer.peek_screen((2*11)*32 + 3) == (63 << 8) | 28
+
+    assert False
+
+
+def test_compile_math_lib():
+    """First, just make sure this particular class makes it through the compiler."""
+
+    ast = project_12.MATH_CLASS
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    assert len(asm.lines) > 0
+
+
+def test_math_lib_debug(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+    math_test = _parse_jack_file("examples/project_12/MathTest.jack")
+
+    translator = translator_class()
+
+    translator.preamble()
+
+    _translate_raw_jack(translator, project_12.MATH_CLASS)
+
+    _translate_raw_jack(translator, minimal_sys_lib(["Math"]))
+
+    _translate_raw_jack(translator, math_test)
+
+    translator.finish()
+
+    check_references(translator)
+
+    computer = run(chip, simulator=simulator)
+
+    # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
+    translator.asm.trace(assembler, computer, stop_cycles=1_000_000)
+
+    assert computer.peek(8000) == 6,      "multiply(2, 3)"
+    assert computer.peek(8001) == -180,   "multiply(6, -30)"
+    assert computer.peek(8002) == -18000, "multiply(-180, 100)"
+    assert computer.peek(8003) == -18000, "multiply(1, -18000)"
+    assert computer.peek(8004) == 0,      "multiply(-18000, 0)"
+
+    assert computer.peek(8005) == 3,      "divide(9, 3)"
+    assert computer.peek(8006) == -3000,  "divide(-18000, 6)"
+    assert computer.peek(8007) == 0,      "divide(32766, -32767)"
+
+    assert computer.peek(8008) == 3,      "sqrt(9)"
+    assert computer.peek(8009) == 181,    "sqrt(32767)"
+
+    assert computer.peek(8010) == 123,    "min(3445, 123)"
+    assert computer.peek(8011) == 123,    "max(123, -345)"
+    assert computer.peek(8012) == 27,     "abs(27)"
+    assert computer.peek(8013) == 32767,  "abs(-32767)"
 
 
 #
