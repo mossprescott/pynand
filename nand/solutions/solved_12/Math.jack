@@ -114,104 +114,119 @@ class Math {
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
-        var int r, n, rSq, br, nSq;
+        var int t, r, n;
 
         if (x < 0) {
             do Sys.error(1);
         }
 
-        // Hand-unrolled loop: sqrt(32767) = 181, which fits in 8 bits.
-        if (~(x < 16384)) {  // 128^2
-            let r = 128;
-            let rSq = 16384;
-        }
-        else {
-            let r = 0;
-            let rSq = 0;
-        }
+        let t = 128;
+        let r = 0;
+        while (t > 0) {
+            let n = r + t;
+            if (~(x < (n*n))) {  // i.e. x >= n^2
+                let r = n;
+            }
 
-        // All this inlining of multiply calls saves cycles but inflates the code size by about
-        // 600 (or 25% for the class.)
-        // Move it to a "faster and larger" alternative library? Naive translators struggle
-        // to fit programs in ROM. Most programs don't need sqrt to be fast (or need it at all.)
-
-        let n = r + 64;
-        // let br = r+r;    // 2r
-        // let br = br+br;  // 4r
-        // let br = br+br;  // 8r
-        // let br = br+br;  // 16r
-        // let br = br+br;  // 32r
-        // let br = br+br;  // 64r
-        // let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
-        let nSq = rSq + (128*r) + 4096;
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 32;
-        // let br = r+r;    // 2r
-        // let br = br+br;  // 4r
-        // let br = br+br;  // 8r
-        // let br = br+br;  // 16r
-        // let br = br+br;  // 32r
-        // let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
-        let nSq = rSq + (64*r) + 1024;
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 16;
-        // let br = r+r;    // 2r
-        // let br = br+br;  // 4r
-        // let br = br+br;  // 8r
-        // let br = br+br;  // 16r
-        // let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
-        let nSq = rSq + (32*r) + 256;
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 8;
-        // let br = r+r;    // 2r
-        // let br = br+br;  // 4r
-        // let br = br+br;  // 8r
-        // let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
-        let nSq = rSq + (16*r) + 64;
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 4;
-        // let br = r+r;    // 2r
-        // let br = br+br;  // 4r
-        // let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
-        let nSq = rSq + (8*r) + 16;
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 2;
-        // let br = r+r;    // 2r
-        // let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
-        let nSq = rSq + (4*r) + 4;  // n^2 = r^2 + 4r + 2^2
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
-        }
-
-        let n = r + 1;
-        let nSq = rSq + (r + r) + 1;  // n^2 = r^2 + 2r + 1
-        if (~(x < nSq)) {
-            let r = n;
-            let rSq = nSq;
+            let t = t/2;
         }
 
         return r;
+
+        // All this inlining of multiply/divide calls saves cycles but inflates the code size
+        // by a huge factor, like maybe 150% for the whole class.
+        // Move it to a "faster and larger" alternative library? Naive translators struggle
+        // to fit programs in ROM. Most programs don't need sqrt to be fast (or need it at all.)
+
+        // var int r, n, rSq, br, nSq;
+
+        // // Hand-unrolled loop: sqrt(32767) = 181, which fits in 8 bits.
+        // if (~(x < 16384)) {  // 128^2
+        //     let r = 128;
+        //     let rSq = 16384;
+        // }
+        // else {
+        //     let r = 0;
+        //     let rSq = 0;
+        // }
+
+        // let n = r + 64;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let br = br+br;  // 32r
+        // // let br = br+br;  // 64r
+        // // let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
+        // let nSq = rSq + (128*r) + 4096;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 32;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let br = br+br;  // 32r
+        // // let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
+        // let nSq = rSq + (64*r) + 1024;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 16;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
+        // let nSq = rSq + (32*r) + 256;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 8;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
+        // let nSq = rSq + (16*r) + 64;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 4;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
+        // let nSq = rSq + (8*r) + 16;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 2;
+        // // let br = r+r;    // 2r
+        // // let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
+        // let nSq = rSq + (4*r) + 4;  // n^2 = r^2 + 4r + 2^2
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 1;
+        // let nSq = rSq + (r + r) + 1;  // n^2 = r^2 + 2r + 1
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // return r;
     }
 
     /** Returns the greater number. */
