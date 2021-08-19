@@ -475,6 +475,13 @@ MATH_CLASS = jack_ast.Class(
 
 # SOLVERS: if you assume these fields you can implement the methods below one at a time
 SCREEN_CLASS_VARS = parse_classVarDecs("""
+    static boolean color;
+
+    // Array of 16 masks, each with the corresponding pixel set:
+    static Array pixels;
+
+    // Array of 16 masks, each with the corresponding pixel, and its neighbors to the left, set:
+    static Array leftPixels;
 """)
 
 SCREEN_INIT = solved_12.SCREEN_INIT
