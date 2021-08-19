@@ -74,6 +74,7 @@ class Output {
             return;
         }
 
+        // For the benefit of tests and terminal users, also write the character to the "tty" port:
         let tty = 24576;  // 0x6000
         let tty[0] = c;
 

@@ -164,32 +164,84 @@ def test_compile_keyboard_lib():
 
     assert len(asm.lines) > 0
 
-# def test_keyboard_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
-#     # Note: this one's not so useful interactively, but easier to view anyway
-#     keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack")
+def test_keyboard_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+    # Note: this one's not so useful interactively, but easier to view anyway
+    keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack")
 
-#     translator = translator_class()
+    translator = translator_class()
 
-#     translator.preamble()
+    translator.preamble()
 
-#     _translate_raw_jack(translator, project_12.KEYBOARD_CLASS)
+    _translate_raw_jack(translator, project_12.KEYBOARD_CLASS)
 
-#     # Dependencies; note: need Sys.init to intialize Memory, but don't want the built-in implementation.
-#     _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
-#     _translate_raw_jack(translator, minimal_sys_lib("Memory"))
+    _translate_raw_jack(translator, MINIMAL_OUTPUT_LIB)
+    _translate_dependencies(translator, ["Array", "Memory", "Math", "String"])
 
-#     _translate_raw_jack(translator, keyboard_test)
+    _translate_raw_jack(translator, keyboard_test)
 
-#     translator.finish()
+    translator.finish()
 
-#     check_references(translator)
+    check_references(translator)
 
-#     computer = run(chip, simulator=simulator)
+    computer = run(chip, simulator=simulator)
 
-#     # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
-#     translator.asm.trace(assembler, computer, stop_cycles=10_000)
+    # TODO: put this stop-start running into a utility somewhere (translate.py?)
+    # Also, make it smarter about how long to wait. Maybe: wait_for_output(), which
+    # will run a lot of cycles if needed, but stops not long after the output shows
+    # up.
 
-#     # TODO
+    asm = assembler(translator.asm)
+    computer.init_rom(asm)
+
+    output = ""
+
+    def crank(cycles=100_000):
+        """Run for a while, checking the tty for output every few cycles."""
+        nonlocal output
+        for _ in range(cycles//100):
+            computer.ticktock(cycles=100)
+            computer.ticktock()
+            c = computer.get_tty()
+            if c != 0:
+                if c == 128:
+                    output += "\n"
+                else:
+                    output += chr(c)
+
+    def type_key(code):
+        computer.set_keydown(code)
+        crank()
+        computer.set_keydown(0)
+        crank()
+
+    crank(1_000_000)
+
+    assert output.endswith("Please press the 'Page Down' key")
+
+    type_key(137)  # page down
+
+    assert output.endswith("Please press the number '3': ")
+
+    type_key(ord("3"))
+
+    assert "Please press the number '3': 3\nok\n" in output
+
+    type_key(ord("J"))
+    type_key(ord("A"))
+    type_key(ord("C"))
+    type_key(ord("C"))
+    type_key(129)  # backspace
+    type_key(ord("K"))
+    type_key(128)  # newline
+
+    # Note: the backspace is ignored by the TTY-only Output impl.
+    assert "Please type 'JACK' and press enter: JACCK\nok\n" in output
+
+    for c in "-32123":
+        type_key(ord(c))
+    type_key(128)  # newline
+
+    assert output.endswith("Test completed successfully")
 
 
 def test_compile_output_lib():
@@ -243,7 +295,7 @@ def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assembl
     # The top line of the adjacent characters "6" and "7":
     assert computer.peek_screen((2*11)*32 + 3) == (63 << 8) | 28
 
-    assert False
+# TODO: Output.println wraps back to the top of the screen after 23 lines
 
 
 def test_compile_math_lib():
@@ -333,8 +385,8 @@ def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     computer = run(chip, simulator=simulator)
 
-    # translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
-    translator.asm.trace(assembler, computer, stop_cycles=1_000_000)
+    # translator.asm.run(assembler, computer, stop_cycles=3_000_000, debug=True)
+    translator.asm.trace(assembler, computer, stop_cycles=3_000_000)
 
     # TODO: spot check some pixels
     assert False
@@ -458,7 +510,8 @@ class Sys {
     }
 
     function void error(int errorCode) {
-        // would be nice to write the code, but don't want o depend on the Output library.
+        // TODO: it would be nice to write the code, but don't want to depend on the OutputString library.
+        // Maybe a simpler version here writing to the port directly?
         // var Array tty;
         // let tty = 24576; // 0x6000
         // let tty[0] = ...;
