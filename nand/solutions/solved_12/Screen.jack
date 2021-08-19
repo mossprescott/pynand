@@ -195,7 +195,29 @@ class Screen {
 
     /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
     function void drawCircle(int x, int y, int r) {
-        // TODO
+        // Note drawing in one direction (down from the top) is slower (twice as many sqrt()s),
+        // but looks nicer. Actually, the authors' version draws four lines at a time, which
+        // looks super goofy.
+
+        // Adding 1/2 the the radius smooths out the compass points, but also results in a circle
+        // that's one pixel larger in each dimension then the authors' rendering.
+
+        var int dx, dy;
+        var int rSq;
+
+        if (r > 181) {
+            return;
+        }
+
+        let rSq = (r*r) + r;  // (r + 1/2)^2 = r^2 + r (+ 1/4)
+
+        let dy = -r;
+        while (~(dy > r)) {  // i.e. dy <= r
+            let dx = Math.sqrt(rSq - (dy*dy));
+            do Screen.drawRectangle(x - dx, y + dy, x + dx, y + dy);
+            let dy = dy + 1;
+        }
+
         return;
     }
 }
