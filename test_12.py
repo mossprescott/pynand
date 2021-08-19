@@ -297,6 +297,11 @@ def test_math_lib(chip=project_05.Computer, assembler=project_06.assemble, trans
     assert computer.peek(8012) == 27,     "abs(27)"
     assert computer.peek(8013) == 32767,  "abs(-32767)"
 
+    # Additional cases:
+    assert computer.peek(8014) == 3000,   "30000/10"
+    assert computer.peek(8015) == -3276,  "-32767/10"
+    assert computer.peek(8016) == -32768, "abs(-32768)"
+
 
 def test_compile_screen_lib():
     """First, just make sure this particular class makes it through the compiler."""

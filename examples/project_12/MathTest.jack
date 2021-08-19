@@ -30,6 +30,11 @@ class Main {
         let r[12] = Math.abs(27);          // 27
         let r[13] = Math.abs(-32767);      // 32767
 
+        // Additional cases:
+        let r[14] = (30000) / 10;          // 3000
+        let r[15] = (-32767) / 10;         // -3276
+        let r[16] = Math.abs(-32767 - 1);  // -32768!! Not pretty, but typical.
+
         return;
     }
 }
