@@ -199,23 +199,25 @@ class Screen {
         // but looks nicer. Actually, the authors' version draws four lines at a time, which
         // looks super goofy.
 
-        // Adding 1/2 the the radius smooths out the compass points, but also results in a circle
-        // that's one pixel larger in each dimension then the authors' rendering.
+        // Subtracting 1/2 from the radius smooths out the compass points, and duplicating
+        // the middle row restores the expected radius, or at least reproduces something close
+        // to the authors' rendering. Actually, theirs isn't even round!
 
-        var int dx, dy;
+        var int i, dy, dx;
         var int rSq;
 
         if (r > 181) {
             return;
         }
 
-        let rSq = (r*r) + r;  // (r + 1/2)^2 = r^2 + r (+ 1/4)
+        let rSq = (r*r) - r;  // (r - 1/2)^2 = r^2 - r (+ 1/4)
 
-        let dy = -r;
-        while (~(dy > r)) {  // i.e. dy <= r
+        let i = -r + 1;
+        while (~(i > r)) {  // i.e. i <= r
+            if (i > 0) { let dy = i - 1; } else { let dy = i; }
             let dx = Math.sqrt(rSq - (dy*dy));
             do Screen.drawRectangle(x - dx, y + dy, x + dx, y + dy);
-            let dy = dy + 1;
+            let i = i + 1;
         }
 
         return;
