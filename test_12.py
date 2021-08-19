@@ -412,9 +412,26 @@ LIBS_WITH_INIT = ["Memory", "Math", "Screen", "Output", "Keyboard"]
 def _translate_dependencies(translator, libs):
     _translate_raw_jack(translator, minimal_sys_lib(libs))
     for lib in libs:
-        # TEMP: until solved_12 has real implementations
-        print(f"Warning: translating original impl: {lib}")
-        _translate_raw_vm(translator, f"nand2tetris/tools/OS/{lib}.vm")
+        # # TEMP: until solved_12 has real implementations
+        # print(f"Warning: translating original impl: {lib}")
+        # _translate_raw_vm(translator, f"nand2tetris/tools/OS/{lib}.vm")
+        if lib == "Memory":
+            _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
+        elif lib == "Math":
+            _translate_raw_jack(translator, solved_12._MATH_CLASS)
+        elif lib == "Screen":
+            _translate_raw_jack(translator, solved_12._SCREEN_CLASS)
+        elif lib == "Output":
+            _translate_raw_jack(translator, solved_12._OUTPUT_CLASS)
+        elif lib == "Keyboard":
+            _translate_raw_jack(translator, solved_12._KEYBOARD_CLASS)
+        elif lib == "Array":
+            _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
+        elif lib == "String":
+            _translate_raw_jack(translator, solved_12._STRING_CLASS)
+        else:
+            raise Exception(f"Unknown class: {lib}")
+
 
 
 def minimal_sys_lib(libs):
