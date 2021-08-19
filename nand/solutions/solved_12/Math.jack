@@ -74,7 +74,7 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
-        // TODO: can this recursion be turned into a loop, to avoid the overhaed of function calls?
+        // TODO: can this recursion be turned into a loop, to avoid the overhead of function calls?
         // You would have to put the "shiftedY" value onto a stack or something, since you can't
         // recover the previous value (unless your ALU provides right-shift, hint, hint.)
         // Failing that, probably at least inline the multiplication, because we know both
@@ -130,64 +130,75 @@ class Math {
             let rSq = 0;
         }
 
+        // All this inlining of multiply calls saves cycles but inflates the code size by about
+        // 600 (or 25% for the class.)
+        // Move it to a "faster and larger" alternative library? Naive translators struggle
+        // to fit programs in ROM. Most programs don't need sqrt to be fast (or need it at all.)
+
         let n = r + 64;
-        let br = r+r;    // 2r
-        let br = br+br;  // 4r
-        let br = br+br;  // 8r
-        let br = br+br;  // 16r
-        let br = br+br;  // 32r
-        let br = br+br;  // 64r
-        let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
+        // let br = r+r;    // 2r
+        // let br = br+br;  // 4r
+        // let br = br+br;  // 8r
+        // let br = br+br;  // 16r
+        // let br = br+br;  // 32r
+        // let br = br+br;  // 64r
+        // let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
+        let nSq = rSq + (128*r) + 4096;
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 32;
-        let br = r+r;    // 2r
-        let br = br+br;  // 4r
-        let br = br+br;  // 8r
-        let br = br+br;  // 16r
-        let br = br+br;  // 32r
-        let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
+        // let br = r+r;    // 2r
+        // let br = br+br;  // 4r
+        // let br = br+br;  // 8r
+        // let br = br+br;  // 16r
+        // let br = br+br;  // 32r
+        // let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
+        let nSq = rSq + (64*r) + 1024;
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 16;
-        let br = r+r;    // 2r
-        let br = br+br;  // 4r
-        let br = br+br;  // 8r
-        let br = br+br;  // 16r
-        let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
+        // let br = r+r;    // 2r
+        // let br = br+br;  // 4r
+        // let br = br+br;  // 8r
+        // let br = br+br;  // 16r
+        // let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
+        let nSq = rSq + (32*r) + 256;
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 8;
-        let br = r+r;    // 2r
-        let br = br+br;  // 4r
-        let br = br+br;  // 8r
-        let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
+        // let br = r+r;    // 2r
+        // let br = br+br;  // 4r
+        // let br = br+br;  // 8r
+        // let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
+        let nSq = rSq + (16*r) + 64;
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 4;
-        let br = r+r;    // 2r
-        let br = br+br;  // 4r
-        let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
+        // let br = r+r;    // 2r
+        // let br = br+br;  // 4r
+        // let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
+        let nSq = rSq + (8*r) + 16;
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
         }
 
         let n = r + 2;
-        let br = r+r;    // 2r
-        let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
+        // let br = r+r;    // 2r
+        // let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
+        let nSq = rSq + (4*r) + 4;  // n^2 = r^2 + 4r + 2^2
         if (~(x < nSq)) {
             let r = n;
             let rSq = nSq;
