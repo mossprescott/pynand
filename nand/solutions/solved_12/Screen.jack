@@ -10,42 +10,186 @@
  * the screen is indexed (0,0).
  */
 class Screen {
+    static boolean color;
+
+    // Array of 16 masks, each with the corresponding pixel set:
+    static Array pixels;
+
+    // Array of 16 masks, each with the corresponding pixel, and its neighbors to the left, set:
+    static Array leftPixels;
 
     /** Initializes the Screen. */
     function void init() {
-        // TODO
+        var int x, bit, leftBits;
+
+        let color = true;
+
+        let pixels = Array.new(16);
+        let leftPixels = Array.new(16);
+        let x = 0;
+        let bit = 1;
+        let leftBits = 1;
+        while (x < 16) {
+            let pixels[x] = bit;
+            let leftPixels[x] = leftBits;
+            let x = x + 1;
+            let bit = bit + bit;
+            let leftBits = leftBits + leftBits + 1;
+        }
+        // let leftPixels[9] = 5 + 16*5;
+
         return;
     }
 
     /** Erases the entire screen. */
     function void clearScreen() {
-        // TODO
+        var Array screen;
+
+        let screen = 16384;
+
+        while (screen < 24576) {
+            // Unroll a bit to reduce the loop overhead. As long as it divides the row stride: 512/16 = 32
+            let screen[0] = 0;
+            let screen[1] = 0;
+            let screen[2] = 0;
+            let screen[3] = 0;
+            let screen = screen + 4;
+        }
+
         return;
     }
 
     /** Sets the current color, to be used for all subsequent drawXXX commands.
      *  Black is represented by true, white by false. */
     function void setColor(boolean b) {
-        // TODO
+        // Note: explicitly `true` so *all* the bits are set.
+        if (b) {
+            let color = true;
+        }
+        else {
+            let color = false;
+        }
+
         return;
     }
 
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
-        // TODO
+        var int word, mask;
+        var Array ptr;
+
+        if ((x < 0) | (x > 511) | (y < 0) | (y > 255)) {
+            return;
+        }
+
+        let word = x/16;
+        let mask = pixels[x - (word*16)];
+        let ptr = 16384 + (32*y) + word;
+
+        let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
         return;
     }
 
     /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
     function void drawLine(int x1, int y1, int x2, int y2) {
-        // TODO
+        var int start, end, word, wordX, mask;
+        var Array ptr;
+
+        if (y1 = y2) {
+            // This case has to be fast, because it's used for drawRectangle, which is
+            // the only one anybody expects to be quick. Note: min/max for input validation
+            // is currently a large chunk of the time. TODO: factor that out when using
+            // drawRectangle.
+
+            let start = Math.max(0, Math.min(x1, x2));
+            let end = Math.min(511, Math.max(x1, x2));
+
+            // Inlined and un-rolled:
+            // let word = start/16;
+            let word = 0;
+            if (start & 16) { let word = 1; }
+            if (start & 32) { let word = word + 2; }
+            if (start & 64) { let word = word + 4; }
+            if (start & 128) { let word = word + 8; }
+            if (start & 256) { let word = word + 16; }
+
+            // wordX = word*16; // i.e. start % 16
+            let wordX = start & ~15;
+
+            // ptr = 16384 + (32*y1) + word
+            let ptr = y1 + y1;    // 2*y1
+            let ptr = ptr + ptr;  // 4*y1
+            let ptr = ptr + ptr;  // 8*y1
+            let ptr = ptr + ptr;  // 16*y1
+            let ptr = ptr + ptr;  // 32*y1
+            let ptr = 16384 + ptr + word;
+
+            // First mask off a partial word on the left, if needed:
+            if (start > wordX) {
+                let mask = ~leftPixels[(start - wordX) - 1];
+                if (end < (wordX + 15)) {
+                    let mask = mask & leftPixels[end - wordX];
+                }
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                // let word = word + 1;  // unused
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Now a fast loop for any whole words:
+            while (~((wordX+16) > end)) {  // i.e. wordX + 16 <= end
+                let ptr[0] = color;
+
+                // let word = word + 1;  // unused
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Finally, mask off any partial word on the right:
+            if (~(wordX > end)) {  // i.e. wordX <= end
+                let mask = leftPixels[end - wordX];
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                // no need to update the state
+            }
+
+            return;
+        }
+
+        if (x1 = x2) {
+            let start = Math.min(y1, y2);
+            let end = Math.max(y1, y2);
+            while (~(start > end)) {
+                // TODO: inline and do the masking and ptr arithmetic directly here
+                do Screen.drawPixel(x1, start);
+                let start = start + 1;
+            }
+
+            return;
+        }
+
+        // TODO: Bresenham
+
         return;
     }
 
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
-        // TODO
+        var Array ptr;
+        var int y_start, y_end;
+        var int x_start, x_end;
+
+        let y_start = Math.max(0, Math.min(y1, y2));
+        let y_end = Math.min(255, Math.max(y1, y2));
+
+        while (~(y_start > y_end)) {  // i.e. y_start <= y_end
+            do Screen.drawLine(x1, y_start, x2, y_start);
+            let y_start = y_start + 1;
+        }
+
         return;
     }
 
