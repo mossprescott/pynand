@@ -457,8 +457,15 @@ class Output {
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
-        let cursorY = cursorY + 1;
+        if (cursorY = 22) {
+            let cursorY = 0;
+        }
+        else {
+            let cursorY = cursorY + 1;
+        }
+
         let cursorX = 0;
+
         return;
     }
 
