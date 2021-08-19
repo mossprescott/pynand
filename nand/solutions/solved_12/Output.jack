@@ -473,6 +473,8 @@ class Output {
     function void backSpace() {
         if (cursorX > 0) {
             let cursorX = cursorX - 1;
+            do Output.printChar(32);  // " "
+            let cursorX = cursorX - 1;
         }
         return;
     }
