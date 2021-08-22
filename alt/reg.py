@@ -94,10 +94,11 @@ class While(NamedTuple):
     body: Sequence["Stmt"]
 
 class Return(NamedTuple):
-    value: "Value"
+    """Effectively, Push and then the return sequence."""
+    expr: "Expr"
 
 class Push(NamedTuple):
-    """Used only with Subroutine calls. Acts like Assign, but the destination is the stack."""
+    """Used only with Subroutine calls. Acts like Eval, but the destination is the stack."""
     expr: "Expr"
 
 class Discard(NamedTuple):
@@ -184,13 +185,15 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     solved_11.handle_subroutine_var_declarations(ast, symbol_table)
 
     extra_var_count = 0
-    def next_var() -> Local:
+    def next_var(name: Optional[str] = None) -> Local:
         nonlocal extra_var_count
-        name = f"${extra_var_count}"
+        name = f"${name or ''}{extra_var_count}"
         extra_var_count += 1
         return Local(name)
 
     def resolve_name(name: str) -> Union[Local, Location]:
+        # TODO: this makes sense for locals, arguments, and statics, but "this" needs to get flattened.
+        # How to deal with that?
         kind = symbol_table.kind_of(name)
         if kind == "local":
             return Local(name)
@@ -201,12 +204,23 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     def flatten_statement(stmt: jack_ast.Statement) -> List[Stmt]:
         if isinstance(stmt, jack_ast.LetStatement):
             if stmt.array_index is None:
+                loc = resolve_name(stmt.name)
+                if isinstance(loc, Local):
                 expr_stmts, expr = flatten_expression(stmt.expr, force=False)
-                var = resolve_name(stmt.name)
-                if isinstance(var, Local):
-                    let_stmt = Eval(dest=var, expr=expr)
+                    let_stmt = Eval(dest=loc, expr=expr)
+                    return expr_stmts + [let_stmt]
+                elif loc.kind == "this":
+                    this_var = next_var("this")
+                    addr_var = next_var(loc.name)
+                    addr_stmts = [
+                        Eval(this_var, Location("argument", 0, "self")),
+                        Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))
+                    ]
+                    value_stmts, value_expr = flatten_expression(stmt.expr)
+                    return value_stmts + addr_stmts + [IndirectWrite(addr_var, value_expr)]
                 else:
-                    let_stmt = Store(var.kind, var.index, var.name, expr)
+                    expr_stmts, expr = flatten_expression(stmt.expr, force=True)
+                    let_stmt = Store(loc, expr)
                 return expr_stmts + [let_stmt]
             else:
                 value_stmts, value_expr = flatten_expression(stmt.expr)
@@ -228,14 +242,13 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             body_stmts = [fs for s in stmt.body for fs in flatten_statement(s)]
             # TODO: inspect the condition and figure out cmp
             return [While(cond_stmts, cond, "!=", body_stmts)]
-
         elif isinstance(stmt, jack_ast.DoStatement):
             stmts, expr = flatten_expression(stmt.expr, force=False)
             return stmts + [Discard(expr)]
 
         elif isinstance(stmt, jack_ast.ReturnStatement):
             if stmt.expr is not None:
-                stmts, expr = flatten_expression(stmt.expr)
+                stmts, expr = flatten_expression(stmt.expr, force=False)
                 return stmts + [Return(expr)]
             else:
                 return [Return(Const(0))]
@@ -270,12 +283,20 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 raise Exception(f"Unknown keyword constant: {expr}")
 
         elif isinstance(expr, jack_ast.VarRef):
-            var = resolve_name(expr.name)
-            if isinstance(var, Local):
-                return [], var  # Never wrapped
+            loc = resolve_name(expr.name)
+            if isinstance(loc, Local):
+                return [], loc  # Never wrapped
+            elif loc.kind == "this":
+                this_var = next_var("this")
+                addr_var = next_var(loc.name)
+                stmts = [
+                    Eval(this_var, Location("argument", 0, "self")),
+                    Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index))),
+                ]
+                flat_expr = IndirectRead(addr_var)
             else:
                 stmts = []
-                flat_expr = var
+                flat_expr = loc
 
         elif isinstance(expr, jack_ast.StringConstant):
             # Tricky: the result of each call is the string, which is the first argument to the
@@ -306,7 +327,8 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 stmts = arg_stmts
                 flat_expr = CallSub(expr.class_name, expr.sub_name, len(expr.args))
             elif expr.var_name is not None:
-                stmts = [Push(resolve_name(expr.var_name))] + arg_stmts
+                instance_stmts, instance_expr = flatten_expression(jack_ast.VarRef(expr.var_name), force=False)
+                stmts = instance_stmts + [Push(instance_expr)] + arg_stmts
                 target_class = symbol_table.type_of(expr.var_name)
                 flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
             else:
@@ -490,7 +512,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
             stmt, live_set = stmt2, live_set_at_top2
 
         elif isinstance(stmt, Return):
-            read.update(refs(stmt.value))
+            read.update(refs(stmt.expr))
         elif isinstance(stmt, Push):
             read.update(refs(stmt.expr))
         elif isinstance(stmt, Discard):
@@ -555,15 +577,15 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
     """
 
     extra_var_count = 0
-    def next_var() -> Local:
+    def next_var(name: Optional[str] = None) -> Local:
         nonlocal extra_var_count
-        name = f"${prefix}{extra_var_count}"
+        name = f"${prefix}{name or ''}{extra_var_count}"
         extra_var_count += 1
         return Local(name)
 
     def rewrite_value(value: Value) -> Tuple[Sequence[Stmt], Value]:
         if value in map:
-            var = next_var()
+            var = next_var(map[value].name)
             return [Eval(var, map[value])], var
         else:
             return [], value
@@ -596,12 +618,17 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
                 if isinstance(expr, (Const, Local)):
                     return expr_stmts + [Store(map[stmt.dest], expr)]
                 else:
-                    var = next_var()
+                    var = next_var(map[stmt.dest].name)
                     return expr_stmts + [Eval(var, expr), Store(map[stmt.dest], var)]
             else:
                 return expr_stmts + [Eval(stmt.dest, expr)]
-        elif isinstance(stmt, (IndirectWrite, Store, Return, Discard)):
-            return [stmt]
+        elif isinstance(stmt, IndirectWrite):
+            address_stmts, address_value = rewrite_value(stmt.address)
+            value_stmts, value_value = rewrite_value(stmt.value)
+            return address_stmts + value_stmts + [IndirectWrite(address_value, value_value)]
+        elif isinstance(stmt, Store):
+            value_stmts, value = rewrite_expr(stmt.value)
+            return value_stmts + [Store(stmt.location, value)]
         elif isinstance(stmt, If):
             test = rewrite_statements(stmt.test)
             value_stmts, value = rewrite_expr(stmt.value)
@@ -613,9 +640,14 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             value_stmts, value = rewrite_expr(stmt.value)
             body = rewrite_statements(stmt.body)
             return [While(test + value_stmts, value, stmt.cmp, body)]
+        elif isinstance(stmt, Return):
+            value_stmts, value = rewrite_expr(stmt.expr)
+            return value_stmts + [Return(value)]
         elif isinstance(stmt, Push):
             expr_stmts, expr = rewrite_expr(stmt.expr)
             return expr_stmts + [Push(expr)]
+        elif isinstance(stmt, Discard):
+            return [stmt]
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
