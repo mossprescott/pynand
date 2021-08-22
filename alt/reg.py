@@ -821,7 +821,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             body = rewrite_statements(stmt.body)
             return While(test, value, stmt.cmp, body)
         elif isinstance(stmt, Return):
-            value = rewrite_value(stmt.value)
+            value = rewrite_expr(stmt.expr)
             return Return(value)
         elif isinstance(stmt, Push):
             expr = rewrite_expr(stmt.expr)
@@ -938,6 +938,7 @@ class Translator(solved_07.Translator):
     # Statements:
 
     def handle_Eval(self, ast: Eval):
+        if not isinstance(ast.expr, CallSub):
         self.asm.start(_Stmt_str(ast))
 
         # Do the update in-place if possible:
@@ -961,6 +962,10 @@ class Translator(solved_07.Translator):
             return
 
         self._handle(ast.expr)
+
+        if isinstance(ast.expr, CallSub):
+            self.asm.start(f"{_Expr_str(ast.dest)} = <result>")
+
         self.asm.instr(f"@R{5+ast.dest.index}")
         self.asm.instr("M=D")
 
@@ -1083,8 +1088,11 @@ class Translator(solved_07.Translator):
         self.asm.label(end_label)
 
     def handle_Return(self, ast: Return):
-        self.asm.start(f"push {_Expr_str(ast.value)} (for return)")
-        self._handle(ast.value)
+        self.asm.start(f"push {_Expr_str(ast.expr)} (for return)")
+
+        # TODO: special-case Return CallSub to skip popping the stack?
+
+        self._handle(ast.expr)
         self.asm.instr("@SP")
         self.asm.instr("M=M+1")
         self.asm.instr("A=M-1")
@@ -1094,7 +1102,7 @@ class Translator(solved_07.Translator):
     def handle_Push(self, ast):
         self.asm.start(_Stmt_str(ast))
 
-        # TODO: special-case Push CallSub to skip popping the stack
+        # TODO: special-case Push CallSub to skip popping the stack?
 
         self._handle(ast.expr)
         self.asm.instr("@SP")
@@ -1252,7 +1260,7 @@ class Translator(solved_07.Translator):
 
     def value_to_a(self, ast: Union[Reg, Const]):
         """Load a register or constant value into A, without overwriting D, and in one less cycle,
-        is some cases."""
+        in some cases."""
 
         if isinstance(ast, Reg):
             self.asm.instr(f"@R{5+ast.index}")
@@ -1304,7 +1312,7 @@ def _Stmt_str(stmt: Stmt) -> str:
     elif isinstance(stmt, While):
         return f"while ({'; '.join(_Stmt_str(s) for s in stmt.test)}; {_Expr_str(stmt.value)} {stmt.cmp} zero)\n" + jack_ast._indent("\n".join(_Stmt_str(s) for s in stmt.body))
     elif isinstance(stmt, Return):
-        return f"return {_Expr_str(stmt.value)}"
+        return f"return {_Expr_str(stmt.expr)}"
     elif isinstance(stmt, Push):
         return f"push {_Expr_str(stmt.expr)}"
     elif isinstance(stmt, Discard):
@@ -1327,9 +1335,9 @@ def _Expr_str(expr: Expr) -> str:
     elif isinstance(expr, Local):
         return f"{expr.name}"
     elif isinstance(expr, Location):
-        return f"{expr.kind}[{expr.index}] ({expr.name})"
+        return f"{expr.name} ({expr.kind} {expr.index})"
     elif isinstance(expr, Reg):
-        return f"r{expr.index} ({expr.name})"
+        return f"{expr.name} (r{expr.index})"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
