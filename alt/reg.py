@@ -929,7 +929,7 @@ class Translator(solved_07.Translator):
         kind, index = ast.location.kind, ast.location.index
         if kind == "static":
             self._handle(ast.value)
-            self.asm.instr(f"@<TODO>.static{index}")
+            self.asm.instr(f"@{self.class_namespace}.static{index}")
             self.asm.instr("M=D")
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
@@ -956,7 +956,8 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{index}")
                 self.asm.instr("D=A")
                 self.asm.instr("@LCL")
-                self.asm.instr("@R15")  # code smell: this isn't actually atomic
+                self.asm.instr("D=M+D")
+                self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
                 self.asm.instr("M=D")
                 self._handle(ast.value)
                 self.asm.instr("@R15")
