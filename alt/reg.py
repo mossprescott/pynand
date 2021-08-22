@@ -1356,4 +1356,45 @@ if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
 
-    computer.main(REG_PLATFORM)
+    # HACK: until the compiler/translator is wired into Platform
+    # computer.main(REG_PLATFORM)
+
+    import os
+    from nand.solutions import solved_10, solved_12
+
+    platform = REG_PLATFORM
+
+    args = computer.parser.parse_args()
+    print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
+
+    translator = Translator()
+
+    def load_file(path):
+        with open(path) as f:
+            src = "\n".join(f.readlines())
+            ast = solved_10.parse_class(src)
+        compile_class(ast, translator)
+
+    if os.path.isdir(args.path):
+        for fn in os.listdir(args.path):
+            load_file(os.path.join(args.path, fn))
+    else:
+        load_file(args.path)
+
+    for lib_ast in solved_12._OS_CLASSES:
+        compile_class(lib_ast, translator)
+
+    if args.print:
+        for l in translator.asm:
+            print(l)
+
+    prg = platform.assemble(translator.asm)
+    src_map = translator.asm.src_map
+
+    print(f"Size in ROM: {len(prg):0,d}")
+
+    computer.run(prg,
+        chip=platform.chip,
+        name=args.path,
+        simulator=args.simulator,
+        src_map=src_map if args.trace else None)
