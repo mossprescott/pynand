@@ -191,6 +191,11 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         extra_var_count += 1
         return Local(name)
 
+    if ast.kind == "method":
+        this_expr = Location("argument", 0, "this")
+    elif ast.kind == "constructor":
+        this_expr = next_var("this")
+
     def resolve_name(name: str) -> Union[Local, Location]:
         # TODO: this makes sense for locals, arguments, and statics, but "this" needs to get flattened.
         # How to deal with that?
@@ -210,14 +215,18 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     let_stmt = Eval(dest=loc, expr=expr)
                     return expr_stmts + [let_stmt]
                 elif loc.kind == "this":
+                    if isinstance(this_expr, Local):
+                        this_var = this_expr
+                        this_stmts = []
+                    else:
                     this_var = next_var("this")
+                        this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
                     addr_var = next_var(loc.name)
                     addr_stmts = [
-                        Eval(this_var, Location("argument", 0, "self")),
                         Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))
                     ]
                     value_stmts, value_expr = flatten_expression(stmt.expr)
-                    return value_stmts + addr_stmts + [IndirectWrite(addr_var, value_expr)]
+                    return value_stmts + this_stmts + addr_stmts + [IndirectWrite(addr_var, value_expr)]
                 else:
                     expr_stmts, expr = flatten_expression(stmt.expr, force=True)
                     let_stmt = Store(loc, expr)
@@ -278,7 +287,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 return [], Const(0)  # Never wrapped
             elif expr.value == "this":
                 stmts = []
-                flat_expr = Location("argument", 0, "this")
+                flat_expr = this_expr
             else:
                 raise Exception(f"Unknown keyword constant: {expr}")
 
@@ -287,10 +296,14 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             if isinstance(loc, Local):
                 return [], loc  # Never wrapped
             elif loc.kind == "this":
+                if isinstance(this_expr, Local):
+                    this_var = this_expr
+                    this_stmts = []
+                else:
                 this_var = next_var("this")
+                    this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
                 addr_var = next_var(loc.name)
-                stmts = [
-                    Eval(this_var, Location("argument", 0, "self")),
+                stmts = this_stmts + [
                     Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index))),
                 ]
                 flat_expr = IndirectRead(addr_var)
@@ -332,7 +345,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 target_class = symbol_table.type_of(expr.var_name)
                 flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
             else:
-                stmts = [Push(Location("argument", 0, "this"))] + arg_stmts
+                stmts = [Push(this_expr)] + arg_stmts
                 target_class = symbol_table.class_name
                 flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
 
@@ -367,7 +380,20 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         else:
             return stmts, flat_expr
 
-    statements = [ fs
+    if ast.kind == "function":
+        preamble_stmts = []
+    elif ast.kind == "method":
+        preamble_stmts = []
+    elif ast.kind == "constructor":
+        instance_word_count = symbol_table.count("this")
+        preamble_stmts = [
+            Push(Const(instance_word_count)),
+            Eval(this_expr, CallSub("Memory", "alloc", 1)),
+        ]
+    else:
+        raise Exception(f"Unknown subroutine kind: {ast}")
+
+    statements = preamble_stmts + [ fs
         for s in ast.body.statements
         for fs in flatten_statement(s)
     ]
