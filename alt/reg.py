@@ -725,17 +725,13 @@ def color_graph(vertices: Sequence[V], edges: Sequence[Tuple[V, V]]) -> List[Set
     return color_sets
 
 
-def allocate_registers(liveness: Sequence[LiveStmt], reg_count: int = 8) -> Dict[Local, Reg]:
-    """Color the liveness graph (in a super dumb way), and assign each Local to a specific register
-    such that:
-    - no two locals that are alive at the same time share the same register
-    - when one local is the source and another the destination of a particular operation,
-        they share the same register, where possible
+def color_locals(liveness: Sequence[LiveStmt]) -> List[Set[Local]]:
+    """Color the liveness graph (in a super dumb way), grouping locals such that:
+    - no two locals that are alive at the same time are in the same set
+    - TODO: when one local is the source and another the destination of a particular operation,
+        they're in the same group
 
     But mostly the first thing.
-
-    Currently very dumb. If there's much pressure at all (more than a few locals live at any one time),
-    it's likely to just give up and fail.)
     """
 
     vars: Set[Local] = set()
@@ -764,16 +760,10 @@ def allocate_registers(liveness: Sequence[LiveStmt], reg_count: int = 8) -> Dict
     visit_stmts(liveness)
 
     color_sets = color_graph(vertices=vars, edges=overlaps)
+    # import pprint
+    # pprint.pprint(color_sets)
 
-    if len(color_sets) > reg_count:
-        raise Exception("Unable to fit local variables in {reg_count} registers. Please contact your chip vendor.")
-        # Someday, choose a small color_set and promote its variables (that is, spill them). Repeat as necessary.
-
-    return {
-        l: Reg(index=c, name=l.name)
-        for c, ls in enumerate(color_sets)
-        for l in ls
-    }
+    return color_sets
 
 
 def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]:
@@ -855,34 +845,59 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
     with additional temporary variables.
     """
 
+    # TODO: treat THIS and THAT as additional locations for "saved" vars.
+    # TODO: color vars needing saving as well? probably not worth it for stack-allocated.
+
+    promoted_count = 0
+    def next_location(var: Local) -> Location:
+        nonlocal promoted_count
+        loc = Location("local", promoted_count, var.name)
+        promoted_count += 1
+        return loc
+
     liveness = analyze_liveness(ast.body)
 
     need_promotion = need_saving(liveness)
-    # print(f"need saving: {need_promotion}")
 
-    promoted = promote_locals(ast.body, { Local(l): Location("local", i, l) for i, l in enumerate(need_promotion) }, "p_")
+    for s in liveness:
+        print(_Stmt_str(s))
+    print(f"need saving: {need_promotion}")
 
-    liveness2 = analyze_liveness(promoted)
+    body = promote_locals(ast.body, { Local(l): next_location(Local(l)) for l in need_promotion }, "p_")
+
+    while True:
+        liveness2 = analyze_liveness(body)
     need_promotion2 = need_saving(liveness2)
 
+        # Sanity check: additional promotion
     if len(need_promotion2) > 0:
         for s in liveness2:
             print(_Stmt_str(s))
         print(f"need saving after one round: {need_promotion2}")
-        assert False, "More than one round of promotion needed? Hope not."
+            raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
 
-    reg_map = allocate_registers(liveness2, reg_count)
+        local_sets = color_locals(liveness2)
 
-    # print(f"reg_map: {reg_map}")
+        if len(local_sets) > reg_count:
+            unallocatable_sets = local_sets[reg_count:]
 
-    reg_pressure = 0 if reg_map == {} else max(r.index for r in reg_map.values())
-    print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+            print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
 
-    reg_body = lock_down_locals(promoted, reg_map)
+            body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
 
-    num_vars = len(need_promotion)
+        else:
+            reg_map = {
+                l: Reg(index=c, name=l.name)
+                for c, ls in enumerate(local_sets)
+                for l in ls
+            }
 
-    return Subroutine(ast.name, num_vars, reg_body)
+            reg_pressure = 0 if reg_map == {} else max(r.index+1 for r in reg_map.values())
+            print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+
+            reg_body = lock_down_locals(body, reg_map)
+
+            return Subroutine(ast.name, promoted_count, reg_body)
 
 
 def compile_class(ast: jack_ast.Class, translator: "Translator"):
