@@ -80,8 +80,6 @@ class Store(NamedTuple):
 Cmp = Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
 
 class If(NamedTuple):
-    # TODO: no need for test statements to be part of the If node; drop it
-    test: Sequence["Stmt"]
     value: "Value"
     cmp: Cmp
     when_true: Sequence["Stmt"]
@@ -211,7 +209,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             if stmt.array_index is None:
                 loc = resolve_name(stmt.name)
                 if isinstance(loc, Local):
-                expr_stmts, expr = flatten_expression(stmt.expr, force=False)
+                    expr_stmts, expr = flatten_expression(stmt.expr, force=False)
                     let_stmt = Eval(dest=loc, expr=expr)
                     return expr_stmts + [let_stmt]
                 elif loc.kind == "this":
@@ -219,7 +217,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                         this_var = this_expr
                         this_stmts = []
                     else:
-                    this_var = next_var("this")
+                        this_var = next_var("this")
                         this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
                     addr_var = next_var(loc.name)
                     addr_stmts = [
@@ -230,7 +228,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 else:
                     expr_stmts, expr = flatten_expression(stmt.expr, force=True)
                     let_stmt = Store(loc, expr)
-                return expr_stmts + [let_stmt]
+                    return expr_stmts + [let_stmt]
             else:
                 value_stmts, value_expr = flatten_expression(stmt.expr)
                 address_stmts, address_expr = flatten_expression(jack_ast.BinaryExpression(jack_ast.VarRef(stmt.name), jack_ast.Op("+"), stmt.array_index))
@@ -244,7 +242,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             else:
                 when_false = None
             # TODO: inspect the condition and figure out cmp
-            return [If(cond_stmts, cond, "!=", when_true, when_false)]
+            return cond_stmts + [If(cond, "!=", when_true, when_false)]
 
         elif isinstance(stmt, jack_ast.WhileStatement):
             cond_stmts, cond = flatten_expression(stmt.cond)
@@ -300,7 +298,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     this_var = this_expr
                     this_stmts = []
                 else:
-                this_var = next_var("this")
+                    this_var = next_var("this")
                     this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
                 addr_var = next_var(loc.name)
                 stmts = this_stmts + [
@@ -454,20 +452,8 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
 
         live_at_body_start = live_at_when_true_start.union(live_at_when_false_start)
 
-        live_at_test_end = live_at_body_start.union(refs(stmt.value))
-
-        test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
-        if len(test_liveness) > 0:
-            live_at_test_start = test_liveness[0].before
-        else:
-            live_at_test_start = live_at_test_end
-
-        stmt = If(test_liveness, stmt.value, stmt.cmp, when_true_liveness, when_false_liveness)
-
-        # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
-        # THis gets fixed when .test goes away.
-        # live_set = live_at_test_start
-        live = live_at_test_start.union(refs(stmt.value))
+        stmt = If(stmt.value, stmt.cmp, when_true_liveness, when_false_liveness)
+        live = live_at_body_start.union(refs(stmt.value))
 
         return stmt, live
 
@@ -477,9 +463,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         therefore are also live at the end, which creates a circularity in the analysis.
         Fortunately there's not much going on and simply repeating the same analysis should
         arrive at a fixed point after one more pass.
-
-        Returns the statement with annotated children, and the set of live variables for
-        "before" (which includes the "test" variable, which is a hack)."""
+        """
 
         body_liveness = analyze_liveness(stmt.body, live_at_end=live_at_end)
         if len(body_liveness) > 0:
@@ -496,12 +480,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
             live_at_test_start = live_at_body_start
 
         stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
-
-        # HACK: otherwise the value gets dropped because there's no stmt for its liveness to hang on.
-        # It's not clear how to fix this; the workaround means possibly holding onto an
-        # unecessary register during the test.
-        # live = live_at_test_start
-        live = live_at_test_start.union(refs(stmt.value))
+        live = live_at_test_start
 
         return stmt, live
 
@@ -581,7 +560,6 @@ def need_saving(liveness: Sequence[LiveStmt]) -> Set[str]:
         if isinstance(l.statement, (Eval, Push, Discard)) and isinstance(l.statement.expr, CallSub):
             result.update(l.before)
         elif isinstance(l.statement, If):
-            result.update(need_saving(l.statement.test))
             result.update(need_saving(l.statement.when_true))
             if l.statement.when_false is not None:
                 result.update(need_saving(l.statement.when_false))
@@ -656,11 +634,10 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             value_stmts, value = rewrite_expr(stmt.value)
             return value_stmts + [Store(stmt.location, value)]
         elif isinstance(stmt, If):
-            test = rewrite_statements(stmt.test)
             value_stmts, value = rewrite_expr(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
             when_false = rewrite_statements(stmt.when_false)
-            return [If(test + value_stmts, value, stmt.cmp, when_true, when_false)]
+            return value_stmts + [If(value, stmt.cmp, when_true, when_false)]
         elif isinstance(stmt, While):
             test = rewrite_statements(stmt.test)
             value_stmts, value = rewrite_expr(stmt.value)
@@ -771,12 +748,14 @@ def color_locals(liveness: Sequence[LiveStmt]) -> List[Set[Local]]:
         add_live_set([Local(n) for n in stmt.before])
 
         if isinstance(stmt.statement, If):
-            visit_stmts(stmt.statement.test)
             visit_stmts(stmt.statement.when_true)
             visit_stmts(stmt.statement.when_false)
         elif isinstance(stmt.statement, While):
             visit_stmts(stmt.statement.test)
             visit_stmts(stmt.statement.body)
+            # Arg: the value being tested may not otherwise ever be live, but it needs to be accounted for
+            if isinstance(stmt.statement.value, Local):
+                add_live_set([stmt.statement.value] + [Local(l) for l in stmt.statement.body[0].before])
 
     def visit_stmts(stmts: Optional[Sequence[LiveStmt]]):
         if stmts is not None:
@@ -833,14 +812,14 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             value = rewrite_value(stmt.value)
             return IndirectWrite(address, value)
         elif isinstance(stmt, Store):
+            # print(f"rewrite Store: {stmt}")
             value = rewrite_value(stmt.value)
             return Store(stmt.location, value)
         elif isinstance(stmt, If):
-            test = rewrite_statements(stmt.test)
             value = rewrite_value(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
             when_false = rewrite_statements(stmt.when_false)
-            return If(test, value, stmt.cmp, when_true, when_false)
+            return If(value, stmt.cmp, when_true, when_false)
         elif isinstance(stmt, While):
             test = rewrite_statements(stmt.test)
             value = rewrite_value(stmt.value)
@@ -885,21 +864,21 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
     need_promotion = need_saving(liveness)
 
-    for s in liveness:
-        print(_Stmt_str(s))
-    print(f"need saving: {need_promotion}")
+    # for s in liveness:
+    #     print(_Stmt_str(s))
+    # print(f"need saving: {need_promotion}")
 
     body = promote_locals(ast.body, { Local(l): next_location(Local(l)) for l in need_promotion }, "p_")
 
     while True:
         liveness2 = analyze_liveness(body)
-    need_promotion2 = need_saving(liveness2)
+        need_promotion2 = need_saving(liveness2)
 
         # Sanity check: additional promotion
-    if len(need_promotion2) > 0:
-        for s in liveness2:
-            print(_Stmt_str(s))
-        print(f"need saving after one round: {need_promotion2}")
+        if len(need_promotion2) > 0:
+            for s in liveness2:
+                print(_Stmt_str(s))
+            # print(f"need saving after one round: {need_promotion2}")
             raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
 
         local_sets = color_locals(liveness2)
@@ -930,8 +909,13 @@ def compile_class(ast: jack_ast.Class, translator: "Translator"):
     """Compile and translate to assembly."""
 
     flat_class = flatten_class(ast)
+
+    print(flat_class)
+
     reg_class = Class(ast.name,
         [phase_two(s) for s in flat_class.subroutines])
+
+    print(reg_class)
 
     translator.translate_class(reg_class)
 
@@ -948,6 +932,8 @@ class Translator(solved_07.Translator):
             self.translate_subroutine(s, class_ast.name)
 
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
+        print(subroutine_ast)
+
         instr_count_before = self.asm.instruction_count
 
         self.function(class_name, subroutine_ast.name, subroutine_ast.num_vars)
@@ -965,7 +951,7 @@ class Translator(solved_07.Translator):
 
     def handle_Eval(self, ast: Eval):
         if not isinstance(ast.expr, CallSub):
-        self.asm.start(_Stmt_str(ast))
+            self.asm.start(_Stmt_str(ast))
 
         # Do the update in-place if possible:
         if isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.left.index:
@@ -1044,10 +1030,6 @@ class Translator(solved_07.Translator):
 
     def handle_If(self, ast: If):
         self.asm.comment("if...")
-
-        # TODO: this goes away
-        for s in ast.test:
-            self._handle(s)
 
         if ast.when_false is None:
             # Awesome: when there's no else, and the condition is simple, it turns into a single branch.
@@ -1328,7 +1310,7 @@ def _Stmt_str(stmt: Stmt) -> str:
         return f"{_Expr_str(stmt.location)} = {_Expr_str(stmt.value)}"
     elif isinstance(stmt, If):
         return "\n".join([
-            f"if ({'; '.join(_Stmt_str(s) for s in stmt.test)}; {_Expr_str(stmt.value)} {stmt.cmp} zero)",
+            f"if ({_Expr_str(stmt.value)} {stmt.cmp} zero)",
             jack_ast._indent("\n".join(_Stmt_str(s) for s in stmt.when_true)),
         ]
         + ([] if stmt.when_false is None else [
