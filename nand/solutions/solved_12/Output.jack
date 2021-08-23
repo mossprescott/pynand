@@ -57,6 +57,7 @@ class Output {
         // of 11 words.
 
         var Array tty;
+        var char cc;
 
         if (c = 128) {  // newLine
             do Output.println();
@@ -81,27 +82,31 @@ class Output {
         // Update the cursor position *first*, so we can return early. _drawChar() will account for it.
         let cursorX = cursorX + 1;
 
-        if (c & 64){
-            if (c & 32){
-                if (c & 16){
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) {  }
+        // Make a local copy so it can live in a register, just in case the compiler is smart enough to
+        // allocate locals to registers, but not smart enough to move an argument there.
+        let cc = c;
+
+        if (cc & 64){
+            if (cc & 32){
+                if (cc & 16){
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) {  }
                                 else {       do Output._drawChar(9766, 11565, 6425, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x7e = 126 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(1799, 3084, 3084, 3084, 14392, 3084, 3084, 3084, 1799, 0, 0); return;  /* 0x7d = 125 */ }
+                                if (cc & 1) { do Output._drawChar(1799, 3084, 3084, 3084, 14392, 3084, 3084, 3084, 1799, 0, 0); return;  /* 0x7d = 125 */ }
                                 else {       do Output._drawChar(3084, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 0, 0); return;  /* 0x7c = 124 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(14392, 3084, 3084, 3084, 1799, 3084, 3084, 3084, 14392, 0, 0); return;  /* 0x7b = 123 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(14392, 3084, 3084, 3084, 1799, 3084, 3084, 3084, 14392, 0, 0); return;  /* 0x7b = 123 */ }
                                 else {       do Output._drawChar(0, 0, 0, 16191, 6939, 3084, 1542, 13107, 16191, 0, 0); return;  /* 0x7a = 122 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 15934, 12336, 6168, 3855, 0); return;  /* 0x79 = 121 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 15934, 12336, 6168, 3855, 0); return;  /* 0x79 = 121 */ }
                                 else {       do Output._drawChar(0, 0, 0, 13107, 7710, 3084, 3084, 7710, 13107, 0, 0); return;  /* 0x78 = 120 */ }
                             }
                         }
@@ -109,17 +114,17 @@ class Output {
                     else {
                         if (c & 4){
                             if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 16191, 16191, 4626, 0, 0); return;  /* 0x77 = 119 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 16191, 16191, 4626, 0, 0); return;  /* 0x77 = 119 */ }
                                 else {       do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 13107, 7710, 3084, 0, 0); return;  /* 0x76 = 118 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 6939, 6939, 6939, 6939, 6939, 13878, 0, 0); return;  /* 0x75 = 117 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 6939, 6939, 6939, 6939, 6939, 13878, 0, 0); return;  /* 0x75 = 117 */ }
                                 else {       do Output._drawChar(1028, 1542, 1542, 3855, 1542, 1542, 1542, 13878, 7196, 0, 0); return;  /* 0x74 = 116 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 1542, 6168, 13107, 7710, 0, 0); return;  /* 0x73 = 115 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 1542, 6168, 13107, 7710, 0, 0); return;  /* 0x73 = 115 */ }
                                 else {       do Output._drawChar(0, 0, 0, 7453, 14135, 13107, 771, 771, 1799, 0, 0); return;  /* 0x72 = 114 */ }
                             }
                             else {
@@ -130,46 +135,46 @@ class Output {
                     }
                 }
                 else {
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x6f = 111 */ }
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x6f = 111 */ }
                                 else {       do Output._drawChar(0, 0, 0, 7453, 13107, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x6e = 110 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7453, 16191, 11051, 11051, 11051, 11051, 0, 0); return;  /* 0x6d = 109 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7453, 16191, 11051, 11051, 11051, 11051, 0, 0); return;  /* 0x6d = 109 */ }
                                 else {       do Output._drawChar(3598, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x6c = 108 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(771, 771, 771, 13107, 6939, 3855, 3855, 6939, 13107, 0, 0); return;  /* 0x6b = 107 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(771, 771, 771, 13107, 6939, 3855, 3855, 6939, 13107, 0, 0); return;  /* 0x6b = 107 */ }
                                 else {       do Output._drawChar(12336, 12336, 0, 14392, 12336, 12336, 12336, 12336, 13107, 7710, 0); return;  /* 0x6a = 106 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(3084, 3084, 0, 3598, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x69 = 105 */ }
+                                if (cc & 1) { do Output._drawChar(3084, 3084, 0, 3598, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x69 = 105 */ }
                                 else {       do Output._drawChar(771, 771, 771, 6939, 14135, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x68 = 104 */ }
                             }
                         }
                     }
                     else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 7710, 13107, 13107, 13107, 15934, 12336, 13107, 7710, 0); return;  /* 0x67 = 103 */ }
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 7710, 13107, 13107, 13107, 15934, 12336, 13107, 7710, 0); return;  /* 0x67 = 103 */ }
                                 else {       do Output._drawChar(7196, 13878, 9766, 1542, 3855, 1542, 1542, 1542, 3855, 0, 0); return;  /* 0x66 = 102 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 16191, 771, 13107, 7710, 0, 0); return;  /* 0x65 = 101 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 16191, 771, 13107, 7710, 0, 0); return;  /* 0x65 = 101 */ }
                                 else {       do Output._drawChar(12336, 12336, 12336, 15420, 13878, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x64 = 100 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 771, 771, 13107, 7710, 0, 0); return;  /* 0x63 = 99 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 771, 771, 13107, 7710, 0, 0); return;  /* 0x63 = 99 */ }
                                 else {       do Output._drawChar(771, 771, 771, 3855, 6939, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x62 = 98 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 3598, 6168, 7710, 6939, 6939, 13878, 0, 0); return;  /* 0x61 = 97 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 3598, 6168, 7710, 6939, 6939, 13878, 0, 0); return;  /* 0x61 = 97 */ }
                                 else {       do Output._drawChar(1542, 3084, 6168, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x60 = 96 */ }
                             }
                         }
@@ -177,61 +182,61 @@ class Output {
                 }
             }
             else {
-                if (c & 16){
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 0, 0, 16191, 0); return;  /* 0x5f = 95 */ }
+                if (cc & 16){
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 0, 0, 16191, 0); return;  /* 0x5f = 95 */ }
                                 else {       do Output._drawChar(2056, 7196, 13878, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x5e = 94 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(7710, 6168, 6168, 6168, 6168, 6168, 6168, 6168, 7710, 0, 0); return;  /* 0x5d = 93 */ }
+                                if (cc & 1) { do Output._drawChar(7710, 6168, 6168, 6168, 6168, 6168, 6168, 6168, 7710, 0, 0); return;  /* 0x5d = 93 */ }
                                 else {       do Output._drawChar(0, 0, 257, 771, 1542, 3084, 6168, 12336, 8224, 0, 0); return;  /* 0x5c = 92 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7710, 1542, 1542, 1542, 1542, 1542, 1542, 1542, 7710, 0, 0); return;  /* 0x5b = 91 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7710, 1542, 1542, 1542, 1542, 1542, 1542, 1542, 7710, 0, 0); return;  /* 0x5b = 91 */ }
                                 else {       do Output._drawChar(16191, 13107, 12593, 6168, 3084, 1542, 8995, 13107, 16191, 0, 0); return;  /* 0x5a = 90 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 7710, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x59 = 89 */ }
+                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 7710, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x59 = 89 */ }
                                 else {       do Output._drawChar(13107, 13107, 7710, 7710, 3084, 7710, 7710, 13107, 13107, 0, 0); return;  /* 0x58 = 88 */ }
                             }
                         }
                     }
                     else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 16191, 16191, 16191, 4626, 0, 0); return;  /* 0x57 = 87 */ }
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 16191, 16191, 16191, 4626, 0, 0); return;  /* 0x57 = 87 */ }
                                 else {       do Output._drawChar(13107, 13107, 13107, 13107, 13107, 7710, 7710, 3084, 3084, 0, 0); return;  /* 0x56 = 86 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x55 = 85 */ }
+                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x55 = 85 */ }
                                 else {       do Output._drawChar(16191, 16191, 11565, 3084, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x54 = 84 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 1542, 7196, 12336, 13107, 13107, 7710, 0, 0); return;  /* 0x53 = 83 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 1542, 7196, 12336, 13107, 13107, 7710, 0, 0); return;  /* 0x53 = 83 */ }
                                 else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 6939, 13107, 13107, 13107, 0, 0); return;  /* 0x52 = 82 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 16191, 15163, 7710, 12336, 0); return;  /* 0x51 = 81 */ }
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 16191, 15163, 7710, 12336, 0); return;  /* 0x51 = 81 */ }
                                 else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 771, 771, 771, 771, 0, 0); return;  /* 0x50 = 80 */ }
                             }
                         }
                     }
                 }
                 else {
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x4f = 79 */ }
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x4f = 79 */ }
                                 else {       do Output._drawChar(13107, 13107, 14135, 14135, 16191, 15163, 15163, 13107, 13107, 0, 0); return;  /* 0x4e = 78 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(8481, 13107, 16191, 16191, 13107, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x4d = 77 */ }
+                                if (cc & 1) { do Output._drawChar(8481, 13107, 16191, 16191, 13107, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x4d = 77 */ }
                                 else {       do Output._drawChar(771, 771, 771, 771, 771, 771, 8995, 13107, 16191, 0, 0); return;  /* 0x4c = 76 */ }
                             }
                         }
@@ -247,23 +252,23 @@ class Output {
                         }
                     }
                     else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7196, 13878, 8995, 771, 15163, 13107, 13107, 13878, 11308, 0, 0); return;  /* 0x47 = 71 */ }
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7196, 13878, 8995, 771, 15163, 13107, 13107, 13878, 11308, 0, 0); return;  /* 0x47 = 71 */ }
                                 else {       do Output._drawChar(16191, 13107, 8995, 2827, 3855, 2827, 771, 771, 771, 0, 0); return;  /* 0x46 = 70 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(16191, 13107, 8995, 2827, 3855, 2827, 8995, 13107, 16191, 0, 0); return;  /* 0x45 = 69 */ }
+                                if (cc & 1) { do Output._drawChar(16191, 13107, 8995, 2827, 3855, 2827, 8995, 13107, 16191, 0, 0); return;  /* 0x45 = 69 */ }
                                 else {       do Output._drawChar(3855, 6939, 13107, 13107, 13107, 13107, 13107, 6939, 3855, 0, 0); return;  /* 0x44 = 68 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7196, 13878, 8995, 771, 771, 771, 8995, 13878, 7196, 0, 0); return;  /* 0x43 = 67 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7196, 13878, 8995, 771, 771, 771, 8995, 13878, 7196, 0, 0); return;  /* 0x43 = 67 */ }
                                 else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 13107, 13107, 13107, 7967, 0, 0); return;  /* 0x42 = 66 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 16191, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x41 = 65 */ }
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 16191, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x41 = 65 */ }
                                 else {       do Output._drawChar(7710, 13107, 13107, 15163, 15163, 15163, 6939, 771, 7710, 0, 0); return;  /* 0x40 = 64 */ }
                             }
                         }
@@ -272,94 +277,94 @@ class Output {
             }
         }
         else {
-            if (c & 32){
-                if (c & 16){
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 6168, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x3f = 63 */ }
+            if (cc & 32){
+                if (cc & 16){
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 6168, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x3f = 63 */ }
                                 else {       do Output._drawChar(0, 0, 771, 1542, 3084, 6168, 3084, 1542, 771, 0, 0); return;  /* 0x3e = 62 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 16191, 0, 0, 16191, 0, 0, 0, 0); return;  /* 0x3d = 61 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 16191, 0, 0, 16191, 0, 0, 0, 0); return;  /* 0x3d = 61 */ }
                                 else {       do Output._drawChar(0, 0, 6168, 3084, 1542, 771, 1542, 3084, 6168, 0, 0); return;  /* 0x3c = 60 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 3084, 3084, 0, 0, 3084, 3084, 1542, 0, 0); return;  /* 0x3b = 59 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 3084, 3084, 0, 0, 3084, 3084, 1542, 0, 0); return;  /* 0x3b = 59 */ }
                                 else {       do Output._drawChar(0, 0, 3084, 3084, 0, 0, 3084, 3084, 0, 0, 0); return;  /* 0x3a = 58 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 15934, 12336, 12336, 6168, 3598, 0, 0); return;  /* 0x39 = 57 */ }
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 15934, 12336, 12336, 6168, 3598, 0, 0); return;  /* 0x39 = 57 */ }
                                 else {       do Output._drawChar(7710, 13107, 13107, 13107, 7710, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x38 = 56 */ }
                             }
                         }
                     }
                     else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(16191, 12593, 12336, 12336, 6168, 3084, 3084, 3084, 3084, 0, 0); return;  /* 0x37 = 55 */ }
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(16191, 12593, 12336, 12336, 6168, 3084, 3084, 3084, 3084, 0, 0); return;  /* 0x37 = 55 */ }
                                 else {       do Output._drawChar(7196, 1542, 771, 771, 7967, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x36 = 54 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(16191, 771, 771, 7967, 12336, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x35 = 53 */ }
+                                if (cc & 1) { do Output._drawChar(16191, 771, 771, 7967, 12336, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x35 = 53 */ }
                                 else {       do Output._drawChar(4112, 6168, 7196, 6682, 6425, 16191, 6168, 6168, 15420, 0, 0); return;  /* 0x34 = 52 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(7710, 13107, 12336, 12336, 7196, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x33 = 51 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(7710, 13107, 12336, 12336, 7196, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x33 = 51 */ }
                                 else {       do Output._drawChar(7710, 13107, 12336, 6168, 3084, 1542, 771, 13107, 16191, 0, 0); return;  /* 0x32 = 50 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(3084, 3598, 3855, 3084, 3084, 3084, 3084, 3084, 16191, 0, 0); return;  /* 0x31 = 49 */ }
+                                if (cc & 1) { do Output._drawChar(3084, 3598, 3855, 3084, 3084, 3084, 3084, 3084, 16191, 0, 0); return;  /* 0x31 = 49 */ }
                                 else {       do Output._drawChar(3084, 7710, 13107, 13107, 13107, 13107, 13107, 7710, 3084, 0, 0); return;  /* 0x30 = 48 */ }
                             }
                         }
                     }
                 }
                 else {
-                    if (c & 8){
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 8224, 12336, 6168, 3084, 1542, 771, 257, 0, 0); return;  /* 0x2f = 47 */ }
+                    if (cc & 8){
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 8224, 12336, 6168, 3084, 1542, 771, 257, 0, 0); return;  /* 0x2f = 47 */ }
                                 else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 3084, 3084, 0, 0); return;  /* 0x2e = 46 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 0, 0, 16191, 0, 0, 0, 0, 0); return;  /* 0x2d = 45 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 0, 0, 16191, 0, 0, 0, 0, 0); return;  /* 0x2d = 45 */ }
                                 else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 3084, 3084, 1542, 0); return;  /* 0x2c = 44 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 3084, 3084, 16191, 3084, 3084, 0, 0, 0); return;  /* 0x2b = 43 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 0, 0, 3084, 3084, 16191, 3084, 3084, 0, 0, 0); return;  /* 0x2b = 43 */ }
                                 else {       do Output._drawChar(0, 0, 0, 13107, 7710, 16191, 7710, 13107, 0, 0, 0); return;  /* 0x2a = 42 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(1542, 3084, 6168, 6168, 6168, 6168, 6168, 3084, 1542, 0, 0); return;  /* 0x29 = 41 */ }
+                                if (cc & 1) { do Output._drawChar(1542, 3084, 6168, 6168, 6168, 6168, 6168, 3084, 1542, 0, 0); return;  /* 0x29 = 41 */ }
                                 else {       do Output._drawChar(6168, 3084, 1542, 1542, 1542, 1542, 1542, 3084, 6168, 0, 0); return;  /* 0x28 = 40 */ }
                             }
                         }
                     }
                     else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(3084, 3084, 1542, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x27 = 39 */ }
+                        if (cc & 4){
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(3084, 3084, 1542, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x27 = 39 */ }
                                 else {       do Output._drawChar(3084, 7710, 7710, 3084, 13878, 6939, 6939, 6939, 13878, 0, 0); return;  /* 0x26 = 38 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(0, 0, 8995, 13107, 6168, 3084, 1542, 13107, 12593, 0, 0); return;  /* 0x25 = 37 */ }
+                                if (cc & 1) { do Output._drawChar(0, 0, 8995, 13107, 6168, 3084, 1542, 13107, 12593, 0, 0); return;  /* 0x25 = 37 */ }
                                 else {       do Output._drawChar(3084, 7710, 13107, 771, 7710, 12336, 13107, 7710, 3084, 3084, 0); return;  /* 0x24 = 36 */ }
                             }
                         }
                         else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(0, 4626, 4626, 16191, 4626, 4626, 16191, 4626, 4626, 0, 0); return;  /* 0x23 = 35 */ }
+                            if (cc & 2){
+                                if (cc & 1) { do Output._drawChar(0, 4626, 4626, 16191, 4626, 4626, 16191, 4626, 4626, 0, 0); return;  /* 0x23 = 35 */ }
                                 else {       do Output._drawChar(13878, 13878, 5140, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x22 = 34 */ }
                             }
                             else {
-                                if (c & 1) { do Output._drawChar(3084, 7710, 7710, 7710, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x21 = 33 */ }
+                                if (cc & 1) { do Output._drawChar(3084, 7710, 7710, 7710, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x21 = 33 */ }
                                 else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x20 = 32 */ }
                             }
                         }
@@ -370,8 +375,6 @@ class Output {
 
         // Fallback: the black box
         do Output._drawChar(16191, 16191, 16191, 16191, 16191, 16191, 16191, 16191, 16191, 0, 0); return;  /* 0x0 = 0 */
-
-        return;
     }
 
     // Note: assuming the cursor is located on screen, and cursorX is one position past it.
