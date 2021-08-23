@@ -219,10 +219,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     else:
                         this_var = next_var("this")
                         this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
-                    addr_var = next_var(loc.name)
-                    addr_stmts = [
-                        Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))
-                    ]
+                    if loc.index == 0:
+                        addr_var = this_var
+                        addr_stmts = []
+                    else:
+                        addr_var = next_var(loc.name)
+                        addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))]
                     value_stmts, value_expr = flatten_expression(stmt.expr)
                     return value_stmts + this_stmts + addr_stmts + [IndirectWrite(addr_var, value_expr)]
                 else:
@@ -231,7 +233,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     return expr_stmts + [let_stmt]
             else:
                 value_stmts, value_expr = flatten_expression(stmt.expr)
-                address_stmts, address_expr = flatten_expression(jack_ast.BinaryExpression(jack_ast.VarRef(stmt.name), jack_ast.Op("+"), stmt.array_index))
+                if stmt.array_index == jack_ast.IntegerConstant(0):
+                    # Index 0 is the most common case:
+                    address = jack_ast.VarRef(stmt.name)
+                else:
+                    address = jack_ast.BinaryExpression(jack_ast.VarRef(stmt.name), jack_ast.Op("+"), stmt.array_index)
+                address_stmts, address_expr = flatten_expression(address)
                 return value_stmts + address_stmts + [IndirectWrite(address_expr, value_expr)]
 
         elif isinstance(stmt, jack_ast.IfStatement):
@@ -300,10 +307,13 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 else:
                     this_var = next_var("this")
                     this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
-                addr_var = next_var(loc.name)
-                stmts = this_stmts + [
-                    Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index))),
-                ]
+                if loc.index == 0:
+                    addr_var = this_var
+                    addr_stmts = []
+                else:
+                    addr_var = next_var(loc.name)
+                    addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))]
+                stmts = this_stmts + addr_stmts
                 flat_expr = IndirectRead(addr_var)
             else:
                 stmts = []
@@ -327,7 +337,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             flat_expr = last_push.expr
 
         elif isinstance(expr, jack_ast.ArrayRef):
-            address_stmts, address_expr = flatten_expression(jack_ast.BinaryExpression(jack_ast.VarRef(expr.name), jack_ast.Op("+"), expr.array_index))
+            if expr.array_index == jack_ast.IntegerConstant(0):
+                # Index 0, probably the most common case:
+                address = jack_ast.VarRef(expr.name)
+            else:
+                address = jack_ast.BinaryExpression(jack_ast.VarRef(expr.name), jack_ast.Op("+"), expr.array_index)
+            address_stmts, address_expr = flatten_expression(address)
             stmts = address_stmts
             flat_expr = IndirectRead(address_expr)
 
@@ -957,9 +972,23 @@ class Translator(solved_07.Translator):
         if isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.left.index:
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
-                self._handle(ast.expr.right)  # D = right
-                self.asm.instr(f"@R{5+ast.dest.index}")
-                self.asm.instr(f"M=M{op}D")
+                right_imm = self.immediate(ast.expr.right)
+                if op == "+" and right_imm is not None:
+                    if right_imm == 0:
+                        pass  # nothing to do: rX = rX + 0
+                    else:
+                        self.asm.instr(f"@R{5+ast.dest.index}")
+                        self.asm.instr(f"M=M{right_imm:+}")
+                elif op == "-" and right_imm is not None:
+                    if right_imm == 0:
+                        pass  # nothing to do: rX = rX - 0
+                    else:
+                        self.asm.instr(f"@R{5+ast.dest.index}")
+                        self.asm.instr(f"M=M{-right_imm:+}")
+                else:
+                    self._handle(ast.expr.right)  # D = right
+                    self.asm.instr(f"@R{5+ast.dest.index}")
+                    self.asm.instr(f"M=M{op}D")
                 return
         elif isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.right.index:
             op = self.binary_op_alu(ast.expr.op)
@@ -973,30 +1002,50 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"M={self.unary_op(ast.expr.op)}M")
             return
 
-        self._handle(ast.expr)
+        imm = self.immediate(ast.expr)
+        if imm is not None:
+            self.asm.instr(f"@R{5+ast.dest.index}")
+            self.asm.instr(f"M={imm}")
+        else:
 
-        if isinstance(ast.expr, CallSub):
-            self.asm.start(f"{_Expr_str(ast.dest)} = <result>")
+            self._handle(ast.expr)
 
-        self.asm.instr(f"@R{5+ast.dest.index}")
-        self.asm.instr("M=D")
+            if isinstance(ast.expr, CallSub):
+                self.asm.start(f"{_Expr_str(ast.dest)} = <result>")
+
+            self.asm.instr(f"@R{5+ast.dest.index}")
+            self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
         self.asm.start(_Stmt_str(ast))
-        self._handle(ast.value)
-        self.value_to_a(ast.address)
-        self.asm.instr("M=D")
+
+        imm = self.immediate(ast.value)
+        if imm is not None:
+            self.value_to_a(ast.address)
+            self.asm.instr(f"M={imm}")
+        else:
+            self._handle(ast.value)
+            self.value_to_a(ast.address)
+            self.asm.instr("M=D")
 
     def handle_Store(self, ast: Store):
         self.asm.start(_Stmt_str(ast))
 
+        imm = self.immediate(ast.value)
+
         kind, index = ast.location.kind, ast.location.index
         if kind == "static":
-            self._handle(ast.value)
-            self.asm.instr(f"@{self.class_namespace}.static{index}")
-            self.asm.instr("M=D")
+            if imm is not None:
+                self.asm.instr(f"@{self.class_namespace}.static{index}")
+                self.asm.instr(f"M={imm}")
+            else:
+                self._handle(ast.value)
+                self.asm.instr(f"@{self.class_namespace}.static{index}")
+                self.asm.instr("M=D")
+
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
+
         else:
             if kind == "argument":
                 segment_ptr = "ARG"
@@ -1005,28 +1054,46 @@ class Translator(solved_07.Translator):
             else:
                 raise Exception(f"Unknown location: {ast}")
 
-            if index <= 6:
-                self._handle(ast.value)
-                self.asm.instr(f"@{segment_ptr}")
+            # Super common case: initialize a var to 0 or 1 (or -1):
+            if imm is not None:
                 if index == 0:
+                    self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M")
-                else:
+                    self.asm.instr(f"M={imm}")
+                elif index == 1:
+                    self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M+1")
-                    for _ in range(index-1):
-                        self.asm.instr("A=A+1")
-                self.asm.instr("M=D")
+                    self.asm.instr(f"M={imm}")
+                else:
+                    self.asm.instr(f"@{index}")
+                    self.asm.instr("D=A")
+                    self.asm.instr(f"@{segment_ptr}")
+                    self.asm.instr("A=M+D")
+                    self.asm.instr(f"M={imm}")
 
             else:
-                self.asm.instr(f"@{index}")
-                self.asm.instr("D=A")
-                self.asm.instr("@LCL")
-                self.asm.instr("D=M+D")
-                self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
-                self.asm.instr("M=D")
-                self._handle(ast.value)
-                self.asm.instr("@R15")
-                self.asm.instr("A=M")
-                self.asm.instr("M=D")
+                if index <= 6:
+                    self._handle(ast.value)
+                    self.asm.instr(f"@{segment_ptr}")
+                    if index == 0:
+                        self.asm.instr("A=M")
+                    else:
+                        self.asm.instr("A=M+1")
+                        for _ in range(index-1):
+                            self.asm.instr("A=A+1")
+                    self.asm.instr("M=D")
+
+                else:
+                    self.asm.instr(f"@{index}")
+                    self.asm.instr("D=A")
+                    self.asm.instr(f"@{segment_ptr}")
+                    self.asm.instr("D=M+D")
+                    self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
+                    self.asm.instr("M=D")
+                    self._handle(ast.value)
+                    self.asm.instr("@R15")
+                    self.asm.instr("A=M")
+                    self.asm.instr("M=D")
 
     def handle_If(self, ast: If):
         self.asm.comment("if...")
@@ -1034,14 +1101,14 @@ class Translator(solved_07.Translator):
         if ast.when_false is None:
             # Awesome: when there's no else, and the condition is simple, it turns into a single branch.
             # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
-            # into the node and compare them directly (which would also fix the overflow bug.)
+            # into the node and compare them directly.
 
             end_label = self.asm.next_label("end")
 
             self.asm.start(f"if {_Expr_str(ast.value)} {ast.cmp} 0?")
             self._handle(ast.value)
             self.asm.instr(f"@{end_label}")
-            self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+            self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
             for s in ast.when_true:
                 self._handle(s)
@@ -1055,7 +1122,7 @@ class Translator(solved_07.Translator):
             self.asm.start(f"if/else {_Expr_str(ast.value)} {ast.cmp} 0?")
             self._handle(ast.value)
             self.asm.instr(f"@{false_label}")
-            self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+            self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
             for s in ast.when_true:
                 self._handle(s)
@@ -1071,7 +1138,7 @@ class Translator(solved_07.Translator):
 
     def handle_While(self, ast):
         # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
-        # into the node and compare them directly (which would also fix the overflow bug.)
+        # into the node and compare them directly.
 
         self.asm.comment("while...")
 
@@ -1085,7 +1152,7 @@ class Translator(solved_07.Translator):
         self.asm.start(f"while {_Expr_str(ast.value)} {ast.cmp} 0?")
         self._handle(ast.value)
         self.asm.instr(f"@{end_label}")
-        self.asm.instr(f"D;J{self.compare_op(ast.cmp)}")
+        self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
         for s in ast.body:
             self._handle(s)
@@ -1096,42 +1163,64 @@ class Translator(solved_07.Translator):
         self.asm.label(end_label)
 
     def handle_Return(self, ast: Return):
-        self.asm.start(f"push {_Expr_str(ast.expr)} (for return)")
+        if isinstance(ast.expr, CallSub):
+            self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
+            self.asm.comment("leave the result on the stack")
 
-        # TODO: special-case Return CallSub to skip popping the stack?
+        else:
+            self.asm.start(f"push {_Expr_str(ast.expr)} (for return)")
 
-        self._handle(ast.expr)
-        self.asm.instr("@SP")
-        self.asm.instr("M=M+1")
-        self.asm.instr("A=M-1")
-        self.asm.instr("M=D")
+            # Save a cycle for "push 0":
+            imm = self.immediate(ast.expr)
+            if imm is not None:
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
+                self.asm.instr("A=M-1")
+                self.asm.instr(f"M={imm}")
+            else:
+                self._handle(ast.expr)
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
+                self.asm.instr("A=M-1")
+                self.asm.instr("M=D")
         self.return_op()
 
     def handle_Push(self, ast):
-        self.asm.start(_Stmt_str(ast))
+        if isinstance(ast.expr, CallSub):
+            # Skip popping the stack
+            self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
+            self.asm.comment("result left on the stack")
+        else:
+            self.asm.start(f"push {_Expr_str(ast.expr)}")
 
-        # TODO: special-case Push CallSub to skip popping the stack?
-
-        self._handle(ast.expr)
-        self.asm.instr("@SP")
-        self.asm.instr("M=M+1")
-        self.asm.instr("A=M-1")
-        self.asm.instr("M=D")
+            # Save a cycle for "push 0":
+            imm = self.immediate(ast.expr)
+            if imm is not None:
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
+                self.asm.instr("A=M-1")
+                self.asm.instr(f"M={imm}")
+            else:
+                self._handle(ast.expr)
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
+                self.asm.instr("A=M-1")
+                self.asm.instr("M=D")
 
     def handle_Discard(self, ast: Discard):
-        self.asm.start(_Stmt_str(ast))
         self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
-        # Pop the stack, not saving the result
+
+        self.asm.comment("discard the result")
         self.asm.instr("@SP")
         self.asm.instr("M=M-1")
 
-    def compare_op(self, cmp: Cmp):
+    def compare_op_neg(self, cmp: Cmp):
         if cmp == "!=":
             return "EQ"
         else:
             raise Exception("TODO")
 
-    def compare_op_neg(self, cmp: Cmp):
+    def compare_op_pos(self, cmp: Cmp):
         if cmp == "!=":
             return "NE"
         else:
@@ -1194,8 +1283,21 @@ class Translator(solved_07.Translator):
         self.asm.instr("D=M")
 
     def handle_Binary(self, ast: Binary):
+        left_imm = self.immediate(ast.left)
         alu_op = self.binary_op_alu(ast.op)
-        if alu_op is not None:
+        right_imm = self.immediate(ast.right)
+
+        if alu_op == "+" and isinstance(ast.left, Reg) and right_imm is not None:
+            # e.g. r0 + 1  ->  @R5; D=M+1
+            self.asm.instr(f"@R{5+ast.left.index}")
+            self.asm.instr(f"D=M{right_imm:+}")
+            return
+        elif alu_op == "-" and isinstance(ast.left, Reg) and right_imm is not None:
+            # e.g. r0 - 1  ->  @R5; D=M-1
+            self.asm.instr(f"@R{5+ast.left.index}")
+            self.asm.instr(f"D=M{-right_imm:+}")
+            return
+        elif alu_op is not None:
             self._handle(ast.left)     # D = left
             self.value_to_a(ast.right) # A = right
             self.asm.instr(f"D=D{alu_op}A")
@@ -1256,12 +1358,21 @@ class Translator(solved_07.Translator):
             self._handle(ast.value)
             self.asm.instr(f"D={self.unary_op(ast.op)}D")
 
-    def unary_op(self, op: jack_ast.Op):
+    def unary_op(self, op: jack_ast.Op) -> str:
         return {"-": "-", "~": "!"}[op.symbol]
 
     def handle_IndirectRead(self, ast: IndirectRead):
         self.value_to_a(ast.address)
         self.asm.instr("D=M")
+
+    def immediate(self, ast: Expr) -> Optional[int]:
+        """If the expression is a constant which the ALU can take as an "immediate" operand
+        (i.e. -1, 0, or 1), then unpack it.
+        """
+        if isinstance(ast, Const) and -1 <= ast.value <= 1:
+            return ast.value
+        else:
+            return None
 
 
     # Helpers:
