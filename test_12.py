@@ -375,7 +375,10 @@ def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     _translate_raw_jack(translator, project_12.SCREEN_CLASS)
 
-    _translate_raw_jack(translator, minimal_sys_lib([]))
+    _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
+    _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
+    _translate_raw_jack(translator, solved_12._MATH_CLASS)
+    _translate_raw_jack(translator, minimal_sys_lib(["Memory", "Math"]))
 
     _translate_raw_jack(translator, screen_test)
 
