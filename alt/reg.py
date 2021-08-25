@@ -23,10 +23,10 @@ value is needed at the same time. Variables that need to retian their values acr
 calls are stored in the "local" space; all other variables are stored in "registers" — fixed
 locations in low-memory that can be accessed without the overhead of updating the stack pointer.
 
-Limitations:
-- If an expression contains too many sub-expressions to be allocated to temps in a simple way, the
-  compiler will give up and fail. This situation can be fixed at the source level by introducing
-  a local variable. If necessary, the compiler could be enhanced to do that transformation itself.
+Note: this compiler does not use the standard VM opcodes; instead, it translates to its own
+IR (intermediate representation), which is more suited to analysis. Its Translator then converts
+the IR directly to assembly. That makes the calling sequence a bit different from the rest of the
+implementations.
 """
 
 import itertools
@@ -35,8 +35,8 @@ from typing import Dict, Generic, List, Literal, NamedTuple, Optional, Sequence,
 
 from nand import jack_ast
 from nand.platform import Platform, BUNDLED_PLATFORM
-from nand.translate import AssemblySource, translate_dir
-from nand.solutions import solved_05, solved_06, solved_07, solved_11
+from nand.translate import AssemblySource
+from nand.solutions import solved_07, solved_11
 from nand.solutions.solved_11 import SymbolTable, VarKind
 
 
@@ -242,20 +242,18 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 return value_stmts + address_stmts + [IndirectWrite(address_expr, value_expr)]
 
         elif isinstance(stmt, jack_ast.IfStatement):
-            cond_stmts, cond = flatten_expression(stmt.cond)
+            test_stmts, test_value, test_cmp = flatten_condition(stmt.cond)
             when_true = [fs for s in stmt.when_true for fs in flatten_statement(s)]
             if stmt.when_false is not None:
                 when_false = [fs for s in stmt.when_false for fs in flatten_statement(s)]
             else:
                 when_false = None
-            # TODO: inspect the condition and figure out cmp
-            return cond_stmts + [If(cond, "!=", when_true, when_false)]
+            return test_stmts + [If(test_value, test_cmp, when_true, when_false)]
 
         elif isinstance(stmt, jack_ast.WhileStatement):
-            cond_stmts, cond = flatten_expression(stmt.cond)
+            test_stmts, test_value, test_cmp = flatten_condition(stmt.cond)
             body_stmts = [fs for s in stmt.body for fs in flatten_statement(s)]
-            # TODO: inspect the condition and figure out cmp
-            return [While(cond_stmts, cond, "!=", body_stmts)]
+            return [While(test_stmts, test_value, test_cmp, body_stmts)]
         elif isinstance(stmt, jack_ast.DoStatement):
             stmts, expr = flatten_expression(stmt.expr, force=False)
             return stmts + [Discard(expr)]
@@ -270,6 +268,40 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         else:
             raise Exception(f"Unknown statement: {stmt}")
 
+    def flatten_condition(expr: jack_ast.Expression) -> Tuple[List[Stmt], Expr, Cmp]:
+        """Inspect an expression used as the condition of if/while, and reduce it to some statements
+        preparing a value to be compared with zero.
+        """
+
+        # Collapse simple negated conditions:
+        if isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
+            if isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "<":
+                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op(">="), expr.expr.right)
+            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == ">":
+                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("<="), expr.expr.right)
+            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "=":
+                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("!="), expr.expr.right)
+
+        # Collapse anything that's become a comparison between two values:
+        if isinstance(expr, jack_ast.BinaryExpression) and expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
+            if expr.right == jack_ast.IntegerConstant(0):
+                left_stmts, left_value = flatten_expression(expr.left)
+                return left_stmts, left_value, expr.op.symbol
+            elif expr.left == jack_ast.IntegerConstant(0):
+                right_stmts, right_value = flatten_expression(expr.right)
+                return right_stmts, right_value, negate_cmp(expr.op.symbol)
+            else:
+                left_stmts, left_value = flatten_expression(expr.left)
+                right_stmts, right_value = flatten_expression(expr.right)
+                diff_var = next_var()
+                diff_stmt = Eval(diff_var, Binary(left_value, jack_ast.Op("-"), right_value))
+                return left_stmts + right_stmts + [diff_stmt], diff_var, expr.op.symbol
+        else:
+            expr_stmts, expr_value = flatten_expression(expr)
+            return expr_stmts, expr_value, "!="
+
+    def negate_cmp(cmp: Cmp) -> Cmp:
+        return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
 
     def flatten_expression(expr: jack_ast.Expression, force=True) -> Tuple[List[Stmt], Expr]:
         """Reduce an expression to something that's definitely trivial, possibly preceded
@@ -891,8 +923,8 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
         # Sanity check: additional promotion
         if len(need_promotion2) > 0:
-            for s in liveness2:
-                print(_Stmt_str(s))
+            # for s in liveness2:
+            #     print(_Stmt_str(s))
             # print(f"need saving after one round: {need_promotion2}")
             raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
 
@@ -913,26 +945,28 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
             }
 
             reg_pressure = 0 if reg_map == {} else max(r.index+1 for r in reg_map.values())
-            print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+            # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
 
             reg_body = lock_down_locals(body, reg_map)
 
             return Subroutine(ast.name, promoted_count, reg_body)
 
 
-def compile_class(ast: jack_ast.Class, translator: "Translator"):
-    """Compile and translate to assembly."""
+def compile_class(ast: jack_ast.Class) -> Class:
+    """Analyze syntax, flatten expressions, allocate registers, and convert to the register-based IR."""
 
     flat_class = flatten_class(ast)
 
-    print(flat_class)
+    # print(flat_class)
 
     reg_class = Class(ast.name,
         [phase_two(s) for s in flat_class.subroutines])
 
-    print(reg_class)
+    # print(reg_class)
 
-    translator.translate_class(reg_class)
+    # translator.translate_class(reg_class)
+
+    return reg_class
 
 
 class Translator(solved_07.Translator):
@@ -942,12 +976,16 @@ class Translator(solved_07.Translator):
 
         self.preamble()
 
+    def handle(self, op):
+        """Override for compatibility: an "op" in this context is an entire Class in the IR form."""
+        self.translate_class(op)
+
     def translate_class(self, class_ast: Class):
         for s in class_ast.subroutines:
             self.translate_subroutine(s, class_ast.name)
 
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
-        print(subroutine_ast)
+        # print(subroutine_ast)
 
         instr_count_before = self.asm.instruction_count
 
@@ -959,7 +997,7 @@ class Translator(solved_07.Translator):
 
         instr_count_after = self.asm.instruction_count
 
-        print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}")
+        # print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}")
 
 
     # Statements:
@@ -1215,16 +1253,17 @@ class Translator(solved_07.Translator):
         self.asm.instr("M=M-1")
 
     def compare_op_neg(self, cmp: Cmp):
-        if cmp == "!=":
-            return "EQ"
-        else:
-            raise Exception("TODO")
+        return {
+            "=": "NE",
+            "<": "GE",
+            ">": "LE",
+            "!=": "EQ",
+            "<=": "GT",
+            ">=": "LT",
+         }[cmp]
 
-    def compare_op_pos(self, cmp: Cmp):
-        if cmp == "!=":
-            return "NE"
-        else:
-            raise Exception("TODO")
+    # def compare_op_pos(self, cmp: Cmp):
+    #     raise Exception("TODO")
 
 
     # Expressions:
@@ -1399,6 +1438,13 @@ class Translator(solved_07.Translator):
         self.__getattribute__(f"handle_{ast.__class__.__name__}")(ast)
 
 
+    # Override some unused bits and pieces to save space:
+
+    def _compare(self, op):
+        # This common sequence isn't used; each comparison is compiled to a custom
+        # test/branch sequence.
+        return f"_compare_{op}_unused"
+
 
 # Hackish pretty-printing:
 def _Class_str(self: Class) -> str:
@@ -1467,53 +1513,38 @@ def _Expr_str(expr: Expr) -> str:
         raise Exception(f"Unknown Expr: {expr}")
 
 
+#
+# Platform:
+#
+
+def compile_compatible(ast, asm):
+    """Wrap the compiler to simulate the sequence the other platforms go through.
+    In this case, this phase doesn't generate VM opcodes, but instead just records
+    each Class to the stream as a unit.
+    """
+
+    ir = compile_class(ast)
+
+    # Giant hack: write each class to the AssemblySource as if it was an instruction
+    asm.add_line_raw(ir)
+
+
+def parse_line_compatible(line):
+    """Phony VM opcode parsing, to simulate the sequence the other platforms go through.
+    These "lines" aren't really lines, and just need to get passed through to the next
+    step (the translator.)
+    """
+
+    return line
+
+
 REG_PLATFORM = BUNDLED_PLATFORM._replace(
-    translator=Translator)
-    # compiler=Compiler)
+    parse_line=parse_line_compatible,
+    translator=Translator,
+    compiler=compile_compatible)
 
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
 
-    # HACK: until the compiler/translator is wired into Platform
-    # computer.main(REG_PLATFORM)
-
-    import os
-    from nand.solutions import solved_10, solved_12
-
-    platform = REG_PLATFORM
-
-    args = computer.parser.parse_args()
-    print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
-
-    translator = Translator()
-
-    def load_file(path):
-        with open(path) as f:
-            src = "\n".join(f.readlines())
-            ast = solved_10.parse_class(src)
-        compile_class(ast, translator)
-
-    if os.path.isdir(args.path):
-        for fn in os.listdir(args.path):
-            load_file(os.path.join(args.path, fn))
-    else:
-        load_file(args.path)
-
-    for lib_ast in solved_12._OS_CLASSES:
-        compile_class(lib_ast, translator)
-
-    if args.print:
-        for l in translator.asm:
-            print(l)
-
-    prg = platform.assemble(translator.asm)
-    src_map = translator.asm.src_map
-
-    print(f"Size in ROM: {len(prg):0,d}")
-
-    computer.run(prg,
-        chip=platform.chip,
-        name=args.path,
-        simulator=args.simulator,
-        src_map=src_map if args.trace else None)
+    computer.main(REG_PLATFORM)
