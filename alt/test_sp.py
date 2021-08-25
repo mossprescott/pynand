@@ -21,7 +21,7 @@ def test_backward_compatible_cpu():
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(SPComputer)
-    
+
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(SPComputer)
 
@@ -46,7 +46,7 @@ def test_dec16():
     assert run(Dec16, in_=12345).out == 12344
     assert run(Dec16, in_=-23456).out == -23457
     assert run(Dec16, in_=-32768).out == 32767
-    
+
     assert gate_count(Dec16) == {'nands': 76}
 
 
@@ -97,7 +97,7 @@ def test_computer_gates():
         'outputs': 1,
     }
 
-   
+
 #
 # Test that all Hack instructions are assembled the same way:
 #
@@ -133,30 +133,30 @@ def test_assemble_sp_ops():
 
 def test_push_constant():
     cpu = run(SPCPU)
-    
+
     init_sp(cpu)
-    
+
     cpu.instruction = parse_op("SP++=-1")
     assert cpu.outM == -1
     assert cpu.writeM == True
     assert cpu.addressM == 256
-    
+
     cpu.ticktock()
-    
+
     assert cpu.sp == 257
 
 def test_pop_to_a():
     cpu = run(SPCPU)
-    
+
     init_sp(cpu)
-    
+
     cpu.instruction = parse_op("A=--SP")
     assert cpu.writeM == False
     assert cpu.addressM == 255
     cpu.inM = 12345
-    
+
     cpu.ticktock()
-    
+
     cpu.instruction = parse_op("D=M")  # Put A on the address lines
     assert cpu.sp == 255
     assert cpu.addressM == 12345
@@ -187,10 +187,10 @@ def test_vm_basic_loop():
 
 def test_vm_fibonacci_series():
     test_08.test_fibonacci_series(chip=SPComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_simple_function():
     test_08.test_simple_function(chip=SPComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_nested_call():
     test_08.test_nested_call(chip=SPComputer, assemble=assemble, translator=Translator)
 
@@ -201,28 +201,25 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=SPComputer, assemble=assemble, translator=Translator)
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
-    instruction_count = test_optimal_08.count_pong_instructions(Translator)
-    
+    instruction_count = test_optimal_08.count_pong_instructions(SP_PLATFORM)
+
     # compare to the project_08 solution (about 28k)
     assert instruction_count < -1  # 15_749
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
-    cycles = test_optimal_08.count_pong_cycles_first_iteration(SPComputer, assemble, Translator)
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(SP_PLATFORM)
 
     assert cycles < 1  #?
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(SPComputer, assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(SP_PLATFORM)
 
     # compare to the project_08 solution (about 4m)
     assert cycles < -1  # 2_612_707
-    
+
 
 def init_sp(cpu):
     ASM = [
