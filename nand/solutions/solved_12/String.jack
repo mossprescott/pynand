@@ -37,7 +37,7 @@ class String {
 
     /** Returns the character at the j-th location of this string. */
     method char charAt(int j) {
-        if (j < 0 | ~(length > j)) {
+        if ((j < 0) | ~(length > j)) {
             return 0;
         }
         else {
