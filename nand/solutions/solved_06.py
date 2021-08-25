@@ -29,6 +29,10 @@ ALU_CONTROL = {
     "A-1": 0b110010,
     "-D":  0b001111,
     "-A":  0b110011,
+    # Redundant spellings so you don't have to remember which way to write them:
+    "A+D": 0b000010,
+    "A&D": 0b000000,
+    "A|D": 0b010101,
 }
 
 JMP_CONTROL = {
