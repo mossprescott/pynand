@@ -6,7 +6,8 @@ experience as compared to the tools provided by the authors:
 
 * No need to install Java
 * No clunky UI
-* You only need Python, a text editor, and basic command-line skills.
+* You only need Python, a text editor, and basic command-line skills
+* Able to simulate any similar CPU design at full speed
 
 
 ## Requirements
@@ -17,7 +18,8 @@ Pytest is required to run the tests: `pip3 install pytest`.
 
 For the full Computer simulation including display and keyboard, `pygame` is required:
 `pip3 install pygame`. On Mac OS X, you may need to install a dev version:
-`pip3 install pygame==2.0.0dev6`
+`pip3 install pygame==2.0.0dev6`. To install pygame on M1 Mac (Big Sur), this may help:
+https://www.quora.com/How-do-you-install-Pygame-on-a-MacBook-M1?share=1.
 
 
 ## Step 1: Do the Exercises
@@ -37,6 +39,20 @@ line, then work on getting the tests to pass one at a time.
 
 That's it for the first chapter. Now move on to `test_02.py`…
 
+### Quit while you're ahead
+
+Although it's fun to complete the entire course to build everything from the chip to the
+compiler yourself, you can stop at any time, or indeed implement whichever parts of the
+stack that you're most interested in.
+
+The amount of time and code required to complete the projects increases pretty substantially
+after the hardware portion (projects 1–5). In particular, projects 8 and 12 may involve
+significant code and lots of debugging.
+
+This repo is set up so you only have to work on the projects that interest you; you'll be
+running programs on your own designs as soon as you complete a single component in any of the
+`project_*.py` modules.
+
 
 ## Step 2: Enjoy
 
@@ -45,9 +61,16 @@ Note: the awesomeness starts after about 5 million cycles.
 
 ![Pong screenshot](examples/Pong.png)
 
-You can also run VM programs with `./computer.py [dir]`, but for the time being you'll have to 
-find your own. Tip: download the nand2tetris tools, use the included Jack compiler to generate
-".vm" files, and use the included "OS" implementation.
+You can also run VM/Jack programs with `./computer.py [dir]`. The test programs for the
+compiler are available under `examples/project_11` (along with Pong in Jack source form),
+and the more interesting examples for testing the OS are in `examples/project_12`.
+
+More interesting/challenging programs can be found on the internet if you're persistent.
+Beware: many JACK programs you can find are quite large and may or may not fit in ROM when
+the standard compiler/translator are used. I suspect their authors only ever tested them with
+the course's included "VM simulator", which doesn't require the program to be translated!
+You can try one of the alternative implementations (under `alt/`), several of which are
+aimed at supporting large programs.
 
 
 ## Step 3: Go Further
@@ -61,9 +84,8 @@ The components here can be used to implement any generally similar CPU design. I
 - Make a better instruction encoding. How can it do more with less?
 - Make an even smaller CPU. What can you take away and still get stuff done?
 
-Note: if you want to run any programs, you'll have to figure out how to get them into
-your new chip's instruction format. One way to do that is to implement a new VM-assembly
-translator, and find some VM programs to run on both chips for comparison.
+You can implement alternative designs by providing a new chip, translator, and/or compiler,
+and see how they measure up to the authors' original design (and your implementation of it.)
 
 Some experiments can be found in this repo under [alt/](alt/README.md).
 
@@ -71,3 +93,17 @@ Some experiments can be found in this repo under [alt/](alt/README.md).
 
 What language do you like to write? Can you compile _that_ language, or something like it, to
 the Hack VM? Or directly to assembly?
+
+
+## Credit
+
+The entire CPU design, the breakdown of projects, most of the tests, and some example programs
+are directly taken from  the original
+[From Nand to Tetris course materials](https://www.nand2tetris.org/course). Solvers are encouraged
+to acquire a copy of the text; many questions are answered there.
+
+All the solutions included in this repo are my own work, but I often compared the results against
+the Nand to Tetris Software Suite. I tried to stay close the spirit of the original, but sometimes
+strayed when certain choices were especially awkward in a Python context.
+
+The experiments found under `alt/` are my own creations.
