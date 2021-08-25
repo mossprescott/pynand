@@ -2,12 +2,13 @@
 
 """Run performance tests on all the implementations and summarize the results.
 
-Note: this takes a couple of minutes to run."""
+Note: this takes a couple of minutes to run.
+"""
 
 from nand import gate_count
 import test_optimal_08
 
-from computer import HACK_PLATFORM, STANDARD_PLATFORM
+from nand.platform import BUNDLED_PLATFORM
 from alt.eight import EIGHT_PLATFORM
 from alt.lazy import LAZY_PLATFORM
 from alt.shift import SHIFT_PLATFORM
@@ -15,10 +16,10 @@ from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
 
 def main():
-    std = measure(STANDARD_PLATFORM)
+    std = measure(BUNDLED_PLATFORM)
     print_result("solutions", std)
 
-    print_relative_result("project_0x.py", std, measure(HACK_PLATFORM))
+    print_relative_result("project_0x.py", std, measure(BUNDLED_PLATFORM))
     print_relative_result("alt/lazy.py", std, measure(LAZY_PLATFORM))
     print_relative_result("alt/sp.py", std, measure(SP_PLATFORM))
     print_relative_result("alt/threaded.py", std, measure(THREADED_PLATFORM))
@@ -50,9 +51,9 @@ def print_relative_result(name, std, t):
 def measure(platform):
     return (
         gate_count(platform.chip)['nands'],
-        test_optimal_08.count_pong_instructions(platform.translator),
-        test_optimal_08.count_pong_cycles_first_iteration(platform.chip, platform.assemble, platform.translator),
-        test_optimal_08.count_cycles_to_init(platform.chip, platform.assemble, platform.translator)
+        test_optimal_08.count_pong_instructions(platform),
+        test_optimal_08.count_pong_cycles_first_iteration(platform),
+        test_optimal_08.count_cycles_to_init(platform)
     )
 
 
