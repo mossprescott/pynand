@@ -2,15 +2,15 @@
 
 """A more efficient VM translator for the book's CPU.
 
-Uses a single trick: when an opcode is encountered, if the opcode pushes a value on to the stack, 
+Uses a single trick: when an opcode is encountered, if the opcode pushes a value on to the stack,
 the value is simply left in D and the translator remembers that this was done. If the next opcode
 consumes the top of the stack, it can usually generate a simpler sequence using the value from D.
 Otherwise, the value is pushed and then the usual opcodes are emitted.
 
 Note on debugging: this tends to make tracing hard to interpret, because whenever a stack operation
-is omitted, the stack just looks wrong in the trace.
+is omitted, the stack just looks wrong in the trace. Maybe the registers should be exposed so
+trace() could at least show the value?
 """
-
 
 from nand.platform import Platform, BUNDLED_PLATFORM
 from nand.translate import AssemblySource, translate_dir
@@ -20,9 +20,9 @@ from nand.solutions import solved_05, solved_06, solved_07
 class Translator(solved_07.Translator):
     def __init__(self):
         self.asm = AssemblySource()
-        
+
         solved_07.Translator.__init__(self, self.asm)
-        
+
         self.top_in_d = False
 
     def finish(self):
@@ -31,7 +31,7 @@ class Translator(solved_07.Translator):
     def push_constant(self, value):
         self._fix_stack()
 
-        # TODO: this is _costing_ one instruction when the following instr. can't take it 
+        # TODO: this is _costing_ one instruction when the following instr. can't take it
         # from D, by doing D=0/1 ... M=D instead of folding the constant in.
         self.asm.start(f"push constant {value}")
         if value <= 1:
@@ -60,7 +60,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("@SP")
             self.asm.instr("AM=M-1")
             self.asm.instr(f"D={op}")
-            # Note: this isn't really a win if the next instruction is going to just push. 
+            # Note: this isn't really a win if the next instruction is going to just push.
         else:
             solved_07.Translator._binary(self, opcode, op)
 
@@ -97,7 +97,7 @@ class Translator(solved_07.Translator):
             self._pop_d()
         else:
             self.asm.start(f"pop temp {index} (from D)")
-            self.top_in_d = False            
+            self.top_in_d = False
         self.asm.instr(f"@R{5+index}")
         self.asm.instr("M=D")
 
@@ -125,7 +125,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("A=D+M")
             self.asm.instr("D=M")
         self.top_in_d = True
- 
+
     def push_temp(self, index):
         assert 0 <= index < 8
 
@@ -149,7 +149,7 @@ class Translator(solved_07.Translator):
 
     def push_pointer(self, index):
         self._fix_stack()
-        
+
         self.asm.start(f"push pointer {index}")
         segment_ptr = ("THIS", "THAT")[index]
         self.asm.instr(f"@{segment_ptr}")
@@ -165,7 +165,7 @@ class Translator(solved_07.Translator):
             self.top_in_d = False
         else:
             solved_07.Translator.pop_static(self, index)
-        
+
     def push_static(self, index):
         self._fix_stack()
 
