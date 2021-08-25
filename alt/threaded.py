@@ -24,6 +24,7 @@ VM-level simulator.
 import re
 
 from nand import *
+from nand.platform import BUNDLED_PLATFORM, Platform
 from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Not, Xor, Not16, Mux16
@@ -893,16 +894,14 @@ class Translator:
 
     def finish(self):
         pass
+THREADED_PLATFORM = BUNDLED_PLATFORM._replace(
+    chip=ThreadedComputer,
+    assemble=assemble,
+    translator=Translator)
 
 
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
-
-    THREADED_PLATFORM = computer.Platform(
-        chip=ThreadedComputer,
-        assemble=assemble,
-        parse_line=solved_07.parse_line,
-        translator=Translator)
 
     computer.main(THREADED_PLATFORM)

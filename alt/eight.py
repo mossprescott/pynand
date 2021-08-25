@@ -42,7 +42,9 @@ don't worry about speed.
 import re
 
 from nand import *
+from nand.platform import Platform, BUNDLED_PLATFORM
 from nand.translate import AssemblySource, translate_dir
+
 
 from nand.solutions.solved_01 import And, Or, Not, Xor, Mux, Mux16
 from nand.solutions.solved_02 import HalfAdder, FullAdder
@@ -362,14 +364,14 @@ Split = build(mkSplit)
 
 # Main:
 
+EIGHT_PLATFORM = BUNDLED_PLATFORM._replace(
+    chip=EightComputer)
+
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
 
-    EIGHT_PLATFORM = computer.Platform(
-        chip=EightComputer,
-        assemble=solved_06.assemble,
-        parse_line=solved_07.parse_line,
-        translator=solved_07.Translator)
+    print("Hint: currently requires --simulator 'vector' (and patience)")
+    # TODO: fix the simulator so this can run at full (half) speed
 
     computer.main(EIGHT_PLATFORM)

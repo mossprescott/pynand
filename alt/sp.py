@@ -35,6 +35,7 @@ See notes in Translator below on some places these would help.
 import re
 
 from nand import *
+from nand.platform import BUNDLED_PLATFORM, Platform
 from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Xor, Not, Not16, Mux16
@@ -395,14 +396,14 @@ class Translator(solved_07.Translator):
         pass
 
 
+SP_PLATFORM = BUNDLED_PLATFORM._replace(
+    chip=SPComputer,
+    assemble=assemble,
+    translator=Translator)
+
+
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
-
-    SP_PLATFORM = computer.Platform(
-        chip=SPComputer,
-        assemble=assemble,
-        parse_line=solved_07.parse_line,
-        translator=Translator)
 
     computer.main(SP_PLATFORM)

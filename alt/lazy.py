@@ -12,6 +12,7 @@ is omitted, the stack just looks wrong in the trace.
 """
 
 
+from nand.platform import Platform, BUNDLED_PLATFORM
 from nand.translate import AssemblySource, translate_dir
 from nand.solutions import solved_05, solved_06, solved_07
 
@@ -212,15 +213,12 @@ class Translator(solved_07.Translator):
             self.top_in_d = False
 
 
+LAZY_PLATFORM = BUNDLED_PLATFORM._replace(
+    translator=Translator)
+
 
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
-
-    LAZY_PLATFORM = computer.Platform(
-        chip=solved_05.Computer,
-        assemble=solved_06.assemble,
-        parse_line=solved_07.parse_line,
-        translator=Translator)
 
     computer.main(LAZY_PLATFORM)

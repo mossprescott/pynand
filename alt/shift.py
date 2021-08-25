@@ -16,6 +16,7 @@ import re
 
 from nand import *
 from nand.component import Const
+from nand.platform import BUNDLED_PLATFORM, Platform
 from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Xor, Not, Not16, Mux16
@@ -241,14 +242,15 @@ class Translator(solved_07.Translator):
         return result
 
 
+SHIFT_PLATFORM = BUNDLED_PLATFORM._replace(
+	chip=ShiftComputer,
+    assemble=assemble,
+	translator=Translator)
+    # TODO: library with replaced divide, etc.
+
+
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
-
-    SHIFT_PLATFORM = computer.Platform(
-        chip=ShiftComputer,
-        assemble=assemble,
-        parse_line=solved_07.parse_line,
-        translator=Translator)
 
     computer.main(SHIFT_PLATFORM)
