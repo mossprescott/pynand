@@ -6,9 +6,6 @@ import pytest
 import nand.syntax
 from nand.platform import USER_PLATFORM
 from nand.translate import translate_dir, translate_library
-import project_05, project_06, project_07, project_08
-
-from nand.solutions import solved_07
 
 def test_code_size_pong():
     """A simple translator will work for small programs, but won't be able to fit a real program in the ROM."""
@@ -26,7 +23,7 @@ def count_pong_instructions(platform):
     translator = platform.translator()
 
     translator.preamble()
-    translate_dir(translator, solved_07.parse_line, "examples/project_11/Pong")
+    translate_dir(translator, platform, "examples/project_11/Pong")
     translate_library(translator, platform)
     translator.finish()
 
@@ -41,15 +38,15 @@ def test_pong_first_iteration():
     assert cycles < 35000
 
 
-def count_pong_cycles_first_iteration(platform):
+def count_pong_cycles_first_iteration(platform, simulator="codegen"):
     translator = platform.translator()
 
     translator.preamble()
-    translate_dir(translator, solved_07.parse_line, "examples/project_11/Pong")
+    translate_dir(translator, platform, "examples/project_11/Pong")
     translate_library(translator, platform)
     translator.finish()
 
-    computer = nand.syntax.run(platform.chip, simulator='codegen')
+    computer = nand.syntax.run(platform.chip, simulator=simulator)
     asm, _, _ = platform.assemble(translator.asm)
     computer.init_rom(asm)
 
@@ -119,24 +116,25 @@ def test_cycles_to_init():
     assert cycles < 5_000_000
 
 
-def count_cycles_to_init(platform):
+def count_cycles_to_init(platform, simulator="codegen"):
     """Count the number of cycles executed before Main.main is called."""
 
     translator = platform.translator()
 
     translator.preamble()
-    translate_dir(translator, solved_07.parse_line, "examples/project_12/ScreenTest.jack")
+    translate_dir(translator, platform, "examples/project_12/ScreenTest.jack")
     translate_library(translator, platform)
     translator.finish()
 
-    computer = nand.syntax.run(platform.chip, simulator='codegen')
+    computer = nand.syntax.run(platform.chip, simulator=simulator)
     asm, _, _ = platform.assemble(translator.asm)
     computer.init_rom(asm)
 
     cycles = 0
     while True:
         computer.ticktock()
-        if translator.asm.src_map.get(computer.pc) == 'function Main.main 1':
+        op = translator.asm.src_map.get(computer.pc)
+        if op is not None and op.startswith('function Main.main'):
             break
         elif cycles > 10_000_000:
             assert False, "Ran for 10 million cycles without reaching Main.main"

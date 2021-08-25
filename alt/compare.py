@@ -11,6 +11,7 @@ import test_optimal_08
 from nand.platform import BUNDLED_PLATFORM
 from alt.eight import EIGHT_PLATFORM
 from alt.lazy import LAZY_PLATFORM
+from alt.reg import REG_PLATFORM
 from alt.shift import SHIFT_PLATFORM
 from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
@@ -24,7 +25,13 @@ def main():
     print_relative_result("alt/sp.py", std, measure(SP_PLATFORM))
     print_relative_result("alt/threaded.py", std, measure(THREADED_PLATFORM))
     print_relative_result("alt/shift.py", std, measure(SHIFT_PLATFORM))
+    print_relative_result("alt/reg.py", std, measure(REG_PLATFORM))
+
+    # print_relative_result("alt/eight.py", std, measure(EIGHT_PLATFORM, "vector"))
     print_relative_result("alt/eight.py", std, (gate_count(EIGHT_PLATFORM.chip)['nands'], std[1], std[2]*2, std[3]*2))  # Cheeky
+    # Note: currently the eight-bit CPU doesn't run correctly in the "codegen" simulator, so it's
+    # a little painful to measure its performance directly. However, by design it takes exactly
+    # two cycles per instruction, so we can just report that with a relatively clear conscience.
 
 
 def print_result(name, t):
@@ -48,12 +55,12 @@ def print_relative_result(name, std, t):
     print(f"  Cycles for init.:    {init:0,d} ({fmt_pct(init, std_init)})")
 
 
-def measure(platform):
+def measure(platform, simulator="codegen"):
     return (
         gate_count(platform.chip)['nands'],
         test_optimal_08.count_pong_instructions(platform),
-        test_optimal_08.count_pong_cycles_first_iteration(platform),
-        test_optimal_08.count_cycles_to_init(platform)
+        test_optimal_08.count_pong_cycles_first_iteration(platform, simulator),
+        test_optimal_08.count_cycles_to_init(platform, simulator)
     )
 
 
