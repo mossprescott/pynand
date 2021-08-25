@@ -11,7 +11,8 @@ from project_04 import *
 def test_mult():
     computer = run(Computer)
 
-    computer.init_rom(assemble(MULT_ASM))
+    pgm, _, _ = assemble(MULT_ASM)
+    computer.init_rom(pgm)
 
     computer.poke(2, -1)
     for _ in range(20):
@@ -62,7 +63,8 @@ def test_fill():
     # We're going to run a few million cycles, so the faster simulator is a better option:
     computer = run(Computer, simulator='codegen')
 
-    computer.init_rom(assemble(FILL_ASM))
+    pgm, _, _ = assemble(FILL_ASM)
+    computer.init_rom(pgm)
 
     computer.set_keydown(0)  # the keyboard is untouched
     for _ in range(1_000_000):

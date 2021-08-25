@@ -336,3 +336,9 @@ ClassP = (
 #     IdentifierP &
 #         (SymbolP("{") << ManyP(ClassVarDecP) & ManyP(SubroutineDecP) >> SymbolP("}"))
 # ).mapConstr(jack_ast.Class)
+
+
+
+# Used by BUNDLED_PLATFORM:
+def parse_class(string):
+    return ClassP.parse(lex(string))

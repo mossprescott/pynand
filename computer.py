@@ -2,32 +2,34 @@
 
 """Run the full computer with display and keyboard connected via pygame.
 
-The program to run must be in the form of Hack assembly (.asm) or VM opcodes (a directory 
+The program to run must be in the form of Hack assembly (.asm) or VM opcodes (a directory
 of .vm files) and is specified by sys.argv[1].
 The `codegen` simulator is used unless --vector is used.
 
 $ ./computer.py examples/Blink.asm
 
-Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix: 
+Note: if nothing is displayed on Mac OS X Mojave, install updated pygame with a fix:
 $ pip3 install pygame==2.0.0dev6
+
+To install pygame on M1 Mac (Big Sur), this may help:
+https://www.quora.com/How-do-you-install-Pygame-on-a-MacBook-M1?share=1
 """
 
 import argparse
-import collections
 import os
 import pygame
 from pygame import Surface, Color, PixelArray
+import re
 import sys
 import time
 
 import nand.component
 import nand.syntax
-from nand.translate import translate_dir
-from nand.solutions import solved_05, solved_06, solved_07
-import project_05, project_06, project_07, project_08
+from nand.translate import translate_dir, translate_library
+from nand.platform import USER_PLATFORM
 
 EVENT_INTERVAL = 1/10
-DISPLAY_INTERVAL = 1/10  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
+DISPLAY_INTERVAL = 1/20  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
 CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so it doesn't bounce around too much
 
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
@@ -41,32 +43,13 @@ parser.add_argument("--print", action="store_true", help="(VM-only) print transl
 parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
 
 
-Platform = collections.namedtuple("Platform", ["chip", "assemble", "parse_line", "translator"])
-"""Package of a chip and the assembler and translator needed to run VM programs on it."""
-
-
-HACK_PLATFORM = Platform(
-    chip=project_05.Computer,
-    assemble=project_06.assemble,
-    parse_line=project_07.parse_line,
-    translator=project_08.Translator)
-"""The default chip and associated tools, defined in the project_0x.py modules."""
-
-
-STANDARD_PLATFORM = Platform(
-    chip=solved_05.Computer,
-    assemble=solved_06.assemble,
-    parse_line=solved_07.parse_line,
-    translator=solved_07.Translator)
-"""The included chip and tools; for comparison with the current solution."""
-
-def main(platform=HACK_PLATFORM):
+def main(platform=USER_PLATFORM):
     args = parser.parse_args()
-    
+
     print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
 
     prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
-    
+
     print(f"Size in ROM: {len(prg):0,d}")
 
     run(prg,
@@ -76,44 +59,90 @@ def main(platform=HACK_PLATFORM):
         src_map=src_map if args.trace else None)
 
 
+
 def load(platform, path, print_asm=False, no_waiting=False):
     if os.path.splitext(path)[1] == '.asm':
+        # The path is expected to be a single file containing the entire contents of ROM:
         print(f"Reading assembly from file: {path}")
         with open(path, mode='r') as f:
             prg = platform.assemble(f)
         return prg, None
     else:
-        translate = platform.translator()
-        translate.preamble()
-        translate_dir(translate, platform.parse_line, path)
-        translate_dir(translate, platform.parse_line, "nand2tetris/tools/OS")  # HACK not committed
+        # The path may be a file or directory containing VM or Jack source.
+        # TODO: handle combinations of the above, with or without included "OS" classes.
+
+        translator = platform.translator()
+        translator.preamble()
+        translate_dir(translator, platform, path, print_asm)
+
+        translate_library(translator, platform)
+
+        translator.finish()
+
+        try:
+            translator.check_references()
+        except Exception as x:
+            print(f"Warning: reference consistency check failed: {x}")
 
         if no_waiting:
-            translate.function("Sys", "wait", 0)
-            translate.push_constant(0)
-            translate.return_op()
+            # Tricky: the assembler will favor the latest occurrence of any label, so simply
+            # redefining a function at the end effectively overrides the previous definition
+            # (which is still taking up space in the ROM.)
+            translator.function("Sys", "wait", 0)
+            translator.push_constant(0)
+            translator.return_op()
 
         if print_asm:
-            for instr in translate.asm:
+            for instr in translator.asm:
                 print(instr)
+            print()
 
-        return platform.assemble(translate.asm), translate.asm.src_map
+        # These are just the defaults for now, but maybe they could be overridable?
+        min_static = 16
+        max_static = 255
+        instrs, symbols, statics = platform.assemble(translator.asm, min_static=min_static, max_static=max_static)
+
+        if print_asm:
+            print(f"Statics ({len(statics)} of {max_static - min_static + 1}):")
+            for name, addr in sorted(statics.items()):
+                print(f"  {name}: {addr}")
+            print()
+
+        return instrs, translator.asm.src_map
 
 
 COLORS = [0xFFFFFF, 0x000000]
 """0: White, 1: Black, as it was meant to be."""
 
-# "Recognizes all ASCII characters, as well as the following keys: 
-# newline (128=String.newline()), backspace (129=String.backspace()), 
-# left arrow (130), up arrow (131), right arrow (132), down arrow (133), 
-# home (134), end (135), page up (136), page down (137), 
-# insert (138), delete (139), ESC (140), F1-F12 (141-152)."
-LEFT_ARROW = 130
-UP_ARROW = 131
-RIGHT_ARROW = 132
-DOWN_ARROW = 133
-ESCAPE = 140
-NEWLINE = 128
+
+KEY_MAP = dict([
+    (pygame.K_RETURN, 128),
+    (pygame.K_BACKSPACE, 129),
+    (pygame.K_LEFT, 130),
+    (pygame.K_UP, 131),
+    (pygame.K_RIGHT, 132),
+    (pygame.K_DOWN, 133),
+    (pygame.K_HOME, 134),
+    (pygame.K_END, 135),
+    (pygame.K_PAGEUP, 136),
+    (pygame.K_PAGEDOWN, 137),
+    (pygame.K_INSERT, 138),
+    (pygame.K_DELETE, 139),
+    (pygame.K_ESCAPE, 140),
+    (pygame.K_F1, 141),
+    (pygame.K_F2, 142),
+    (pygame.K_F3, 143),
+    (pygame.K_F4, 144),
+    (pygame.K_F5, 145),
+    (pygame.K_F6, 146),
+    (pygame.K_F7, 147),
+    (pygame.K_F8, 148),
+    (pygame.K_F9, 149),
+    (pygame.K_F10, 150),
+    (pygame.K_F11, 151),
+    (pygame.K_F12, 152),
+] +
+[ (c, c) for c in range(32, 127) ])   # Printable characters, plus a few odd-balls
 
 
 class KVM:
@@ -122,45 +151,39 @@ class KVM:
         self.height = height
 
         pygame.init()
-        
+
         flags = 0
         # flags = pygame.FULLSCREEN
         # pygame.SCALED requires 2.0.0
         flags |= pygame.SCALED
         self.screen = pygame.display.set_mode((width, height), flags=flags)
         pygame.display.set_caption(title)
-        
+
     def process_events(self):
         """Drain pygame's event loop, returning the pressed key, if any.
         """
+        typed_keys = []
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.unicode != "" and ord(event.unicode) in KEY_MAP:
+                    typed_keys.append(KEY_MAP[ord(event.unicode)])
+
+        # If any keydown event occurred since the last time we checked, the first such key is
+        # recorded as down for the CPU. That gives the program a chance to detect keystrokes
+        # that are too fast to actually be seen, but more importantly it also catches keystrokes
+        # that pygame doesn't otherwise pass along: keys that are pressed when a modifier is down.
+        if typed_keys != []:
+            # print(f"typed: {typed_keys}")
+            return typed_keys[0]
+
         keys = pygame.key.get_pressed()
-        
-        # print(f"key codes: {codes}")
-        # print(f"mods: {hex(pygame.key.get_mods())}")
-        if keys[pygame.K_UP]:
-            key = UP_ARROW
-        elif keys[pygame.K_LEFT]:
-            key = LEFT_ARROW
-        elif keys[pygame.K_DOWN]:
-            key = DOWN_ARROW
-        elif keys[pygame.K_RIGHT]:
-            key = RIGHT_ARROW
-        elif keys[pygame.K_ESCAPE]:
-            key = ESCAPE
-        elif keys[pygame.K_SPACE]:
-            key = ord(' ')
-        elif keys[pygame.K_RETURN]:
-            key = NEWLINE
-        else:
-            for c in range(ord('a'), ord('z')+1):
-                if keys[c]:
-                    key = c
-                    break
-            else:
-                key = None
-        return key
+        for idx, key in KEY_MAP.items():
+            if keys[idx]:
+                return key
+
+        return None
 
     def update_display(self, get_pixel):
         self.screen.fill(COLORS[0])
@@ -181,29 +204,44 @@ class KVM:
 def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
     computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
-    
+
     kvm = KVM(name, 512, 256)
 
     last_cycle_time = last_event_time = last_display_time = now = time.monotonic()
-    
+
     last_cycle_count = cycles = 0
     while True:
         if not src_map:
             computer.ticktock(CYCLES_PER_CALL)
             cycles += CYCLES_PER_CALL
-            
+
         else:
             computer.ticktock(); cycles += 1
 
             op = src_map.get(computer.pc) if src_map else None
-            if op and op.startswith("call") and (
-                'Main' in op or 'init' in op):
-                print(f"{computer.pc}: {op}; cycle: {cycles:0,d}")
-        
+            if op and op.startswith("call"):
+                # if 'Main' in op or 'init' in op or "Sys.halt" in op:
+                #     print(f"{cycles:10,d}; {op}     @{computer.pc}")
+                m = re.match(r'call (.*)\.(.*) (\d)', op)
+                if m:
+                    class_name = m.group(1)
+                    sub_name = m.group(2)
+                    tracable = False
+                    if class_name == 'Main': tracable = True
+                    elif sub_name == 'init': tracable = True
+                    elif class_name == "Sys" and sub_name == "halt": tracable = True
+                    elif class_name not in ("Keyboard", "Math", "Memory", "Array", "String"): tracable = True
+                    tracable = True
+                    if tracable:
+                        print(f"{cycles:10,d}; {class_name}.{sub_name}     @{computer.pc}")
+            # if op:
+            #     print(f"{computer.pc:5d}: {op}; cycle: {cycles:0,d}")
+
+
         # Note: check the time only every few frames to reduce the overhead of timing
         if cycles % CYCLES_PER_CALL == 0:
             now = time.monotonic()
-        
+
             # A few times per second, process events and update the display:
             if now >= last_event_time + EVENT_INTERVAL:
                 last_event_time = now
@@ -211,6 +249,7 @@ def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
                 computer.set_keydown(key or 0)
 
             if now >= last_display_time + DISPLAY_INTERVAL:
+                # TODO: detect when in Sys.wait() and refresh the display sooner. Call it V-Sync?
                 last_display_time = now
                 kvm.update_display(computer.peek_screen)
 
@@ -219,7 +258,7 @@ def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
                 pygame.display.set_caption(f"{name}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
                 last_cycle_time = now
                 last_cycle_count = cycles
-            
+
                 # print(f"cycles: {cycles//1000:0,d}k; pc: {computer.pc}")
                 # print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
                 # print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")

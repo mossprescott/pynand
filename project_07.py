@@ -177,6 +177,19 @@ class Translator:
         return self.solved.check_references()
 
 
+    #
+    # Wiring:
+    #
+
+    def handle(self, op):
+        """Dispatch to the handler for an opcode, in the form of a tuple (op_name, [args])."""
+
+        # SOLVERS: this is just plumbing to call one of the methods definied below. Feel
+        # free to leave it here and don't worry about it how it works too much.
+        op_name, args = op
+        self.__getattribute__(op)(*args)
+
+
 def parse_line(line):
     # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of
     # the method of Translator which handles the opcode, and a sequence with any arguments.

@@ -21,6 +21,7 @@ class Translator:
 
         self.defined_functions = []
         self.referenced_functions = []
+        self.last_function_start = None
 
         # HACK: some code that's always required, even when preamble is not used.
 
@@ -36,6 +37,13 @@ class Translator:
         self.call_label = self._call()
 
         self.asm.label(start)
+
+
+    def handle(self, op):
+        """Dispatch to the handler for an opcode, in the form of a tuple (op_name, [args])."""
+
+        op_name, args = op
+        self.__getattribute__(op_name)(*args)
 
 
     def push_constant(self, value):
@@ -244,6 +252,11 @@ class Translator:
 
 
     def function(self, class_name, function_name, num_vars):
+        # if self.last_function_start is not None:
+        #     instrs = self.asm.instruction_count - self.last_function_start
+        #     print(f"  {self.function_namespace} instructions: {instrs}")
+        self.last_function_start = self.asm.instruction_count
+
         self.defined_functions.append(f"{class_name}.{function_name}")
 
         self.class_namespace = class_name.lower()
@@ -339,6 +352,8 @@ class Translator:
         self.asm.instr("M=D")
 
         self.call("Sys", "init", 0)
+        # self.asm.instr("@Sys.init")
+        # self.asm.instr("0;JMP")
 
 
     def _compare(self, op):
@@ -403,7 +418,7 @@ class Translator:
 
         self.asm.instr(f"M={op}")
 
-    def _unary(self, opcode,  op):
+    def _unary(self, opcode, op):
         """Modify the top item on the stack without updating SP."""
         self.asm.start(opcode)
         self.asm.instr("@SP")
@@ -545,7 +560,7 @@ class Translator:
         assert len(self.defined_functions) == len(defined), "Each function is defined only once"
 
         unresolved = referenced - defined
-        assert unresolved == set(), "Unresolved references"
+        assert unresolved == set(), f"Unresolved references: {unresolved}"
 
 
 def parse_line(line):
