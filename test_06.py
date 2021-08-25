@@ -86,41 +86,58 @@ def test_ops(parse_op=project_06.parse_op):
 
 def test_load_add():
     with open("examples/Add.asm") as f:
-        add = project_06.assemble(f)
-    assert add == ADD_PROGRAM
+        ops, symbols, statics = project_06.assemble(f)
+    assert ops == ADD_PROGRAM
+    assert symbols == {}
+    assert statics == {}
 
 
 def test_load_max_no_symbols():
     with open("examples/MaxL.asm") as f:
-        max_ = project_06.assemble(f)
-    assert max_ == MAX_PROGRAM
+        ops, symbols, statics = project_06.assemble(f)
+    assert ops == MAX_PROGRAM
+    assert symbols == {}
+    assert statics == {}
 
 
 def test_load_max():
     with open("examples/Max.asm") as f:
-        max_ = project_06.assemble(f)
-    assert max_ == MAX_PROGRAM
+        ops, symbols, statics = project_06.assemble(f)
+    assert ops == MAX_PROGRAM
+    assert symbols == {"OUTPUT_FIRST": 10, "OUTPUT_D": 12, "INFINITE_LOOP": 14}
+    assert statics == {}
 
 
 def test_load_rect():
     with open("examples/RectL.asm") as f:
-        rect1 = project_06.assemble(f)
-    assert len(rect1) == 25
+        ops1, symbols1, statics1 = project_06.assemble(f)
+    assert len(ops1) == 25
+    assert symbols1 == {}
+    assert statics1 == {}
 
     with open("examples/Rect.asm") as f:
-        rect2 = project_06.assemble(f)
-    assert len(rect2) == 25
+        ops2, symbols2, statics2 = project_06.assemble(f)
+    assert len(ops2) == 25
+    assert symbols2 == {"LOOP": 10, "INFINITE_LOOP": 23}
+    assert statics2 == {"counter": 16, "address": 17}
 
-    assert rect2 == rect1
+    assert ops2 == ops1
 
 
 def test_load_pong():
     with open("examples/PongL.asm") as f:
-        pong1 = project_06.assemble(f)
-    assert len(pong1) == 27483
+        ops1, symbols1, statics1 = project_06.assemble(f)
+    assert len(ops1) == 27483
+    assert symbols1 == {}
+    assert statics1 == {}
 
     with open("examples/Pong.asm") as f:
-        pong2 = project_06.assemble(f)
-    assert len(pong2) == 27483
+        ops2, symbols2, statics2 = project_06.assemble(f)
+    assert len(ops2) == 27483
+    assert len(symbols2) == 882
+    assert symbols2["main.main"] == 3837
+    assert len(statics2) == 14
+    assert statics2["ponggame.0"] == 16
+    assert statics2["screen.0"] == 29
 
-    assert pong2 == pong1
+    assert ops2 == ops1

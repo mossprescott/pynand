@@ -57,15 +57,15 @@ BUILTIN_SYMBOLS = {
 
 def parse_op(string, symbols=None):
     """Parse a single assembly op directly to the corresponding Hack instruction word.
-    
+
     The op may be a numeric symbol (an A-command) or a C-command, but not a reference
     to a symbol or variable.
-    
+
     :param symbols: a dictionary mapping symbol names to addresses (of labels in the code
     and memory locations allocated for "static" variables.) Note: not used in this implementation,
     but included in the signature in so that other compatible parsers can use it.
     """
-    
+
     m = re.match(r"@((?:0x)?\d+)", string)
     if m:
         return eval(m.group(1))
@@ -80,14 +80,14 @@ def parse_op(string, symbols=None):
                 dest |= 0b010
             if 'M' in dest_str:
                 dest |= 0b001
-        
+
             alu_str = m.group(2).replace('M', 'A')
             if alu_str in ALU_CONTROL:
                 alu = ALU_CONTROL[alu_str]
                 m_for_a = int('M' in m.group(2))
             else:
                 raise Exception(f"unrecognized alu op: {m.group(2)}")
-            
+
             jmp_str = m.group(3)
             if jmp_str is None:
                 jmp = 0
@@ -95,21 +95,26 @@ def parse_op(string, symbols=None):
                 jmp = JMP_CONTROL[jmp_str]
             else:
                 raise Exception(f"unrecognized jump: J{m.group(3)}")
-        
+
             return (0b111 << 13) | (m_for_a << 12) | (alu << 6) | (dest << 3) | jmp
         else:
             raise Exception(f"unrecognized: {string}")
 
 
-def assemble(lines, parse_op=parse_op):
+def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
     """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
-    
+
     "//" denotes a comment and is ignored, along with the remainder of the line.
     Leading and trailing white space on each line is ignored.
     After comments and white space are stripped, blank lines are ignored.
+
+    :return: A tuple containing (list of instruction words,
+                dictionary mapping labels to locations in ROM,
+                dictionary mapping non-label symbols to addresses in RAM).
     """
-    
+
+    # First pass: strip out non-instruction lines and extraneous characters:
     code_lines = []
     for line in lines:
         m = re.match(r"([^/]*)(?://.*)?", line)
@@ -117,34 +122,51 @@ def assemble(lines, parse_op=parse_op):
             string = m.group(1).strip()
         else:
             string = line.strip()
-        
+
         if string:
             code_lines.append(string)
-    
-    symbols = BUILTIN_SYMBOLS.copy()
+
+    # Second pass: resolve labels to locations
+    symbols = {}
     loc = 0
     for line in code_lines:
         m = re.match(r"\((.*)\)", line)
         if m:
-            symbols[m.group(1)] = loc
+            name = m.group(1)
+            if name in BUILTIN_SYMBOLS:
+                raise Exception(f"Attempt to redefine builtin symbol {name} at location {loc}")
+            elif name in symbols:
+                # This isn't an error because allowing re-definition makes it easy to hackishly
+                # override something (see alt/shift.py). Sorry, world.
+                print(f"WARNING! Label {name} redefined at {loc} (previous location: {symbols[name]})")
+            symbols[name] = loc
         else:
             loc += 1
-        
+
+    # Third pass: parse all other instructions, and resolve non-label symbols (i.e. "static" allocations.)
     ops = []
-    next_variable = 16
+    statics = {}
+    next_static = min_static
     for line in code_lines:
         if "(" in line:
             pass
         else:
             m = re.match(r"@(\D.*)", line)
             if m:
-                symbol_str = m.group(1)
-                if symbol_str not in symbols:
-                    # TODO: capture these for testing (i.e. checking for bad references)
-                    # print(f"Allocated static: {symbol_str}; {next_variable}")
-                    symbols[symbol_str] = next_variable
-                    next_variable += 1
-                ops.append(symbols[symbol_str])
+                name = m.group(1)
+                if name in BUILTIN_SYMBOLS:
+                    ops.append(BUILTIN_SYMBOLS[name])
+                elif name in symbols:
+                    ops.append(symbols[name])
+                elif name in statics:
+                    ops.append(statics[name])
+                else:
+                    if next_static > max_static:
+                        raise Exception(f"Unable to allocate static storage for symbol {name}; already used all {max_static - min_static + 1} available locations")
+                    statics[name] = next_static
+                    ops.append(next_static)
+                    next_static += 1
             else:
                 ops.append(parse_op(line, symbols))
-    return ops
+
+    return (ops, symbols, statics)

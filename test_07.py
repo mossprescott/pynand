@@ -256,7 +256,7 @@ def test_memory_access_static(chip=project_05.Computer, assemble=project_06.asse
 def init_sp(computer, address=256):
     """Initialize SP, which may or may not be stored in RAM."""
 
-    pgm = project_06.assemble([
+    pgm, _, _ = project_06.assemble([
         f"@{address}",
         "D=A",
         "@SP",
