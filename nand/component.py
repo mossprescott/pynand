@@ -5,7 +5,7 @@ import itertools
 
 class Component:
     """Defines the interface for a component, including what traces it reads and writes, and when."""
-    
+
     def __init__(self):
         self.label = self.__class__.__name__
 
@@ -26,17 +26,17 @@ class Component:
 
 
 class Const(Component):
-    """Mostly fictional component which just supplies a constant value. No runtime cost. 
+    """Mostly fictional component which just supplies a constant value. No runtime cost.
     """
-    
+
     def __init__(self, bits, value):
         Component.__init__(self)
         self.bits = bits
         self.value = value
-    
+
     def inputs(self):
         return {}
-    
+
     def outputs(self):
         return {"out": self.bits}
 

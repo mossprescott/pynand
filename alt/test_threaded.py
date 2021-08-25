@@ -21,7 +21,7 @@ def test_backward_compatible_cpu():
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(ThreadedComputer)
-    
+
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(ThreadedComputer)
 
@@ -75,12 +75,12 @@ def test_call_and_return(simulator):
 
     cpu.instruction = parse_op("CALL target", symbols)
     cpu.ticktock()
-    
+
     assert cpu.pc == 12345
 
     cpu.instruction = parse_op("RTN")
     cpu.ticktock()
-    assert cpu.pc == 1001    
+    assert cpu.pc == 1001
 
 
 def test_computer_gates():
@@ -115,7 +115,7 @@ def test_backward_compatible_ops():
 def test_assemble_call():
     symbols = {"target": 12345}
     assert unsigned(parse_op("CALL target", symbols))  == 0b1000_0000_0000_0000 | 12345
-    
+
     # with pytest.raises(SyntaxError) as exc_info:
     #     parse_op("CALL ")
     # assert str(exc_info.value).startswith("M not allowed as a destination for pop")
@@ -149,10 +149,10 @@ def test_vm_basic_loop():
 
 def test_vm_fibonacci_series():
     test_08.test_fibonacci_series(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_simple_function():
     test_08.test_simple_function(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_nested_call():
     test_08.test_nested_call(chip=ThreadedComputer, assemble=assemble, translator=Translator)
 

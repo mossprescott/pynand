@@ -81,7 +81,7 @@ class IC:
 
     def copy(self):
         """Construct a new IC with all the same components and wiring. Note: this is a shallow copy,
-        containing the same child components. Therefore, changes to the wiring of the new IC do not 
+        containing the same child components. Therefore, changes to the wiring of the new IC do not
         affect the original, but changes to the wiring of child components do.
         """
         ic = IC(f"{self.label}", self._inputs, self._outputs)
@@ -100,7 +100,7 @@ class IC:
         flat_children = {}
 
         all_wires = {}
-        
+
         for comp in self.sorted_components():
             if isinstance(comp, IC) and comp.label not in primitives:
                 # print(f"flatten: {comp.label}")
@@ -124,31 +124,31 @@ class IC:
 
         ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
         ic.wires = collapse_internal(all_wires)
-        
+
         # Now prune wires that don't connect to any reachable compononent:
         reachable = set(ic.sorted_components() + [common, root])
         ic.wires = {
-            t: f 
-            for (t, f) in ic.wires.items() 
+            t: f
+            for (t, f) in ic.wires.items()
             if f.comp in reachable and t.comp in reachable
         }
-        
+
         return ic
 
 
     def sorted_components(self):
-        """List of all components (including only direct children), roughly in the order that 
+        """List of all components (including only direct children), roughly in the order that
         signals propagate.
 
-        That is, when component A has an output that feeds an input of component B, A comes before B 
-        in the list. If there are reference cycles, the components are ordered as if one such 
+        That is, when component A has an output that feeds an input of component B, A comes before B
+        in the list. If there are reference cycles, the components are ordered as if one such
         reference (chosen in no particular way) was removed.
-        
-        DFFs (and other components that have _only_ sequential logic) get special treatment: 
-        they appear last in the result no matter what, which allows their inputs to be evaluated 
+
+        DFFs (and other components that have _only_ sequential logic) get special treatment:
+        they appear last in the result no matter what, which allows their inputs to be evaluated
         later as well.
         """
-        
+
         # DFF output never changes based on upstream combinational logic
         # So stop the DFS at a DFF (or other sequential-only output)
         # Still need to update the _inputs_ of any such component each time, but
@@ -190,7 +190,7 @@ class IC:
 
         reachable = dfs([root], False)
         reachable.remove(root)
-        
+
         dffs = [n for n in reachable if isinstance(n, DFF)]
         result = dfs([root] + dffs, True)
         result.remove(root)
@@ -214,9 +214,9 @@ class IC:
     def __str__(self):
         """A multi-line summary of all the wiring."""
         # Sort wires by topological order of the "from" component, then name, then the "to" component and name.
-        
+
         # TODO: render components in order, one per line, with neatly summarized inputs and outputs.
-        
+
         all_comps = self.sorted_components()
         def to_index(c, root_val):
             if c == root:
@@ -249,13 +249,13 @@ class IC:
 
         def wires(key, bit_pairs):
             (fc, fn), (tc, tn) = key
-            def line(l, r, x): 
+            def line(l, r, x):
                 return f"  {l:21s} -> {r:21s}{x}"
             def comp_name_label(comp, name):
                 if isinstance(comp, Const):
                     return hex(comp.value)
                 elif comp == root or (comp == clock.comp and name == clock.name):
-                    return name 
+                    return name
                 else:
                     return f"{self._comp_label(comp, all_comps)}.{name}"
             def conn_label(comp, name, bit):
@@ -281,8 +281,8 @@ class IC:
                 ]
             else:
                 return [
-                    line(conn_label(fc, fn, fb), 
-                         conn_label(tc, tn, tb), 
+                    line(conn_label(fc, fn, fb),
+                         conn_label(tc, tn, tb),
                          back_edge_label(fc, tc))
                     for fb, tb in sorted(bit_pairs)
                     ]
@@ -310,9 +310,9 @@ class IC:
 def collapse_internal(graph):
     """Collapse _all_ paths, removing _every_ internal node.
     """
-    
+
     result = graph.copy()
-    
+
     to_delete = []
     for src, dst in graph.items():
         while dst in result:
@@ -320,7 +320,7 @@ def collapse_internal(graph):
             result[src] = previous_dst
             to_delete.append(dst)
             dst = previous_dst
-            
+
     for node in to_delete:
         if node in result:
             del result[node]
@@ -330,9 +330,9 @@ def collapse_internal(graph):
 
 class Root:
     """Pseudo-component which stands in for the IC itself in connections. There is exactly one instance
-    this class, `root`, which is used by every IC. Doing it that way makes it trivial to make a copy 
+    this class, `root`, which is used by every IC. Doing it that way makes it trivial to make a copy
     of an IC: just make a shallow copy of the `wires` dictionary.
-    
+
     Note: inputs() and outputs() not defined here, because te result would be wrong. Anyone interested in
     inputs and outputs needs to special case the root and look at the IC itself.
     """
@@ -345,7 +345,7 @@ class Root:
 
     def outputs(self):
         raise NotImplementedError("Not a true component. Input and outputs are available from the IC.")
-        
+
 root = Root()
 """A single instance of Root which should be the only instance ever."""
 

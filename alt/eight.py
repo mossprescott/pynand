@@ -1,41 +1,41 @@
 #! /usr/bin/env python3
 
-"""An attempt at a _smaller_ CPU, by reducing the ALU and data paths to only 8 bits, and taking 
-two cycles for every instruction. This is the classic "low-cost" CPU move (examples include the 
-Motorola 68000, and various 4/8- and 8/16-bit CPUs before that), promising compatibility with 
-fancier architectures, and then delivering seriously compromised performance, or conversely, 
+"""An attempt at a _smaller_ CPU, by reducing the ALU and data paths to only 8 bits, and taking
+two cycles for every instruction. This is the classic "low-cost" CPU move (examples include the
+Motorola 68000, and various 4/8- and 8/16-bit CPUs before that), promising compatibility with
+fancier architectures, and then delivering seriously compromised performance, or conversely,
 locking users into an architecture so they can later be upsold to more expensive models.
 
-To that end, 8-bit versions of all the components are defined, plus components to pack/unpack 
-them into 16-bit values for communication with the ROM and memory (which are shared with the 
-normal chip.) Some of the 8-bit components have additional inputs and outputs to allow for 
+To that end, 8-bit versions of all the components are defined, plus components to pack/unpack
+them into 16-bit values for communication with the ROM and memory (which are shared with the
+normal chip.) Some of the 8-bit components have additional inputs and outputs to allow for
 propagating carry bits from one word the the next.
 
-In a real design, the memory bus, etc. would also be reduced in width since there is now only 
+In a real design, the memory bus, etc. would also be reduced in width since there is now only
 one address/data word to move every two cycles, but to keep things simple the idea here is that
 the chip has exactly the same external interface.
 
 The question is: how close can this get to 50% smaller? No doubt there will be some overhead to
 keep track of half-cycles, and to propagate carries, etc.
 
-And the result so far suggests that it's hard to get anywhere near 50% savings. The ALU, which 
+And the result so far suggests that it's hard to get anywhere near 50% savings. The ALU, which
 accounts for almost 45% of the gates in the original design, does get virtually 50% smaller.
-However, there are DFFs to keep track of two bytes of intermediate results (on each for PC and 
+However, there are DFFs to keep track of two bytes of intermediate results (on each for PC and
 ALU), and a bunch of extra Mux8s to select one or the other input.
 
-Note: this implementation defines _only_ a new CPU/Computer, which implements exactly the same 
-instruction set as the standard Hack CPU, so the same assembler and VM translator can be used. 
-The only way to tell them apart from the outside is to notice that every other cycle doesn't 
+Note: this implementation defines _only_ a new CPU/Computer, which implements exactly the same
+instruction set as the standard Hack CPU, so the same assembler and VM translator can be used.
+The only way to tell them apart from the outside is to notice that every other cycle doesn't
 seem to make any progress.
 
 Note: some instructions _could_ be completed in a single cycle:
 - @xxx: about 30% of instructions (so, 15% savings), and decoding is simple
-- [A][D][M]=A|D|M (any time the ALU isn't actually needed): also almost 30%, but harder to 
+- [A][D][M]=A|D|M (any time the ALU isn't actually needed): also almost 30%, but harder to
     decode (need a PLA)
 - in fact, any instruction not using the ALU's add function (f=1) could be done in a single cycle
-    if the ALU's functions were separated. With some cooperation from the assembler, that might 
+    if the ALU's functions were separated. With some cooperation from the assembler, that might
     account for a large fraction.
-But this would almost certainly add some gates, so for now just focus on keeping it small and 
+But this would almost certainly add some gates, so for now just focus on keeping it small and
 don't worry about speed.
 """
 
@@ -61,7 +61,7 @@ def mkNot8(inputs, outputs):
         outputs.out[i] = Not(in_=in_[i]).out
 
 Not8 = build(mkNot8)
-        
+
 
 def mkAnd8(inputs, outputs):
     for i in range(8):
@@ -84,7 +84,7 @@ Mux8 = build(mkMux8)
 
 def mkInc8(inputs, outputs):
     """Note: this is subtly different than Inc16 in that it may or may not actually increment
-    the value, under the control of carry_in. This allows the carry to propagate from the low 
+    the value, under the control of carry_in. This allows the carry to propagate from the low
     word to the high word.
     """
     carry = inputs.carry_in
@@ -130,37 +130,37 @@ Neg8 = build(mkNeg8)
 
 def mkEightALU(inputs, outputs):
     """Eight-bit ALU, with one addition:
-    
+
     The single low bit carry_in is added along with x and y, and the carry_out from that operation
-    is exposed. Note that carry_out reflects the result of addition, whether or not the sum is used 
+    is exposed. Note that carry_out reflects the result of addition, whether or not the sum is used
     (f) and whether or not the result is negated (no).
     """
 
     x = inputs.x
     y = inputs.y
     carry_in = inputs.carry_in
-    
+
     zx = inputs.zx
     nx = inputs.nx
     zy = inputs.zy
     ny = inputs.ny
     f  = inputs.f
     no = inputs.no
-    
+
     x_zeroed = Mux8(a=x, b=0, sel=zx).out
     y_zeroed = Mux8(a=y, b=0, sel=zy).out
 
     x_inverted = Mux8(a=x_zeroed, b=Not8(in_=x_zeroed).out, sel=nx).out
     y_inverted = Mux8(a=y_zeroed, b=Not8(in_=y_zeroed).out, sel=ny).out
-    
+
     anded = And8(a=x_inverted, b=y_inverted)
     added = Add8(a=x_inverted, b=y_inverted, carry_in=carry_in)
-    
+
     result = Mux8(a=anded.out, b=added.out, sel=f).out
     result_inverted = Not8(in_=result).out
-    
+
     out = Mux8(a=result, b=result_inverted, sel=no).out
-    
+
     outputs.out = out
     outputs.zr = Zero8(in_=out).out
     outputs.ng = Neg8(in_=out).out
@@ -179,7 +179,7 @@ Register8 = build(mkRegister8)
 
 def mkLatch8(inputs, outputs):
     """Just 8 DFFs, for cases where we need to latch a half-word between top and bottom half-cycles.
-    """    
+    """
     for i in range(8):
         outputs.out[i] = DFF(in_=inputs.in_[i]).out
 Latch8 = build(mkLatch8)
@@ -189,13 +189,13 @@ def mkPC8(inputs, outputs):
     """16-bit PC, built from two 8-bit registers and a single Inc8.
 
     On the first half-cycle, the low half-word is incremented but not yet stored.
-    On the second half-cycle, the high half-word is incremented, and then the two half-words 
+    On the second half-cycle, the high half-word is incremented, and then the two half-words
     appear together at the same time.
 
-    That way, the address presented to the ROM is consistently correct, and the instruction word 
+    That way, the address presented to the ROM is consistently correct, and the instruction word
     can be read in both half-cycles.
-    
-    Note: all that fanciness means that this component doesn't save much compared to the normal 
+
+    Note: all that fanciness means that this component doesn't save much compared to the normal
     PC. It might be better to just use that and only increment it on every other cycle.
     """
 
@@ -209,7 +209,7 @@ def mkPC8(inputs, outputs):
     in_split = Split(in_=in_)
     in_lo = in_split.lo
     in_hi = in_split.hi
-    
+
     reseted = lazy()
 
     pc_lo_next = Latch8(in_=reseted.out)
@@ -252,13 +252,13 @@ def Not_(x):
 
 
 def mkEightCPU(inputs, outputs):
-    """Implement the 16-bit Hack instruction set using a single 8-bit ALU and a pair of 8-bit 
+    """Implement the 16-bit Hack instruction set using a single 8-bit ALU and a pair of 8-bit
     registers for each architectural register, plus some extra flip-flops to keep track of state
     in between two "half"-cycles.
-    
-    In the first cycle, the low half-word of results is computed. In the second cycle, the high 
+
+    In the first cycle, the low half-word of results is computed. In the second cycle, the high
     word is computed, and when appropriate, the full word is presented to the memory. Note: on
-    instructions that write to the memory, the address and data words may be only half-updated 
+    instructions that write to the memory, the address and data words may be only half-updated
     on the first cycle (but writeM is not asserted then.)
     """
 
@@ -291,9 +291,9 @@ def mkEightCPU(inputs, outputs):
 
     # For convenience, each half-word in a separate 8-bit register:
     load_a = And_(Or_(not_i, da), bottom_half)
-    a_lo_reg = Register8(in_=Mux8(a=split_instr.lo, b=alu_saved.out, sel=i).out, 
+    a_lo_reg = Register8(in_=Mux8(a=split_instr.lo, b=alu_saved.out, sel=i).out,
                          load=load_a)
-    a_hi_reg = Register8(in_=Mux8(a=split_instr.hi, b=alu.out, sel=i).out, 
+    a_hi_reg = Register8(in_=Mux8(a=split_instr.hi, b=alu.out, sel=i).out,
                          load=load_a)
     a_both_reg = Splice(hi=a_hi_reg.out, lo=a_lo_reg.out).out
 

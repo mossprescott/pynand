@@ -21,7 +21,7 @@ def test_backward_compatible_cpu():
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(ShiftComputer)
-    
+
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(ShiftComputer)
 
@@ -49,7 +49,7 @@ def test_shiftR16():
     assert run(ShiftR16, in_=-23456).out == -11728
     assert run(ShiftR16, in_=-4).out == -2
     assert run(ShiftR16, in_=-2).out == -1
-    
+
     # These two might be unexpected, but this is what you get: floor instead of truncate.
     assert run(ShiftR16, in_=-3).out == -2
     assert run(ShiftR16, in_=-1).out == -1
@@ -63,29 +63,29 @@ def test_shiftR16():
 
 def test_shift_instr():
     cpu = run(ShiftCPU)
-    
+
     cpu.instruction = parse_op("@4")
     cpu.ticktock()
-    
+
     cpu.instruction = parse_op("A=A>>1")
     cpu.ticktock()
     assert cpu.addressM == 2
-    
-    cpu.ticktock()    
+
+    cpu.ticktock()
     assert cpu.addressM == 1
-    
-    cpu.ticktock()    
+
+    cpu.ticktock()
     assert cpu.addressM == 0
-    
-    cpu.ticktock()    
+
+    cpu.ticktock()
     assert cpu.addressM == 0
-    
+
     cpu.instruction = parse_op("@6")
     cpu.ticktock()
     cpu.instruction = parse_op("D=-A")
     cpu.ticktock()
     assert cpu.outM == -6
-    
+
     cpu.instruction = parse_op("D=D>>1")
     assert cpu.outM == -3
     cpu.ticktock()
@@ -109,7 +109,7 @@ def test_computer_gates():
         'outputs': 1,
     }
 
-   
+
 #
 # Test that all Hack instructions are assembled the same way:
 #
@@ -158,10 +158,10 @@ def test_vm_basic_loop():
 
 def test_vm_fibonacci_series():
     test_08.test_fibonacci_series(chip=ShiftComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_simple_function():
     test_08.test_simple_function(chip=ShiftComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_nested_call():
     test_08.test_nested_call(chip=ShiftComputer, assemble=assemble, translator=Translator)
 
@@ -178,15 +178,15 @@ def test_vm_statics_multiple_files():
 
 def test_multiply():
     translate = Translator()
-    
+
     translate.push_constant(123)
     translate.push_constant(34)
     translate.neg()
     translate.call("Math", "multiply", 2)
-    
+
     translate.finish()
-    
-    # Include Math.abs here just so we don't have to load the entire library. Might end up 
+
+    # Include Math.abs here just so we don't have to load the entire library. Might end up
     # implementing it as an opcode anyway.
     abs_ops = """
         function Math.abs 0
@@ -209,14 +209,14 @@ def test_multiply():
             print(t)
             op, args = t
             translate.__getattribute__(op)(*args)
-    
+
     computer = run(ShiftComputer, simulator="codegen")
     asm = assemble(translate.asm)
     computer.init_rom(asm)
-    
+
     computer.poke(0, 256)
     translate.asm.run(assemble, computer, stop_cycles=1500, debug=True)
-    
+
     assert computer.peek(0) == 257
     assert computer.peek(256) == -4182
 
@@ -224,7 +224,7 @@ def test_multiply():
 @pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(Translator)
-    
+
     # compare to the project_08 solution (about 28k)
     assert instruction_count < 28_300
 
