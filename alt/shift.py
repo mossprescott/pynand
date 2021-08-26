@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-"""An alternative CPU which is backward compatible with the Nand to Tetris design, adding the ability to 
+"""An alternative CPU which is backward compatible with the Nand to Tetris design, adding the ability to
 shift the ALU's result to the right by one bit.
 
 This is pretty cheap: about 50 additional gates to check a bit and select the shifted or un-shifted result.
@@ -8,7 +8,7 @@ This is pretty cheap: about 50 additional gates to check a bit and select the sh
 The VM translator rewrites division by a constant power of 2 to a (series of) "shiftr" opcode(s), and substitutes
 a more efficient implementation of Math.multiply that uses it.
 
-The result is about 50% fewer cycles to run the Pong game loop, and essentially no difference in simulation speed, 
+The result is about 50% fewer cycles to run the Pong game loop, and essentially no difference in simulation speed,
 since the only change is a single, conditional `>> 1` expression.
 """
 
@@ -29,20 +29,20 @@ from nand.solutions import solved_07
 
 def mkShiftR16(inputs, outputs):
     """Sign-extending right shift."""
-    
+
     for i in range(15):
         outputs.out[i] = inputs.in_[i+1]
     outputs.out[15] = inputs.in_[15]
-    
+
 ShiftR16 = build(mkShiftR16)
 
 
 def mkShiftCPU(inputs, outputs):
     """Implements the Hack architecture, plus a single extra bit of ALU control:
-    
-    If bit 13 is not set, the result from the ALU is shifted one bit to the right before being 
+
+    If bit 13 is not set, the result from the ALU is shifted one bit to the right before being
     written to M, A, or D. The sign bit is retained (so, sign extension).
-    
+
     Condition codes (and therefore, JMPs) are not affected by any shifting, so probably don't use them
     together.
     """
@@ -82,9 +82,9 @@ ShiftCPU = build(mkShiftCPU)
 
 def mkShiftComputer(inputs, outputs):
     """This is the same as regular Computer, except using ShiftCPU."""
-    
+
     reset = inputs.reset
-    
+
     cpu = lazy()
 
     rom = ROM(15)(address=cpu.pc)
@@ -105,7 +105,7 @@ def parse_op(string, symbols={}):
     m = re.match(r"(.+)>>1", string)
     if m:
         return 0xdfff & solved_06.parse_op(m.group(1), symbols)
-    
+
     return solved_06.parse_op(string, symbols)
 
 
@@ -113,7 +113,11 @@ def assemble(lines):
     return solved_06.assemble(lines, parse_op)
 
 
-# Math.multiply from the included library, rewritten to use shiftr to rotate the bits of y into the 
+# TODO: add ">>" or maybe "shiftr" to the compiler, and write multiply in Jack.
+# TODO: patch the platform's Math library directly, so the reference consistency check won't fail.
+
+
+# Math.multiply from the included library, rewritten to use shiftr to rotate the bits of y into the
 # low bit, rather than using a table and a separate local variable to tell when to stop.
 FAST_MULTIPLY = """
     function Math.multiply 5
@@ -209,7 +213,7 @@ INFINITE_LOOP = """
 class Translator(solved_07.Translator):
     """Re-use the standard translator, adding a single new opcode: "shiftr".
     """
-    
+
     def __init__(self):
         self.asm = AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
@@ -223,7 +227,7 @@ class Translator(solved_07.Translator):
             if t:
                 op, args = t
                 self.__getattribute__(op)(*args)
-        
+
     def rewrite_ops(self, ops):
         result = []
         while ops:
@@ -234,7 +238,7 @@ class Translator(solved_07.Translator):
                 result.append(("shiftr", ()))
                 result.append(("shiftr", ()))
                 ops = ops[2:]
-                # print("rewrote divide by 16")
+                print("rewrote divide by 16")
             # TODO: similar for multiply, but use "pop temp 1"; "push temp 1" "push temp 1" "add"?
             else:
                 result.append(ops[0])
