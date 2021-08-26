@@ -48,8 +48,7 @@ USER_PLATFORM = Platform(
     translator=project_08.Translator,
     parser=project_10.parse_class,
     compiler=project_11.compile_class,
-    # library=project_12.OS_CLASSES)
-    library=solved_12._OS_CLASSES)  # HACK: because Output._drawChar is unresolved if the user's (partial) solution is used.
+    library=project_12.OS_CLASSES)
 """The default chip and associated tools, defined in the project_0x.py modules."""
 
 

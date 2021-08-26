@@ -17,17 +17,170 @@
 class Output {
 
     // Character map for displaying characters
-    // static Array charMaps;
+    static Array charMaps;
 
     static int cursorY, cursorX;
     static String temp;
 
     /** Initializes the screen, and locates the cursor at the screen's top-left. */
     function void init() {
+        do Output.initMap();
+
         let cursorY = 0;
         let cursorX = 0;
         let temp = String.new(6);  // space for any int
+
         return;
+    }
+
+    // Initializes the character map array
+    function void initMap() {
+        var int i;
+
+        let charMaps = Array.new(127);
+
+        // Black square, used for displaying non-printable characters.
+        do Output.create(0,63,63,63,63,63,63,63,63,63,0,0);
+
+        // Assigns the bitmap for each character in the charachter set.
+        // The first parameter is the character index, the next 11 numbers
+        // are the values of each row in the frame that represents this character.
+        do Output.create(32,0,0,0,0,0,0,0,0,0,0,0);          //
+        do Output.create(33,12,30,30,30,12,12,0,12,12,0,0);  // !
+        do Output.create(34,54,54,20,0,0,0,0,0,0,0,0);       // "
+        do Output.create(35,0,18,18,63,18,18,63,18,18,0,0);  // #
+        do Output.create(36,12,30,51,3,30,48,51,30,12,12,0); // $
+        do Output.create(37,0,0,35,51,24,12,6,51,49,0,0);    // %
+        do Output.create(38,12,30,30,12,54,27,27,27,54,0,0); // &
+        do Output.create(39,12,12,6,0,0,0,0,0,0,0,0);        // '
+        do Output.create(40,24,12,6,6,6,6,6,12,24,0,0);      // (
+        do Output.create(41,6,12,24,24,24,24,24,12,6,0,0);   // )
+        do Output.create(42,0,0,0,51,30,63,30,51,0,0,0);     // *
+        do Output.create(43,0,0,0,12,12,63,12,12,0,0,0);     // +
+        do Output.create(44,0,0,0,0,0,0,0,12,12,6,0);        // ,
+        do Output.create(45,0,0,0,0,0,63,0,0,0,0,0);         // -
+        do Output.create(46,0,0,0,0,0,0,0,12,12,0,0);        // .
+        do Output.create(47,0,0,32,48,24,12,6,3,1,0,0);      // /
+
+        do Output.create(48,12,30,51,51,51,51,51,30,12,0,0); // 0
+        do Output.create(49,12,14,15,12,12,12,12,12,63,0,0); // 1
+        do Output.create(50,30,51,48,24,12,6,3,51,63,0,0);   // 2
+        do Output.create(51,30,51,48,48,28,48,48,51,30,0,0); // 3
+        do Output.create(52,16,24,28,26,25,63,24,24,60,0,0); // 4
+        do Output.create(53,63,3,3,31,48,48,48,51,30,0,0);   // 5
+        do Output.create(54,28,6,3,3,31,51,51,51,30,0,0);    // 6
+        do Output.create(55,63,49,48,48,24,12,12,12,12,0,0); // 7
+        do Output.create(56,30,51,51,51,30,51,51,51,30,0,0); // 8
+        do Output.create(57,30,51,51,51,62,48,48,24,14,0,0); // 9
+
+        do Output.create(58,0,0,12,12,0,0,12,12,0,0,0);      // :
+        do Output.create(59,0,0,12,12,0,0,12,12,6,0,0);      // ;
+        do Output.create(60,0,0,24,12,6,3,6,12,24,0,0);      // <
+        do Output.create(61,0,0,0,63,0,0,63,0,0,0,0);        // =
+        do Output.create(62,0,0,3,6,12,24,12,6,3,0,0);       // >
+        do Output.create(64,30,51,51,59,59,59,27,3,30,0,0);  // @
+        do Output.create(63,30,51,51,24,12,12,0,12,12,0,0);  // ?
+
+        do Output.create(65,30,51,51,51,63,51,51,51,51,0,0); // A
+        do Output.create(66,31,51,51,51,31,51,51,51,31,0,0); // B
+        do Output.create(67,28,54,35,3,3,3,35,54,28,0,0);    // C
+        do Output.create(68,15,27,51,51,51,51,51,27,15,0,0); // D
+        do Output.create(69,63,51,35,11,15,11,35,51,63,0,0); // E
+        do Output.create(70,63,51,35,11,15,11,3,3,3,0,0);    // F
+        do Output.create(71,28,54,35,3,59,51,51,54,44,0,0);  // G
+        do Output.create(72,51,51,51,51,63,51,51,51,51,0,0); // H
+        do Output.create(73,30,12,12,12,12,12,12,12,30,0,0); // I
+        do Output.create(74,60,24,24,24,24,24,27,27,14,0,0); // J
+        do Output.create(75,51,51,51,27,15,27,51,51,51,0,0); // K
+        do Output.create(76,3,3,3,3,3,3,35,51,63,0,0);       // L
+        do Output.create(77,33,51,63,63,51,51,51,51,51,0,0); // M
+        do Output.create(78,51,51,55,55,63,59,59,51,51,0,0); // N
+        do Output.create(79,30,51,51,51,51,51,51,51,30,0,0); // O
+        do Output.create(80,31,51,51,51,31,3,3,3,3,0,0);     // P
+        do Output.create(81,30,51,51,51,51,51,63,59,30,48,0);// Q
+        do Output.create(82,31,51,51,51,31,27,51,51,51,0,0); // R
+        do Output.create(83,30,51,51,6,28,48,51,51,30,0,0);  // S
+        do Output.create(84,63,63,45,12,12,12,12,12,30,0,0); // T
+        do Output.create(85,51,51,51,51,51,51,51,51,30,0,0); // U
+        do Output.create(86,51,51,51,51,51,30,30,12,12,0,0); // V
+        do Output.create(87,51,51,51,51,51,63,63,63,18,0,0); // W
+        do Output.create(88,51,51,30,30,12,30,30,51,51,0,0); // X
+        do Output.create(89,51,51,51,51,30,12,12,12,30,0,0); // Y
+        do Output.create(90,63,51,49,24,12,6,35,51,63,0,0);  // Z
+
+        do Output.create(91,30,6,6,6,6,6,6,6,30,0,0);          // [
+        do Output.create(92,0,0,1,3,6,12,24,48,32,0,0);        // \
+        do Output.create(93,30,24,24,24,24,24,24,24,30,0,0);   // ]
+        do Output.create(94,8,28,54,0,0,0,0,0,0,0,0);          // ^
+        do Output.create(95,0,0,0,0,0,0,0,0,0,63,0);           // _
+        do Output.create(96,6,12,24,0,0,0,0,0,0,0,0);          // `
+
+        do Output.create(97,0,0,0,14,24,30,27,27,54,0,0);      // a
+        do Output.create(98,3,3,3,15,27,51,51,51,30,0,0);      // b
+        do Output.create(99,0,0,0,30,51,3,3,51,30,0,0);        // c
+        do Output.create(100,48,48,48,60,54,51,51,51,30,0,0);  // d
+        do Output.create(101,0,0,0,30,51,63,3,51,30,0,0);      // e
+        do Output.create(102,28,54,38,6,15,6,6,6,15,0,0);      // f
+        do Output.create(103,0,0,30,51,51,51,62,48,51,30,0);   // g
+        do Output.create(104,3,3,3,27,55,51,51,51,51,0,0);     // h
+        do Output.create(105,12,12,0,14,12,12,12,12,30,0,0);   // i
+        do Output.create(106,48,48,0,56,48,48,48,48,51,30,0);  // j
+        do Output.create(107,3,3,3,51,27,15,15,27,51,0,0);     // k
+        do Output.create(108,14,12,12,12,12,12,12,12,30,0,0);  // l
+        do Output.create(109,0,0,0,29,63,43,43,43,43,0,0);     // m
+        do Output.create(110,0,0,0,29,51,51,51,51,51,0,0);     // n
+        do Output.create(111,0,0,0,30,51,51,51,51,30,0,0);     // o
+        do Output.create(112,0,0,0,30,51,51,51,31,3,3,0);      // p
+        do Output.create(113,0,0,0,30,51,51,51,62,48,48,0);    // q
+        do Output.create(114,0,0,0,29,55,51,3,3,7,0,0);        // r
+        do Output.create(115,0,0,0,30,51,6,24,51,30,0,0);      // s
+        do Output.create(116,4,6,6,15,6,6,6,54,28,0,0);        // t
+        do Output.create(117,0,0,0,27,27,27,27,27,54,0,0);     // u
+        do Output.create(118,0,0,0,51,51,51,51,30,12,0,0);     // v
+        do Output.create(119,0,0,0,51,51,51,63,63,18,0,0);     // w
+        do Output.create(120,0,0,0,51,30,12,12,30,51,0,0);     // x
+        do Output.create(121,0,0,0,51,51,51,62,48,24,15,0);    // y
+        do Output.create(122,0,0,0,63,27,12,6,51,63,0,0);      // z
+
+        do Output.create(123,56,12,12,12,7,12,12,12,56,0,0);   // {
+        do Output.create(124,12,12,12,12,12,12,12,12,12,0,0);  // |
+        do Output.create(125,7,12,12,12,56,12,12,12,7,0,0);    // }
+        do Output.create(126,38,45,25,0,0,0,0,0,0,0,0);        // ~
+
+	    return;
+    }
+
+    // Creates the character map array of the given character index, using the given values.
+    function void create(int index, int a, int b, int c, int d, int e,
+                         int f, int g, int h, int i, int j, int k) {
+	    var Array map;
+
+	    let map = Array.new(11);
+        let charMaps[index] = map;
+
+        let map[0] = a;
+        let map[1] = b;
+        let map[2] = c;
+        let map[3] = d;
+        let map[4] = e;
+        let map[5] = f;
+        let map[6] = g;
+        let map[7] = h;
+        let map[8] = i;
+        let map[9] = j;
+        let map[10] = k;
+
+        return;
+    }
+
+    // Returns the character map (array of size 11) of the given character.
+    // If the given character is invalid or non-printable, returns the
+    // character map of a black square.
+    function Array getMap(char c) {
+        if ((c < 32) | (c > 126)) {
+            let c = 0;
+        }
+        return charMaps[c];
     }
 
     /** Moves the cursor to the j-th column of the i-th row,
@@ -41,23 +194,17 @@ class Output {
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
-        // Implementation:
-        //
-        // Use a giant switch to pick the right pixels for this char. This
-        // eliminates the very expensive initialization that the authors'
-        // version does at startup, and it eliminates those 90-odd Arrays
-        // on the heap, but it moves some additional work to each call:
-        //
-        // The switch itself, which is always 7 branches deep. This looks a heck of a lot
-        // better if you use alt/lazy, which eliminates much of the thrash on the stack for
-        // these conditionals, or alt/sp, which compresses them much more. Even better
-        // would be a proper computed jump.
-        //
-        // Pushing 11 arguments onto the stack is more expensive than indexing into an array
-        // of 11 words.
+        // Implementation note: all multiply and divide operations in this function have been
+        // unrolled by hand for speed. Since the numbers involved are known to be small and
+        // positive (screen coords) or constant factors (determined by the layout of pixels
+        // in RAM), it's *much* more efficient to do /2, *16, and *352 with some custom, inline
+        // code. Overall, these optimizations reduce the running time for OutputTest.jack by
+        // about 65%, while increasing the size of the library in ROM by something like 600
+        // words.
 
         var Array tty;
-        var char cc;
+        var Array map, tmpY, tmpX, pixelPair;
+        var int mask, row, pixels;
 
         if (c = 128) {  // newLine
             do Output.println();
@@ -71,324 +218,22 @@ class Output {
             return;
         }
 
-        if ((cursorY < 0) | (cursorY > 22) | (cursorX < 0) | (cursorX > 63)) {
-            return;
-        }
-
         // For the benefit of tests and terminal users, also write the character to the "tty" port:
         let tty = 24576;  // 0x6000
         let tty[0] = c;
 
-        // Update the cursor position *first*, so we can return early. _drawChar() will account for it.
-        let cursorX = cursorX + 1;
-
-        // Make a local copy so it can live in a register, just in case the compiler is smart enough to
-        // allocate locals to registers, but not smart enough to move an argument there.
-        let cc = c;
-
-        if (cc & 64){
-            if (cc & 32){
-                if (cc & 16){
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) {  }
-                                else {       do Output._drawChar(9766, 11565, 6425, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x7e = 126 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(1799, 3084, 3084, 3084, 14392, 3084, 3084, 3084, 1799, 0, 0); return;  /* 0x7d = 125 */ }
-                                else {       do Output._drawChar(3084, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 0, 0); return;  /* 0x7c = 124 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(14392, 3084, 3084, 3084, 1799, 3084, 3084, 3084, 14392, 0, 0); return;  /* 0x7b = 123 */ }
-                                else {       do Output._drawChar(0, 0, 0, 16191, 6939, 3084, 1542, 13107, 16191, 0, 0); return;  /* 0x7a = 122 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 15934, 12336, 6168, 3855, 0); return;  /* 0x79 = 121 */ }
-                                else {       do Output._drawChar(0, 0, 0, 13107, 7710, 3084, 3084, 7710, 13107, 0, 0); return;  /* 0x78 = 120 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (c & 4){
-                            if (c & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 16191, 16191, 4626, 0, 0); return;  /* 0x77 = 119 */ }
-                                else {       do Output._drawChar(0, 0, 0, 13107, 13107, 13107, 13107, 7710, 3084, 0, 0); return;  /* 0x76 = 118 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 6939, 6939, 6939, 6939, 6939, 13878, 0, 0); return;  /* 0x75 = 117 */ }
-                                else {       do Output._drawChar(1028, 1542, 1542, 3855, 1542, 1542, 1542, 13878, 7196, 0, 0); return;  /* 0x74 = 116 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 1542, 6168, 13107, 7710, 0, 0); return;  /* 0x73 = 115 */ }
-                                else {       do Output._drawChar(0, 0, 0, 7453, 14135, 13107, 771, 771, 1799, 0, 0); return;  /* 0x72 = 114 */ }
-                            }
-                            else {
-                                if (c & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 13107, 13107, 15934, 12336, 12336, 0); return;  /* 0x71 = 113 */ }
-                                else {       do Output._drawChar(0, 0, 0, 7710, 13107, 13107, 13107, 7967, 771, 771, 0); return;  /* 0x70 = 112 */ }
-                            }
-                        }
-                    }
-                }
-                else {
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x6f = 111 */ }
-                                else {       do Output._drawChar(0, 0, 0, 7453, 13107, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x6e = 110 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7453, 16191, 11051, 11051, 11051, 11051, 0, 0); return;  /* 0x6d = 109 */ }
-                                else {       do Output._drawChar(3598, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x6c = 108 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(771, 771, 771, 13107, 6939, 3855, 3855, 6939, 13107, 0, 0); return;  /* 0x6b = 107 */ }
-                                else {       do Output._drawChar(12336, 12336, 0, 14392, 12336, 12336, 12336, 12336, 13107, 7710, 0); return;  /* 0x6a = 106 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(3084, 3084, 0, 3598, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x69 = 105 */ }
-                                else {       do Output._drawChar(771, 771, 771, 6939, 14135, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x68 = 104 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 7710, 13107, 13107, 13107, 15934, 12336, 13107, 7710, 0); return;  /* 0x67 = 103 */ }
-                                else {       do Output._drawChar(7196, 13878, 9766, 1542, 3855, 1542, 1542, 1542, 3855, 0, 0); return;  /* 0x66 = 102 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 16191, 771, 13107, 7710, 0, 0); return;  /* 0x65 = 101 */ }
-                                else {       do Output._drawChar(12336, 12336, 12336, 15420, 13878, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x64 = 100 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 7710, 13107, 771, 771, 13107, 7710, 0, 0); return;  /* 0x63 = 99 */ }
-                                else {       do Output._drawChar(771, 771, 771, 3855, 6939, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x62 = 98 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 3598, 6168, 7710, 6939, 6939, 13878, 0, 0); return;  /* 0x61 = 97 */ }
-                                else {       do Output._drawChar(1542, 3084, 6168, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x60 = 96 */ }
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                if (cc & 16){
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 0, 0, 16191, 0); return;  /* 0x5f = 95 */ }
-                                else {       do Output._drawChar(2056, 7196, 13878, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x5e = 94 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(7710, 6168, 6168, 6168, 6168, 6168, 6168, 6168, 7710, 0, 0); return;  /* 0x5d = 93 */ }
-                                else {       do Output._drawChar(0, 0, 257, 771, 1542, 3084, 6168, 12336, 8224, 0, 0); return;  /* 0x5c = 92 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7710, 1542, 1542, 1542, 1542, 1542, 1542, 1542, 7710, 0, 0); return;  /* 0x5b = 91 */ }
-                                else {       do Output._drawChar(16191, 13107, 12593, 6168, 3084, 1542, 8995, 13107, 16191, 0, 0); return;  /* 0x5a = 90 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 7710, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x59 = 89 */ }
-                                else {       do Output._drawChar(13107, 13107, 7710, 7710, 3084, 7710, 7710, 13107, 13107, 0, 0); return;  /* 0x58 = 88 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 16191, 16191, 16191, 4626, 0, 0); return;  /* 0x57 = 87 */ }
-                                else {       do Output._drawChar(13107, 13107, 13107, 13107, 13107, 7710, 7710, 3084, 3084, 0, 0); return;  /* 0x56 = 86 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(13107, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x55 = 85 */ }
-                                else {       do Output._drawChar(16191, 16191, 11565, 3084, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x54 = 84 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 1542, 7196, 12336, 13107, 13107, 7710, 0, 0); return;  /* 0x53 = 83 */ }
-                                else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 6939, 13107, 13107, 13107, 0, 0); return;  /* 0x52 = 82 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 16191, 15163, 7710, 12336, 0); return;  /* 0x51 = 81 */ }
-                                else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 771, 771, 771, 771, 0, 0); return;  /* 0x50 = 80 */ }
-                            }
-                        }
-                    }
-                }
-                else {
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 13107, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x4f = 79 */ }
-                                else {       do Output._drawChar(13107, 13107, 14135, 14135, 16191, 15163, 15163, 13107, 13107, 0, 0); return;  /* 0x4e = 78 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(8481, 13107, 16191, 16191, 13107, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x4d = 77 */ }
-                                else {       do Output._drawChar(771, 771, 771, 771, 771, 771, 8995, 13107, 16191, 0, 0); return;  /* 0x4c = 76 */ }
-                            }
-                        }
-                        else {
-                            if (c & 2){
-                                if (c & 1) { do Output._drawChar(13107, 13107, 13107, 6939, 3855, 6939, 13107, 13107, 13107, 0, 0); return;  /* 0x4b = 75 */ }
-                                else {       do Output._drawChar(15420, 6168, 6168, 6168, 6168, 6168, 6939, 6939, 3598, 0, 0); return;  /* 0x4a = 74 */ }
-                            }
-                            else {
-                                if (c & 1) { do Output._drawChar(7710, 3084, 3084, 3084, 3084, 3084, 3084, 3084, 7710, 0, 0); return;  /* 0x49 = 73 */ }
-                                else {       do Output._drawChar(13107, 13107, 13107, 13107, 16191, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x48 = 72 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7196, 13878, 8995, 771, 15163, 13107, 13107, 13878, 11308, 0, 0); return;  /* 0x47 = 71 */ }
-                                else {       do Output._drawChar(16191, 13107, 8995, 2827, 3855, 2827, 771, 771, 771, 0, 0); return;  /* 0x46 = 70 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(16191, 13107, 8995, 2827, 3855, 2827, 8995, 13107, 16191, 0, 0); return;  /* 0x45 = 69 */ }
-                                else {       do Output._drawChar(3855, 6939, 13107, 13107, 13107, 13107, 13107, 6939, 3855, 0, 0); return;  /* 0x44 = 68 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7196, 13878, 8995, 771, 771, 771, 8995, 13878, 7196, 0, 0); return;  /* 0x43 = 67 */ }
-                                else {       do Output._drawChar(7967, 13107, 13107, 13107, 7967, 13107, 13107, 13107, 7967, 0, 0); return;  /* 0x42 = 66 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 16191, 13107, 13107, 13107, 13107, 0, 0); return;  /* 0x41 = 65 */ }
-                                else {       do Output._drawChar(7710, 13107, 13107, 15163, 15163, 15163, 6939, 771, 7710, 0, 0); return;  /* 0x40 = 64 */ }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        else {
-            if (cc & 32){
-                if (cc & 16){
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 6168, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x3f = 63 */ }
-                                else {       do Output._drawChar(0, 0, 771, 1542, 3084, 6168, 3084, 1542, 771, 0, 0); return;  /* 0x3e = 62 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 16191, 0, 0, 16191, 0, 0, 0, 0); return;  /* 0x3d = 61 */ }
-                                else {       do Output._drawChar(0, 0, 6168, 3084, 1542, 771, 1542, 3084, 6168, 0, 0); return;  /* 0x3c = 60 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 3084, 3084, 0, 0, 3084, 3084, 1542, 0, 0); return;  /* 0x3b = 59 */ }
-                                else {       do Output._drawChar(0, 0, 3084, 3084, 0, 0, 3084, 3084, 0, 0, 0); return;  /* 0x3a = 58 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 13107, 13107, 15934, 12336, 12336, 6168, 3598, 0, 0); return;  /* 0x39 = 57 */ }
-                                else {       do Output._drawChar(7710, 13107, 13107, 13107, 7710, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x38 = 56 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(16191, 12593, 12336, 12336, 6168, 3084, 3084, 3084, 3084, 0, 0); return;  /* 0x37 = 55 */ }
-                                else {       do Output._drawChar(7196, 1542, 771, 771, 7967, 13107, 13107, 13107, 7710, 0, 0); return;  /* 0x36 = 54 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(16191, 771, 771, 7967, 12336, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x35 = 53 */ }
-                                else {       do Output._drawChar(4112, 6168, 7196, 6682, 6425, 16191, 6168, 6168, 15420, 0, 0); return;  /* 0x34 = 52 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(7710, 13107, 12336, 12336, 7196, 12336, 12336, 13107, 7710, 0, 0); return;  /* 0x33 = 51 */ }
-                                else {       do Output._drawChar(7710, 13107, 12336, 6168, 3084, 1542, 771, 13107, 16191, 0, 0); return;  /* 0x32 = 50 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(3084, 3598, 3855, 3084, 3084, 3084, 3084, 3084, 16191, 0, 0); return;  /* 0x31 = 49 */ }
-                                else {       do Output._drawChar(3084, 7710, 13107, 13107, 13107, 13107, 13107, 7710, 3084, 0, 0); return;  /* 0x30 = 48 */ }
-                            }
-                        }
-                    }
-                }
-                else {
-                    if (cc & 8){
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 8224, 12336, 6168, 3084, 1542, 771, 257, 0, 0); return;  /* 0x2f = 47 */ }
-                                else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 3084, 3084, 0, 0); return;  /* 0x2e = 46 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 0, 0, 16191, 0, 0, 0, 0, 0); return;  /* 0x2d = 45 */ }
-                                else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 3084, 3084, 1542, 0); return;  /* 0x2c = 44 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 0, 0, 3084, 3084, 16191, 3084, 3084, 0, 0, 0); return;  /* 0x2b = 43 */ }
-                                else {       do Output._drawChar(0, 0, 0, 13107, 7710, 16191, 7710, 13107, 0, 0, 0); return;  /* 0x2a = 42 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(1542, 3084, 6168, 6168, 6168, 6168, 6168, 3084, 1542, 0, 0); return;  /* 0x29 = 41 */ }
-                                else {       do Output._drawChar(6168, 3084, 1542, 1542, 1542, 1542, 1542, 3084, 6168, 0, 0); return;  /* 0x28 = 40 */ }
-                            }
-                        }
-                    }
-                    else {
-                        if (cc & 4){
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(3084, 3084, 1542, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x27 = 39 */ }
-                                else {       do Output._drawChar(3084, 7710, 7710, 3084, 13878, 6939, 6939, 6939, 13878, 0, 0); return;  /* 0x26 = 38 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(0, 0, 8995, 13107, 6168, 3084, 1542, 13107, 12593, 0, 0); return;  /* 0x25 = 37 */ }
-                                else {       do Output._drawChar(3084, 7710, 13107, 771, 7710, 12336, 13107, 7710, 3084, 3084, 0); return;  /* 0x24 = 36 */ }
-                            }
-                        }
-                        else {
-                            if (cc & 2){
-                                if (cc & 1) { do Output._drawChar(0, 4626, 4626, 16191, 4626, 4626, 16191, 4626, 4626, 0, 0); return;  /* 0x23 = 35 */ }
-                                else {       do Output._drawChar(13878, 13878, 5140, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x22 = 34 */ }
-                            }
-                            else {
-                                if (cc & 1) { do Output._drawChar(3084, 7710, 7710, 7710, 3084, 3084, 0, 3084, 3084, 0, 0); return;  /* 0x21 = 33 */ }
-                                else {       do Output._drawChar(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); return;  /* 0x20 = 32 */ }
-                            }
-                        }
-                    }
-                }
-            }
+        if ((cursorY < 0) | (cursorY > 22) | (cursorX < 0) | (cursorX > 63)) {
+            return;
         }
 
-        // Fallback: the black box
-        do Output._drawChar(16191, 16191, 16191, 16191, 16191, 16191, 16191, 16191, 16191, 0, 0); return;  /* 0x0 = 0 */
-    }
+        // OK, now we know the character is not cursor-control and the current position is on
+        // screen, so we can go ahead and render the pixels:
 
-    // Note: assuming the cursor is located on screen, and cursorX is one position past it.
-    //
-    // Each row contains two copies of the pixels to be drawn in the corrseponding row:
-    // one in the low byte (for odd colums), and another in the upper byte (for even columns).
-    //
-    // TODO: inline this into the bottom of printChar, to avoid the function call overhead.
-    function void _drawChar(int r1, int r2, int r3, int r4, int r5,
-                         int r6, int r7, int r8, int r9, int r10, int r11) {
-        var Array pixelPair;
-        var int maskPos, maskNeg;
+        let map = Output.getMap(c);
 
-        var int tmpY, actualCursorX, tmpX;
+
+        // Effectively:
+        // let pixelPair = 16384 + (cursorY*352) + (cursorX/2);
 
         // Hand-unrolled multiplication by 352 (= 11*32 = (8 + 2 + 1) << 5)
         let tmpY = cursorY + cursorY;      // 2c
@@ -400,42 +245,51 @@ class Output {
         let tmpY = tmpY + tmpY;            // 176c
         let tmpY = tmpY + tmpY;            // 352c
 
-        // Hand-unrolled division: (cursorX-1)/2
-        let actualCursorX = cursorX - 1;
+        // Hand-unrolled division: cursorX/2 (0 <= cursorX < 63)
         let tmpX = 0;
-        if (actualCursorX & 2)  { let tmpX = tmpX | 1; }
-        if (actualCursorX & 4)  { let tmpX = tmpX | 2; }
-        if (actualCursorX & 8)  { let tmpX = tmpX | 4; }
-        if (actualCursorX & 16) { let tmpX = tmpX | 8; }
-        if (actualCursorX & 32) { let tmpX = tmpX | 16; }
+        if (cursorX & 2)  { let tmpX = tmpX | 1; }
+        if (cursorX & 4)  { let tmpX = tmpX | 2; }
+        if (cursorX & 8)  { let tmpX = tmpX | 4; }
+        if (cursorX & 16) { let tmpX = tmpX | 8; }
+        if (cursorX & 32) { let tmpX = tmpX | 16; }
 
         let pixelPair = 16384 + tmpY + tmpX;
 
-        if (actualCursorX & 1) {
-            // Odd column: pixels in the high byte
-            let maskPos = ~255;
-            let maskNeg = 255;
+
+        if (cursorX & 1) {
+            // Odd column: pixels in the low byte
+            let mask = 255;
         }
         else {
-            let maskPos = 255;
-            let maskNeg = ~255;
+            let mask = ~255;
         }
 
-        let pixelPair[0]   = (pixelPair[0]   & maskNeg) | (r1 & maskPos);
-        let pixelPair[32]  = (pixelPair[32]  & maskNeg) | (r2 & maskPos);
-        let pixelPair[64]  = (pixelPair[64]  & maskNeg) | (r3 & maskPos);
-        let pixelPair[96]  = (pixelPair[96]  & maskNeg) | (r4 & maskPos);
-        let pixelPair[128] = (pixelPair[128] & maskNeg) | (r5 & maskPos);
-        let pixelPair[160] = (pixelPair[160] & maskNeg) | (r6 & maskPos);
-        let pixelPair[192] = (pixelPair[192] & maskNeg) | (r7 & maskPos);
-        let pixelPair[224] = (pixelPair[224] & maskNeg) | (r8 & maskPos);
-        let pixelPair[256] = (pixelPair[256] & maskNeg) | (r9 & maskPos);
-        let pixelPair[288] = (pixelPair[288] & maskNeg) | (r10 & maskPos);
-        let pixelPair[320] = (pixelPair[320] & maskNeg) | (r11 & maskPos);
+        let row = 0;
+        while (row < 11) {
+            let pixels = map[row];
+            if (cursorX & 1) {
+                // Unrolled left shift:
+                // let pixels = pixels*256;
+                let pixels = pixels + pixels;  // *2
+                let pixels = pixels + pixels;  // *4
+                let pixels = pixels + pixels;  // *8
+                let pixels = pixels + pixels;  // *16
+                let pixels = pixels + pixels;  // *32
+                let pixels = pixels + pixels;  // *64
+                let pixels = pixels + pixels;  // *128
+                let pixels = pixels + pixels;  // *256
+            }
+
+            let pixelPair[0] = (pixelPair[0] & mask) | pixels;
+
+            let pixelPair = pixelPair + 32;  // 32 words per line
+            let row = row + 1;
+        }
+
+        let cursorX = cursorX + 1;
 
         return;
     }
-
 
     /** displays the given string starting at the cursor location,
      *  and advances the cursor appropriately. */
