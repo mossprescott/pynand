@@ -65,7 +65,7 @@ def load(platform, path, print_asm=False, no_waiting=False):
         # The path is expected to be a single file containing the entire contents of ROM:
         print(f"Reading assembly from file: {path}")
         with open(path, mode='r') as f:
-            prg = platform.assemble(f)
+            prg, _, _ = platform.assemble(f)
         return prg, None
     else:
         # The path may be a file or directory containing VM or Jack source.
