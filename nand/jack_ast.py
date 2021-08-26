@@ -7,7 +7,7 @@ Each NamedTuple corresponds to one of the productions of the Jack grammar as see
 materials (e.g. Chapter 10 lecture notes, slide 84).
 """
 
-from typing import NamedTuple, Optional, Sequence, Union
+from typing import Literal, NamedTuple, Optional, Sequence, Union
 
 
 Type = str
@@ -110,8 +110,10 @@ class Parameter(NamedTuple):
     type: Type
     name: str
 
+SubKind = Literal["function", "method", "constructor"]
+
 class SubroutineDec(NamedTuple):
-    kind: str  # 'constructor', 'function', or 'method'
+    kind: SubKind
     result: Optional[Type]  # Note: None means "void" here
     name: str
     params: Sequence[Parameter]
@@ -145,7 +147,7 @@ def _indented_list(lst):
         + ["]"]
     )
 
-# Money-patch the __reprs__ on each node that has lists of declarations and statements.
+# Monkey-patch the __reprs__ on each node that has lists of declarations and statements.
 # The idea is to be identical to the default __repr__, with added white space.
 
 # def _SubroutineCall_repr(self):

@@ -1,22 +1,22 @@
-from typing import Literal, Tuple
+from typing import Dict, Literal, Tuple
 
 from nand.jack_ast import *
 from nand.translate import AssemblySource
 
-SubKind = Literal["function", "method", "constructor"]
-VarKind = Literal["static", "field", "argument", "local"]
+VarKind = Literal["static", "this", "argument", "local"]
+SymbolMap = Dict[str, Tuple[Type, int]]
 
 class SymbolTable:
     def __init__(self, class_name: str):
         self.class_name = class_name
-        self.subroutine_name = None
-        self.subroutine_kind = None
+        self.subroutine_name: Optional[str] = None
+        self.subroutine_kind: Optional[SubKind] = None
 
-        self.statics = {}
-        self.fields = {}
+        self.statics: SymbolMap = {}
+        self.fields: SymbolMap = {}
 
-        self.arguments = {}
-        self.locals = {}
+        self.arguments: SymbolMap = {}
+        self.locals: SymbolMap = {}
 
     def start_subroutine(self, name: str, kind: SubKind):
         """Start a new subroutine scope (i.e. remove all "argument" and "local" definitions.),
@@ -77,7 +77,7 @@ class SymbolTable:
         else:
             return f"{self.subroutine_kind} {self.class_name}.{self.subroutine_name}"
 
-    def _map_for(self, kind):
+    def _map_for(self, kind) -> SymbolMap:
         if kind == "static":
             return self.statics
         elif kind == "this":
@@ -89,7 +89,7 @@ class SymbolTable:
         else:
             raise Exception(f"Unrecognized kind: {kind}")
 
-    def _find_name(self, name) -> Optional[Tuple[Tuple[str, int], VarKind]]:
+    def _find_name(self, name) -> Tuple[Tuple[Type, int], VarKind]:
         if name in self.locals:
             return self.locals[name], "local"
         elif name in self.arguments:
@@ -189,13 +189,13 @@ def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: As
     else:
         raise Exception(f"Unexpected subroutine kind: {ast.kind}")
 
-    print(f"  compiled subroutine: {symbol_table.class_name}.{ast.name}")
+    # print(f"  compiled subroutine: {symbol_table.class_name}.{ast.name}")
 
 
 def _is_terminal_function(ast: SubroutineDec, symbol_table: SymbolTable) -> bool:
     return symbol_table.class_name == "Sys" and ast.name in ("error", "halt")
 
-def _has_final_return(stmts: Sequence[Statement]) -> bool:
+def _has_final_return(stmts: Sequence[StatementRec]) -> bool:
     if len(stmts) == 0:
         return False
 
@@ -250,17 +250,26 @@ def compile_statement(ast: StatementRec, symbol_table: SymbolTable, asm: Assembl
 
 def compile_let_statement(ast, symbol_table, asm):
     if ast.array_index is not None:
-        # First compute the destination address:
+        # # First compute the destination address:
+        # compile_expression(ast.array_index, symbol_table, asm)
+        # compile_expression(VarRef(ast.name), symbol_table, asm)
+        # asm.instr("add")
+
+        # # Now the right hand side:
+        # compile_expression(ast.expr, symbol_table, asm)
+        # asm.instr("pop temp 0")     # stash the value
+
+        # asm.instr("pop pointer 1")  # set the THAT pointer
+        # asm.instr("push temp 0")    # recover the value
+        # asm.instr("pop that 0")     # and finally store it
+
+        # Wait, don't we want to evaluate the rhs first anyway? We can avoid pop/push temp 0
+        # either way...
+        compile_expression(ast.expr, symbol_table, asm)
         compile_expression(ast.array_index, symbol_table, asm)
         compile_expression(VarRef(ast.name), symbol_table, asm)
         asm.instr("add")
-
-        # Now the right hand side:
-        compile_expression(ast.expr, symbol_table, asm)
-        asm.instr("pop temp 0")     # stash the value
-
         asm.instr("pop pointer 1")  # set the THAT pointer
-        asm.instr("push temp 0")    # recover the value
         asm.instr("pop that 0")     # and finally store it
 
     else:
