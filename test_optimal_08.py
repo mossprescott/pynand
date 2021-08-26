@@ -50,9 +50,8 @@ def count_pong_cycles_first_iteration(platform, simulator="codegen"):
     asm, _, _ = platform.assemble(translator.asm)
     computer.init_rom(asm)
 
-    src_map = translator.asm.src_map
-    bat_start, (bat_end,) = find_function(src_map, "Bat", "move")
-    move_ball_start, (move_ball_end,) = find_function(src_map, "PongGame", "moveBall")
+    bat_start, (bat_end,) = translator.asm.find_function("Bat", "move")
+    move_ball_start, (move_ball_end,) = translator.asm.find_function("PongGame", "moveBall")
 
     cycles = 0
 
@@ -85,27 +84,6 @@ def count_pong_cycles_first_iteration(platform, simulator="codegen"):
     # print(f"moveBall ended at cycle {cycles:0,d}")
 
     return (bat_end_cycles - bat_start_cycles) + (move_ball_end - move_ball_start)
-
-
-def find_function(src_map, class_name, function_name):
-    """Search in the src map for the location of the instructions that begin and end a particular function.
-    Returns a tuple (address of "function" op, [addresses of "return" ops]).
-    """
-
-    # Note: reversed, so we always find the _last_ occurrence, in case the function has been overridden
-    for addr, op in sorted(src_map.items(), reverse=True):
-        if op.startswith(f"function {class_name}.{function_name} "):
-            start = addr
-            break
-
-    ends = []
-    for addr, op in [t for t in sorted(src_map.items()) if t[0] > addr]:
-        if op == "return":
-            ends.append(addr)
-        elif op.startswith("function"):
-            break
-
-    return start, ends
 
 
 def test_cycles_to_init():
