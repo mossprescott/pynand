@@ -281,15 +281,22 @@ def translate_ops(translator, ops):
         translator.handle(op)
 
 
+EXTERNAL_LIBRARY_PATH = None
+# EXTERNAL_LIBRARY_PATH = "nand2tetris/tools/OS"
+
 def translate_library(translator, platform):
-    for lib_class in platform.library:
-        # TODO: handle VM source (for nand2tetris comparison)
+    if EXTERNAL_LIBRARY_PATH is None:
+        for lib_class in platform.library:
+            # TODO: handle VM source (for nand2tetris comparison)
 
-        ast = lib_class
+            ast = lib_class
 
-        asm = AssemblySource()
-        platform.compiler(ast, asm)
+            asm = AssemblySource()
+            platform.compiler(ast, asm)
 
-        ops = [platform.parse_line(l) for l in asm.lines if platform.parse_line(l) is not None]
+            ops = [platform.parse_line(l) for l in asm.lines if platform.parse_line(l) is not None]
 
-        translate_ops(translator, ops)
+            translate_ops(translator, ops)
+
+    else:
+        translate_dir(translator, platform, EXTERNAL_LIBRARY_PATH)
