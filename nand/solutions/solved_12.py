@@ -81,6 +81,7 @@ KEYBOARD_READ_INT    = _find_subroutine(_KEYBOARD_CLASS, "readInt")
 _OUTPUT_CLASS = _parse_jack_file("Output")
 
 OUTPUT_INIT         = _find_subroutine(_OUTPUT_CLASS, "init")
+OUTPUT_INIT_MAP     = _find_subroutine(_OUTPUT_CLASS, "initMap")
 OUTPUT_MOVE_CURSOR  = _find_subroutine(_OUTPUT_CLASS, "moveCursor")
 OUTPUT_PRINT_CHAR   = _find_subroutine(_OUTPUT_CLASS, "printChar")
 OUTPUT_PRINT_STRING = _find_subroutine(_OUTPUT_CLASS, "printString")
