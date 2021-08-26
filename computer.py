@@ -30,7 +30,7 @@ from nand.platform import USER_PLATFORM
 
 EVENT_INTERVAL = 1/10
 DISPLAY_INTERVAL = 1/20  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
-CYCLE_INTERVAL = 1/1.0  # How often to update the cycle counter; a bit longer so it doesn't bounce around too much
+CYCLE_INTERVAL = 1/1.0  # How often to update the cycle and frame counters; a bit longer so they doesn't bounce around too much
 
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
@@ -40,15 +40,17 @@ parser.add_argument("path", help="Path to source, either one file with assembly 
 parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
 parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization. Note: runs almost 3x slower.")
 parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
+# TODO: "--debug" showing opcode-level trace. Breakpoints, stepping, peek/poke?
 parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
-
+parser.add_argument("--max-fps", action="store", type=int, default=30, help="(VM-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).")
+# TODO: "--headless" with no UI, with Keyboard and TTY connected to stdin/stdout
 
 def main(platform=USER_PLATFORM):
     args = parser.parse_args()
 
     print(f"\nRunning {args.path} on {platform.chip.constr().label}\n")
 
-    prg, src_map = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
+    prg, src_map, wait_addresses, halt_addresses = load(platform, args.path, print_asm=args.print, no_waiting=args.no_waiting)
 
     print(f"Size in ROM: {len(prg):0,d}")
 
@@ -56,8 +58,10 @@ def main(platform=USER_PLATFORM):
         chip=platform.chip,
         name=args.path,
         simulator=args.simulator,
-        src_map=src_map if args.trace else None)
-
+        src_map=src_map if args.trace else None,
+        is_in_wait=in_function_pred(None if args.no_waiting else wait_addresses),
+        max_fps = args.max_fps,
+        is_in_halt=in_function_pred(halt_addresses))
 
 
 def load(platform, path, print_asm=False, no_waiting=False):
@@ -66,7 +70,7 @@ def load(platform, path, print_asm=False, no_waiting=False):
         print(f"Reading assembly from file: {path}")
         with open(path, mode='r') as f:
             prg, _, _ = platform.assemble(f)
-        return prg, None
+        return prg, None, None, None
     else:
         # The path may be a file or directory containing VM or Jack source.
         # TODO: handle combinations of the above, with or without included "OS" classes.
@@ -97,6 +101,9 @@ def load(platform, path, print_asm=False, no_waiting=False):
                 print(instr)
             print()
 
+        wait_addresses = translator.asm.find_function("Sys", "wait")
+        halt_addresses = translator.asm.find_function("Sys", "halt")
+
         # These are just the defaults for now, but maybe they could be overridable?
         min_static = 16
         max_static = 255
@@ -108,7 +115,7 @@ def load(platform, path, print_asm=False, no_waiting=False):
                 print(f"  {name}: {addr}")
             print()
 
-        return instrs, translator.asm.src_map
+        return instrs, translator.asm.src_map, wait_addresses, halt_addresses
 
 
 COLORS = [0xFFFFFF, 0x000000]
@@ -201,17 +208,25 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
+def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wait=(lambda _: False), max_fps=None, is_in_halt=(lambda _: False)):
     computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
 
     kvm = KVM(name, 512, 256)
 
-    last_cycle_time = last_event_time = last_display_time = now = time.monotonic()
+    last_cycle_time = last_event_time = last_display_time = last_frame_time = now = time.monotonic()
+    was_in_sys_wait = False
+    halted = False
 
     last_cycle_count = cycles = 0
+    last_frame_count = frames = 0
     while True:
-        if not src_map:
+        if halted:
+            # Stop burning (host) cpu simulating the halt loop, but keep processing events
+            # so the UI stays up.
+            time.sleep(EVENT_INTERVAL)
+
+        elif not src_map:
             computer.ticktock(CYCLES_PER_CALL)
             cycles += CYCLES_PER_CALL
 
@@ -230,17 +245,35 @@ def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
                     if class_name == 'Main': tracable = True
                     elif sub_name == 'init': tracable = True
                     elif class_name == "Sys" and sub_name == "halt": tracable = True
-                    elif class_name not in ("Keyboard", "Math", "Memory", "Array", "String"): tracable = True
-                    tracable = True
+                    elif class_name not in ("Keyboard", "Math", "Memory", "Array", "String", "Screen"): tracable = True
+                    # tracable = True
                     if tracable:
                         print(f"{cycles:10,d}; {class_name}.{sub_name}     @{computer.pc}")
             # if op:
             #     print(f"{computer.pc:5d}: {op}; cycle: {cycles:0,d}")
 
-
         # Note: check the time only every few frames to reduce the overhead of timing
         if cycles % CYCLES_PER_CALL == 0:
             now = time.monotonic()
+
+            # Detect when the program is complete:
+            if not halted and is_in_halt(computer.pc):
+                print(f"Halted after {cycles:,d} cycles (@{computer.pc})")
+                halted = True
+
+            # Detect the end of the game loop:
+            in_sys_wait = is_in_wait(computer.pc)
+            if in_sys_wait and not was_in_sys_wait:
+                frames += 1
+
+                actual_delay = now - last_frame_time
+                last_frame_time = now
+                if max_fps is not None:
+                    target_delay = 1.0/max_fps
+                    remaining_delay = target_delay - actual_delay
+                    if remaining_delay > 0:
+                        # print(f"frame delay: {remaining_delay:.3f} ({100*remaining_delay/target_delay:.1f}%)")
+                        time.sleep(remaining_delay)
 
             # A few times per second, process events and update the display:
             if now >= last_event_time + EVENT_INTERVAL:
@@ -248,20 +281,63 @@ def run(program, chip, name="Nand!", simulator='codegen', src_map=None):
                 key = kvm.process_events()
                 computer.set_keydown(key or 0)
 
-            if now >= last_display_time + DISPLAY_INTERVAL:
-                # TODO: detect when in Sys.wait() and refresh the display sooner. Call it V-Sync?
+            # Update the display a little sooner if we're in Sys.wait at the moment. The effect
+            # is to update after drawing is complete for a frame, more often than not, which reduces
+            # tearing. But we always maintain a minimum refresh rate, so you can see what the
+            # program is doing. Makes the most noticable difference when the FPS limit is high and the
+            # CPU is slow (not "compiled".)
+            if in_sys_wait:
+                display_interval = DISPLAY_INTERVAL/4
+            else:
+                display_interval = DISPLAY_INTERVAL
+            if now >= last_display_time + display_interval:
                 last_display_time = now
                 kvm.update_display(computer.peek_screen)
 
-            if now >= last_cycle_time + CYCLE_INTERVAL:
+            if not halted and now >= last_cycle_time + CYCLE_INTERVAL:
+                msgs = []
+
+                msgs.append(f"{cycles//1000:0,d}k cycles")
+
                 cps = (cycles - last_cycle_count)/(now - last_cycle_time)
-                pygame.display.set_caption(f"{name}: {cycles//1000:0,d}k cycles; {cps/1000:0,.1f}k/s; PC: {computer.pc}")
+                msgs.append(f"{cps/1000:0,.1f}k/s")
+
+                if frames > 0:
+                    fps = (frames - last_frame_count)/(now - last_cycle_time)
+                    msgs.append(f"{fps:0.0f}fps")
+
+                # This is sometimes helpful to show when your program jumps to some random address,
+                # or runs off the end of the ROM.
+                # msgs.append(f"@{computer.pc}")
+
+                pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
+
                 last_cycle_time = now
                 last_cycle_count = cycles
+                last_frame_count = frames
 
-                # print(f"cycles: {cycles//1000:0,d}k; pc: {computer.pc}")
-                # print(f"mem@00:   {', '.join(hex(computer.peek(i))[2:].rjust(4, '0') for i in range(16))}")
-                # print(f"mem@16:   {', '.join(hex(computer.peek(i+16))[2:].rjust(4, '0') for i in range(16))}")
+            # Note: you might want to check the frame delay and sleep *here*, after updating the
+            # display, so that the limit logic could account for the time is takes to process
+            # events and update the display. But somehow when it happens in that sequence, the
+            # loop gets very unresponsive and the FPS limit is effectively useless. Something
+            # in pygame doesn't like that sequence, somehow?
+
+            was_in_sys_wait = in_sys_wait
+
+
+def in_function_pred(function_addresses):
+    """Construct a function that checks to see if the current address (i.e. the PC) is within
+    a certain region (i.e. a particular function). See translate.find_function().
+    """
+
+    if function_addresses is None:
+        return lambda _: False
+
+    start = function_addresses[0]
+    last_return = function_addresses[1][-1]
+    def pred(addr):
+        return start <= addr <= last_return
+    return pred
 
 
 if __name__ == "__main__":

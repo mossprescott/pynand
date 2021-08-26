@@ -67,6 +67,46 @@ class AssemblySource:
         return self.lines.__iter__()
 
 
+    def find_function(self, class_name, function_name):
+        """Search in the src map for the location of the instructions that enter and leave
+        a particular function.
+
+        Returns a tuple (address of "function" op, [addresses of all "return" ops within the function]).
+
+        If the function contains no "return" ops, then the list will contain the location just past the
+        end of the function's ops.
+
+        Note: the point is that you can tell that you're leaving the function when one of its
+        returns is executed, even if it has made some subroutine calls in the meantime.
+        """
+
+        start = None
+
+        # Note: reversed, so we always find the _last_ occurrence, in case the function has been overridden
+        for addr, op in sorted(self.src_map.items(), reverse=True):
+            if op.startswith(f"function {class_name}.{function_name} "):
+                start = addr
+                break
+
+        if start is None:
+            return None
+
+        ends = []
+        for addr, op in [t for t in sorted(self.src_map.items()) if t[0] > start]:
+            if op == "return":
+                ends.append(addr)
+            elif op.startswith("function"):
+                if ends == []:
+                    ends.append(addr-1)  # somewhat bogus, but don't want to trigger if we hit the exact start of the next fn.
+                break
+
+        if ends == []:
+            # Must be Sys.halt (which is allowed to have no "return"), and must be the last in ROM.
+            ends.append(self.instruction_count)
+
+        return start, ends
+
+
     # TODO: find a better home for this (nand.runtime? .execute?, .debug?)
     def run(self, assembler, computer, stop_cycles=None, debug=False, tty=None):
         """Step through the execution of the generated program, using the provided assembler and
