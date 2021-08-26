@@ -19,7 +19,7 @@ This compiler/translator starts with the normal Jack AST and analyzes it one met
 Expressions are flattened through the use of temporary variables, so that no statement does
 more than a single step. Then the lifetime (liveness) of each local/temporary variable is analyzed,
 and each one is assigned a storage location that doesn't collide with any other variable whose
-value is needed at the same time. Variables that need to retian their values across subroutine
+value is needed at the same time. Variables that need to retain their values across subroutine
 calls are stored in the "local" space; all other variables are stored in "registers" — fixed
 locations in low-memory that can be accessed without the overhead of updating the stack pointer.
 
@@ -974,7 +974,7 @@ class Translator(solved_07.Translator):
         self.asm = AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
 
-        self.preamble()
+        # self.preamble()  # called by the loader, apparently
 
     def handle(self, op):
         """Override for compatibility: an "op" in this context is an entire Class in the IR form."""
@@ -1004,7 +1004,7 @@ class Translator(solved_07.Translator):
 
     def handle_Eval(self, ast: Eval):
         if not isinstance(ast.expr, CallSub):
-            self.asm.start(_Stmt_str(ast))
+            self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Stmt_str(ast)}")
 
         # Do the update in-place if possible:
         if isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.left.index:
@@ -1045,17 +1045,16 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"@R{5+ast.dest.index}")
             self.asm.instr(f"M={imm}")
         else:
-
             self._handle(ast.expr)
 
             if isinstance(ast.expr, CallSub):
-                self.asm.start(f"{_Expr_str(ast.dest)} = <result>")
+                self.asm.start(f"eval-result {_Expr_str(ast.dest)} = <result>")
 
             self.asm.instr(f"@R{5+ast.dest.index}")
             self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
-        self.asm.start(_Stmt_str(ast))
+        self.asm.start(f"write {_Stmt_str(ast)}")
 
         imm = self.immediate(ast.value)
         if imm is not None:
@@ -1067,7 +1066,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("M=D")
 
     def handle_Store(self, ast: Store):
-        self.asm.start(_Stmt_str(ast))
+        self.asm.start(f"store {_Stmt_str(ast)}")
 
         imm = self.immediate(ast.value)
 
@@ -1206,7 +1205,7 @@ class Translator(solved_07.Translator):
             self.asm.comment("leave the result on the stack")
 
         else:
-            self.asm.start(f"push {_Expr_str(ast.expr)} (for return)")
+            self.asm.start(f"push-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)} (for return)")
 
             # Save a cycle for "push 0":
             imm = self.immediate(ast.expr)
@@ -1229,7 +1228,7 @@ class Translator(solved_07.Translator):
             self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
             self.asm.comment("result left on the stack")
         else:
-            self.asm.start(f"push {_Expr_str(ast.expr)}")
+            self.asm.start(f"push-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)}")
 
             # Save a cycle for "push 0":
             imm = self.immediate(ast.expr)
@@ -1248,7 +1247,7 @@ class Translator(solved_07.Translator):
     def handle_Discard(self, ast: Discard):
         self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
 
-        self.asm.comment("discard the result")
+        self.asm.comment("discard <result>")
         self.asm.instr("@SP")
         self.asm.instr("M=M-1")
 
@@ -1412,6 +1411,30 @@ class Translator(solved_07.Translator):
             return ast.value
         else:
             return None
+
+    def describe_expr(self, expr) -> str:
+        """A short suffix categorizing the type of expression, for example 'const'.
+
+        Added to "opcode" tags in the instruction stream, these separate descriptions might be
+        helpful for readers; mainly they improve profiling.
+        """
+        #
+        if isinstance(expr, CallSub):
+            return "call"
+        elif isinstance(expr, Const):
+            return "const"
+        elif isinstance(expr, Location):
+            return "load"
+        elif isinstance(expr, Reg):
+            return "copy"
+        elif isinstance(expr, Binary):
+            return "binary"
+        elif isinstance(expr, Unary):
+            return "unary"
+        elif isinstance(expr, IndirectRead):
+            return "read"
+        else:
+            raise Exception(f"Unknown expr: {expr}")
 
 
     # Helpers:
