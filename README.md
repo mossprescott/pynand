@@ -57,7 +57,7 @@ running programs on your own designs as soon as you complete a single component 
 ## Step 2: Enjoy
 
 Run `./computer.py examples/Pong.asm`. Bask in the glory of a CPU you built from scratch.
-Note: the awesomeness starts after about 5 million cycles.
+Note: the awesomeness starts after about 100,000 cycles.
 
 ![Pong screenshot](examples/Pong.png)
 
