@@ -376,7 +376,7 @@ def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
     _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
     _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
     _translate_raw_jack(translator, solved_12._MATH_CLASS)
-    _translate_raw_jack(translator, minimal_sys_lib(["Memory", "Math"]))
+    _translate_raw_jack(translator, minimal_sys_lib(["Memory", "Math", "Screen"]))
 
     _translate_raw_jack(translator, screen_test)
 
@@ -386,11 +386,37 @@ def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     computer = run(chip, simulator=simulator)
 
-    # translator.asm.run(assembler, computer, stop_cycles=3_000_000, debug=True)
-    translator.asm.trace(assembler, computer, stop_cycles=3_000_000)
+    # translator.asm.run(assembler, computer, stop_cycles=10_000_000, debug=False)
+    translator.asm.trace(assembler, computer, stop_cycles=10_000_000)
 
-    # TODO: spot check some pixels
-    assert False
+    dump_screen(computer)  # For debugging
+
+    # If you have failures here, try running
+    # `./computer.py examples/project_12/ScreenTest.jack` and see if looks like a house.
+    # If later assertions fail, maybe your impl is too slow and it's just not finished after
+    # 10 million cycles. See the trace logging.
+
+    # Spot check some groups of pixels:
+    assert [computer.peek_screen(220*32 + w) for w in range(32)] == [-1]*32, "ground all filled"
+
+    assert computer.peek_screen(100*32 + 20) == -1, "house filled"
+    assert computer.peek_screen(160*32 + 22) == 0, "door cleared"
+
+    assert computer.peek_screen(64*32 + 19) != 0, "along left roof line (at least one pixel)"
+    assert computer.peek_screen(50*32 + 22) != 0, "along right roof line (at least one pixel)"
+
+    assert computer.peek_screen(6*32 + 8) == 1 << 12, "12 o-clock ray tip"
+    assert computer.peek_screen(114*32 + 8) == 1 << 12, "6 o-clock ray tip"
+    assert computer.peek_screen(60*32 + 5) == -64, "9 o-clock ray tip"
+    assert computer.peek_screen(60*32 + 12) == 7, "3 o-clock ray tip"
+
+
+def dump_screen(computer):
+    """Write the entire contents of the screen buffer to stdout."""
+
+    print("   ", " ".join(f"{w:6d}" for w in range(32)))
+    for y in range(256):
+        print(f"{y:3d}", ",".join(f"{computer.peek_screen(y*32 + w):6d}" for w in range(32)))
 
 
 def test_compile_sys_lib():
