@@ -35,7 +35,7 @@ def test_array_lib(chip=project_05.Computer, assembler=project_06.assemble, tran
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
     translator.asm.run(assembler, computer, stop_cycles=10_000, debug=True)
@@ -71,7 +71,7 @@ def test_string_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -125,7 +125,7 @@ def test_memory_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -181,7 +181,7 @@ def test_keyboard_lib(chip=project_05.Computer, assembler=project_06.assemble, t
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -190,7 +190,7 @@ def test_keyboard_lib(chip=project_05.Computer, assembler=project_06.assemble, t
     # will run a lot of cycles if needed, but stops not long after the output shows
     # up.
 
-    asm = assembler(translator.asm)
+    asm, _, _ = assembler(translator.asm)
     computer.init_rom(asm)
 
     output = ""
@@ -255,16 +255,14 @@ def test_compile_output_lib():
     assert len(asm.lines) > 0
 
 
-def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
-    memory_test = _parse_jack_file("examples/project_12/OutputTest.jack")
+def test_output_lib(chip=project_05.Computer, assembler=project_06.assemble, translator_class=project_08.Translator, simulator='codegen'):
+    output_test = _parse_jack_file("examples/project_12/OutputTest.jack")
 
     translator = translator_class()
 
     translator.preamble()
 
     _translate_raw_jack(translator, project_12.OUTPUT_CLASS)
-    # TODO: need the "private" helper from solved_12._OUTPUT_CLASS,
-    # if the default impl is used. Get rid of it.
 
     # Dependencies; note: need Sys.init to intialize Output, but don't want the built-in implementation.
     _translate_raw_jack(translator, solved_12._ARRAY_CLASS)
@@ -273,11 +271,11 @@ def test_output_lib_debug(chip=project_05.Computer, assembler=project_06.assembl
     _translate_raw_jack(translator, solved_12._MATH_CLASS)
     _translate_raw_jack(translator, minimal_sys_lib(["Memory", "Math", "Output"]))
 
-    _translate_raw_jack(translator, memory_test)
+    _translate_raw_jack(translator, output_test)
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -324,7 +322,7 @@ def test_math_lib(chip=project_05.Computer, assembler=project_06.assemble, trans
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -384,7 +382,7 @@ def test_screen_lib(chip=project_05.Computer, assembler=project_06.assemble, tra
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -427,7 +425,7 @@ def test_sys_lib(chip=project_05.Computer, assembler=project_06.assemble, transl
 
     translator.finish()
 
-    check_references(translator)
+    translator.check_references()
 
     computer = run(chip, simulator=simulator)
 
@@ -467,9 +465,6 @@ LIBS_WITH_INIT = ["Memory", "Math", "Screen", "Output", "Keyboard"]
 def _translate_dependencies(translator, libs):
     _translate_raw_jack(translator, minimal_sys_lib(libs))
     for lib in libs:
-        # # TEMP: until solved_12 has real implementations
-        # print(f"Warning: translating original impl: {lib}")
-        # _translate_raw_vm(translator, f"nand2tetris/tools/OS/{lib}.vm")
         if lib == "Memory":
             _translate_raw_jack(translator, solved_12._MEMORY_CLASS)
         elif lib == "Math":
@@ -540,26 +535,3 @@ def _translate_raw_jack(translator, ast):
     # HACK: re-use the impl in nand.translate somehow?
     for op, args in [project_07.parse_line(l) for l in asm.lines if project_07.parse_line(l) is not None]:
         translator.__getattribute__(op)(*args)
-
-
-### TEMP: until solved_12 is a full implementation
-def _translate_raw_vm(translator, src_path):
-    with open(src_path) as f:
-        for op, args in [project_07.parse_line(l) for l in f.readlines() if project_07.parse_line(l) is not None]:
-            translator.__getattribute__(op)(*args)
-
-
-def check_references(translator):
-    """Check for obvious "linkage" errors: functions that are referenced but never defined.
-
-    WARNING: this is currently making completely unfounded assumptions about the translator.
-    TODO: somehow inspect the VM ops, maybe, and avoid that assumption.
-    """
-
-    defined = set(translator.solved.defined_functions)
-    referenced = set(translator.solved.referenced_functions)
-
-    assert len(translator.solved.defined_functions) == len(defined), "Each function is defined only once"
-
-    unresolved = referenced - defined
-    assert unresolved == set(), "Unresolved references"
