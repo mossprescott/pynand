@@ -109,8 +109,8 @@ def parse_op(string, symbols={}):
     return solved_06.parse_op(string, symbols)
 
 
-def assemble(lines):
-    return solved_06.assemble(lines, parse_op)
+def assemble(lines, **kw):
+    return solved_06.assemble(lines, parse_op, **kw)
 
 
 # TODO: add ">>" or maybe "shiftr" to the compiler, and write multiply in Jack.
