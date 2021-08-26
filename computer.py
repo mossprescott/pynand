@@ -42,7 +42,7 @@ parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle 
 parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
 # TODO: "--debug" showing opcode-level trace. Breakpoints, stepping, peek/poke?
 parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
-parser.add_argument("--max-fps", action="store", type=int, default=30, help="(VM-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).")
+parser.add_argument("--max-fps", action="store", type=int, help="Experimental! (VM-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).\nMay or may not work, depending on the translator.")
 # TODO: "--headless" with no UI, with Keyboard and TTY connected to stdin/stdout
 
 def main(platform=USER_PLATFORM):
@@ -60,7 +60,7 @@ def main(platform=USER_PLATFORM):
         simulator=args.simulator,
         src_map=src_map if args.trace else None,
         is_in_wait=in_function_pred(None if args.no_waiting else wait_addresses),
-        max_fps = args.max_fps,
+        max_fps=args.max_fps,
         is_in_halt=in_function_pred(halt_addresses))
 
 
@@ -103,6 +103,10 @@ def load(platform, path, print_asm=False, no_waiting=False):
 
         wait_addresses = translator.asm.find_function("Sys", "wait")
         halt_addresses = translator.asm.find_function("Sys", "halt")
+
+        # TODO: when --max-fps is enabled, inject a raw assembly version of Sys.wait that
+        # definitely runs long enough to be detected in the run loop. Is that feasible,
+        # given possible variation in VM/CPU details?
 
         # These are just the defaults for now, but maybe they could be overridable?
         min_static = 16
@@ -263,17 +267,22 @@ def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wa
 
             # Detect the end of the game loop:
             in_sys_wait = is_in_wait(computer.pc)
-            if in_sys_wait and not was_in_sys_wait:
+
+            # BUG: this isn't reliable; it works only if the program doesn't jump to any
+            # instructions outside the boundaries of the Sys.wait function body itself.
+            # But a lot of translators are going to do that, even if it's written as a flat
+            # loop at the Jack level. To make this work, probably going to have to inject a
+            # raw assembly version of Sys.wait that has predictable behavior.
+            if max_fps is not None and in_sys_wait and not was_in_sys_wait:
                 frames += 1
 
                 actual_delay = now - last_frame_time
                 last_frame_time = now
-                if max_fps is not None:
-                    target_delay = 1.0/max_fps
-                    remaining_delay = target_delay - actual_delay
-                    if remaining_delay > 0:
-                        # print(f"frame delay: {remaining_delay:.3f} ({100*remaining_delay/target_delay:.1f}%)")
-                        time.sleep(remaining_delay)
+                target_delay = 1.0/max_fps
+                remaining_delay = target_delay - actual_delay
+                if remaining_delay > 0:
+                    # print(f"frame delay: {remaining_delay:.3f} ({100*remaining_delay/target_delay:.1f}%)")
+                    time.sleep(remaining_delay)
 
             # A few times per second, process events and update the display:
             if now >= last_event_time + EVENT_INTERVAL:
@@ -287,7 +296,7 @@ def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wa
             # program is doing. Makes the most noticable difference when the FPS limit is high and the
             # CPU is slow (not "compiled".)
             if in_sys_wait:
-                display_interval = DISPLAY_INTERVAL/4
+                display_interval = DISPLAY_INTERVAL/2
             else:
                 display_interval = DISPLAY_INTERVAL
             if now >= last_display_time + display_interval:
@@ -308,7 +317,7 @@ def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wa
 
                 # This is sometimes helpful to show when your program jumps to some random address,
                 # or runs off the end of the ROM.
-                # msgs.append(f"@{computer.pc}")
+                msgs.append(f"@{computer.pc}")
 
                 pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
 
