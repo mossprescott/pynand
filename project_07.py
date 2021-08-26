@@ -187,7 +187,7 @@ class Translator:
         # SOLVERS: this is just plumbing to call one of the methods definied below. Feel
         # free to leave it here and don't worry about it how it works too much.
         op_name, args = op
-        self.__getattribute__(op)(*args)
+        self.__getattribute__(op_name)(*args)
 
 
 def parse_line(line):
