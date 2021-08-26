@@ -34,9 +34,9 @@ class Sys {
             do Sys.error(1);
         }
 
-        while (~(duration > 0)) {
+        while (duration > 0) {
             let x = 50;
-            while (~(x > 0)) {
+            while (x > 0) {
                 let x = x - 1;
             }
             let duration = duration - 1;
