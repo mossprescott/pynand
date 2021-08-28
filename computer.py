@@ -203,11 +203,12 @@ class KVM:
         for y in range(self.height):
             for w in range(row_words):
                 word = get_pixel(y*row_words + w)
-                for i in range(16):
-                    if word & 0b1:
-                        x = w*16 + i
-                        self.screen.set_at((x, y), COLORS[1])
-                    word >>= 1
+                if word != 0:
+                    for i in range(16):
+                        if word & 0b1:
+                            x = w*16 + i
+                            self.screen.set_at((x, y), COLORS[1])
+                        word >>= 1
 
         pygame.display.flip()
 
