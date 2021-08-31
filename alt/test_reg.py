@@ -65,7 +65,7 @@ class Main {
         while (true) {
             let x = x + 1;
 
-            do Sys.wait();
+            do Sys.wait(x);
         }
 
         return;

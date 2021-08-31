@@ -529,11 +529,11 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
         live = live_at_test_start
 
-        return stmt, live
+        return stmt, live.copy()
 
 
     result = []
-    live_set = set(live_at_end)
+    live_set = live_at_end.copy()
 
     for stmt in reversed(stmts):
         # Tricky: when analysis is repeated, strip out previous annotations
