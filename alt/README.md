@@ -16,7 +16,7 @@ See each module for instructions.
 | [alt/threaded.py](threaded.py)  | 1,549 (+23%) |   8,280 (-69%) |    41,103 (+26%) |     173,750 (+34%) | Adds lightweight CALL/RTN instructions, enabling a very compact "threaded interpreter" translation, which runs a little slower. |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  | 26,740 (+1.4%) |    *32,762 (-0%)* |   *129,500 (-0%)* | Adds a "shiftr" instruction, and rewrites "push constant 16; call Math.divide" to use it instead; also a more efficient Math.multiply using shiftr. See note below. |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) | _same_         |            +100% |              +100% | Finally, a _smaller_ CPU, by using an 8-bit ALU and 2 cycles per instruction. |
-| [alt/reg.py](reg.py)             | _same_       |  21,917 (-17%) |    20,465 (-37%) |      72,221 (-44%) | A much more ambititous compiler, which uses the "registers" at locations 5-12 for transient local variables and expression evaluation, reserving the stack only for subroutine calls and locals that cross them. |
+| [alt/reg.py](reg.py)             | _same_       |  21,393 (-21%) |    19,647 (-40%) |      68,100 (-47%) | A much more ambititous compiler, which uses the "registers" at locations 5-12 for transient local variables and expression evaluation, reserving the stack only for subroutine calls and locals that cross them. |
 
 **ROM Size** is the total number of instructions in ROM when Pong is translated from the same Jack
 sources.

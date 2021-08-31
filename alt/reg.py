@@ -92,7 +92,7 @@ class While(NamedTuple):
     body: Sequence["Stmt"]
 
 class Return(NamedTuple):
-    """Effectively, Push and then the return sequence."""
+    """Evaluate expr, store the value in the "RESULT" register, and return to the caller."""
     expr: "Expr"
 
 class Push(NamedTuple):
@@ -107,6 +107,8 @@ Stmt = Union[Eval, IndirectWrite, If, While, Push, Discard]
 
 
 class CallSub(NamedTuple):
+    """Call a subroutine (whose arguments have already been pushed onto the stack), and
+    recover the result from the "RESULT" register."""
     class_name: str
     sub_name: str
     num_args: int
@@ -969,6 +971,13 @@ def compile_class(ast: jack_ast.Class) -> Class:
     return reg_class
 
 
+
+#
+# Translate from the IR to assembly:
+#
+
+RESULT = "R12" # for now, just use one of the registers also used for local variables.
+
 class Translator(solved_07.Translator):
     def __init__(self):
         self.asm = AssemblySource()
@@ -1202,54 +1211,59 @@ class Translator(solved_07.Translator):
     def handle_Return(self, ast: Return):
         if isinstance(ast.expr, CallSub):
             self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
-            self.asm.comment("leave the result on the stack")
+            self.asm.comment(f"leave the result in {RESULT}")
 
         else:
-            self.asm.start(f"push-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)} (for return)")
+            self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)} (for return)")
 
-            # Save a cycle for "push 0":
+            # Save a cycle for "return 0":
             imm = self.immediate(ast.expr)
             if imm is not None:
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+1")
-                self.asm.instr("A=M-1")
+                self.asm.instr(f"@{RESULT}")
                 self.asm.instr(f"M={imm}")
             else:
                 self._handle(ast.expr)
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+1")
-                self.asm.instr("A=M-1")
+                self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
+
         self.return_op()
 
     def handle_Push(self, ast):
-        if isinstance(ast.expr, CallSub):
-            # Skip popping the stack
-            self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
-            self.asm.comment("result left on the stack")
-        else:
+        # if isinstance(ast.expr, CallSub):
+        #     # Skip popping the stack
+        #     self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
+        #     self.asm.comment("result left on the stack")
+        # else:
+        if not isinstance(ast.expr, CallSub):
             self.asm.start(f"push-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)}")
 
-            # Save a cycle for "push 0":
-            imm = self.immediate(ast.expr)
-            if imm is not None:
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+1")
-                self.asm.instr("A=M-1")
-                self.asm.instr(f"M={imm}")
-            else:
-                self._handle(ast.expr)
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+1")
-                self.asm.instr("A=M-1")
-                self.asm.instr("M=D")
+        # Save a cycle for "push 0":
+        imm = self.immediate(ast.expr)
+        if imm is not None:
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr(f"M={imm}")
+        else:
+            self._handle(ast.expr)
+
+            if isinstance(ast.expr, CallSub):
+                self.asm.start(f"push-result {_Expr_str(ast.expr)}")
+
+            self.asm.instr("@SP")
+            self.asm.instr("M=M+1")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=D")
 
     def handle_Discard(self, ast: Discard):
         self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
 
-        self.asm.comment("discard <result>")
-        self.asm.instr("@SP")
-        self.asm.instr("M=M-1")
+        # Note: now that results are passed in a register, there's no cleanup to do when
+        # the result is not used.
+
+        # self.asm.comment("discard <result>")
+        # self.asm.instr("@SP")
+        # self.asm.instr("M=M-1")
 
     def compare_op_neg(self, cmp: Cmp):
         return {
@@ -1269,9 +1283,8 @@ class Translator(solved_07.Translator):
 
     def handle_CallSub(self, ast: CallSub):
         self.call(ast.class_name, ast.sub_name, ast.num_args)
-        # Pop the stack to D
-        self.asm.instr("@SP")
-        self.asm.instr("AM=M-1")
+        # Move the result to D
+        self.asm.instr(f"@{RESULT}")
         self.asm.instr("D=M")
 
     def handle_Const(self, ast: Const):
@@ -1467,6 +1480,65 @@ class Translator(solved_07.Translator):
         # This common sequence isn't used; each comparison is compiled to a custom
         # test/branch sequence.
         return f"_compare_{op}_unused"
+
+    def _return(self):
+        "Override the normal sequence to skip popping/re-pushing the result."
+        # TODO: more serious surgery, to avoid much of the overhead of saving state.
+
+        label = self.asm.next_label("return_common")
+
+        self.asm.comment(f"common return sequence")
+        self.asm.label(label)
+
+        # R13 = result
+        # self._pop_d()
+        # self.asm.instr("@R13")
+        # self.asm.instr("M=D")
+
+        # SP = LCL
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+        # R15 = ARG
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self.asm.instr("@R15")
+        self.asm.instr("M=D")
+        # restore segment pointers from stack:
+        self._pop_d()
+        self.asm.instr("@THAT")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@THIS")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+        self._pop_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+        # R14 = return address
+        self._pop_d()
+        self.asm.instr("@R14")
+        self.asm.instr("M=D")
+        # SP = R15
+        self.asm.instr("@R15")
+        self.asm.instr("D=M")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+
+        # # Push R13 (result)
+        # self.asm.instr("@R13")
+        # self.asm.instr("D=M")
+        # self._push_d()
+
+        # jmp to R14
+        self.asm.instr("@R14")
+        self.asm.instr("A=M")
+        self.asm.instr("0;JMP")
+
+        return label
 
 
 # Hackish pretty-printing:
