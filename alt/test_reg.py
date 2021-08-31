@@ -1,8 +1,8 @@
 #! /usr/bin/env pytest
 
 from nand import run
-from nand.solutions import solved_06, solved_10, solved_12
-import test_12
+from nand.solutions import solved_05, solved_06, solved_10, solved_12
+import test_12, test_optimal_08
 
 from alt.reg import *
 from alt.reg import _Stmt_str
@@ -89,6 +89,61 @@ class Main {
     assert all([s.before == x for s in while_stmt.statement.body])
 
 
+def test_if_allocation():
+    src = """
+class Test {
+    function void foo(int x) {
+        var int y;
+        let y = x + 2;
+        if (y < x) {
+            return x;
+        }
+        return y;
+    }
+}
+"""
+    ast = solved_10.parse_class(src)
+
+    flat_class = flatten_class(ast)
+
+    print(flat_class)
+
+    sub = phase_two(flat_class.subroutines[0])
+
+    print(sub)
+
+    # TODO: assert that the test gets turned into an
+    # something tight using registers.
+    assert False
+
+def test_loop_allocation():
+    src = """
+class Test {
+    function void main() {
+        var int x;
+        let x = 0;
+        while (x < 10) {
+            let x = x + 1;
+        }
+        return;
+    }
+}
+"""
+    ast = solved_10.parse_class(src)
+
+    flat_class = flatten_class(ast)
+
+    print(flat_class)
+
+    sub = phase_two(flat_class.subroutines[0])
+
+    print(sub)
+
+    # TODO: assert that the test gets turned into an
+    # something tight using registers.
+    assert False
+
+
 def test_compile_average():
     with open("examples/project_11/Average/Main.jack") as f:
         src = "\n".join(f.readlines())
@@ -107,93 +162,50 @@ def test_compile_average():
 
     print(f"need saving: {need_saving(liveness)}")
 
+    # TODO: assert some stuff related to liveness, allocation, or what?
     assert False
 
 
-def test_compile_arraytest(chip=solved_05.Computer, assembler=solved_06.assemble, simulator="codegen"):
-    with open("examples/project_12/ArrayTest.jack") as f:
-        src = "\n".join(f.readlines())
-        array_test = solved_10.parse_class(src)
+def test_array_lib():
+    test_12.test_array_lib(platform=REG_PLATFORM)
 
-    # main = array_test.subroutineDecs[0]
-    # # print(pprint_subroutine_dec(main))
+def test_string_lib():
+    test_12.test_string_lib(platform=REG_PLATFORM)
 
-    # result = flatten_class(array_test)
-    # print(result)
-    # # print(pprint_subroutine_dec(result))
+def test_memory_lib():
+    test_12.test_memory_lib(platform=REG_PLATFORM)
 
-    # liveness = analyze_liveness(result.subroutines[0].body)
-    # for s in liveness:
-    #     print(_Stmt_str(s))
+def test_keyboard_lib():
+    test_12.test_keyboard_lib(platform=REG_PLATFORM)
 
-    # print(f"need saving: {need_saving(liveness)}")
+def test_output_lib():
+    test_12.test_output_lib(platform=REG_PLATFORM)
 
-    translator = Translator()
+def test_math_lib():
+    test_12.test_math_lib(platform=REG_PLATFORM)
 
-    compile_class(array_test, translator)
+def test_screen_lib():
+    test_12.test_screen_lib(platform=REG_PLATFORM)
 
-    compile_class(solved_12._ARRAY_CLASS, translator)
-    compile_class(solved_12._MEMORY_CLASS, translator)
-    compile_class(test_12.minimal_sys_lib(["Memory"]), translator)
-
-    for l in translator.asm:
-        print(l)
-
-    translator.check_references()
-
-    computer = run(chip, simulator=simulator)
-    translator.asm.run(assembler, computer, stop_cycles=2_000, debug=True)
-    # translator.asm.trace(assembler, computer, stop_cycles=2_000)
+def test_sys_lib():
+    test_12.test_sys_lib(platform=REG_PLATFORM)
 
 
-    print([computer.peek(addr) for addr in range(8000, 8004)])
+def test_vm_pong_instructions():
+    instruction_count = test_optimal_08.count_pong_instructions(REG_PLATFORM)
 
-    assert computer.peek(8000) == 222
-    assert computer.peek(8001) == 122
-    assert computer.peek(8002) == 100
-    assert computer.peek(8003) == 10
-
-    assert False
+    # compare to the project_08 solution (about 28k)
+    assert instruction_count < -1  # 15_749
 
 
-def test_compile_stringtest():
-    with open("examples/project_12/StringTest.jack") as f:
-        src = "\n".join(f.readlines())
-        string_test = solved_10.parse_class(src)
+def test_pong_first_iteration():
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(REG_PLATFORM)
 
-    main = string_test.subroutineDecs[0]
-    # print(pprint_subroutine_dec(main))
+    assert cycles < 1  #?
 
-    result = flatten_class(string_test)
-    print(result)
-    # print(pprint_subroutine_dec(result))
 
-    liveness = analyze_liveness(result.subroutines[0].body)
-    for s in liveness:
-        print(_Stmt_str(s))
+def test_vm_cycles_to_init():
+    cycles = test_optimal_08.count_cycles_to_init(REG_PLATFORM)
 
-    print(f"need saving: {need_saving(liveness)}")
-
-    assert False
-
-def test_compile_mathtest():
-    with open("examples/project_12/MathTest.jack") as f:
-        src = "\n".join(f.readlines())
-        math_test = solved_10.parse_class(src)
-
-    # main = math_test.subroutineDecs[0]
-
-    # result = flatten_class(math_test)
-
-    # locked_down = phase_two(result.subroutines[0])
-
-    # ready = Class("Main", [locked_down])
-
-    translator = Translator()
-
-    compile_class(math_test, translator)
-
-    for l in translator.asm:
-        print(l)
-
-    assert False
+    # compare to the project_08 solution (about 4m)
+    assert cycles < -1  # 2_612_707
