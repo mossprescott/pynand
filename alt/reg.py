@@ -1358,7 +1358,8 @@ class Translator(solved_07.Translator):
         if cmp_op is not None:
             # Massive savings here for this compiler; by pushing the comparison all the way into
             # the ALU, this is one branch, with a specific condition code, to pick the right result.
-            # But having to leave the result in D kind of spoils the party...
+            # But having to leave the result in D kind of spoils the party; for one thing, have to
+            # branch again to skip the no-taken branch, which would have written the other result.
 
             # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
             #    -30,000 > 30,000
@@ -1367,19 +1368,27 @@ class Translator(solved_07.Translator):
             true_label = self.asm.next_label("compare_true")
             end_label = self.asm.next_label("compare_end")
 
-            self._handle(ast.left)      # D = left
-            self.value_to_a(ast.right)  # A = right
-            self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+            # Note: if the right operand is -1,0,1, we shave a few cycles. An earlier phase should
+            # take care of rewriting conditions into that form where possible.
+
+            self._handle(ast.left)          # D = left
+            if right_imm == 0:
+                pass                        # comparing with zero, so D already has left - 0, effectively
+            elif right_imm is not None and -1 <= right_imm <= 1:
+                self.asm.instr(f"D=D{-right_imm:+d}")     # D = left - right (so, positive if left > right)
+            else:
+                self.value_to_a(ast.right)  # A = right
+                self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
 
             self.asm.instr(f"@{true_label}")
             self.asm.instr(f"D;J{cmp_op}")
 
-            self.asm.instr("D=0")  #  D = false
+            self.asm.instr("D=0")           #  D = false
             self.asm.instr(f"@{end_label}")
             self.asm.instr("0;JMP")
 
             self.asm.label(true_label)
-            self.asm.instr("D=-1")
+            self.asm.instr("D=-1")          #  D = true
             self.asm.label(end_label)
             return
 
