@@ -300,3 +300,22 @@ def translate_library(translator, platform):
 
     else:
         translate_dir(translator, platform, EXTERNAL_LIBRARY_PATH)
+
+
+def override_sys_wait(translator, platform):
+    """Substitute a version of Sys.wait() that just returns immediately.
+
+    This makes game loops run at "full speed", not burning any cycles trying to hit some
+    arbitrary timing goal.
+
+    Still a hack, but in this form it works with any compiler/translator.
+    When a class is compiled, it gets translated to a set of independent subroutine bodies,
+    so here we just define the one we want to override, translate it last, and count on the
+    assembler to favor the later occurrence of the label.
+    """
+    asm = AssemblySource()
+    platform.compiler(platform.parser("class Sys { function void wait() { return; } }"), asm)
+    for op in translator.rewrite_ops(asm.lines):
+        parsed_op = platform.parse_line(op)
+        if parsed_op is not None:
+            translator.handle(parsed_op)

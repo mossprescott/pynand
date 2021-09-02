@@ -25,7 +25,7 @@ import time
 
 import nand.component
 import nand.syntax
-from nand.translate import translate_dir, translate_library
+from nand.translate import override_sys_wait, translate_dir, translate_library
 from nand.platform import USER_PLATFORM
 
 EVENT_INTERVAL = 1/10
@@ -92,9 +92,7 @@ def load(platform, path, print_asm=False, no_waiting=False):
             # Tricky: the assembler will favor the latest occurrence of any label, so simply
             # redefining a function at the end effectively overrides the previous definition
             # (which is still taking up space in the ROM.)
-            translator.function("Sys", "wait", 0)
-            translator.push_constant(0)
-            translator.return_op()
+            override_sys_wait(translator, platform)
 
         if print_asm:
             for instr in translator.asm:
