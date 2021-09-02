@@ -1183,30 +1183,29 @@ class Translator(solved_07.Translator):
             self.asm.label(end_label)
 
     def handle_While(self, ast):
-        # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
-        # into the node and compare them directly.
+        # Note: putting the test at the bottom of the loop means one jmp to start,
+        # then a single (conditional) jump per iteration. That's cheaper as long
+        # as the average loop does more than one iteration.
 
-        self.asm.comment("while...")
+        body_label = self.asm.next_label("loop_body")
+        test_label = self.asm.next_label("loop_test")
 
-        top_label = self.asm.next_label("loop_top")
-        end_label = self.asm.next_label("loop_end")
+        self.asm.start("while-start")
+        self.asm.instr(f"@{test_label}")
+        self.asm.instr(f"0;JMP")
 
-        self.asm.label(top_label)
-        for s in ast.test:
-            self._handle(s)
-
-        self.asm.start(f"while {_Expr_str(ast.value)} {ast.cmp} 0?")
-        self._handle(ast.value)
-        self.asm.instr(f"@{end_label}")
-        self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
-
+        self.asm.label(body_label)
         for s in ast.body:
             self._handle(s)
 
-        self.asm.instr(f"@{top_label}")
-        self.asm.instr(f"0;JMP")
+        self.asm.label(test_label)
+        for s in ast.test:
+            self._handle(s)
 
-        self.asm.label(end_label)
+        self.asm.start(f"while-test {_Expr_str(ast.value)} {ast.cmp} 0?")
+        self._handle(ast.value)
+        self.asm.instr(f"@{body_label}")
+        self.asm.instr(f"D;J{self.compare_op_pos(ast.cmp)}")
 
     def handle_Return(self, ast: Return):
         if isinstance(ast.expr, CallSub):
