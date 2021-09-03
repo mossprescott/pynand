@@ -77,8 +77,8 @@ def test_string_lib(string_class=project_12.STRING_CLASS, platform=USER_PLATFORM
     computer = run(platform.chip, simulator=simulator)
 
     output_stream = StringWriter()
-    # translator.asm.run(platform.assemble, computer, stop_cycles=400_000, tty=output_stream, debug=True)
-    translator.asm.trace(platform.assemble, computer, stop_cycles=500_000, tty=output_stream)
+    translator.asm.run(platform.assemble, computer, stop_cycles=500_000, tty=output_stream, debug=True)
+    # translator.asm.trace(platform.assemble, computer, stop_cycles=500_000, tty=output_stream)
 
     output_lines = "".join(output_stream.strs).split("\n")
     assert output_lines == [
@@ -162,7 +162,6 @@ def test_compile_keyboard_lib(keyboard_class=project_12.OUTPUT_CLASS, platform=U
     assert len(asm.lines) > 0
 
 def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=USER_PLATFORM, simulator='codegen'):
-    # Note: this one's not so useful interactively, but easier to view anyway
     keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack", platform)
 
     translator = platform.translator()
@@ -318,8 +317,8 @@ def test_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFORM, simu
 
     computer = run(platform.chip, simulator=simulator)
 
-    # translator.asm.run(platform.assemble, computer, stop_cycles=10_000, debug=True)
-    translator.asm.trace(platform.assemble, computer, stop_cycles=1_000_000)
+    translator.asm.run(platform.assemble, computer, stop_cycles=300_000, debug=True)
+    # translator.asm.trace(platform.assemble, computer, stop_cycles=300_000)
 
     assert computer.peek(8000) == 6,      "multiply(2, 3)"
     assert computer.peek(8001) == -180,   "multiply(6, -30)"
