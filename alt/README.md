@@ -16,13 +16,14 @@ See each module for instructions.
 | [alt/threaded.py](threaded.py)  | 1,549 (+23%) |   8,280 (-69%) |    41,103 (+26%) |     173,750 (+34%) | Adds lightweight CALL/RTN instructions, enabling a very compact "threaded interpreter" translation, which runs a little slower. |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  | 26,740 (+1.4%) |    *32,762 (-0%)* |   *129,500 (-0%)* | Adds a "shiftr" instruction, and rewrites "push constant 16; call Math.divide" to use it instead; also a more efficient Math.multiply using shiftr. See note below. |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) | _same_         |            +100% |              +100% | Finally, a _smaller_ CPU, by using an 8-bit ALU and 2 cycles per instruction. |
-| [alt/reg.py](reg.py)             | _same_       |  21,393 (-21%) |    19,647 (-40%) |      68,100 (-47%) | A much more ambititous compiler, which uses the "registers" at locations 5-12 for transient local variables and expression evaluation, reserving the stack only for subroutine calls and locals that cross them. |
+| [alt/reg.py](reg.py)             | _same_       |  21,393 (-21%) |    16,500 (-48%) |      59,200 (-54%) | A much more ambititous compiler, which uses the "registers" at locations 5-12 for transient local variables and expression evaluation, reserving the stack only for subroutine calls and locals that cross them. |
 
-**ROM Size** is the total number of instructions in ROM when Pong is translated from the same Jack
-sources.
+**ROM Size** is the total number of instructions in ROM when Pong is compiled and translated
+from the same Jack sources.
 
 **Cycles per frame** is the number of cycles to run the first iteration of the Pong game loop.
-Specifically, this includes `Bat.move` and `PongGame.moveBall`, and _not_ `Sys.wait`.
+Specifically, this includes `Bat.move` and `PongGame.moveBall`, and _not_ `Screen.clearScreen`
+or `Sys.wait`.
 
 **Cycles for init** is the number of cycles from start to reaching `call Main.main 0`. That is,
 the number of cycles to execute all of the common setup code in `Sys.init`.

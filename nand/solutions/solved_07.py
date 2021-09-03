@@ -8,6 +8,13 @@ import re
 
 from nand.translate import AssemblySource
 
+INITIALIZE_LOCALS = False
+"""If true, additional instructions are generated to initialize each local variable to 0 each time
+the function body is entered. It's not entirely clear if Jack requires this behavior; the included
+OS implementation and sample programs do not assume that it happens.
+"""
+
+
 class Translator:
     """Translate all VM opcodes to assembly instructions.
 
@@ -272,32 +279,41 @@ class Translator:
             # that is dumb.
             self.asm.instr("0")
         elif num_vars == 1:
-            # 5 instr.
-            self.asm.instr("@SP")
-            self.asm.instr("A=M")
-            self.asm.instr("M=0")
+            # 2 instr. (or 5, if locals are initialized)
+            if INITIALIZE_LOCALS:
+                # 5 instr.
+                self.asm.instr("@SP")
+                self.asm.instr("A=M")
+                self.asm.instr("M=0")
             self.asm.instr("@SP")
             self.asm.instr("M=M+1")
         elif num_vars == 2:
-            # 8 instr.
-            self.asm.instr("@SP")
-            self.asm.instr("A=M")
-            self.asm.instr("M=0")
-            self.asm.instr("A=A+1")
-            self.asm.instr("M=0")
+            # 3 instr. (or 8 if locals are initialized)
+            if INITIALIZE_LOCALS:
+                self.asm.instr("@SP")
+                self.asm.instr("A=M")
+                self.asm.instr("M=0")
+                self.asm.instr("A=A+1")
+                self.asm.instr("M=0")
             self.asm.instr("@SP")
             self.asm.instr("M=M+1")
             self.asm.instr("M=M+1")
         else:
-            # 5 + 2*(num_vars) instr.
-            self.asm.instr("@SP")
-            self.asm.instr("A=M")
-            for _ in range(num_vars):
-                self.asm.instr("M=0")
-                self.asm.instr("A=A+1")
-            self.asm.instr("D=A")
-            self.asm.instr("@SP")
-            self.asm.instr("M=D")
+            # 4 instr. (or 5 + 2*(num_vars) if locals are initialized)
+            if INITIALIZE_LOCALS:
+                self.asm.instr("@SP")
+                self.asm.instr("A=M")
+                for _ in range(num_vars):
+                    self.asm.instr("M=0")
+                    self.asm.instr("A=A+1")
+                self.asm.instr("D=A")
+                self.asm.instr("@SP")
+                self.asm.instr("M=D")
+            else:
+                self.asm.instr(f"@{num_vars}")
+                self.asm.instr("D=A")
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+D")
 
     def return_op(self):
         # A short sequence that jumps to the common impl, which costs only 2 instructions in ROM per

@@ -1,5 +1,7 @@
 #! /usr/bin/env pytest
 
+import pytest
+
 from nand import run
 from nand.platform import USER_PLATFORM
 from nand.translate import AssemblySource, translate_jack
@@ -417,7 +419,7 @@ def test_compile_sys_lib(sys_class=project_12.SYS_CLASS, platform=USER_PLATFORM)
 
     assert len(asm.lines) > 0
 
-
+@pytest.mark.skip(reason="It's not clear what to assert here that proves anything.")
 def test_sys_lib(sys_class=project_12.SYS_CLASS, platform=USER_PLATFORM, simulator='codegen'):
     sys_test = _parse_jack_file("examples/project_12/SysTest.jack", platform)
 

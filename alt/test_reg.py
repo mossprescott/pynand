@@ -1,5 +1,7 @@
 #! /usr/bin/env pytest
 
+import pytest
+
 from nand import run
 from nand.solutions import solved_05, solved_06, solved_10, solved_12
 import test_12, test_optimal_08
@@ -159,25 +161,27 @@ def test_math_lib():
 def test_screen_lib():
     test_12.test_screen_lib(platform=REG_PLATFORM)
 
+@pytest.mark.skip(reason="It's not clear what to assert here that proves anything.")
 def test_sys_lib():
     test_12.test_sys_lib(platform=REG_PLATFORM)
 
 
-def test_vm_pong_instructions():
+def test_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(REG_PLATFORM)
 
-    # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # 15_749
+    # compare to the project_08 solution (about 27k)
+    assert instruction_count < 21_500
 
 
 def test_pong_first_iteration():
     cycles = test_optimal_08.count_pong_cycles_first_iteration(REG_PLATFORM)
 
-    assert cycles < 1  #?
+    # Note: this isn't deterministic, but it
+    assert cycles < 16_600
 
 
-def test_vm_cycles_to_init():
+def test_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(REG_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # 2_612_707
+    # compare to the project_08 solution (about 130k)
+    assert cycles < 60_000

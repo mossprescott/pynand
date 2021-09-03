@@ -27,6 +27,18 @@ Note: this compiler does not use the standard VM opcodes; instead, it translates
 IR (intermediate representation), which is more suited to analysis. Its Translator then converts
 the IR directly to assembly. That makes the calling sequence a bit different from the rest of the
 implementations.
+
+Other differences:
+
+- Subroutine results are stored in r0 (aka @5)
+- Return addresses are stored at @4 (aka THAT)
+- Each call site just pushes arguments, stashes the return address and then jumps to the "function"
+    address. It's up to each function to do any saving of registers and adjustment of the stack
+    that it wants to. That makes it possible do less work in the case of a simple function.
+    Note: it also means that things go (more) haywire if a call provides the wrong number of args.
+
+These changes mean that the debug/trace logging done by some test cases doesn't always show the
+correct arguments, locals, return addresses, and result values.
 """
 
 import itertools
@@ -154,6 +166,7 @@ Expr = Union[CallSub, Const, Local, Location, Reg, Binary, Unary, IndirectRead]
 
 class Subroutine(NamedTuple):
     name: str
+    num_args: int
     num_vars: int
     body: List[Stmt]
 
@@ -445,8 +458,9 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         for fs in flatten_statement(s)
     ]
 
+    num_args = symbol_table.count("argument")
     num_vars = None  # bogus, but this isn't meaningful until the next phase anyway
-    return Subroutine(ast.name, None, statements)
+    return Subroutine(ast.name, num_args, num_vars, statements)
 
 
 class LiveStmt(NamedTuple):
@@ -955,7 +969,7 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
             reg_body = lock_down_locals(body, reg_map)
 
-            return Subroutine(ast.name, promoted_count, reg_body)
+            return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
 
 
 def compile_class(ast: jack_ast.Class) -> Class:
@@ -980,7 +994,14 @@ def compile_class(ast: jack_ast.Class) -> Class:
 # Translate from the IR to assembly:
 #
 
+RETURN_ADDRESS = "R4"  # Note: have to avoid using the "temp" registers if this is going to be left in place in leaf functions.
 RESULT = "R12" # for now, just use one of the registers also used for local variables.
+
+INITIALIZE_LOCALS = solved_07.INITIALIZE_LOCALS
+"""Use the same rule about initializing locals as the bundled impl., for a fair comparison.
+Note: the current implementation will fail if this option is enabled, but it wouldn't be that
+hard to implement if needed.
+"""
 
 class Translator(solved_07.Translator):
     def __init__(self):
@@ -1000,10 +1021,67 @@ class Translator(solved_07.Translator):
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
         # print(subroutine_ast)
 
+        # if self.last_function_start is not None:
+        #     instrs = self.asm.instruction_count - self.last_function_start
+        #     print(f"  {self.function_namespace} instructions: {instrs}")
+        self.last_function_start = self.asm.instruction_count
+
+        self.defined_functions.append(f"{class_name}.{subroutine_ast.name}")
+
+        self.class_namespace = class_name.lower()
+        self.function_namespace = f"{class_name.lower()}.{subroutine_ast.name}"
+
         instr_count_before = self.asm.instruction_count
 
-        self.function(class_name, subroutine_ast.name, subroutine_ast.num_vars)
+        self.asm.start(f"function {class_name}.{subroutine_ast.name} {subroutine_ast.num_vars}")
+        self.asm.label(f"{self.function_namespace}")
 
+        # Note: this could be done with a common sequence in the preamble, but jumping there and
+        # back would cost at least 6 cycles or so, and the goal here is to get small by generating
+        # tighter code, not save space in ROM by adding runtime overhead.
+        # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
+        # at all.
+        self.asm.comment("push the return address, then LCL and ARG")
+        self.asm.instr(f"@{RETURN_ADDRESS}")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@LCL")
+        self.asm.instr("D=M")
+        self._push_d()
+        self.asm.instr("@ARG")
+        self.asm.instr("D=M")
+        self._push_d()
+
+        self.asm.comment("LCL = SP")
+        self.asm.instr("@SP")
+        self.asm.instr("D=M")
+        self.asm.instr("@LCL")
+        self.asm.instr("M=D")
+
+        self.asm.comment("ARG = SP - (num_args + 3)")
+        self.asm.instr(f"@{subroutine_ast.num_args + 3}")
+        self.asm.instr("D=A")
+        self.asm.instr("@SP")
+        self.asm.instr("D=M-D")
+        self.asm.instr("@ARG")
+        self.asm.instr("M=D")
+
+        self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
+        if INITIALIZE_LOCALS:
+            raise Exception("TODO: initialize locals to 0")
+        else:
+            if subroutine_ast.num_vars == 0:
+                pass
+            elif subroutine_ast.num_vars == 1:
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
+            else:
+                self.asm.instr(f"@{subroutine_ast.num_vars}")
+                self.asm.instr("D=A")
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+D")
+
+        # Now the body:
         for s in subroutine_ast.body:
             self._handle(s)
         self.asm.blank()
@@ -1213,7 +1291,7 @@ class Translator(solved_07.Translator):
 
     def handle_Return(self, ast: Return):
         if isinstance(ast.expr, CallSub):
-            self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
+            self.handle_CallSub(ast.expr)
             self.asm.comment(f"leave the result in {RESULT}")
 
         else:
@@ -1232,15 +1310,10 @@ class Translator(solved_07.Translator):
         self.return_op()
 
     def handle_Push(self, ast):
-        # if isinstance(ast.expr, CallSub):
-        #     # Skip popping the stack
-        #     self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
-        #     self.asm.comment("result left on the stack")
-        # else:
         if not isinstance(ast.expr, CallSub):
             self.asm.start(f"push-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)}")
 
-        # Save a cycle for "push 0":
+        # Save a cycle for "push 0/1":
         imm = self.immediate(ast.expr)
         if imm is not None:
             self.asm.instr("@SP")
@@ -1259,14 +1332,9 @@ class Translator(solved_07.Translator):
             self.asm.instr("M=D")
 
     def handle_Discard(self, ast: Discard):
-        self.call(ast.expr.class_name, ast.expr.sub_name, ast.expr.num_args)
-
         # Note: now that results are passed in a register, there's no cleanup to do when
         # the result is not used.
-
-        # self.asm.comment("discard <result>")
-        # self.asm.instr("@SP")
-        # self.asm.instr("M=M-1")
+        self.handle_CallSub(ast.expr)
 
     def compare_op_neg(self, cmp: Cmp):
         return {
@@ -1278,14 +1346,36 @@ class Translator(solved_07.Translator):
             ">=": "LT",
          }[cmp]
 
-    # def compare_op_pos(self, cmp: Cmp):
-    #     raise Exception("TODO")
+    def compare_op_pos(self, cmp: Cmp):
+        return {
+            "=": "EQ",
+            "<": "LT",
+            ">": "GT",
+            "!=": "NE",
+            "<=": "LE",
+            ">=": "GE",
+         }[cmp]
 
 
     # Expressions:
 
     def handle_CallSub(self, ast: CallSub):
-        self.call(ast.class_name, ast.sub_name, ast.num_args)
+        self.referenced_functions.append(f"{ast.class_name}.{ast.sub_name}")
+
+        return_label = self.asm.next_label("return_address")
+
+        self.asm.start(f"call {ast.class_name}.{ast.sub_name} {ast.num_args}")
+
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{RETURN_ADDRESS}")
+        self.asm.instr("M=D")
+
+        self.asm.instr(f"@{ast.class_name.lower()}.{ast.sub_name}")
+        self.asm.instr("0;JMP")
+
+        self.asm.label(return_label)
+
         # Move the result to D
         self.asm.instr(f"@{RESULT}")
         self.asm.instr("D=M")
@@ -1486,7 +1576,27 @@ class Translator(solved_07.Translator):
         self.__getattribute__(f"handle_{ast.__class__.__name__}")(ast)
 
 
+    # Override common bits:
+
+    def preamble(self):
+        self.asm.start("VM initialization")
+        self.asm.instr("@256")
+        self.asm.instr("D=A")
+        self.asm.instr("@SP")
+        self.asm.instr("M=D")
+
+        # Note: this call will never return, so no need to set up a return address, or
+        # even initialize ARG/LCL.
+        self.asm.start("call Sys.init 0")
+        self.asm.instr("@sys.init")
+        self.asm.instr("0;JMP")
+
+
     # Override some unused bits and pieces to save space:
+
+    def _call(self):
+        # not used
+        return "_call_common_unused"
 
     def _compare(self, op):
         # This common sequence isn't used; each comparison is compiled to a custom
@@ -1494,58 +1604,46 @@ class Translator(solved_07.Translator):
         return f"_compare_{op}_unused"
 
     def _return(self):
-        "Override the normal sequence to skip popping/re-pushing the result."
-        # TODO: more serious surgery, to avoid much of the overhead of saving state.
+        "Override the normal sequence; much less stack adjustment required."
+        # TODO: use this only for non-leaf subroutines
 
         label = self.asm.next_label("return_common")
 
         self.asm.comment(f"common return sequence")
         self.asm.label(label)
 
-        # R13 = result
-        # self._pop_d()
-        # self.asm.instr("@R13")
-        # self.asm.instr("M=D")
-
-        # SP = LCL
+        self.asm.comment("SP = LCL")
         self.asm.instr("@LCL")
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("M=D")
-        # R15 = ARG
+
+        self.asm.comment("R15 = ARG (previous SP)")
         self.asm.instr("@ARG")
         self.asm.instr("D=M")
         self.asm.instr("@R15")
         self.asm.instr("M=D")
-        # restore segment pointers from stack:
-        self._pop_d()
-        self.asm.instr("@THAT")
-        self.asm.instr("M=D")
-        self._pop_d()
-        self.asm.instr("@THIS")
-        self.asm.instr("M=D")
+
+        self.asm.comment("restore segment pointers from stack (ARG, LCL)")
         self._pop_d()
         self.asm.instr("@ARG")
         self.asm.instr("M=D")
         self._pop_d()
         self.asm.instr("@LCL")
         self.asm.instr("M=D")
-        # R14 = return address
+
+        self.asm.comment("R14 = saved return address from the stack")
         self._pop_d()
         self.asm.instr("@R14")
         self.asm.instr("M=D")
-        # SP = R15
+
+        self.asm.comment("SP = R15 (saved ARG)")
         self.asm.instr("@R15")
         self.asm.instr("D=M")
         self.asm.instr("@SP")
         self.asm.instr("M=D")
 
-        # # Push R13 (result)
-        # self.asm.instr("@R13")
-        # self.asm.instr("D=M")
-        # self._push_d()
-
-        # jmp to R14
+        self.asm.comment("jmp to R14 (saved return address)")
         self.asm.instr("@R14")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
@@ -1560,7 +1658,7 @@ def _Class_str(self: Class) -> str:
 Class.__str__ = _Class_str
 
 def _Subroutine_str(self: Subroutine) -> str:
-    return "\n".join([f"function {self.name} {self.num_vars}"]
+    return "\n".join([f"function {self.name} {self.num_vars} (args: {self.num_args})"]
                      + [jack_ast._indent(_Stmt_str(s)) for s in self.body])
 
 Subroutine.__str__ = _Subroutine_str
