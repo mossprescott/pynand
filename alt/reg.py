@@ -115,7 +115,7 @@ class Discard(NamedTuple):
     """Call a subroutine, then pop the stack, discarding the result."""
     expr: "CallSub"
 
-Stmt = Union[Eval, IndirectWrite, If, While, Push, Discard]
+Stmt = Union[Eval, IndirectWrite, Store, If, While, Push, Discard]
 
 
 class CallSub(NamedTuple):
@@ -136,13 +136,13 @@ class Local(NamedTuple):
 class Location(NamedTuple):
     """A location identified by segment and index."""
     kind: VarKind
-    index: int
+    idx: int
     name: str  # include for debugging purposes
 
 class Reg(NamedTuple):
     """A variable which is local the the subroutine scope, does not need to persist
     across subroutine calls, and has been assigned to a register."""
-    index: int
+    idx: int
     name: str  # include for debugging purposes
 
 Value = Union[Const, Local, Reg]
@@ -234,12 +234,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     else:
                         this_var = next_var("this")
                         this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
-                    if loc.index == 0:
+                    if loc.idx == 0:
                         addr_var = this_var
                         addr_stmts = []
                     else:
                         addr_var = next_var(loc.name)
-                        addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))]
+                        addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.idx)))]
                     value_stmts, value_expr = flatten_expression(stmt.expr)
                     return value_stmts + this_stmts + addr_stmts + [IndirectWrite(addr_var, value_expr)]
                 else:
@@ -354,12 +354,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 else:
                     this_var = next_var("this")
                     this_stmts = [Eval(this_var, Location("argument", 0, "self"))]
-                if loc.index == 0:
+                if loc.idx == 0:
                     addr_var = this_var
                     addr_stmts = []
                 else:
                     addr_var = next_var(loc.name)
-                    addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.index)))]
+                    addr_stmts = [Eval(addr_var, Binary(this_var, jack_ast.Op("+"), Const(loc.idx)))]
                 stmts = this_stmts + addr_stmts
                 flat_expr = IndirectRead(addr_var)
             else:
@@ -521,7 +521,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         return stmt, live
 
 
-    def analyze_while(stmt: While, live_at_end) -> Tuple[Stmt, Set[str]]:
+    def analyze_while(stmt: While, live_at_end) -> Tuple[While, Set[str]]:
         """While is tricky because variables that are live at the beginning of the loop
         therefore are also live at the end, which creates a circularity in the analysis.
         Fortunately there's not much going on and simply repeating the same analysis should
@@ -906,6 +906,8 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
     def rewrite_statements(stmts: Optional[Sequence[Stmt]]) -> Optional[List[Stmt]]:
         if stmts is not None:
             return [rewrite_statement(s) for s in stmts ]
+        else:
+            return None
 
     return rewrite_statements(stmts)
 
@@ -959,12 +961,12 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
         else:
             reg_map = {
-                l: Reg(index=c, name=l.name)
-                for c, ls in enumerate(local_sets)
+                l: Reg(idx=i, name=l.name)
+                for i, ls in enumerate(local_sets)
                 for l in ls
             }
 
-            reg_pressure = 0 if reg_map == {} else max(r.index+1 for r in reg_map.values())
+            reg_pressure = 0 if reg_map == {} else max(r.idx+1 for r in reg_map.values())
             # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
 
             reg_body = lock_down_locals(body, reg_map)
@@ -1094,11 +1096,13 @@ class Translator(solved_07.Translator):
     # Statements:
 
     def handle_Eval(self, ast: Eval):
+        assert isinstance(ast.dest, Reg)
+
         if not isinstance(ast.expr, CallSub):
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Stmt_str(ast)}")
 
         # Do the update in-place if possible:
-        if isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.left.index:
+        if isinstance(ast.expr, Binary) and isinstance(ast.expr.left, Reg) and ast.dest.idx == ast.expr.left.idx:
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
                 right_imm = self.immediate(ast.expr.right)
@@ -1106,34 +1110,34 @@ class Translator(solved_07.Translator):
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX + 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.index}")
+                        self.asm.instr(f"@R{5+ast.dest.idx}")
                         self.asm.instr(f"M=M{right_imm:+}")
                 elif op == "-" and right_imm is not None:
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX - 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.index}")
+                        self.asm.instr(f"@R{5+ast.dest.idx}")
                         self.asm.instr(f"M=M{-right_imm:+}")
                 else:
                     self._handle(ast.expr.right)  # D = right
-                    self.asm.instr(f"@R{5+ast.dest.index}")
+                    self.asm.instr(f"@R{5+ast.dest.idx}")
                     self.asm.instr(f"M=M{op}D")
                 return
-        elif isinstance(ast.expr, Binary) and ast.dest.index == ast.expr.right.index:
+        elif isinstance(ast.expr, Binary) and isinstance(ast.expr.right, Reg) and ast.dest.idx == ast.expr.right.idx:
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
                 self._handle(ast.expr.left)  # D = left
-                self.asm.instr(f"@R{5+ast.dest.index}")
+                self.asm.instr(f"@R{5+ast.dest.idx}")
                 self.asm.instr(f"M=D{op}M")
                 return
         elif isinstance(ast.expr, Unary) and ast.dest == ast.expr:
-            self.asm.instr(f"@R{5+ast.dest.index}")
+            self.asm.instr(f"@R{5+ast.dest.idx}")
             self.asm.instr(f"M={self.unary_op(ast.expr.op)}M")
             return
 
         imm = self.immediate(ast.expr)
         if imm is not None:
-            self.asm.instr(f"@R{5+ast.dest.index}")
+            self.asm.instr(f"@R{5+ast.dest.idx}")
             self.asm.instr(f"M={imm}")
         else:
             self._handle(ast.expr)
@@ -1141,7 +1145,7 @@ class Translator(solved_07.Translator):
             if isinstance(ast.expr, CallSub):
                 self.asm.start(f"eval-result {_Expr_str(ast.dest)} = <result>")
 
-            self.asm.instr(f"@R{5+ast.dest.index}")
+            self.asm.instr(f"@R{5+ast.dest.idx}")
             self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
@@ -1161,7 +1165,7 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.value)
 
-        kind, index = ast.location.kind, ast.location.index
+        kind, index = ast.location.kind, ast.location.idx
         if kind == "static":
             if imm is not None:
                 self.asm.instr(f"@{self.class_namespace}.static{index}")
@@ -1391,9 +1395,9 @@ class Translator(solved_07.Translator):
             self.asm.instr("D=-A")
 
     def handle_Location(self, ast: Location):
-        kind, index = ast.kind, ast.index
+        kind, index = ast.kind, ast.idx
         if ast.kind == "static":
-            self.asm.instr(f"@{self.class_namespace}.static{ast.index}")
+            self.asm.instr(f"@{self.class_namespace}.static{ast.idx}")
             self.asm.instr("D=M")
         elif ast.kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
@@ -1423,7 +1427,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("D=M")
 
     def handle_Reg(self, ast: Reg):
-        self.asm.instr(f"@R{5+ast.index}")
+        self.asm.instr(f"@R{5+ast.idx}")
         self.asm.instr("D=M")
 
     def handle_Binary(self, ast: Binary):
@@ -1433,12 +1437,12 @@ class Translator(solved_07.Translator):
 
         if alu_op == "+" and isinstance(ast.left, Reg) and right_imm is not None:
             # e.g. r0 + 1  ->  @R5; D=M+1
-            self.asm.instr(f"@R{5+ast.left.index}")
+            self.asm.instr(f"@R{5+ast.left.idx}")
             self.asm.instr(f"D=M{right_imm:+}")
             return
         elif alu_op == "-" and isinstance(ast.left, Reg) and right_imm is not None:
             # e.g. r0 - 1  ->  @R5; D=M-1
-            self.asm.instr(f"@R{5+ast.left.index}")
+            self.asm.instr(f"@R{5+ast.left.idx}")
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
@@ -1504,7 +1508,7 @@ class Translator(solved_07.Translator):
 
     def handle_Unary(self, ast: Unary):
         if isinstance(ast.value, Reg):
-            self.asm.instr(f"@R{5+ast.value.index}")
+            self.asm.instr(f"@R{5+ast.value.idx}")
             self.asm.instr(f"D={self.unary_op(ast.op)}M")
         else:
             # Note: ~(Const) isn't being evaluated in the compiler yet, but should be.
@@ -1559,7 +1563,7 @@ class Translator(solved_07.Translator):
         in some cases."""
 
         if isinstance(ast, Reg):
-            self.asm.instr(f"@R{5+ast.index}")
+            self.asm.instr(f"@R{5+ast.idx}")
             self.asm.instr("A=M")
         elif isinstance(ast, Const):
             if -1 <= ast.value <= 1:
@@ -1705,9 +1709,9 @@ def _Expr_str(expr: Expr) -> str:
     elif isinstance(expr, Local):
         return f"{expr.name}"
     elif isinstance(expr, Location):
-        return f"{expr.name} ({expr.kind} {expr.index})"
+        return f"{expr.name} ({expr.kind} {expr.idx})"
     elif isinstance(expr, Reg):
-        return f"{expr.name} (r{expr.index})"
+        return f"{expr.name} (r{expr.idx})"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
