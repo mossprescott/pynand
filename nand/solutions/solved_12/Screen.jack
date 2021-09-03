@@ -44,17 +44,16 @@ class Screen {
     /** Erases the entire screen. */
     function void clearScreen() {
         var Array screen;
+        var int count;
 
         let screen = 16384;
+        let count = 8192;
 
-        while (screen < 24576) {
-            // Unroll a bit to reduce the loop overhead. As long as it divides the row stride: 512/16 = 32
+         while (~(count < 0)) {
             let screen[0] = 0;
-            let screen[1] = 0;
-            let screen[2] = 0;
-            let screen[3] = 0;
-            let screen = screen + 4;
-        }
+            let screen = screen + 1;
+            let count = count - 1;
+         }
 
         return;
     }
