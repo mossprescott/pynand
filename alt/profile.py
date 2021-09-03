@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-"""VM-level profiler, tracking the number of cycles by: instruction, opcode, function (self), function (total).
+"""VM-level profiler, tracking the number of cycles by: instruction, opcode, function.
 
 This immediately revealed that Math.divide is a huge problem, and in particular dividing by 16. So
 I added the shift.py implementation which eliminates those calls, for the biggest improvement yet.
@@ -23,17 +23,11 @@ import collections
 import sys
 
 import nand.syntax, nand.translate, nand.platform
-import project_05, project_06, project_07, project_08
 
 
-# initialization:
-# SKIP_CYCLES = 0
-# CYCLES = 1_000_000
-# # CYCLES = 5_000_000
+# TODO: make some or all of this stuff command-line params
 
-# skip initialization:
-SKIP_CYCLES = 500_000
-CYCLES = 2_000_000
+MAX_CYCLES = 15_000_000
 
 CALL_SITES = False
 """If True, time is charged to each particular call, otherwise, all calls to the same function are
@@ -43,20 +37,28 @@ CALL_SITES = False
 # CALL_TREES = True
 # """If True, aggregate time in functions according to the call chain."""
 
+# SIMULATOR = "codegen"
+SIMULATOR = "compiled"  # only about 30% faster, interestingly
+
+NO_WAITING = True
 
 def main():
     path = sys.argv[1] if len(sys.argv) == 2 else "examples/project_11/Pong"
 
-
-    # platform = nand.platform.BUNDLED_PLATFORM
-    # import alt.threaded
-    # platform = alt.threaded.THREADED_PLATFORM
-    # import alt.lazy
-    # platform = alt.lazy.LAZY_PLATFORM
-    # import alt.shift
-    # platform = alt.shift.SHIFT_PLATFORM
-    import alt.reg
-    platform = alt.reg.REG_PLATFORM
+    if False:
+        platform = nand.platform.BUNDLED_PLATFORM
+    elif False:
+        import alt.threaded
+        platform = alt.threaded.THREADED_PLATFORM
+    elif False:
+        import alt.lazy
+        platform = alt.lazy.LAZY_PLATFORM
+    elif False:
+        import alt.shift
+        platform = alt.shift.SHIFT_PLATFORM
+    elif True:
+        import alt.reg
+        platform = alt.reg.REG_PLATFORM
 
 
     translate = platform.translator()
@@ -65,13 +67,12 @@ def main():
     nand.translate.translate_dir(translate, platform, path)
     nand.translate.translate_library(translate, platform)
 
-    # Substitute implementation for Sys.wait(), which returns immediately. This take precedence
-    # just because it appears later in the assembly stream, so it's address will appear in the symbol map.
+    # Substitute implementation for Sys.wait(), which returns immediately. This takes precedence
+    # just because it appears later in the assembly stream, so its address will appear in the symbol map.
     # TODO: make this some kind of system trap, along with Sys.halt and Sys.error, that signals the
     # simulator to sleep for a bit, maybe.
-    translate.function("Sys", "wait", 0)
-    translate.push_constant(0)
-    translate.return_op()
+    if NO_WAITING:
+        nand.translate.override_sys_wait(translate, platform)
 
     translate.finish()
 
@@ -82,7 +83,7 @@ def main():
     src_map = translate.asm.src_map
     # print(list(src_map.items())[:10])
 
-    computer = nand.syntax.run(platform.chip, simulator="codegen")
+    computer = nand.syntax.run(platform.chip, simulator=SIMULATOR)
     computer.init_rom(prg)
 
 
@@ -99,14 +100,22 @@ def main():
 
     fn_prefix = "call " if CALL_SITES else "function "
 
-    print(f"Skipping {SKIP_CYCLES:,d} cycles")
-    # computer.ticktock(SKIP_CYCLES)
+    # Counts the number of Sys.wait() calls. If greater than zero, we are in the game loop
+    current_frame = 0
 
-    for cycle in range(SKIP_CYCLES + CYCLES):
+    recorded_cycles = 0
+
+    was_recording = False
+
+    for cycle in range(MAX_CYCLES):
+        # recording = current_frame > 0  # Uncomment to skip initialization
+        recording = True               # Uncomment to profile from the start
+
+        if recording and not was_recording:
+            print(f"\nStart recording at cycle {cycle:,d}")
+            was_recording = True
+
         if cycle % 5000 == 0:
-            if cycle >= SKIP_CYCLES and (cycle - 5000) < SKIP_CYCLES:
-                print()
-                print(f"Running {CYCLES:,d} cycles")
             print(".", end="", flush=True)
 
         pc = computer.pc
@@ -120,6 +129,14 @@ def main():
             if current_opcode in ("push", "pop"):
                 current_opcode = " ".join(op.split()[:2])
 
+            if current_opcode == "function":
+                fn = op.split()[1]
+                if fn == "Sys.wait":
+                    current_frame += 1
+                elif fn == "Sys.halt":
+                    print(f"\nHalted")
+                    break
+
             # Note: functions with no locals don't actually need to generate any instructions for
             # the "function" opcode, but if they didn't, their first opcode would overwrite the
             # "function" opcode in the source map, since it has the same instruction address.
@@ -128,13 +145,13 @@ def main():
             # Need to make src_map a multi-map.
             if op.startswith(fn_prefix):
                 fn_stack.append(pc)
-                if cycle > SKIP_CYCLES:
+                if recording:
                     fns[pc] += 1
             elif op.startswith("return") and len(fn_stack) > 1:
                 # TODO: wait to pop _after_ this op, so the return is charged to the function (not the caller)
                 fn_stack.pop()
 
-        if cycle > SKIP_CYCLES:
+        if recording:
             if current_instr:
                 instructions[current_instr] += 1
 
@@ -143,25 +160,29 @@ def main():
 
             fn_instructions[fn_stack[-1]] += 1
 
+            recorded_cycles += 1
+
         computer.ticktock()
 
+    print()
+    print(f"Ran {cycle:,d} cycles; recorded: {recorded_cycles:,d}; frames: {current_frame+1:,d}")
     print()
 
     # print(raw_instructions.most_common(50))
 
     print("Instructions (top 20):")
     for addr, count in instructions.most_common(20):
-        print(f"  {100*count/CYCLES:0.2f}%: {src_map[addr]} @ {addr}")
+        print(f"  {100*count/recorded_cycles:0.2f}%: {src_map[addr]} @ {addr}")
     print()
 
     print("Opcodes:")
     for op, count in opcodes.most_common():
-        print(f"  {100*count/CYCLES:0.2f}%: {op}")
+        print(f"  {100*count/recorded_cycles:0.2f}%: {op}")
     print()
 
     print("Functions (top 20):")
     for addr, count in fn_instructions.most_common(20):
-        print(f"  {100*count/CYCLES:0.2f}%: {'start' if addr == 0 else src_map[addr]} @ {addr} ({fns[addr]} times)")
+        print(f"  {100*count/recorded_cycles:0.2f}%: {'start' if addr == 0 else src_map[addr]} @ {addr} ({fns[addr]} times)")
 
 
 if __name__ == "__main__":
