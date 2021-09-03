@@ -8,7 +8,7 @@ Note: this takes a couple of minutes to run.
 from nand import gate_count
 import test_optimal_08
 
-from nand.platform import BUNDLED_PLATFORM
+from nand.platform import BUNDLED_PLATFORM, USER_PLATFORM
 from alt.eight import EIGHT_PLATFORM
 from alt.lazy import LAZY_PLATFORM
 from alt.reg import REG_PLATFORM
@@ -20,11 +20,11 @@ def main():
     std = measure(BUNDLED_PLATFORM)
     print_result("solutions", std)
 
-    print_relative_result("project_0x.py", std, measure(BUNDLED_PLATFORM))
     print_relative_result("alt/lazy.py", std, measure(LAZY_PLATFORM))
     print_relative_result("alt/sp.py", std, measure(SP_PLATFORM))
     print_relative_result("alt/threaded.py", std, measure(THREADED_PLATFORM))
     print_relative_result("alt/shift.py", std, measure(SHIFT_PLATFORM))
+    print_relative_result("project_0x.py", std, measure(USER_PLATFORM))
     print_relative_result("alt/reg.py", std, measure(REG_PLATFORM))
 
     # print_relative_result("alt/eight.py", std, measure(EIGHT_PLATFORM, "vector"))
