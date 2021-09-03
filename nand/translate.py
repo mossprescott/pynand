@@ -121,7 +121,7 @@ class AssemblySource:
 
         if stop_cycles is None:
             stop_cycles = self.instruction_count
-        stop_cycles *= 2
+        stop_cycles *= 2  # Hack: because at least one chip/translator uses twice as many cycles as expected.
 
         if debug:
             # print_lines(self.lines)
@@ -137,28 +137,33 @@ class AssemblySource:
         THIS = 3
         THAT = 4
 
-        def print_state():
+        def print_state(op=None):
             arg = [computer.peek(i) for i in range(computer.peek(ARG), computer.peek(LCL)-5)]
             saved = [computer.peek(i) for i in range(computer.peek(LCL)-5, computer.peek(LCL))]
             stack = [computer.peek(i) for i in range(computer.peek(LCL) or 256, computer.sp)]
-            print("    SP     LCL    ARG  THIS   THAT     R0     R1     R2     R3     R4     R5     R6     R7     G0     G1     G2")
+            print("    SP    LCL    ARG   THIS   THAT     R0     R1     R2     R3     R4     R5     R6     R7     G0     G1     G2")
             print(" ".join(f"{w:6d}" for w in ([computer.sp] + [computer.peek(addr) for addr in range(1,16)])))
             print(f"  return: {saved[0]}; saved: {saved[1:]}; args: {arg}")
             print(f"  local+stack: {stack[-50:]}")
             # TODO: show values of statics, maybe only when they're written (or read?!)
+            print(f"@{computer.pc}: {op or ''} ({cycles:0,d} of {stop_cycles:0,d} cycles)")
 
         for cycles in range(stop_cycles):
-            if debug:
-                op = self.src_map.get(computer.pc)
-                if op:
-                    print_state()
-                    print(f"{computer.pc}: {op} ({cycles:0,d} of {stop_cycles:0,d} cycles)")
+            op = self.src_map.get(computer.pc)
+            if op:
+                if debug:
+                    print_state(op)
+                if op.startswith("call Sys.halt"):
+                    print(f"Halted at cycle {cycles:,d}")
+                    return
+
             # This is handy to catch common errors, but doesn't work when the stack is going to be
             # initialized by the program itself.
             # if computer.sp < 256:
             #     print(f"broken stack at {computer.pc}")
             #     print_state()
             #     raise Exception()
+
             computer.ticktock()
 
             if tty is not None and not computer.tty_ready:
@@ -172,7 +177,8 @@ class AssemblySource:
 
         # Always show the final state:
         print_state()
-        print(f"{computer.pc}: ({cycles:0,d} of {stop_cycles:0,d} cycles)")
+        print()
+        print("Did not reach Sys.halt()!")
 
 
     # TODO: find a better home for this (nand.runtime? .execute?, .debug?)
