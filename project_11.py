@@ -100,15 +100,29 @@ def compile_expression(ast, symbol_table, asm):
 
     >>> from nand.translate import AssemblySource
     >>> asm = AssemblySource()
-    >>> compile_expression(IntegerConstant(1), SymbolTable(), asm)
+    >>> compile_expression(IntegerConstant(1), SymbolTable("Test"), asm)
     >>> asm.lines
     ['  push constant 1']
     """
+
+    # if isinstance(ast, IntegerConstant):
+    #     asm.instr(f"push constant {ast.value}")
+    # elif ...
 
     # SOLVERS: replace this with your own implementation
     solved_11.compile_expression(ast, symbol_table, asm)
 
 
 def compile_class(ast, asm):
+    """Given a jack_ast.Class node, generate VM source for all subroutines.
+
+    VM opcodes are written to the provided AssemblySource, which can also take
+    care of generating unique labels.
+    """
+
+    # symbol_table = SymbolTable(ast.name)
+    # for sd in ast.subroutineDecs:
+    #     ...
+
     # SOLVERS: replace this with your own implementation
     solved_11.compile_class(ast, asm)
