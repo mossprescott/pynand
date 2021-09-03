@@ -77,6 +77,7 @@ class String {
 
         var int ptr, sign, x, digit;
 
+        let ptr = 0;
         let sign = 1;
         let x = 0;
 
@@ -87,7 +88,7 @@ class String {
 
         while (ptr < length) {
             let digit = charAt(ptr) - 48;
-            if (-1 < digit & 10 > digit) {
+            if ((-1 < digit) & (10 > digit)) {
                 let x = (10*x) + digit;
             }
             else {
