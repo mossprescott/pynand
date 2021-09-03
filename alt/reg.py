@@ -813,7 +813,11 @@ def color_locals(liveness: Sequence[LiveStmt]) -> List[Set[Local]]:
 
     visit_stmts(liveness)
 
-    color_sets = color_graph(vertices=vars, edges=overlaps)
+    # Sort the vars so that named vars get assigned to registers first, mostly to make the result
+    # more predictable for test assertions.
+    sorted_vars = sorted(vars, key=lambda lcl: (lcl.name.startswith("$"), lcl.name))
+
+    color_sets = color_graph(vertices=sorted_vars, edges=overlaps)
     # import pprint
     # pprint.pprint(color_sets)
 

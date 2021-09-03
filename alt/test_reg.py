@@ -106,15 +106,12 @@ class Test {
 
     flat_class = flatten_class(ast)
 
-    print(flat_class)
-
     sub = phase_two(flat_class.subroutines[0])
 
     print(sub)
 
-    # TODO: assert that the test gets turned into an
-    # something tight using registers.
-    assert False
+    assert sub.num_vars == 0, "No locals on the stack"
+    assert sub.body[-1] == Return(Reg(0, "y")), "y is assigned to the first register"
 
 def test_loop_allocation():
     src = """
@@ -133,37 +130,12 @@ class Test {
 
     flat_class = flatten_class(ast)
 
-    print(flat_class)
-
     sub = phase_two(flat_class.subroutines[0])
 
     print(sub)
 
-    # TODO: assert that the test gets turned into an
-    # something tight using registers.
-    assert False
-
-
-def test_compile_average():
-    with open("examples/project_11/Average/Main.jack") as f:
-        src = "\n".join(f.readlines())
-        average = solved_10.parse_class(src)
-
-    main = average.subroutineDecs[0]
-    # print(pprint_subroutine_dec(main))
-
-    result = flatten_class(average)
-    print(result)
-    # print(pprint_subroutine_dec(result))
-
-    liveness = analyze_liveness(result.subroutines[0].body)
-    for s in liveness:
-        print(_Stmt_str(s))
-
-    print(f"need saving: {need_saving(liveness)}")
-
-    # TODO: assert some stuff related to liveness, allocation, or what?
-    assert False
+    assert sub.num_vars == 0, "No locals on the stack"
+    assert sub.body[0] == Eval(Reg(0, "x"), Const(0)), "x is assigned to the first register"
 
 
 def test_array_lib():
