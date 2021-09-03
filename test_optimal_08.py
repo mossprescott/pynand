@@ -39,6 +39,9 @@ def test_pong_first_iteration():
 
 
 def count_pong_cycles_first_iteration(platform, simulator="codegen"):
+    """Count the number of cycles for the first call to each of the two main functions
+    of Pong's game loop: Bat.move() and moveBall()."""
+
     translator = platform.translator()
 
     translator.preamble()
@@ -95,7 +98,12 @@ def test_cycles_to_init():
 
 
 def count_cycles_to_init(platform, simulator="codegen"):
-    """Count the number of cycles executed before Main.main is called."""
+    """Count the number of cycles executed before Main.main is called.
+
+    Note: this includes only OS initialization, not the one-time initialization
+    done by Pong (notably, the call to Screen.clearScreen() before starting the
+    game loop.)
+    """
 
     translator = platform.translator()
 
