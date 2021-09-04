@@ -40,6 +40,7 @@ class AssemblySource:
 
 
     def comment(self, comment):
+        """Add a comment line to the instruction stream, but do not record it as the location of an opcode."""
         self.lines.append(f"// {comment}")
 
 

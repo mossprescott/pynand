@@ -380,7 +380,7 @@ class Translator:
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
         end_label = self.asm.next_label(f"{op.lower()}_common$end")
-        # self.asm.start(f"{op.lower()}_common")  # usually don't want to see this detail in traces
+        self.asm.comment(f"common sequence for {op.lower()}")
         self.asm.label(label)
         self.asm.instr("@R15")    # R15 = D (the return address)
         self.asm.instr("M=D")
@@ -451,7 +451,7 @@ class Translator:
 
         label = self.asm.next_label("call_common")
 
-        # self.asm.start(f"call_common")
+        self.asm.comment(f"common call sequence")
         self.asm.label(label)
 
         # R15 = SP - (D + 1) (which will be the new ARG)
@@ -498,7 +498,7 @@ class Translator:
     def _return(self):
         label = self.asm.next_label("return_common")
 
-        # self.asm.start(f"return_common")
+        self.asm.comment(f"common return sequence")
         self.asm.label(label)
 
         # R13 = result
