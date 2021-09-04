@@ -133,6 +133,7 @@ def main():
                 fn = op.split()[1]
                 if fn == "Sys.wait":
                     current_frame += 1
+                    print("w", end="", flush=True)
                 elif fn == "Sys.halt":
                     print(f"\nHalted")
                     break
