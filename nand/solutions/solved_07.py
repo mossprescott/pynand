@@ -8,10 +8,15 @@ import re
 
 from nand.translate import AssemblySource
 
-INITIALIZE_LOCALS = False
+INITIALIZE_LOCALS = True
 """If true, additional instructions are generated to initialize each local variable to 0 each time
-the function body is entered. It's not entirely clear if Jack requires this behavior; the included
-OS implementation and sample programs do not assume that it happens.
+the function body is entered. This behavior is desirable but often skipped by simple compilers to
+save some cycles; the included OS implementation and sample programs do not assume that it happens.
+A cleverer compiler would analyze the control flow and verify that a local is definitely initialized
+before its value is used, but clever isn't really what this is about.
+
+On the other hand, one test does require that behavior (test_08.test_nested_call), so for now we'll
+spend the cycles.
 """
 
 
@@ -272,6 +277,13 @@ class Translator:
         self.asm.start(f"function {class_name}.{function_name} {num_vars}")
         self.asm.label(f"{self.function_namespace}")
 
+        self.reserve_local_space(num_vars)
+
+    def reserve_local_space(self, num_vars):
+        """Make space on the stack for `num_vars` local variables, and possibly initialize them to 0,
+        depending on the value of INITIALIZE_LOCALS.
+        """
+
         if num_vars == 0:
             # Note: a lot of functions have no locals, so skipping this has some impact.
             # Tricky: this instruction has no effect; it's just here to take up space in the ROM and ensure that the
@@ -279,14 +291,15 @@ class Translator:
             # that is dumb.
             self.asm.instr("0")
         elif num_vars == 1:
-            # 2 instr. (or 5, if locals are initialized)
+            # 2 instr. (or 4, if locals are initialized)
             if INITIALIZE_LOCALS:
-                # 5 instr.
                 self.asm.instr("@SP")
-                self.asm.instr("A=M")
+                self.asm.instr("M=M+1")
+                self.asm.instr("A=M-1")
                 self.asm.instr("M=0")
-            self.asm.instr("@SP")
-            self.asm.instr("M=M+1")
+            else:
+                self.asm.instr("@SP")
+                self.asm.instr("M=M+1")
         elif num_vars == 2:
             # 3 instr. (or 8 if locals are initialized)
             if INITIALIZE_LOCALS:
@@ -299,14 +312,15 @@ class Translator:
             self.asm.instr("M=M+1")
             self.asm.instr("M=M+1")
         else:
-            # 4 instr. (or 5 + 2*(num_vars) if locals are initialized)
+            # 4 instr. (or 4 + 2*(num_vars) if locals are initialized)
             if INITIALIZE_LOCALS:
                 self.asm.instr("@SP")
                 self.asm.instr("A=M")
-                for _ in range(num_vars):
-                    self.asm.instr("M=0")
+                self.asm.instr("M=0")
+                for _ in range(1, num_vars):
                     self.asm.instr("A=A+1")
-                self.asm.instr("D=A")
+                    self.asm.instr("M=0")
+                self.asm.instr("D=A+1")
                 self.asm.instr("@SP")
                 self.asm.instr("M=D")
             else:

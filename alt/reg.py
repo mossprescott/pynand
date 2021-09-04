@@ -999,12 +999,6 @@ def compile_class(ast: jack_ast.Class) -> Class:
 RETURN_ADDRESS = "R4"  # Note: have to avoid using the "temp" registers if this is going to be left in place in leaf functions.
 RESULT = "R12" # for now, just use one of the registers also used for local variables.
 
-INITIALIZE_LOCALS = solved_07.INITIALIZE_LOCALS
-"""Use the same rule about initializing locals as the bundled impl., for a fair comparison.
-Note: the current implementation will fail if this option is enabled, but it wouldn't be that
-hard to implement if needed.
-"""
-
 class Translator(solved_07.Translator):
     def __init__(self):
         self.asm = AssemblySource()
@@ -1068,20 +1062,9 @@ class Translator(solved_07.Translator):
         self.asm.instr("@ARG")
         self.asm.instr("M=D")
 
-        self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
-        if INITIALIZE_LOCALS:
-            raise Exception("TODO: initialize locals to 0")
-        else:
-            if subroutine_ast.num_vars == 0:
-                pass
-            elif subroutine_ast.num_vars == 1:
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+1")
-            else:
-                self.asm.instr(f"@{subroutine_ast.num_vars}")
-                self.asm.instr("D=A")
-                self.asm.instr("@SP")
-                self.asm.instr("M=M+D")
+        if subroutine_ast.num_vars > 0:
+            self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
+            self.reserve_local_space(subroutine_ast.num_vars)
 
         # Now the body:
         for s in subroutine_ast.body:
