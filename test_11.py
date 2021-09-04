@@ -2,7 +2,9 @@
 
 import pytest
 
-from nand.translate import AssemblySource
+from nand import run
+from nand.platform import BUNDLED_PLATFORM
+from nand.translate import AssemblySource, translate_library
 import project_10
 
 import project_11
@@ -321,7 +323,10 @@ def test_no_this():
 #
 # Compile: full programs
 #
-def test_program_seven():
+def test_program_seven_opcodes():
+    """This program is so simple that there's probably only one reasonable way to compile it,
+    so just compare the VM opcodes."""
+
     with open("examples/project_11/Seven/Main.jack") as f:
         src = f.read()
 
@@ -347,171 +352,147 @@ def test_program_seven():
 
     assert list(asm.lines) == expected.split("\n")[1:-1]
 
-def test_program_average():
+
+def test_program_average_compile():
+    # Isolate the compiler by using the included solution for everything else:
+    platform = BUNDLED_PLATFORM
+    simulator = "codegen"
+
     with open("examples/project_11/Average/Main.jack") as f:
         src = f.read()
 
-    ast = project_10.parse_class(src)
-
-    # TODO: just construct the symbol table and verify it's as expected:
-    # a: 0, length: 1, i: 2, sum: 3
+    ast = platform.parser(src)
 
     asm = AssemblySource()
-
     project_11.compile_class(ast, asm)
 
-    # Note: this is the exact output of the Java compiler, modulo label numbering
-    expected = """
-  function Main.main 4
-  push constant 18
-  call String.new 1
-  push constant 72
-  call String.appendChar 2
-  push constant 111
-  call String.appendChar 2
-  push constant 119
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 109
-  call String.appendChar 2
-  push constant 97
-  call String.appendChar 2
-  push constant 110
-  call String.appendChar 2
-  push constant 121
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 110
-  call String.appendChar 2
-  push constant 117
-  call String.appendChar 2
-  push constant 109
-  call String.appendChar 2
-  push constant 98
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 114
-  call String.appendChar 2
-  push constant 115
-  call String.appendChar 2
-  push constant 63
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  call Keyboard.readInt 1
-  pop local 1
-  push local 1
-  call Array.new 1
-  pop local 0
-  push constant 0
-  pop local 2
-  label WHILE_EXP_0
-  push local 2
-  push local 1
-  lt
-  not
-  if-goto WHILE_END_1
-  push local 2
-  push local 0
-  add
-  push constant 16
-  call String.new 1
-  push constant 69
-  call String.appendChar 2
-  push constant 110
-  call String.appendChar 2
-  push constant 116
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 114
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 97
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 110
-  call String.appendChar 2
-  push constant 117
-  call String.appendChar 2
-  push constant 109
-  call String.appendChar 2
-  push constant 98
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 114
-  call String.appendChar 2
-  push constant 58
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  call Keyboard.readInt 1
-  pop temp 0
-  pop pointer 1
-  push temp 0
-  pop that 0
-  push local 3
-  push local 2
-  push local 0
-  add
-  pop pointer 1
-  push that 0
-  add
-  pop local 3
-  push local 2
-  push constant 1
-  add
-  pop local 2
-  goto WHILE_EXP_0
-  label WHILE_END_1
-  push constant 15
-  call String.new 1
-  push constant 84
-  call String.appendChar 2
-  push constant 104
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 97
-  call String.appendChar 2
-  push constant 118
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 114
-  call String.appendChar 2
-  push constant 97
-  call String.appendChar 2
-  push constant 103
-  call String.appendChar 2
-  push constant 101
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  push constant 105
-  call String.appendChar 2
-  push constant 115
-  call String.appendChar 2
-  push constant 32
-  call String.appendChar 2
-  call Output.printString 1
-  pop temp 0
-  push local 3
-  push local 1
-  call Math.divide 2
-  call Output.printInt 1
-  pop temp 0
-  push constant 0
-  return
+    # If it fails, you probably want to see the opcodes it wrote:
+    for l in asm.lines:
+        print(l)
 
-"""
+    ops = [platform.parse_line(l) for l in asm.lines if platform.parse_line(l) is not None]
 
-    assert asm.lines == expected.split("\n")[1:-1]
+    translator = platform.translator()
+    translator.preamble()
+
+    for op in ops:
+        translator.handle(op)
+
+    translate_library(translator, platform)
+
+    translator.finish()
+    translator.check_references()
+
+    # TODO: would need to provide input via the keyboard port (see test_12.test_keyboard_lib)
+
+    # computer = run(platform.chip, simulator=simulator)
+
+    # output_stream = StringWriter()
+    # translator.asm.run(platform.assemble, computer, stop_cycles=200_000, debug=True, tty=output_stream)
+
+    # output_lines = "".join(output_stream.strs).split("\n")
+    # assert output_lines == [
+    #     # TODO
+    # ]
+
+
+def test_program_convert_to_bin():
+    # Isolate the compiler by using the included solution for everything else:
+    platform = BUNDLED_PLATFORM
+    simulator = "codegen"
+
+    with open("examples/project_11/ConvertToBin/Main.jack") as f:
+        src = f.read()
+
+    ast = platform.parser(src)
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    # If it fails, you probably want to see the opcodes it wrote:
+    for l in asm.lines:
+        print(l)
+
+    ops = [platform.parse_line(l) for l in asm.lines if platform.parse_line(l) is not None]
+
+    translator = platform.translator()
+    translator.preamble()
+
+    for op in ops:
+        translator.handle(op)
+
+    # Note: using the full OS implementation is simpler then the fancy tricks done in test_12
+    # to isolate individual OS classes, but it also means that this test might need 100s
+    # of thousands of cycles to run (mainly initializing the OS unnecessarily.)
+    translate_library(translator, platform)
+
+    translator.finish()
+    translator.check_references()
+
+    computer = run(platform.chip, simulator=simulator)
+
+    computer.poke(8000, 0xBEEF)
+
+    translator.asm.run(platform.assemble, computer, stop_cycles=200_000, debug=True)
+
+    for b in range(16):
+        assert computer.peek(8001+b) == bool(0xBEEF & (1 << b))
+
+
+def test_program_complex_arrays():
+    # Isolate the compiler by using the included solution for everything else:
+    platform = BUNDLED_PLATFORM
+    simulator = "codegen"
+
+    with open("examples/project_11/ComplexArrays/Main.jack") as f:
+        src = f.read()
+
+    ast = platform.parser(src)
+
+    asm = AssemblySource()
+    project_11.compile_class(ast, asm)
+
+    # If it fails, you probably want to see the opcodes it wrote:
+    for l in asm.lines:
+        print(l)
+
+    ops = [platform.parse_line(l) for l in asm.lines if platform.parse_line(l) is not None]
+
+    translator = platform.translator()
+    translator.preamble()
+
+    for op in ops:
+        translator.handle(op)
+
+    # Note: using the full OS implementation is simpler then the fancy tricks done in test_12
+    # to isolate individual OS classes, but it also means that this test might need millions of
+    # cycles to run, including writing all the results to the screen buffer.
+    translate_library(translator, platform)
+
+    translator.finish()
+    translator.check_references()
+
+    computer = run(platform.chip, simulator=simulator)
+
+    output_stream = StringWriter()
+    translator.asm.run(platform.assemble, computer, stop_cycles=1_000_000, debug=True, tty=output_stream)
+
+    output_lines = "".join(output_stream.strs).split("\n")
+    assert output_lines == [
+        "Test 1: expected result: 5; actual result: 5",
+        "Test 2: expected result: 40; actual result: 40",
+        "Test 3: expected result: 0; actual result: 0",
+        "Test 4: expected result: 77; actual result: 77",
+        "Test 5: expected result: 110; actual result: 110",
+        "",
+    ]
+
+
+class StringWriter:
+    """Dumb "file-like object" (barely) for capturing the output from simulation in a string."""
+    def __init__(self):
+        self.strs = []
+
+    def write(self, chars):
+        self.strs.append(chars)
+        print(chars)
