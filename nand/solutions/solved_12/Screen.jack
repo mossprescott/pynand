@@ -105,29 +105,30 @@ class Screen {
             // drawRectangle.
 
             // TODO: handle *both* coords outside the range
-            // TODO: avoid the function calls
             let start = Math.max(0, Math.min(x1, x2));
             let end = Math.min(511, Math.max(x1, x2));
 
+            // Note: if * and / aren't optimized, most of the time is here:
+            let word = start/16;
+            let wordX = word*16; // i.e. start % 16
+            let ptr = 16384 + (32*y1) + word;
+
             // Inlined and un-rolled:
-            // let word = start/16;
-            let word = 0;
-            if (start & 16) { let word = 1; }
-            if (start & 32) { let word = word + 2; }
-            if (start & 64) { let word = word + 4; }
-            if (start & 128) { let word = word + 8; }
-            if (start & 256) { let word = word + 16; }
+            // let word = 0;
+            // if (start & 16) { let word = 1; }
+            // if (start & 32) { let word = word + 2; }
+            // if (start & 64) { let word = word + 4; }
+            // if (start & 128) { let word = word + 8; }
+            // if (start & 256) { let word = word + 16; }
 
-            // wordX = word*16; // i.e. start % 16
-            let wordX = start & ~15;
+            // let wordX = start & ~15;
 
-            // ptr = 16384 + (32*y1) + word
-            let ptr = y1 + y1;    // 2*y1
-            let ptr = ptr + ptr;  // 4*y1
-            let ptr = ptr + ptr;  // 8*y1
-            let ptr = ptr + ptr;  // 16*y1
-            let ptr = ptr + ptr;  // 32*y1
-            let ptr = 16384 + ptr + word;
+            // let ptr = y1 + y1;    // 2*y1
+            // let ptr = ptr + ptr;  // 4*y1
+            // let ptr = ptr + ptr;  // 8*y1
+            // let ptr = ptr + ptr;  // 16*y1
+            // let ptr = ptr + ptr;  // 32*y1
+            // let ptr = 16384 + ptr + word;
 
             // First mask off a partial word on the left, if needed:
             if (start > wordX) {
