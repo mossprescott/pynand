@@ -170,7 +170,7 @@ def test_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(REG_PLATFORM)
 
     # compare to the project_08 solution (about 27k)
-    assert instruction_count < 21_500
+    assert instruction_count < 21_550
 
 
 def test_pong_first_iteration():
