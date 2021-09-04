@@ -315,6 +315,8 @@ class Output {
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
+        var Array tty;
+
         if (cursorY = 22) {
             let cursorY = 0;
         }
@@ -323,6 +325,10 @@ class Output {
         }
 
         let cursorX = 0;
+
+        // For the benefit of tests and terminal users, also write a newline char to the "tty" port:
+        let tty = 24576;  // 0x6000
+        let tty[0] = 128;
 
         return;
     }
