@@ -35,7 +35,7 @@ def test_pong_first_iteration():
 
     print(f"cycles for first iteration: {cycles:0,d}")
 
-    assert cycles < 35000
+    assert cycles < 200_000
 
 
 def count_pong_cycles_first_iteration(platform, simulator="codegen"):
@@ -94,7 +94,7 @@ def test_cycles_to_init():
 
     print(f"cycles to init: {cycles:0,d}")
 
-    assert cycles < 5_000_000
+    assert cycles < 150_000
 
 
 def count_cycles_to_init(platform, simulator="codegen"):
