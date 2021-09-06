@@ -1321,7 +1321,9 @@ class Translator(solved_07.Translator):
     def handle_Discard(self, ast: Discard):
         # Note: now that results are passed in a register, there's no cleanup to do when
         # the result is not used.
-        self.handle_CallSub(ast.expr)
+        self.call(ast.expr)
+
+        self.asm.comment(f"ignore the result")
 
     def compare_op_neg(self, cmp: Cmp):
         return {
@@ -1347,6 +1349,13 @@ class Translator(solved_07.Translator):
     # Expressions:
 
     def handle_CallSub(self, ast: CallSub):
+        self.call(ast)
+
+        # Move the result to D
+        self.asm.instr(f"@{RESULT}")
+        self.asm.instr("D=M")
+
+    def call(self, ast: CallSub):
         self.referenced_functions.append(f"{ast.class_name}.{ast.sub_name}")
 
         return_label = self.asm.next_label("return_address")
@@ -1363,9 +1372,6 @@ class Translator(solved_07.Translator):
 
         self.asm.label(return_label)
 
-        # Move the result to D
-        self.asm.instr(f"@{RESULT}")
-        self.asm.instr("D=M")
 
     def handle_Const(self, ast: Const):
         if -1 <= ast.value <= 1:
