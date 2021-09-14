@@ -231,30 +231,7 @@ class Output {
 
         let map = Output.getMap(c);
 
-
-        // Effectively:
-        // let pixelPair = 16384 + (cursorY*352) + (cursorX/2);
-
-        // Hand-unrolled multiplication by 352 (= 11*32 = (8 + 2 + 1) << 5)
-        let tmpY = cursorY + cursorY;      // 2c
-        let tmpY = tmpY + tmpY + cursorY;  // 2(2c) + c = 5c
-        let tmpY = tmpY + tmpY + cursorY;  // 2(5c) + c = 11c
-        let tmpY = tmpY + tmpY;            // 22c
-        let tmpY = tmpY + tmpY;            // 44c
-        let tmpY = tmpY + tmpY;            // 88c
-        let tmpY = tmpY + tmpY;            // 176c
-        let tmpY = tmpY + tmpY;            // 352c
-
-        // Hand-unrolled division: cursorX/2 (0 <= cursorX < 63)
-        let tmpX = 0;
-        if (cursorX & 2)  { let tmpX = tmpX | 1; }
-        if (cursorX & 4)  { let tmpX = tmpX | 2; }
-        if (cursorX & 8)  { let tmpX = tmpX | 4; }
-        if (cursorX & 16) { let tmpX = tmpX | 8; }
-        if (cursorX & 32) { let tmpX = tmpX | 16; }
-
-        let pixelPair = 16384 + tmpY + tmpX;
-
+        let pixelPair = 16384 + (cursorY*352) + (cursorX/2);
 
         if (cursorX & 1) {
             // Odd column: pixels in the low byte
@@ -268,16 +245,8 @@ class Output {
         while (row < 11) {
             let pixels = map[row];
             if (cursorX & 1) {
-                // Unrolled left shift:
-                // let pixels = pixels*256;
-                let pixels = pixels + pixels;  // *2
-                let pixels = pixels + pixels;  // *4
-                let pixels = pixels + pixels;  // *8
-                let pixels = pixels + pixels;  // *16
-                let pixels = pixels + pixels;  // *32
-                let pixels = pixels + pixels;  // *64
-                let pixels = pixels + pixels;  // *128
-                let pixels = pixels + pixels;  // *256
+                // Shift the pixels 8 to the left:
+                let pixels = pixels*256;
             }
 
             let pixelPair[0] = (pixelPair[0] & mask) | pixels;

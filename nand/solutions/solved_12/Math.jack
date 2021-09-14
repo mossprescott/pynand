@@ -37,8 +37,8 @@ class Math {
 
         // Get sign, then take absolute values (inline to save fn calls):
         if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
-        if (y < 0) {let y = -y; }
-        if (x < 0) {let x = -x; }
+        let y = Math.abs(y);
+        let x = Math.abs(x);
 
         // Put the smaller (abs.) value in y (because this is O(log y)):
         if (x < y) {
@@ -89,8 +89,8 @@ class Math {
 
         // Get sign, then take absolute values (inline to save fn calls):
         if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
-        if (y < 0) {let y = -y; }
-        if (x < 0) {let x = -x; }
+        let y = Math.abs(y);
+        let x = Math.abs(x);
 
         // No more bits to look at:
         if (y > x) {
