@@ -81,7 +81,6 @@ class Screen {
             return;
         }
 
-        // TODO: unroll * and /
         let word = x/16;
         let mask = pixels[x - (word*16)];
         let ptr = 16384 + (32*y) + word;
@@ -93,85 +92,12 @@ class Screen {
 
     /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
     function void drawLine(int x1, int y1, int x2, int y2) {
-        var int start, end, word, wordX, mask;
-        var Array ptr;
-
         var int tmp, dx, dy, cx, cy, diff;
 
-        if (y1 = y2) {
-            // This case has to be fast, because it's used for drawRectangle, which is
-            // the only one anybody expects to be quick. Note: min/max for input validation
-            // is currently a large chunk of the time. TODO: factor that out when using
-            // drawRectangle.
-
-            // TODO: handle *both* coords outside the range
-            let start = Math.max(0, Math.min(x1, x2));
-            let end = Math.min(511, Math.max(x1, x2));
-
-            // Note: if * and / aren't optimized, most of the time is here:
-            let word = start/16;
-            let wordX = word*16; // i.e. start % 16
-            let ptr = 16384 + (32*y1) + word;
-
-            // Inlined and un-rolled:
-            // let word = 0;
-            // if (start & 16) { let word = 1; }
-            // if (start & 32) { let word = word + 2; }
-            // if (start & 64) { let word = word + 4; }
-            // if (start & 128) { let word = word + 8; }
-            // if (start & 256) { let word = word + 16; }
-
-            // let wordX = start & ~15;
-
-            // let ptr = y1 + y1;    // 2*y1
-            // let ptr = ptr + ptr;  // 4*y1
-            // let ptr = ptr + ptr;  // 8*y1
-            // let ptr = ptr + ptr;  // 16*y1
-            // let ptr = ptr + ptr;  // 32*y1
-            // let ptr = 16384 + ptr + word;
-
-            // First mask off a partial word on the left, if needed:
-            if (start > wordX) {
-                let mask = ~leftPixels[(start - wordX) - 1];
-                if (end < (wordX + 15)) {
-                    let mask = mask & leftPixels[end - wordX];
-                }
-                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
-
-                // let word = word + 1;  // unused
-                let wordX = wordX + 16;
-                let ptr = ptr + 1;
-            }
-
-            // Now a fast loop for any whole words:
-            while (~((wordX+16) > end)) {  // i.e. wordX + 16 <= end
-                let ptr[0] = color;
-
-                // let word = word + 1;  // unused
-                let wordX = wordX + 16;
-                let ptr = ptr + 1;
-            }
-
-            // Finally, mask off any partial word on the right:
-            if (~(wordX > end)) {  // i.e. wordX <= end
-                let mask = leftPixels[end - wordX];
-                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
-
-                // no need to update the state
-            }
-
-            return;
-        }
-
-        if (x1 = x2) {
-            // Vertical lines are simple, but don't need to be especially fast:
-            let start = Math.min(y1, y2);
-            let end = Math.max(y1, y2);
-            while (~(start > end)) {
-                // TODO: inline and do the masking and ptr arithmetic directly here
-                do Screen.drawPixel(x1, start);
-                let start = start + 1;
-            }
+        if ((y1 = y2) | (x1 = x2)) {
+            // Vertical and horizontal lines are handled as one-pixel-wide rectangles,
+            // re-using the same code (saving space in the ROM)
+            do Screen.drawRectangle(x1, y1, x2, y2);
 
             return;
         }
@@ -277,17 +203,73 @@ class Screen {
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
+        var int startY, endY;
+        var int startX, endX;
+
+        var int firstWord, firstWordX;
+        var Array firstPtr;
+
+        var int wordX, mask;
         var Array ptr;
-        var int y_start, y_end;
-        var int x_start, x_end;
 
         // TODO: handle *both* coords outside the range
-        let y_start = Math.max(0, Math.min(y1, y2));
-        let y_end = Math.min(255, Math.max(y1, y2));
+        let startY = Math.max(0, Math.min(y1, y2));
+        let endY = Math.min(255, Math.max(y1, y2));
 
-        while (~(y_start > y_end)) {  // i.e. y_start <= y_end
-            do Screen.drawLine(x1, y_start, x2, y_start);
-            let y_start = y_start + 1;
+        let startX = Math.max(0, Math.min(x1, x2));
+        let endX = Math.min(511, Math.max(x1, x2));
+
+        // All the expensive arithmetic is done here, once, and then each value is updated
+        // for each row with a fast offset operation.
+        let firstWord = startX/16;                       // Index of the word containing the left-most pixel
+        let firstWordX = firstWord*16;                   // The x-coord of the first pixel in that word (i.e. startX % 16)
+        let firstPtr = 16384 + (32*startY) + firstWord;  // Address of the same word in the screen buffer
+
+        while (true) {
+
+            // Make a working copy of each value to mutate:
+            let wordX = firstWordX;
+            let ptr = firstPtr;
+
+            // First mask off a partial word on the left, if needed:
+            if (startX > wordX) {
+                let mask = ~leftPixels[(startX - wordX) - 1];
+                if (endX < (wordX + 15)) {
+                    let mask = mask & leftPixels[endX - wordX];
+                }
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                // let word = word + 1;  // unused
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Now a fast loop for any whole words:
+            while (~((wordX+16) > endX)) {  // i.e. wordX + 16 <= endX
+                let ptr[0] = color;
+
+                // let word = word + 1;  // unused
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Finally, mask off any partial word on the right:
+            if (~(wordX > endX)) {  // i.e. wordX <= endX
+                let mask = leftPixels[endX - wordX];
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                // no need to update the state
+            }
+
+
+            if (startY < endY) {
+                // More rows to draw, so update the initial values for the next row:
+                let startY = startY + 1;
+                let firstPtr = firstPtr + 32;
+            }
+            else {
+                return;
+            }
         }
 
         return;
