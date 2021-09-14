@@ -342,6 +342,8 @@ def test_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFORM, simu
     assert computer.peek(8014) == 3000,   "30000/10"
     assert computer.peek(8015) == -3276,  "-32767/10"
     assert computer.peek(8016) == -32768, "abs(-32768)"
+    assert computer.peek(8017) == 771,    "12345/16"
+    assert computer.peek(8018) == -771,   "-12345/16"
 
 
 def test_compile_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_PLATFORM):
