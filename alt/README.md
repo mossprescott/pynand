@@ -17,6 +17,7 @@ See each module for instructions.
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  |   26,050 (+1%) |    19,800 (-52%) |        129,200 (–) | Adds a "shiftr" instruction, and rewrites "push constant 16; call Math.divide" to use it instead; also a more efficient Math.multiply using shiftr. |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) | _same_         |            +100% |              +100% | Finally, a _smaller_ CPU, by using an 8-bit ALU and 2 cycles per instruction. |
 | [alt/reg.py](reg.py)             | _same_       |  20,900 (-19%) |    19,150 (-54%) |      59,000 (-54%) | A much more ambititous compiler, which uses the "registers" at locations 5-12 for transient local variables and expression evaluation, reserving the stack only for subroutine calls and locals that cross them. |
+| [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |        129,200 (–) | Adds an optimizaation phase after parsing and before the normal compiler runs, which replaces certain function calls with lower-overhead "reduced" alternatives. |
 
 **ROM Size** is the total number of instructions in ROM when Pong is compiled and translated
 from the same Jack sources.

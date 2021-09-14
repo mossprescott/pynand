@@ -56,9 +56,12 @@ def main():
     elif False:
         import alt.shift
         platform = alt.shift.SHIFT_PLATFORM
-    elif True:
+    elif False:
         import alt.reg
         platform = alt.reg.REG_PLATFORM
+    elif True:
+        import alt.reduce
+        platform = alt.reduce.REDUCE_PLATFORM
 
 
     translate = platform.translator()
