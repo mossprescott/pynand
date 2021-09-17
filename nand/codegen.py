@@ -327,10 +327,10 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
     if cython:
         for comp in all_comps:
             if comp.label in SPECIAL or (comp.label != "Const" and not inlinable(comp)):
-                output_bits = comp.outputs()["out"]
-                cython_type = "bool" if output_bits == 1 else "int"
-                comp_name = output_name(comp)
-                l(2, f"{comp_name}: cython.{cython_type}")
+                for name, bits in comp.outputs().items():
+                    cython_type = "bool" if bits == 1 else "int"
+                    comp_name = f"_{all_comps.index(comp)}_{name}"
+                    l(2, f"{comp_name}: cython.{cython_type}")
         l(2, "")
 
     l(2,   f"for _ in range(cycles):")
