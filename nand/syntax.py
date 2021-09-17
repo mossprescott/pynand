@@ -28,13 +28,16 @@ class Chip:
             if isinstance(val, Ref):
                 return val
             elif isinstance(val, int):
-                return Ref(Instance(nand.component.Const(comp.inputs()[name], val), {}), "out", None)
+                return _const_ref(comp.inputs()[name], val)
             else:
                 raise SyntaxError(f"Expected a reference for input {name!r}, got {val}")
 
         arg_refs = {name: to_ref(name, val) for (name, val) in args.items()}
 
         return Instance(comp, arg_refs)
+
+def _const_ref(bits, val):
+    return Ref(Instance(nand.component.Const(bits, val), {}), "out", None)
 
 
 class Ref:
@@ -127,10 +130,14 @@ def build(builder):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
 
-            if not isinstance(value, Ref):
-                raise SyntaxError(f"Expected a reference for output '{name}', got {value}")
+            if isinstance(value, Ref):
+                ref = value
+            elif isinstance(value, int) and 0 <= value <= 1:
+                ref = _const_ref(1, value)
+            else:
+                raise SyntaxError(f"Expected a reference or single-bit constant for output '{name}', got {value}")
 
-            self.dict[(name, None)] = value
+            self.dict[(name, None)] = ref
 
         def __getattr__(self, name):
             """Called when the builder is going to assign to a bit slice of an output."""
@@ -142,10 +149,17 @@ def build(builder):
             self.name = name
 
         def __setitem__(self, key, value):
-            """Value is an int between 0 and 15, or (eventually) a slice object with
+            """Key is an int between 0 and 15, or (eventually) a slice object with
             .start and .step on the same interval.
             """
-            self.output_coll.dict[(self.name, key)] = value
+            if isinstance(value, Ref):
+                ref = value
+            elif isinstance(value, int) and 0 <= value <= 1:
+                ref = _const_ref(1, value)
+            else:
+                raise SyntaxError(f"Expected a reference or single-bit constant for output '{self.name}[{key}]', got {value}")
+
+            self.output_coll.dict[(self.name, key)] = ref
 
     def instances(to_search):
         result = set([])

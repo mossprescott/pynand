@@ -129,8 +129,21 @@ def test_multibit_const_input():
     assert run(Constants).one == 1
     assert run(Constants).onetofive == 12345
 
-# TODO: const output? For consistency only; probably not sensible.
+def test_simple_const_output():
+    def mkZero(inputs, outputs):
+        outputs.out = 0
+    Zero = build(mkZero)
 
+    assert(run(Zero).out) == 0
+
+def test_multibit_const_output():
+    def mkShiftL16(inputs, outputs):
+        outputs.out[0] = 0
+        for i in range(15):
+            outputs.out[i+1] = inputs.in_[i]
+    ShiftL16 = build(mkShiftL16)
+
+    assert(run(ShiftL16, in_=1).out) == 2
 
 def test_lazy_simple():
     def mkAnd(inputs, outputs):
@@ -140,12 +153,12 @@ def test_lazy_simple():
         nand1.set(Nand(a=inputs.a, b=inputs.b))
         outputs.out = nand2.out
     And = build(mkAnd)
-    
+
     chip = And.constr()
     assert chip.inputs() == {"a": 1, "b": 1}
     assert chip.outputs() == {"out": 1}
     assert len(chip.wires) == 5  # TODO: how to assert on the structure?
-    
+
     assert run(And, a=False, b=False).out == False
     assert run(And, a=False, b=True).out == False
     assert run(And, a=True, b=False).out == False
@@ -158,7 +171,7 @@ def test_clocked_simple():
     ClockLow = build(mkClockLow)
 
     ch = run(ClockLow)
-    
+
     assert ch.out == True
 
     ch.tick()
@@ -194,7 +207,7 @@ def test_clocked_simple():
 
 def test_error_unexpected_arg():
     def mkErr(inputs, outputs):
-        Nand(a=0, b=0, c=0)    
+        Nand(a=0, b=0, c=0)
     Err = build(mkErr)
 
     with pytest.raises(SyntaxError) as exc_info:
@@ -262,4 +275,4 @@ def test_error_ref_expected_for_output():
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
-    assert str(exc_info.value).startswith("Expected a reference for output 'out', got ")
+    assert str(exc_info.value).startswith("Expected a reference or single-bit constant for output 'out', got ")
