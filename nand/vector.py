@@ -119,7 +119,7 @@ def synthesize(ic):
             stateful)
 
 
-    
+
 def component_ops(comp):
     if isinstance(comp, Nand):
         return NandOps()
@@ -417,8 +417,18 @@ class NandVector:
 
 
 def extend_sign(x):
-    """Extend the sign of the low-16 bits of a value to the full width.
+    """Extend the sign of the low-16 bits of a value to the full width. That is, given the bits
+    of a signed value as they would appear in a 16-bit word, convert to a proper Python int.
+    Helpful for unpacking values that have been assembled from bits.
+
+    >>> extend_sign(1)
+    1
+    >>> extend_sign(1 << 15)
+    -32768
+    >>> extend_sign(0xFFFF)
+    -1
     """
+
     if x & 0x8000 != 0:
         return (-1 & ~0xffff) | x
     else:
@@ -426,8 +436,22 @@ def extend_sign(x):
 
 
 def unsigned(x):
-    """Extend the low 16-bits of an unsigned value to the full width, without sign extension.
+    """Return the bit pattern of the low 16-bits of a (signed) int value, as an unsigned int.
+    These are the bits that would be used to represent the value in a 16-bit word. Sometimes
+    helpful for packing values into words.
+
+    This is the inverse of extend_sign() (for values that fit in 16 bits.)
+
+    >>> unsigned(1)
+    1
+    >>> unsigned(-1)
+    65535
+    >>> unsigned(-64) == 0b1111_1111_1100_0000
+    True
+    >>> for x in range(-10, 10):
+    ...     assert extend_sign(unsigned(x)) == x
     """
+
     return x & 0xffff
 
 
