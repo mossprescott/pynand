@@ -143,7 +143,7 @@ def _indent(str):
 def _indented_list(lst):
     return "\n".join(
         ["["]
-        + [_indent(repr(x)) for x in lst]
+        + [_indent(repr(x)) + "," for x in lst]
         + ["]"]
     )
 
@@ -161,6 +161,16 @@ def _indented_list(lst):
 #         ])) + ")",
 #     ])
 # SubroutineCall.__repr__ = _SubroutineCall_repr  # type: ignore
+
+def _IfStatement_repr(self):
+    return "\n".join([
+        f"IfStatement(",
+        _indent(
+            f"cond={repr(self.cond)},\n"
+            f"when_true={_indented_list(self.when_true)},\n"
+            f"when_false={_indented_list(self.when_false) if self.when_false is not None else None})")
+    ])
+IfStatement.__repr__ = _IfStatement_repr  # type: ignore
 
 def _WhileStatement_repr(self):
     return "\n".join([
