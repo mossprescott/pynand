@@ -1,9 +1,9 @@
-from typing import Dict, Literal, Tuple
+from typing import Dict, Tuple
 
 from nand.jack_ast import *
 from nand.translate import AssemblySource
 
-VarKind = Literal["static", "this", "argument", "local"]
+VarKind = str  # requires 3.8: Literal["static", "this", "argument", "local"]
 SymbolMap = Dict[str, Tuple[Type, int]]
 
 class SymbolTable:

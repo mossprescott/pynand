@@ -7,7 +7,7 @@ Each NamedTuple corresponds to one of the productions of the Jack grammar as see
 materials (e.g. Chapter 10 lecture notes, slide 84).
 """
 
-from typing import Literal, NamedTuple, Optional, Sequence, Union
+from typing import NamedTuple, Optional, Sequence, Union
 
 
 Type = str
@@ -110,7 +110,7 @@ class Parameter(NamedTuple):
     type: Type
     name: str
 
-SubKind = Literal["function", "method", "constructor"]
+SubKind = str  # requires 3.8: Literal["function", "method", "constructor"]
 
 class SubroutineDec(NamedTuple):
     kind: SubKind
