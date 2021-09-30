@@ -43,7 +43,7 @@ correct arguments, locals, return addresses, and result values.
 
 import itertools
 from os import name
-from typing import Dict, Generic, List, Literal, NamedTuple, Optional, Sequence, Set, Tuple, TypeVar, Union
+from typing import Dict, Generic, List, NamedTuple, Optional, Sequence, Set, Tuple, TypeVar, Union
 
 from nand import jack_ast
 from nand.platform import Platform, BUNDLED_PLATFORM
@@ -89,7 +89,7 @@ class Store(NamedTuple):
     location: "Location"
     value: "Value"
 
-Cmp = Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
+Cmp = str  # requires 3.8: Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
 
 class If(NamedTuple):
     value: "Value"
