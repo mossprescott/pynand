@@ -1,34 +1,34 @@
 import pytest
 
-from nand.syntax import Nand, build, run, lazy, clock
+from nand.syntax import Nand, chip, run, lazy, clock
 
 def test_trivial():
-    def mkBuffer(inputs, outputs):
+    @chip
+    def Buffer(inputs, outputs):
         outputs.out = inputs.in_
-    Buffer = build(mkBuffer)
 
-    chip = Buffer.constr()
+    buffer = Buffer.constr()
 
-    assert chip.inputs() == {"in_": 1}
-    assert chip.outputs() == {"out": 1}
+    assert buffer.inputs() == {"in_": 1}
+    assert buffer.outputs() == {"out": 1}
 
-    assert len(chip.wires) == 1  # TODO: how to assert on the structure?
+    assert len(buffer.wires) == 1  # TODO: how to assert on the structure?
 
     assert run(Buffer, in_=False).out == False
     assert run(Buffer, in_=True).out == True
 
 
 def test_simple():
-    def mkNot(inputs, outputs):
+    @chip
+    def Not(inputs, outputs):
         outputs.out = Nand(a=inputs.in_, b=inputs.in_).out
-    Not = build(mkNot)
 
-    chip = Not.constr()
+    not_ = Not.constr()
 
-    assert chip.inputs() == {"in_": 1}
-    assert chip.outputs() == {"out": 1}
+    assert not_.inputs() == {"in_": 1}
+    assert not_.outputs() == {"out": 1}
 
-    assert len(chip.wires) == 3  # TODO: how to assert on the structure?
+    assert len(not_.wires) == 3  # TODO: how to assert on the structure?
 
     assert run(Not, in_=False).out == True
     assert run(Not, in_=True).out == False
@@ -37,17 +37,17 @@ def test_simple():
 def test_flat_multibit():
     """No nesting, multiple-bit input and output, both explicit."""
 
-    def mkNot2(inputs, outputs):
+    @chip
+    def Not2(inputs, outputs):
         outputs.out[0] = Nand(a=inputs.in_[0], b=inputs.in_[0]).out
         outputs.out[1] = Nand(a=inputs.in_[1], b=inputs.in_[1]).out
-    Not2 = build(mkNot2)
 
-    chip = Not2.constr()
+    not2 = Not2.constr()
 
-    assert chip.inputs() == {"in_": 2}
-    assert chip.outputs() == {"out": 2}
+    assert not2.inputs() == {"in_": 2}
+    assert not2.outputs() == {"out": 2}
 
-    assert len(chip.wires) == 6  # TODO: how to assert on the structure?
+    assert len(not2.wires) == 6  # TODO: how to assert on the structure?
 
     assert run(Not2, in_=0b01).out == 0b10
     assert run(Not2, in_=0b10).out == 0b01
@@ -56,21 +56,21 @@ def test_flat_multibit():
 def test_implicit_multibit_out():
     """A nested chip with multiple-bit output and a bare reference to it."""
 
-    def mkDup(inputs, outputs):
+    @chip
+    def Dup(inputs, outputs):
         outputs.out[0] = inputs.in_
         outputs.out[1] = inputs.in_
-    Dup = build(mkDup)
 
-    def mkWrap(inputs, outputs):
+    @chip
+    def Wrap(inputs, outputs):
         outputs.out = Dup(in_=inputs.in_).out
-    Wrap = build(mkWrap)
 
-    chip = Wrap.constr()
+    wrap = Wrap.constr()
 
-    assert chip.inputs() == {"in_": 1}
-    assert chip.outputs() == {"out": 2}
+    assert wrap.inputs() == {"in_": 1}
+    assert wrap.outputs() == {"out": 2}
 
-    assert len(chip.wires) == 3  # TODO: how to assert on the structure?
+    assert len(wrap.wires) == 3  # TODO: how to assert on the structure?
 
     assert run(Wrap, in_=0b0).out == 0b00
     assert run(Wrap, in_=0b1).out == 0b11
@@ -79,19 +79,19 @@ def test_implicit_multibit_out():
 def test_implicit_multibit_in():
     """A nested chip with multiple-bit input and a bare reference to it."""
 
-    def mkLessThan3(inputs, outputs):
+    @chip
+    def LessThan3(inputs, outputs):
         outputs.out = Nand(a=inputs.in_[0], b=inputs.in_[1]).out
-    LessThan3 = build(mkLessThan3)
 
-    def mkWrap(inputs, outputs):
+    @chip
+    def Wrap(inputs, outputs):
         outputs.out = LessThan3(in_=inputs.in_).out
-    Wrap = build(mkWrap)
 
-    chip = Wrap.constr()
-    assert chip.inputs() == {"in_": 2}
-    assert chip.outputs() == {"out": 1}
+    wrap = Wrap.constr()
+    assert wrap.inputs() == {"in_": 2}
+    assert wrap.outputs() == {"out": 1}
 
-    assert len(chip.wires) == 3  # TODO: how to assert on the structure?
+    assert len(wrap.wires) == 3  # TODO: how to assert on the structure?
 
     assert run(Wrap, in_=0).out == True
     assert run(Wrap, in_=1).out == True
@@ -100,64 +100,64 @@ def test_implicit_multibit_in():
 
 
 def test_simple_const_input():
-    def mkBounce(inputs, outputs):
+    @chip
+    def Bounce(inputs, outputs):
         outputs.out = inputs.in_
-    Bounce = build(mkBounce)
 
-    def mkZeroOne(inputs, outputs):
+    @chip
+    def ZeroOne(inputs, outputs):
         outputs.zero = Bounce(in_=0).out
         outputs.one = Bounce(in_=1).out
-    ZeroOne = build(mkZeroOne)
 
     assert run(ZeroOne).zero == False
     assert run(ZeroOne).one == True
 
 
 def test_multibit_const_input():
-    def mkBounce16(inputs, outputs):
+    @chip
+    def Bounce16(inputs, outputs):
         for i in range(16):
             outputs.out[i] = inputs.in_[i]
-    Bounce16 = build(mkBounce16)
 
-    def mkConstants(inputs, outputs):
+    @chip
+    def Constants(inputs, outputs):
         outputs.zero = Bounce16(in_=0).out
         outputs.one = Bounce16(in_=1).out
         outputs.onetofive = Bounce16(in_=12345).out
-    Constants = build(mkConstants)
 
     assert run(Constants).zero == 0
     assert run(Constants).one == 1
     assert run(Constants).onetofive == 12345
 
 def test_simple_const_output():
-    def mkZero(inputs, outputs):
+    @chip
+    def Zero(inputs, outputs):
         outputs.out = 0
-    Zero = build(mkZero)
 
     assert(run(Zero).out) == 0
 
 def test_multibit_const_output():
-    def mkShiftL16(inputs, outputs):
+    @chip
+    def ShiftL16(inputs, outputs):
         outputs.out[0] = 0
         for i in range(15):
             outputs.out[i+1] = inputs.in_[i]
-    ShiftL16 = build(mkShiftL16)
 
     assert(run(ShiftL16, in_=1).out) == 2
 
 def test_lazy_simple():
-    def mkAnd(inputs, outputs):
+    @chip
+    def And(inputs, outputs):
         # Just declare them in the wrong order for no good reason:
         nand1 = lazy()
         nand2 = Nand(a=nand1.out, b=nand1.out)
         nand1.set(Nand(a=inputs.a, b=inputs.b))
         outputs.out = nand2.out
-    And = build(mkAnd)
 
-    chip = And.constr()
-    assert chip.inputs() == {"a": 1, "b": 1}
-    assert chip.outputs() == {"out": 1}
-    assert len(chip.wires) == 5  # TODO: how to assert on the structure?
+    and_ = And.constr()
+    assert and_.inputs() == {"a": 1, "b": 1}
+    assert and_.outputs() == {"out": 1}
+    assert len(and_.wires) == 5  # TODO: how to assert on the structure?
 
     assert run(And, a=False, b=False).out == False
     assert run(And, a=False, b=True).out == False
@@ -166,9 +166,9 @@ def test_lazy_simple():
 
 
 def test_clocked_simple():
-    def mkClockLow(inputs, outputs):
+    @chip
+    def ClockLow(inputs, outputs):
         outputs.out = Nand(a=clock, b=clock).out
-    ClockLow = build(mkClockLow)
 
     ch = run(ClockLow)
 
@@ -186,9 +186,9 @@ def test_clocked_simple():
 #     """An edge case: clock copied directly to an output.
 #     """
 #
-#     def mkClockHigh(inputs, outputs):
+#     @chip
+#     def ClockHigh(inputs, outputs):
 #         outputs.out = clock
-#     ClockHigh = build(mkClockHigh)
 #
 #     print(ClockHigh.constr())
 #
@@ -206,9 +206,9 @@ def test_clocked_simple():
 
 
 def test_error_unexpected_arg():
-    def mkErr(inputs, outputs):
+    @chip
+    def Err(inputs, outputs):
         Nand(a=0, b=0, c=0)
-    Err = build(mkErr)
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
@@ -216,52 +216,52 @@ def test_error_unexpected_arg():
 
 
 def test_error_missing_arg():
-    def mkAnd(inputs, outputs):
+    @chip
+    def And(inputs, outputs):
         outputs.out = Nand(a=inputs.a, b=inputs.b).out
-    And = build(mkAnd)
 
-    def mkWrap(inputs, outputs):
+    @chip
+    def Wrap(inputs, outputs):
         outputs.out = And(a=inputs.in_).out  # Missing `b=` here
-    Wrap = build(mkWrap)
 
     with pytest.raises(SyntaxError) as exc_info:
-        chip = Wrap.constr()
+        wrap = Wrap.constr()
     assert str(exc_info.value) == "Missing input(s): {'b'}"
 
 
 def test_error_unknown_input():
-    def mkAnd(inputs, outputs):
+    @chip
+    def And(inputs, outputs):
         outputs.out = Nand(a=inputs.a, b=inputs.b).out
-    And = build(mkAnd)
 
-    def mkWrap(inputs, outputs):
+    @chip
+    def Wrap(inputs, outputs):
         outputs.out = And(a=inputs.in_, b=inputs.in_, c=inputs.in_).out  # Extra input: `c`
-    Wrap = build(mkWrap)
 
     with pytest.raises(SyntaxError) as exc_info:
-        chip = Wrap.constr()
+        wrap = Wrap.constr()
     assert str(exc_info.value) == "Unrecognized input: 'c'"
 
 
 def test_error_unknown_output():
-    def mkAnd(inputs, outputs):
+    @chip
+    def And(inputs, outputs):
         outputs.out = Nand(a=inputs.a, b=inputs.b).out
-    And = build(mkAnd)
 
-    def mkWrap(inputs, outputs):
+    @chip
+    def Wrap(inputs, outputs):
         outputs.out = And(a=inputs.in_, b=inputs.in_).result  # Wrong name
-    Wrap = build(mkWrap)
 
     with pytest.raises(SyntaxError) as exc_info:
-        chip = Wrap.constr()
+        wrap = Wrap.constr()
     assert str(exc_info.value) == "Unrecognized output: 'result'"
 
 
 def test_error_ref_expected_for_input():
-    def mkErr(inputs, outputs):
+    @chip
+    def Err(inputs, outputs):
         Nand(a=Nand(a=0, b=1),  # missing ".out"
              b=0)
-    Err = build(mkErr)
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()
@@ -269,9 +269,9 @@ def test_error_ref_expected_for_input():
 
 
 def test_error_ref_expected_for_output():
-    def mkErr(inputs, outputs):
+    @chip
+    def Err(inputs, outputs):
         outputs.out = Nand(a=0, b=1)  # missing ".out"
-    Err = build(mkErr)
 
     with pytest.raises(SyntaxError) as exc_info:
         Err.constr()

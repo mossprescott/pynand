@@ -2,7 +2,7 @@
 #
 # See https://www.nand2tetris.org/project03
 
-from nand import build, clock
+from nand import chip, clock
 
 from project_01 import *
 from project_02 import *
@@ -11,7 +11,8 @@ from project_02 import *
 from nand.solutions import solved_03
 
 
-def mkMyDFF(inputs, outputs):
+@chip
+def MyDFF(inputs, outputs):
     # Note: provided as a primitive in the Nand to Tetris simulator, but implementing it
     # from scratch is fun.
 
@@ -24,10 +25,9 @@ def mkMyDFF(inputs, outputs):
 
     outputs.out = n1.out
 
-MyDFF = build(mkMyDFF)
 
-
-def mkBit(inputs, outputs):
+@chip
+def Bit(inputs, outputs):
     # OK to use the primitive DFF here, for the most efficient result.
 
     in_ = inputs.in_
@@ -38,10 +38,9 @@ def mkBit(inputs, outputs):
 
     outputs.out = n1.out
 
-Bit = build(mkBit)
 
-
-def mkRegister(inputs, outputs):
+@chip
+def Register(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
 
@@ -50,10 +49,9 @@ def mkRegister(inputs, outputs):
 
     outputs.out = n1.out
 
-Register = build(mkRegister)
 
-
-def mkRAM8(inputs, outputs):
+@chip
+def RAM8(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     address = inputs.address
@@ -63,10 +61,9 @@ def mkRAM8(inputs, outputs):
 
     outputs.out = n1.out
 
-RAM8 = build(mkRAM8)
 
-
-def mkRAM64(inputs, outputs):
+@chip
+def RAM64(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     address = inputs.address
@@ -76,10 +73,9 @@ def mkRAM64(inputs, outputs):
 
     outputs.out = n1.out
 
-RAM64 = build(mkRAM64)
 
-
-def mkRAM512(inputs, outputs):
+@chip
+def RAM512(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     address = inputs.address
@@ -89,15 +85,14 @@ def mkRAM512(inputs, outputs):
 
     outputs.out = n1.out
 
-RAM512 = build(mkRAM512)
-
 
 # SOLVERS: This has gotten repetitive by now, so just use the provided RAM4K and RAM16K
 RAM4K = solved_03.RAM4K
 RAM16K = solved_03.RAM16K
 
 
-def mkPC(inputs, outputs):
+@chip
+def PC(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     inc = inputs.inc
@@ -107,5 +102,3 @@ def mkPC(inputs, outputs):
     n1 = solved_03.PC(in_=in_, load=load, inc=inc, reset=reset)
 
     outputs.out = n1.out
-
-PC = build(mkPC)

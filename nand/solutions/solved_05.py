@@ -5,26 +5,27 @@ If you want to solve them on your own, stop reading now!
 """
 
 from nand.component import Const
-from nand import RAM, ROM, Input, Output, build, lazy
+from nand import RAM, ROM, Input, Output, chip, lazy
 from nand.solutions.solved_01 import *
 from nand.solutions.solved_02 import *
 from nand.solutions.solved_03 import *
 
 
-def mkMemorySystem(inputs, outputs):
+@chip
+def MemorySystem(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     address = inputs.address
 
-    def mkShift13(inputs, outputs):
+    @chip
+    def Shift13(inputs, outputs):
         outputs.out[0] = inputs.in_[13]
         outputs.out[1] = inputs.in_[14]
-    Shift13 = build(mkShift13)
 
-    def mkMask14(inputs, outputs):
+    @chip
+    def Mask14(inputs, outputs):
         for i in range(14):
             outputs.out[i] = inputs.in_[i]
-    Mask14 = build(mkMask14)
 
     bank = Shift13(in_=address).out
     load_bank = DMux4Way(in_=load, sel=bank)
@@ -48,10 +49,9 @@ def mkMemorySystem(inputs, outputs):
     # gets the job done.
     outputs.tty_ready = tty.ready
 
-MemorySystem = build(mkMemorySystem)
 
-
-def mkCPU(inputs, outputs):
+@chip
+def CPU(inputs, outputs):
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
@@ -81,10 +81,9 @@ def mkCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-CPU = build(mkCPU)
 
-
-def mkComputer(inputs, outputs):
+@chip
+def Computer(inputs, outputs):
     reset = inputs.reset
 
     cpu = lazy()
@@ -109,5 +108,3 @@ def mkComputer(inputs, outputs):
     # would create.
     # keyboard = inputs.keyboard
     # outputs.tty = mem.tty
-
-Computer = build(mkComputer)

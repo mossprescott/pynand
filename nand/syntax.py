@@ -9,6 +9,10 @@ from nand.optimize import simplify
 
 
 class Chip:
+    """Wraps a component constructor, so that it can be called with arguments to
+    construct an instance.
+    """
+
     def __init__(self, constr):
         self.constr = constr
 
@@ -64,6 +68,10 @@ class Ref:
 
 
 class Instance:
+    """An instance of a certain component with particular input refs supplied, and providing
+    output refs as attributes.
+    """
+
     def __init__(self, ic, args):
         self._ic = ic
         self.args = args
@@ -80,9 +88,10 @@ class Instance:
 
 class Lazy:
     """Placeholder instance that allows inputs and outputs to be defined before the actual
-    implementation is provided, allowing circular references to be created.
+    implementation is provided, so that circular references to be created.
 
-    >>> def mkCircular(inputs, outputs):
+    >>> @chip
+    ... def Circular(inputs, outputs):
     ...     thing = lazy()
     ...     foo = Not(in_=thing.out)
     ...     thing.set(Not(foo.out))
@@ -111,7 +120,12 @@ class Lazy:
         return Ref(self, name, None)
 
 
-def build(builder):
+def build(builder, comp_name=None):
+    """Construct a Chip based on a builder function. See @chip."""
+
+    if comp_name is None and builder.__name__.startswith("mk"):
+        comp_name = builder.__name__[2:]
+
     class InputCollector:
         def __init__(self, inst):
             self.inst = inst
@@ -179,15 +193,9 @@ def build(builder):
         return result
 
     def constr():
-        builder_name = builder.__name__
-        if builder_name.startswith("mk"):
-            name = builder_name[2:]
-        else:
-            name = builder_name
-
         # Tricky: inputs/outputs aren't known yet, but need the IC to be initialized so we can refer
         # to it via an Instance
-        ic = IC(name, {}, {})
+        ic = IC(comp_name, {}, {})
         inst = Instance(ic, {})
         input_coll = InputCollector(inst)
         output_coll = OutputCollector(inst)
@@ -277,11 +285,35 @@ def build(builder):
     return Chip(constr)
 
 
+def chip(func):
+    """Decorate a function which uses the provided inputs and outputs to construct a Component.
+
+    The resulting chip can be used as a component in defining additional chips, or can be used
+    directly via run():
+
+    >>> @chip
+    ... def Invert(inputs, outputs):
+    ...     outputs.out = Nand(a=inputs.in_, b=inputs.in_).out
+    ...
+    >>> invert = run(Invert)
+    >>> invert.out
+    1
+    >>> invert.in_ = 1
+    >>> invert.out
+    0
+    """
+    return build(func, func.__name__)
+
+
 def run(chip, optimize=True, simulator='vector', **args):
     """Construct a complete IC, synthesize it, wrap it for easy access, and initialize inputs.
 
     `simulator` can be 'vector', for the slow, precise simulator, or 'codegen', for the fast,
-    less flexible one.
+    less flexible one. For the adventurous, there is also 'compiled', which is the same as codegen,
+    but run through cython's static compiler. See the README.
+
+    Inputs can be provided as additional keyword arguments, or by setting properties on the
+    resulting object.
     """
 
     ic = _constr(chip)

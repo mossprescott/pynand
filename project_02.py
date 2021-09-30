@@ -2,14 +2,15 @@
 #
 # See https://www.nand2tetris.org/project02
 
-from nand import Nand, build
+from nand import Nand, chip
 from project_01 import And, And16, Or, Mux16, Not, Not16, Xor
 
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_02
 
 
-def mkHalfAdder(inputs, outputs):
+@chip
+def HalfAdder(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -19,10 +20,9 @@ def mkHalfAdder(inputs, outputs):
     outputs.sum = n1.sum
     outputs.carry = n1.carry
 
-HalfAdder = build(mkHalfAdder)
 
-
-def mkFullAdder(inputs, outputs):
+@chip
+def FullAdder(inputs, outputs):
     a = inputs.a
     b = inputs.b
     c = inputs.c
@@ -33,10 +33,9 @@ def mkFullAdder(inputs, outputs):
     outputs.sum = n1.sum
     outputs.carry = n1.carry
 
-FullAdder = build(mkFullAdder)
 
-
-def mkInc16(inputs, outputs):
+@chip
+def Inc16(inputs, outputs):
     """Add one to a single 16-bit input, ignoring overflow."""
 
     in_ = inputs.in_
@@ -46,10 +45,9 @@ def mkInc16(inputs, outputs):
 
     outputs.out = n1.out
 
-Inc16 = build(mkInc16)
 
-
-def mkAdd16(inputs, outputs):
+@chip
+def Add16(inputs, outputs):
     """Add two 16-bit inputs, ignoring overflow."""
 
     a = inputs.a
@@ -60,10 +58,9 @@ def mkAdd16(inputs, outputs):
 
     outputs.out = n1.out
 
-Add16 = build(mkAdd16)
 
-
-def mkZero16(inputs, outputs):
+@chip
+def Zero16(inputs, outputs):
     """Test whether a single 16-bit input has the value 0."""
 
     in_ = inputs.in_
@@ -73,10 +70,9 @@ def mkZero16(inputs, outputs):
 
     outputs.out = n1.out
 
-Zero16 = build(mkZero16)
 
-
-def mkNeg16(inputs, outputs):
+@chip
+def Neg16(inputs, outputs):
     """Test whether a single 16-bit input is negative."""
 
     in_ = inputs.in_
@@ -86,10 +82,9 @@ def mkNeg16(inputs, outputs):
 
     outputs.out = n1.out
 
-Neg16 = build(mkNeg16)
 
-
-def mkALU(inputs, outputs):
+@chip
+def ALU(inputs, outputs):
     """Combine two 16-bit inputs according to six control bits, producing a 16-bit result and two
     condition codes.
     """
@@ -110,5 +105,3 @@ def mkALU(inputs, outputs):
     outputs.out = n1.out  # the resulting value
     outputs.zr = n1.zr    # is the output equal to 0?
     outputs.ng = n1.ng    # is the output negative?
-
-ALU = build(mkALU)

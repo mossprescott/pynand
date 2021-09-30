@@ -2,7 +2,7 @@
 #
 # See https://www.nand2tetris.org/project05
 
-from nand import RAM, ROM, Input, build, lazy
+from nand import RAM, ROM, Input, chip, lazy
 from project_01 import *
 from project_02 import *
 from project_03 import *
@@ -25,7 +25,8 @@ from nand.solutions import solved_05
 # have that if it was your job to debug the OS code for writing to the screen (and it
 # will be — see project 12.)
 
-def mkMemorySystem(inputs, outputs):
+@chip
+def MemorySystem(inputs, outputs):
     in_ = inputs.in_
     load = inputs.load
     address = inputs.address
@@ -37,10 +38,9 @@ def mkMemorySystem(inputs, outputs):
     outputs.out = n1.out
     outputs.tty_ready = n1.tty_ready  # Wire this up to your Output component's "ready" signal.
 
-MemorySystem = build(mkMemorySystem)
 
-
-def mkCPU(inputs, outputs):
+@chip
+def CPU(inputs, outputs):
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
@@ -55,7 +55,6 @@ def mkCPU(inputs, outputs):
     outputs.addressM = n1.addressM   # Address in data memory (of M) (latched)
     outputs.pc = n1.pc               # address of next instruction (latched)
 
-CPU = build(mkCPU)
 
 
 # Note: there are a couple of required outputs for Computer, which aren't seen in
@@ -70,7 +69,8 @@ CPU = build(mkCPU)
 #    but it's the only available output so there you go.
 
 
-def mkComputer(inputs, outputs):
+@chip
+def Computer(inputs, outputs):
     reset = inputs.reset
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
@@ -78,5 +78,3 @@ def mkComputer(inputs, outputs):
 
     outputs.pc = n1.pc
     outputs.tty_ready = n1.tty_ready  # Note: wire this the output from MemorySystem
-
-Computer = build(mkComputer)
