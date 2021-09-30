@@ -37,7 +37,10 @@ class SymbolTable:
         """
 
         defs = self._map_for(kind)
-        defs[name] = (type_, len(defs))
+        # Note: probabaly something's not right if you're re-defining the same name,
+        # but mutating the generated index seems worse than not anyway.
+        if name not in defs:
+            defs[name] = (type_, len(defs))
 
     def count(self, kind: VarKind) -> int:
         """Number of identifiers of the given kind already defined in the current scope
@@ -332,7 +335,12 @@ def compile_return_statement(ast, symbol_table, asm):
 
 def compile_expression(ast: ExpressionRec, symbol_table: SymbolTable, asm: AssemblySource):
     if isinstance(ast, IntegerConstant):
-        asm.instr(f"push constant {ast.value}")
+        # Note: the standard parser won't emit these, but they can appear in a transformed AST.
+        if ast.value < 0:
+            asm.instr(f"push constant {-ast.value}")
+            asm.instr("neg")
+        else:
+            asm.instr(f"push constant {ast.value}")
 
     elif isinstance(ast, StringConstant):
         # Yikes: this is 2 instructions per character, and it leaks the string.
