@@ -3,15 +3,21 @@
 import pytest
 
 from nand import run
-from nand.platform import USER_PLATFORM
+from nand.platform import BUNDLED_PLATFORM
 from nand.translate import AssemblySource, translate_jack
 from nand.solutions import solved_12
 import project_05, project_06, project_07, project_08, project_10
 
 import project_12
 
+# Note: each test uses the bundled solutions for each dependency, so that the test
+# is isolated from the user's own implementation of all but the class being tested.
+# That means you have to follow the suggested implementation fairly closely so your
+# classes don't depend on implementation details that don't match the expected
+# behavior (even if they work fine when run together.) To change that, just switch
+# the default value for the `platform` parameter to `USER_PLATFORM` on any or all tests.
 
-def test_compile_array_lib(array_class=project_12.ARRAY_CLASS, platform=USER_PLATFORM):
+def test_compile_array_lib(array_class=project_12.ARRAY_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -20,7 +26,7 @@ def test_compile_array_lib(array_class=project_12.ARRAY_CLASS, platform=USER_PLA
     assert len(asm.lines) > 0
 
 
-def test_array_lib(array_class=project_12.ARRAY_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_array_lib(array_class=project_12.ARRAY_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     # Note: this one's not so useful interactively, but easier to view anyway
     array_test = _parse_jack_file("examples/project_12/ArrayTest.jack", platform)
 
@@ -46,7 +52,7 @@ def test_array_lib(array_class=project_12.ARRAY_CLASS, platform=USER_PLATFORM, s
     assert computer.peek(8002) == 100
     assert computer.peek(8003) == 10
 
-def test_compile_string_lib(string_class=project_12.STRING_CLASS, platform=USER_PLATFORM):
+def test_compile_string_lib(string_class=project_12.STRING_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -55,7 +61,7 @@ def test_compile_string_lib(string_class=project_12.STRING_CLASS, platform=USER_
     assert len(asm.lines) > 0
 
 
-def test_string_lib(string_class=project_12.STRING_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_string_lib(string_class=project_12.STRING_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     string_test = _parse_jack_file("examples/project_12/StringTest.jack", platform)
 
     translator = platform.translator()
@@ -98,7 +104,7 @@ def test_string_lib(string_class=project_12.STRING_CLASS, platform=USER_PLATFORM
     ]
 
 
-def test_compile_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=USER_PLATFORM):
+def test_compile_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -106,7 +112,7 @@ def test_compile_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=USER_
 
     assert len(asm.lines) > 0
 
-def test_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     # Note: this one's not so useful interactively, but easier to view anyway
     memory_test = _parse_jack_file("examples/project_12/MemoryTest.jack", platform)
 
@@ -149,11 +155,11 @@ def test_memory_lib_reuse():
 
 def test_memory_lib_stress():
     # TODO: a series of alloc and deAlloc calls for blocks of various sizes, which will
-    # fragment the heap if no effrot is made to prevent it.
+    # fragment the heap if no effort is made to prevent it.
     pass  # TODO
 
 
-def test_compile_keyboard_lib(keyboard_class=project_12.OUTPUT_CLASS, platform=USER_PLATFORM):
+def test_compile_keyboard_lib(keyboard_class=project_12.OUTPUT_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -161,7 +167,7 @@ def test_compile_keyboard_lib(keyboard_class=project_12.OUTPUT_CLASS, platform=U
 
     assert len(asm.lines) > 0
 
-def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack", platform)
 
     translator = platform.translator()
@@ -240,7 +246,7 @@ def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=USER_PL
     assert output.endswith("Test completed successfully")
 
 
-def test_compile_output_lib(output_class=project_12.OUTPUT_CLASS, platform=USER_PLATFORM):
+def test_compile_output_lib(output_class=project_12.OUTPUT_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -249,7 +255,7 @@ def test_compile_output_lib(output_class=project_12.OUTPUT_CLASS, platform=USER_
     assert len(asm.lines) > 0
 
 
-def test_output_lib(output_class=project_12.OUTPUT_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_output_lib(output_class=project_12.OUTPUT_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     output_test = _parse_jack_file("examples/project_12/OutputTest.jack", platform)
 
     translator = platform.translator()
@@ -290,7 +296,7 @@ def test_output_lib(output_class=project_12.OUTPUT_CLASS, platform=USER_PLATFORM
 # TODO: Output.println wraps back to the top of the screen after 23 lines
 
 
-def test_compile_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFORM):
+def test_compile_math_lib(math_class=project_12.MATH_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -299,7 +305,7 @@ def test_compile_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFO
     assert len(asm.lines) > 0
 
 
-def test_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_math_lib(math_class=project_12.MATH_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     math_test = _parse_jack_file("examples/project_12/MathTest.jack", platform)
 
     translator = platform.translator()
@@ -346,7 +352,7 @@ def test_math_lib(math_class=project_12.MATH_CLASS, platform=USER_PLATFORM, simu
     assert computer.peek(8018) == -771,   "-12345/16"
 
 
-def test_compile_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_PLATFORM):
+def test_compile_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -355,7 +361,7 @@ def test_compile_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_
     assert len(asm.lines) > 0
 
 
-def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     screen_test = _parse_jack_file("examples/project_12/ScreenTest.jack", platform)
 
     translator = platform.translator()
@@ -364,9 +370,11 @@ def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_PLATFORM
 
     translate_jack(translator, platform, screen_class)
 
+    # TODO: pull these dependencies from platform.library? Otherwise the test fails if the
+    # provided platform provides anything extra.
     translate_jack(translator, platform, solved_12._ARRAY_CLASS)
     translate_jack(translator, platform, solved_12._MEMORY_CLASS)
-    translate_jack(translator, platform, solved_12._MATH_CLASS)
+    translate_library(translator, platform, "Math")
     translate_jack(translator, platform, minimal_sys_lib(["Memory", "Math", "Screen"], platform))
 
     translate_jack(translator, platform, screen_test)
@@ -377,7 +385,7 @@ def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=USER_PLATFORM
 
     computer = run(platform.chip, simulator=simulator)
 
-    translator.asm.run(platform.assemble, computer, stop_cycles=10_000_000, debug=False)
+    translator.asm.run(platform.assemble, computer, stop_cycles=10_000_000, debug=True)
     # translator.asm.run(platform.assemble, computer, stop_cycles=100_000, debug=True)
     # translator.asm.trace(platform.assemble, computer, stop_cycles=10_000_000)
     # translator.asm.trace(platform.assemble, computer, stop_cycles=100_000)
@@ -412,7 +420,7 @@ def dump_screen(computer):
         print(f"{y:3d}", ",".join(f"{computer.peek_screen(y*32 + w):6d}" for w in range(32)))
 
 
-def test_compile_sys_lib(sys_class=project_12.SYS_CLASS, platform=USER_PLATFORM):
+def test_compile_sys_lib(sys_class=project_12.SYS_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
     asm = AssemblySource()
@@ -421,7 +429,7 @@ def test_compile_sys_lib(sys_class=project_12.SYS_CLASS, platform=USER_PLATFORM)
     assert len(asm.lines) > 0
 
 @pytest.mark.skip(reason="It's not clear what to assert here that proves anything.")
-def test_sys_lib(sys_class=project_12.SYS_CLASS, platform=USER_PLATFORM, simulator='codegen'):
+def test_sys_lib(sys_class=project_12.SYS_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     sys_test = _parse_jack_file("examples/project_12/SysTest.jack", platform)
 
     translator = platform.translator()
@@ -483,23 +491,7 @@ LIBS_WITH_INIT = ["Memory", "Math", "Screen", "Output", "Keyboard"]
 def _translate_dependencies(translator, platform, libs):
     translate_jack(translator, platform, minimal_sys_lib(libs, platform))
     for lib in libs:
-        if lib == "Memory":
-            translate_jack(translator, platform, solved_12._MEMORY_CLASS)
-        elif lib == "Math":
-            translate_jack(translator, platform, solved_12._MATH_CLASS)
-        elif lib == "Screen":
-            translate_jack(translator, platform, solved_12._SCREEN_CLASS)
-        elif lib == "Output":
-            translate_jack(translator, platform, solved_12._OUTPUT_CLASS)
-        elif lib == "Keyboard":
-            translate_jack(translator, platform, solved_12._KEYBOARD_CLASS)
-        elif lib == "Array":
-            translate_jack(translator, platform, solved_12._ARRAY_CLASS)
-        elif lib == "String":
-            translate_jack(translator, platform, solved_12._STRING_CLASS)
-        else:
-            raise Exception(f"Unknown class: {lib}")
-
+        translate_library(translator, platform, lib)
 
 
 def minimal_sys_lib(libs, platform):
@@ -545,3 +537,15 @@ def _parse_jack_file(path, platform):
 
 def minimal_output_lib(platform):
     return _parse_jack_file("nand/solutions/solved_12/TerminalOutput.jack", platform)
+
+
+def translate_library(translator, platform, class_name):
+    """Locate a class by name from the "OS" library provided with the Platform, and load it
+    for use as a dependency.
+    """
+
+    matching = [cl for cl in platform.library if cl.name == class_name]
+    if len(matching) == 1:
+        translate_jack(translator, platform, matching[0])
+    else:
+        raise Exception(f"Could not find a class {class_name!r} in the platform's library ({[cl.name for cl in platform.library]})")
