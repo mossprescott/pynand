@@ -24,7 +24,6 @@ def test_compile_array_lib(array_class=project_12.ARRAY_CLASS, platform=BUNDLED_
 
     assert len(asm.lines) > 0
 
-
 def test_array_lib(array_class=project_12.ARRAY_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     # Note: this one's not so useful interactively, but easier to view anyway
     array_test = _parse_jack_file("examples/project_12/ArrayTest.jack", platform)
@@ -51,6 +50,7 @@ def test_array_lib(array_class=project_12.ARRAY_CLASS, platform=BUNDLED_PLATFORM
     assert computer.peek(8002) == 100
     assert computer.peek(8003) == 10
 
+
 def test_compile_string_lib(string_class=project_12.STRING_CLASS, platform=BUNDLED_PLATFORM):
     """First, just make sure this particular class makes it through the compiler."""
 
@@ -58,7 +58,6 @@ def test_compile_string_lib(string_class=project_12.STRING_CLASS, platform=BUNDL
     platform.compiler(string_class, asm)
 
     assert len(asm.lines) > 0
-
 
 def test_string_lib(string_class=project_12.STRING_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     string_test = _parse_jack_file("examples/project_12/StringTest.jack", platform)
@@ -253,7 +252,6 @@ def test_compile_output_lib(output_class=project_12.OUTPUT_CLASS, platform=BUNDL
 
     assert len(asm.lines) > 0
 
-
 def test_output_lib(output_class=project_12.OUTPUT_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     output_test = _parse_jack_file("examples/project_12/OutputTest.jack", platform)
 
@@ -302,7 +300,6 @@ def test_compile_math_lib(math_class=project_12.MATH_CLASS, platform=BUNDLED_PLA
     platform.compiler(math_class, asm)
 
     assert len(asm.lines) > 0
-
 
 def test_math_lib(math_class=project_12.MATH_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
     math_test = _parse_jack_file("examples/project_12/MathTest.jack", platform)
@@ -516,7 +513,7 @@ class Sys {
     }
 
     function void error(int errorCode) {
-        // TODO: it would be nice to write the code, but don't want to depend on the OutputString library.
+        // TODO: it would be nice to write the code, but don't want to depend on the String library.
         // Maybe a simpler version here writing to the port directly?
         // var Array tty;
         // let tty = 24576; // 0x6000
