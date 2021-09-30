@@ -105,7 +105,7 @@ PRIMITIVES = set([
     "MemorySystem",  # Needed for Computer
     # Additional components used in the exercises, but not typically used in a full computer sim:
     "DMux", "DMux8Way", "Mux8Way16",
-    # Additonal for alternative CPUs:
+    # Additional for alternative CPUs:
     "Dec16", "Eq16", "Mask15", "ShiftR16",
 ])
 

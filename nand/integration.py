@@ -161,8 +161,8 @@ class IC:
         obey them, by repeating propagation until a fixed point is found.
 
         TODO: generalize this and don't assume the behavior of Register/MemorySystem is as expected.
-        It should be up to the caller to say whay assumptions it wants to make; e.g. a simulator
-        (codegen) that's already assuming some particular implementation
+        It should be up to the caller to say what assumptions it wants to make; e.g. a simulator
+        (codegen) that's already assuming some particular implementation.
         """
 
         # DFF/Register output never changes based on upstream combinational logic, so stop the
