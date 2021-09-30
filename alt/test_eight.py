@@ -711,7 +711,7 @@ def test_backward_compatible_tty(simulator="vector"):
     test_05.test_computer_tty(EightComputer, simulator=simulator, cycles_per_instr=2)
 
 def test_backward_compatible_speed():
-    """Note: alyways compared using the (slower, fairer) "vector" simulator."""
+    """Note: always compared using the (slower, fairer) "vector" simulator."""
     test_05.test_speed(EightComputer, cycles_per_instr=2)
 
 

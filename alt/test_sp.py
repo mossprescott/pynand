@@ -34,7 +34,7 @@ def test_backward_compatible_tty():
 def test_backward_compatible_speed():
     cps = test_05.cycles_per_second(SPComputer)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
-    assert cps > 750
+    assert cps > 375  # About 750/s is expected, but include a wide margin for random slowness
 
 
 #

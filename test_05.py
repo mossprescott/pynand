@@ -537,4 +537,4 @@ def cycles_per_second(chip, cycles_per_instr=1):
 def test_speed(chip=project_05.Computer, cycles_per_instr=1):
     cps = cycles_per_second(chip, cycles_per_instr)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
-    assert cps > 1000
+    assert cps > 500  # Note: about 1k/s is expected, but include a wide margin for random slowness
