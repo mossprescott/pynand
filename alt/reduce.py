@@ -29,7 +29,7 @@ TODO: also do some simple compile-time evaluation:
 - remove dead code (e.g. if (false) { ... })
 """
 
-from typing import Generic, List, Optional, Sequence, Tuple, TypeVar, final
+from typing import Generic, List, Optional, Sequence, Tuple, TypeVar
 
 from nand import jack_ast
 from nand.platform import BUNDLED_PLATFORM
@@ -56,12 +56,12 @@ class JackTransform(Generic[Context]):
         VarDecs and preceding Statements."""
         return None
 
-    @final
+    #@final  # requires 3.8
     def __or__(self, other: "JackTransform") -> "JackTransform":
         """Compose two transforms, applying them from left to right and taking the first result."""
         return Composed(self, other)
 
-    @final
+    #@final  # requires 3.8
     def transform(self, class_ast: jack_ast.Class, context: Context) -> jack_ast.Class:
 
         def rewrite_subroutineDec(ast: jack_ast.SubroutineDec) -> jack_ast.SubroutineDec:
