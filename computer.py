@@ -35,14 +35,15 @@ CYCLE_INTERVAL = 1/1.0  # How often to update the cycle and frame counters; a bi
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
-parser = argparse.ArgumentParser(description="Run assembly or VM source with display and keyboard")
-parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm files.")
+parser = argparse.ArgumentParser(description="Run assembly or VM/Jack source with display and keyboard")
+parser.add_argument("path", help="Path to source, either one file with assembly (<file>.asm) or a directory containing .vm or .jack files.")
 parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
-parser.add_argument("--trace", action="store_true", help="(VM-only) print cycle counts during initialization. Note: runs almost 3x slower.")
-parser.add_argument("--print", action="store_true", help="(VM-only) print translated assembly.")
+parser.add_argument("--trace", action="store_true", help="(VM/Jack-only) print cycle counts during initialization. Note: runs almost 3x slower.")
+parser.add_argument("--print", action="store_true", help="(VM/Jack-only) print translated assembly.")
 # TODO: "--debug" showing opcode-level trace. Breakpoints, stepping, peek/poke?
-parser.add_argument("--no-waiting", action="store_true", help="(VM-only) substitute a no-op function for Sys.wait.")
-parser.add_argument("--max-fps", action="store", type=int, help="Experimental! (VM-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).\nMay or may not work, depending on the translator.")
+parser.add_argument("--no-waiting", action="store_true", help="(VM/Jack-only) substitute a no-op function for Sys.wait.")
+parser.add_argument("--max-fps", action="store", type=int, help="Experimental! (VM/Jack-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).\nMay or may not work, depending on the translator.")
+# TODO: "--max-cps"; limit the clock speed directly. That will allow different chips to be compared (in a way).
 # TODO: "--headless" with no UI, with Keyboard and TTY connected to stdin/stdout
 
 def main(platform=USER_PLATFORM):
