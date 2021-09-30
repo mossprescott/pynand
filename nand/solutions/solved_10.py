@@ -152,7 +152,7 @@ KeywordConstantP = (
     | TokenP(("keyword", "false"), jack_ast.KeywordConstant(False))
     | TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None))
     | TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this"))
-)
+).describe("keyword constant")
 
 
 def _unpack_subroutineCall(qual_name: Optional[str], name: str, exprs: Sequence[jack_ast.Expression]):
@@ -200,7 +200,7 @@ ExpressionP.set(OrP(
 # Statements:
 #
 
-StatementP: DeferP[TT, jack_ast.Statement] = DeferP("Statement")
+StatementP: DeferP[TT, jack_ast.Statement] = DeferP("StatementP")
 
 LetStatementP: Parser[TT, jack_ast.Statement] = (
     KeywordP("let")
@@ -273,7 +273,7 @@ TypeP = (
     | KeywordP("char")
     | KeywordP("boolean")
     | IdentifierP.filter(lambda str: str[0].isupper())
-).map(jack_ast.Type)
+).map(jack_ast.Type).describe("type")
 
 VarDecP = (
     KeywordP("var")
@@ -298,7 +298,9 @@ ParameterP = (
     & IdentifierP
 ).mapConstr(jack_ast.Parameter)
 
-ResultTypeP: Parser[TT, Optional[jack_ast.Type]] = OrP(KeywordP("void").const(None), TypeP)
+ResultTypeP: Parser[TT, Optional[jack_ast.Type]] = OrP(
+    KeywordP("void").const(None).describe("void"),
+    TypeP)
 
 SubroutineDecP = (
     ( KeywordP("constructor")

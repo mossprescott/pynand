@@ -28,7 +28,7 @@ supposed to work. Even so, mypy is helpful for debugging complex Parser composit
 For the curious:
 
 A possibly more robust implementation of a similar idea is the [parsec](https://pypi.org/project/parsec/)
-package (based on Haskell's famous (simlarly-named library)[https://hackage.haskell.org/package/parsec].
+package (based on Haskell's famous [similarly-named library](https://hackage.haskell.org/package/parsec)).
 
 Or just google "Parser Combinators".
 
@@ -49,7 +49,7 @@ is raised:
 >>> aP.parse("table")
 Traceback (most recent call last):
 ...
-nand.parsing.ParseFailure: Expected 'a' at ParseLocation(pos: 0; next token: 't')
+nand.parsing.ParseFailure: Expected token 'a' at location 0; next token: 't'
 
 
 You can match one of a set of alternatives by combining parsers with the '|' operator:
@@ -117,7 +117,7 @@ to do arbitrary computation:
 2
 """
 
-from typing import Callable, Generic, Sequence, Optional, Tuple, TypeVar, final
+from typing import Callable, Generic, Sequence, Optional, Tuple, Type, TypeVar, final
 
 
 T = TypeVar("T", covariant=True)
@@ -159,6 +159,37 @@ class Parser(Generic[T, V]):
         """
 
         raise NotImplementedError()
+
+    @final
+    def describe(self, label: str) -> "Parser[T, V]":
+        """Supply a human-readable description of what the parser is trying to match, to be
+        included in error messages.
+
+        >>> a_or_b = TokenP("a", None) | TokenP("b", None)
+
+        >>> a_or_b.parse("c")
+        Traceback (most recent call last):
+        ...
+        nand.parsing.ParseFailure: Expected one of token 'a', token 'b' at location 0; next token: 'c'
+
+        >>> a_or_b.describe("one of the first two letters of the alphabet").parse("c")
+        Traceback (most recent call last):
+        ...
+        nand.parsing.ParseFailure: Expected one of the first two letters of the alphabet at location 0; next token: 'c'
+        """
+
+        class LabeledP(Parser[T, V]):
+            def __init__(self, parser, label):
+                self.parser = parser
+                self.label = label
+            def __call__(self, loc: "ParseLocation") -> Tuple[V, "ParseLocation"]:
+                try:
+                    return self.parser(loc)
+                except ParseFailure:
+                    raise ParseFailure(label, loc)
+            def __str__(self):
+                return self.label
+        return LabeledP(self, label)
 
     @final
     def map(self, transform: Callable[[V], W]) -> "Parser[T, W]":
@@ -215,7 +246,11 @@ class Parser(Generic[T, V]):
     def __or__(self, rhs: "Parser[T, V]") -> "Parser[T, V]":
         """Match one or the other; see OrP."""
 
-        return OrP(self, rhs)
+        # Collapse chained OrP's for better parse failure messages:
+        if isinstance(self, OrP):
+            return OrP(*(list(self.parsers) + [rhs]))
+        else:
+            return OrP(self, rhs)
 
     @final
     def __and__(self, rhs: "Parser[T, W]") -> "Parser[T, Tuple[V, W]]":
@@ -269,7 +304,7 @@ class ParseLocation(Generic[T]):
         return ParseLocation(self.tokens, self.pos+1)
 
     def __str__(self):
-        return f"ParseLocation(pos: {self.pos}; next token: {repr(self.current_token())})"
+        return f"ParseLocation(pos: {self.pos}; next token: {'<eof>' if self.at_eof() else repr(self.current_token())})"
 
 
 class ParseFailure(Exception, Generic[T]):
@@ -278,7 +313,7 @@ class ParseFailure(Exception, Generic[T]):
         self.loc = loc
 
     def __str__(self):
-        return f"Expected {self.expected} at {self.loc}"
+        return f"Expected {self.expected} at location {self.loc.pos}; next token: {'<eof>' if self.loc.at_eof() else repr(self.loc.current_token())}"
 
 
 #
@@ -312,12 +347,12 @@ class TokenP(Parser[T, V]):
     >>> one_a.parse("q")
     Traceback (most recent call last):
     ...
-    nand.parsing.ParseFailure: Expected 'a' at ParseLocation(pos: 0; next token: 'q')
+    nand.parsing.ParseFailure: Expected token 'a' at location 0; next token: 'q'
 
     >>> one_a.parse("abc")
     Traceback (most recent call last):
     ...
-    nand.parsing.ParseFailure: Expected eof at ParseLocation(pos: 1; next token: 'b')
+    nand.parsing.ParseFailure: Expected eof at location 1; next token: 'b'
     """
 
     def __init__(self, token: T, value: V):
@@ -328,7 +363,10 @@ class TokenP(Parser[T, V]):
         if loc.current_token() == self.token:
             return self.value, loc.advance()
         else:
-            raise ParseFailure(repr(self.token), loc)
+            raise ParseFailure(str(self), loc)
+
+    def __str__(self):
+        return f"token {repr(self.token)}"
 
 
 class OptionalP(Parser[T, Optional[V]]):
@@ -357,8 +395,13 @@ class ManyP(Parser[T, Sequence[V]]):
             try:
                 val, loc = self.parser(loc)
                 vals.append(val)
-            except ParseFailure:
-                return vals, loc
+            except ParseFailure as x:
+                # If the parser consumed any input and *then* failed, report that failure.
+                # If not, then we're at the end of the list and just return it.
+                if x.loc == loc:
+                    return vals, loc
+                else:
+                    raise x
 
 
 class SepByP(Parser[T, Sequence[V]]):
@@ -403,23 +446,44 @@ class OrP(Parser[T, V]):
     >>> a_or_b.parse("a")
     'Nice!'
 
+
     Note: the '|' operator is another way to construct the same parser:
 
     >>> a_or_b = TokenP("a", "Nice!") | TokenP("b", "Great!")
     >>> a_or_b.parse("b")
     'Great!'
+
+
+    If one of the alternatives makes some progress before failing, it's failure will
+    be the one you see:
+
+    >>> a_and_b = TokenP("a", None) & TokenP("b", None)
+    >>> c_and_d = TokenP("c", None) & TokenP("d", None)
+    >>> (a_and_b | c_and_d).parse("af")
+    Traceback (most recent call last):
+    ...
+    nand.parsing.ParseFailure: Expected token 'b' at location 1; next token: 'f'
     """
 
     def __init__(self, *parsers: Parser[T, V]):
         self.parsers = parsers
 
     def __call__(self, loc) -> Tuple[V, ParseLocation[T]]:
+        failures = []
         for p in self.parsers:
             try:
                 return p(loc)
-            except ParseFailure:
-                pass
-        raise ParseFailure(f"one of {self.parsers}", loc)
+            except ParseFailure as x:
+                failures.append(x)
+        # Tricky: choose the "most interesting" failure to report — the one that
+        # got the farthest and therefore has the most specific problem to report,
+        # most of the time.
+        furthest = sorted(failures, key=lambda pf: -pf.loc.pos)[0]
+        if furthest.loc.pos > loc.pos:
+            raise furthest
+        else:
+            # No parser made any progress, so summarize them all
+            raise ParseFailure(f"one of {', '.join(str(p) for p in self.parsers)}", loc)
 
 
 V1 = TypeVar("V1", covariant=True)
@@ -445,6 +509,9 @@ class Seq2P(Parser[T, Tuple[V1, V2]]):
         self.second = second
 
     def __call__(self, loc) -> Tuple[Tuple[V1, V2], ParseLocation[T]]:
+        # TODO: if the first partially succeeds (that is, parses some stuff, then tries to parse
+        # more but doesn't match), and then the second also fails, we want to make an informed
+        # choice which failure to report.
         v1, loc = self.first(loc)
         v2, loc = self.second(loc)
         return (v1, v2), loc
@@ -518,6 +585,9 @@ class DeferP(Parser[T, V]):
     error.
     """
 
+    # Note: you end up having to annotate the type whenever you construct one of these, but fancy
+    # tricks don't seem to work anyway because the types involved are recursive and hurt mypy's
+    # brain so I gave up.
     def __init__(self, name: str):
         self.name = name
         self.parser = None  # type: Optional[Parser[T, V]]
