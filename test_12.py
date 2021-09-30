@@ -5,7 +5,6 @@ import pytest
 from nand import run
 from nand.platform import BUNDLED_PLATFORM
 from nand.translate import AssemblySource, translate_jack
-from nand.solutions import solved_12
 import project_05, project_06, project_07, project_08, project_10
 
 import project_12
@@ -123,7 +122,7 @@ def test_memory_lib(memory_class=project_12.MEMORY_CLASS, platform=BUNDLED_PLATF
     translate_jack(translator, platform, memory_class)
 
     # Dependencies; note: need Sys.init to intialize Memory, but don't want the built-in implementation.
-    translate_jack(translator, platform, solved_12._ARRAY_CLASS)
+    translate_library(translator, platform, "Array")
     translate_jack(translator, platform, minimal_sys_lib("Memory", platform))
 
     translate_jack(translator, platform, memory_test)
@@ -265,10 +264,10 @@ def test_output_lib(output_class=project_12.OUTPUT_CLASS, platform=BUNDLED_PLATF
     translate_jack(translator, platform, output_class)
 
     # Dependencies; note: need Sys.init to intialize Output, but don't want the built-in implementation.
-    translate_jack(translator, platform, solved_12._ARRAY_CLASS)
-    translate_jack(translator, platform, solved_12._MEMORY_CLASS)
-    translate_jack(translator, platform, solved_12._STRING_CLASS)
-    translate_jack(translator, platform, solved_12._MATH_CLASS)
+    translate_library(translator, platform, "Array")
+    translate_library(translator, platform, "Memory")
+    translate_library(translator, platform, "String")
+    translate_library(translator, platform, "Math")
     translate_jack(translator, platform, minimal_sys_lib(["Memory", "Math", "Output"], platform))
 
     translate_jack(translator, platform, output_test)
@@ -370,10 +369,9 @@ def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=BUNDLED_PLATF
 
     translate_jack(translator, platform, screen_class)
 
-    # TODO: pull these dependencies from platform.library? Otherwise the test fails if the
-    # provided platform provides anything extra.
-    translate_jack(translator, platform, solved_12._ARRAY_CLASS)
-    translate_jack(translator, platform, solved_12._MEMORY_CLASS)
+    # Dependencies; note: need Sys.init to intialize Screen, but don't want the built-in implementation.
+    translate_library(translator, platform, "Array")
+    translate_library(translator, platform, "Memory")
     translate_library(translator, platform, "Math")
     translate_jack(translator, platform, minimal_sys_lib(["Memory", "Math", "Screen"], platform))
 
@@ -439,13 +437,13 @@ def test_sys_lib(sys_class=project_12.SYS_CLASS, platform=BUNDLED_PLATFORM, simu
     translate_jack(translator, platform, sys_class)
 
     # Dependencies:
-    translate_jack(translator, platform, solved_12._MEMORY_CLASS)
-    translate_jack(translator, platform, solved_12._MATH_CLASS)
-    translate_jack(translator, platform, solved_12._SCREEN_CLASS)
-    translate_jack(translator, platform, solved_12._OUTPUT_CLASS)
-    translate_jack(translator, platform, solved_12._KEYBOARD_CLASS)
-    translate_jack(translator, platform, solved_12._ARRAY_CLASS)
-    translate_jack(translator, platform, solved_12._STRING_CLASS)
+    translate_library(translator, platform, "Memory")
+    translate_library(translator, platform, "Math")
+    translate_library(translator, platform, "Screen")
+    translate_library(translator, platform, "Output")
+    translate_library(translator, platform, "Keyboard")
+    translate_library(translator, platform, "Array")
+    translate_library(translator, platform, "String")
 
     translate_jack(translator, platform, sys_test)
 
