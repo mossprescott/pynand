@@ -475,7 +475,7 @@ def test_program_complex_arrays():
     computer = run(platform.chip, simulator=simulator)
 
     output_stream = StringWriter()
-    translator.asm.run(platform.assemble, computer, stop_cycles=1_000_000, debug=True, tty=output_stream)
+    translator.asm.run(platform.assemble, computer, stop_cycles=5_000_000, debug=True, tty=output_stream)
 
     output_lines = "".join(output_stream.strs).split("\n")
     assert output_lines == [
