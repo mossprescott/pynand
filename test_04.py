@@ -2,13 +2,12 @@
 
 from nand import run, unsigned
 # Note: using the included implementations, so you can work on the projects in any order
-from nand.solutions.solved_05 import Computer
-from nand.solutions.solved_06 import assemble
+from nand.solutions import solved_05, solved_06
 
 from project_04 import *
 
 
-def test_mult():
+def test_mult(Computer=solved_05.Computer, assemble=solved_06.assemble):
     computer = run(Computer)
 
     pgm, _, _ = assemble(MULT_ASM)
@@ -59,7 +58,7 @@ def test_mult():
     assert computer.peek(2) == 42
 
 
-def test_fill():
+def test_fill(Computer=solved_05.Computer, assemble=solved_06.assemble):
     # We're going to run a few million cycles, so the faster simulator is a better option:
     computer = run(Computer, simulator='codegen')
 
