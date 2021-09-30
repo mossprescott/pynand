@@ -764,7 +764,7 @@ def color_graph(vertices: Sequence[V], edges: Sequence[Tuple[V, V]]) -> List[Set
     c = # of colors. Wikipedia says you can get the same result faster by reversing the
     nesting of loops (https://en.wikipedia.org/wiki/Greedy_coloring).
 
-    >>> color_graph(vertices: [1,2,3,4], edges: [(1,2), (2,3)])
+    >>> color_graph(vertices=[1,2,3,4], edges=[(1,2), (2,3)])
     [{1, 3, 4}, {2}]
     """
 
