@@ -117,7 +117,15 @@ to do arbitrary computation:
 2
 """
 
-from typing import Callable, Generic, Sequence, Optional, Tuple, Type, TypeVar, final
+from typing import Callable, Generic, Sequence, Optional, Tuple, Type, TypeVar
+import sys
+
+# Gross hack so we can run on 3.6 and 3.7 (with less checking):
+if sys.version_info.major > 3 or (sys.version_info.major == 3 and sys.version_info.minor >= 8):
+    from typing import final
+else:
+    def final(func):  # type: ignore
+        return func
 
 
 T = TypeVar("T", covariant=True)
