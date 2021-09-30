@@ -12,6 +12,7 @@ from nand.platform import BUNDLED_PLATFORM, USER_PLATFORM
 from alt.eight import EIGHT_PLATFORM
 from alt.lazy import LAZY_PLATFORM
 from alt.reg import REG_PLATFORM
+from alt.reduce import REDUCE_PLATFORM
 from alt.shift import SHIFT_PLATFORM
 from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
@@ -20,12 +21,13 @@ def main():
     std = measure(BUNDLED_PLATFORM)
     print_result("solutions", std)
 
+    print_relative_result("project_0x.py", std, measure(USER_PLATFORM))
     print_relative_result("alt/lazy.py", std, measure(LAZY_PLATFORM))
     print_relative_result("alt/sp.py", std, measure(SP_PLATFORM))
     print_relative_result("alt/threaded.py", std, measure(THREADED_PLATFORM))
     print_relative_result("alt/shift.py", std, measure(SHIFT_PLATFORM))
-    print_relative_result("project_0x.py", std, measure(USER_PLATFORM))
     print_relative_result("alt/reg.py", std, measure(REG_PLATFORM))
+    print_relative_result("alt/reduce.py", std, measure(REDUCE_PLATFORM))
 
     # print_relative_result("alt/eight.py", std, measure(EIGHT_PLATFORM, "vector"))
     print_relative_result("alt/eight.py", std, (gate_count(EIGHT_PLATFORM.chip)['nands'], std[1], std[2]*2, std[3]*2))  # Cheeky
