@@ -207,11 +207,10 @@ def test_multiply():
         t = solved_07.parse_line(line)
         if t:
             print(t)
-            op, args = t
-            translate.__getattribute__(op)(*args)
+            translate.handle(t)
 
     computer = run(ShiftComputer, simulator="codegen")
-    asm = assemble(translate.asm)
+    asm, _, _ = assemble(translate.asm)
     computer.init_rom(asm)
 
     computer.poke(0, 256)
