@@ -289,7 +289,8 @@ def test_alu_chained():
     """Test sequential application of the 8-bit ALU by connecting two separate ALUs, with the
     carry bit wired between them.
     """
-    def mkChainedALU(inputs, outputs):
+    @chip
+    def ChainedALU(inputs, outputs):
         x_split = Split(in_=inputs.x)
         y_split = Split(in_=inputs.y)
         alu_lo = EightALU(x=x_split.lo, y=y_split.lo,
@@ -301,7 +302,6 @@ def test_alu_chained():
         outputs.out = Splice(lo=alu_lo.out, hi=alu_hi.out).out
         outputs.zr = And(a=alu_lo.zr, b=alu_hi.zr).out
         outputs.ng = alu_hi.ng
-    ChainedALU = build(mkChainedALU)
 
     test_02.test_alu(ChainedALU)
 

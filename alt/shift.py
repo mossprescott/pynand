@@ -27,17 +27,17 @@ from nand.solutions import solved_06
 from nand.solutions import solved_07
 
 
-def mkShiftR16(inputs, outputs):
+@chip
+def ShiftR16(inputs, outputs):
     """Sign-extending right shift."""
 
     for i in range(15):
         outputs.out[i] = inputs.in_[i+1]
     outputs.out[15] = inputs.in_[15]
 
-ShiftR16 = build(mkShiftR16)
 
-
-def mkShiftCPU(inputs, outputs):
+@chip
+def ShiftCPU(inputs, outputs):
     """Implements the Hack architecture, plus a single extra bit of ALU control:
 
     If bit 13 is not set, the result from the ALU is shifted one bit to the right before being
@@ -77,10 +77,9 @@ def mkShiftCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-ShiftCPU = build(mkShiftCPU)
 
-
-def mkShiftComputer(inputs, outputs):
+@chip
+def ShiftComputer(inputs, outputs):
     """This is the same as regular Computer, except using ShiftCPU."""
 
     reset = inputs.reset
@@ -97,8 +96,6 @@ def mkShiftComputer(inputs, outputs):
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
     outputs.tty_ready = mem.tty_ready
-
-ShiftComputer = build(mkShiftComputer)
 
 
 def parse_op(string, symbols={}):

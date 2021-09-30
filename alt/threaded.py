@@ -40,7 +40,8 @@ from nand.solutions import solved_07
 # of many-input Nands.)
 # Note: this simplifies to Zero16, if one of the inputs is 0, so maybe should just implement this
 # in project_02 instead.
-def mkEq16(inputs, outputs):
+@chip
+def Eq16(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -61,18 +62,17 @@ def mkEq16(inputs, outputs):
                           b=Not(in_=Xor(a=a[ 2], b=b[ 2]).out).out).out,
                     b=And(a=Not(in_=Xor(a=a[ 1], b=b[ 1]).out).out,
                           b=Not(in_=Xor(a=a[ 0], b=b[ 0]).out).out).out).out).out).out
-Eq16 = build(mkEq16)
 
 
-def mkMask15(inputs, outputs):
+@chip
+def Mask15(inputs, outputs):
     for i in range(15):
         outputs.out[i] = inputs.in_[i]
     outputs.out[15] = Not(in_=1).out  # HACK: syntax not working for output bit, apparently
 
-Mask15 = build(mkMask15)
 
-
-def mkThreadedCPU(inputs, outputs):
+@chip
+def ThreadedCPU(inputs, outputs):
     """Backwards-compatible with the Hack CPU, with two additional instructions and a new register
     storing a return address written by CALL and read by RTN.
 
@@ -158,10 +158,9 @@ def mkThreadedCPU(inputs, outputs):
     outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
-ThreadedCPU = build(mkThreadedCPU)
 
-
-def mkThreadedComputer(inputs, outputs):
+@chip
+def ThreadedComputer(inputs, outputs):
     reset = inputs.reset
 
     cpu = lazy()
@@ -176,8 +175,6 @@ def mkThreadedComputer(inputs, outputs):
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
     outputs.tty_ready = mem.tty_ready
-
-ThreadedComputer = build(mkThreadedComputer)
 
 
 def parse_op(string, symbols={}):

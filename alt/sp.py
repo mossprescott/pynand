@@ -46,8 +46,10 @@ from nand.solutions import solved_06
 from nand.solutions import solved_07
 
 
-def mkDec16(inputs, outputs):
-    def mkHalfSub(inputs, outputs):
+@chip
+def Dec16(inputs, outputs):
+    @chip
+    def HalfSub(inputs, outputs):
         """This is the same trick as HalfAdder, with the second input and the output inverted.
         """
 
@@ -61,18 +63,15 @@ def mkDec16(inputs, outputs):
         outputs.sum = Nand(a=not_a_or_not_b, b=a_or_b).out
         outputs.neg_carry = Not(in_=a_or_b).out
 
-    HalfSub = build(mkHalfSub)
-
     neg_carry = outputs.out[0] = Not(in_=inputs.in_[0]).out
     for i in range(1, 16):
         sub = HalfSub(a=inputs.in_[i], neg_b=neg_carry)
         outputs.out[i] = sub.sum
         neg_carry = sub.neg_carry
 
-Dec16 = build(mkDec16)
 
-
-def mkSPCPU(inputs, outputs):
+@chip
+def SPCPU(inputs, outputs):
     """Implements the Hack architecture, plus two extra instructions:
 
     Pop to register:
@@ -172,10 +171,9 @@ def mkSPCPU(inputs, outputs):
     # expose SP for debugging purposes (since it's no longer found in the RAM)
     outputs.sp = sp_reg.out
 
-SPCPU = build(mkSPCPU)
 
-
-def mkSPComputer(inputs, outputs):
+@chip
+def SPComputer(inputs, outputs):
     """This is the same as regular Computer, except using SPCPU, and exposing `sp` as an output so that
     it can be inspected for tests and debugging.
     """
@@ -195,8 +193,6 @@ def mkSPComputer(inputs, outputs):
     outputs.pc = cpu.pc
     outputs.sp = cpu.sp
     outputs.tty_ready = mem.tty_ready
-
-SPComputer = build(mkSPComputer)
 
 
 def parse_op(string, symbols={}):
@@ -260,7 +256,7 @@ class Translator(solved_07.Translator):
         self.asm.instr("SP++=D")
 
     def _pop_d(self):
-        # TODO: no need for this as soon as everything's switched to use SP++ directly?
+        # TODO: no need for this as soon as everything's switched to use --SP directly?
         self.asm.instr("D=--SP")
 
     def _binary(self, opcode, op):

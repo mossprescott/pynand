@@ -55,34 +55,32 @@ from nand.solutions import solved_06, solved_07
 
 # Project 01:
 
-def mkNot8(inputs, outputs):
+@chip
+def Not8(inputs, outputs):
     in_ = inputs.in_
     for i in range(8):
         outputs.out[i] = Not(in_=in_[i]).out
 
-Not8 = build(mkNot8)
 
-
-def mkAnd8(inputs, outputs):
+@chip
+def And8(inputs, outputs):
     for i in range(8):
         outputs.out[i] = And(a=inputs.a[i], b=inputs.b[i]).out
 
-And8 = build(mkAnd8)
 
-
-def mkMux8(inputs, outputs):
+@chip
+def Mux8(inputs, outputs):
     not_sel = Not(in_=inputs.sel).out
     for i in range(8):
         fromAneg = Nand(a=inputs.a[i], b=not_sel).out
         fromBneg = Nand(a=inputs.b[i], b=inputs.sel).out
         outputs.out[i] = Nand(a=fromAneg, b=fromBneg).out
 
-Mux8 = build(mkMux8)
-
 
 # Project 02:
 
-def mkInc8(inputs, outputs):
+@chip
+def Inc8(inputs, outputs):
     """Note: this is subtly different than Inc16 in that it may or may not actually increment
     the value, under the control of carry_in. This allows the carry to propagate from the low
     word to the high word.
@@ -94,10 +92,9 @@ def mkInc8(inputs, outputs):
         carry = tmp.carry
     outputs.carry_out = carry
 
-Inc8 = build(mkInc8)
 
-
-def mkAdd8(inputs, outputs):
+@chip
+def Add8(inputs, outputs):
     carry = inputs.carry_in
     for i in range(8):
         tmp = FullAdder(a=inputs.a[i], b=inputs.b[i], c=carry)
@@ -105,10 +102,9 @@ def mkAdd8(inputs, outputs):
         carry = tmp.carry
     outputs.carry_out = carry
 
-Add8 = build(mkAdd8)
 
-
-def mkZero8(inputs, outputs):
+@chip
+def Zero8(inputs, outputs):
     in_ = inputs.in_
     outputs.out = And(
         a=And(a=And(a=Not(in_=in_[ 7]).out,
@@ -119,16 +115,15 @@ def mkZero8(inputs, outputs):
                     b=Not(in_=in_[ 2]).out).out,
               b=And(a=Not(in_=in_[ 1]).out,
                     b=Not(in_=in_[ 0]).out).out).out).out
-Zero8 = build(mkZero8)
 
 
-def mkNeg8(inputs, outputs):
+@chip
+def Neg8(inputs, outputs):
     outputs.out = inputs.in_[7]
 
-Neg8 = build(mkNeg8)
 
-
-def mkEightALU(inputs, outputs):
+@chip
+def EightALU(inputs, outputs):
     """Eight-bit ALU, with one addition:
 
     The single low bit carry_in is added along with x and y, and the carry_out from that operation
@@ -166,26 +161,25 @@ def mkEightALU(inputs, outputs):
     outputs.ng = Neg8(in_=out).out
     outputs.carry_out = added.carry_out
 
-EightALU = build(mkEightALU)
-
 
 # Project 03:
 
-def mkRegister8(inputs, outputs):
+@chip
+def Register8(inputs, outputs):
     for i in range(8):
         outputs.out[i] = Bit(in_=inputs.in_[i], load=inputs.load).out
-Register8 = build(mkRegister8)
 
 
-def mkLatch8(inputs, outputs):
+@chip
+def Latch8(inputs, outputs):
     """Just 8 DFFs, for cases where we need to latch a half-word between top and bottom half-cycles.
     """
     for i in range(8):
         outputs.out[i] = DFF(in_=inputs.in_[i]).out
-Latch8 = build(mkLatch8)
 
 
-def mkPC8(inputs, outputs):
+@chip
+def PC8(inputs, outputs):
     """16-bit PC, built from two 8-bit registers and a single Inc8.
 
     On the first half-cycle, the low half-word is incremented but not yet stored.
@@ -226,8 +220,6 @@ def mkPC8(inputs, outputs):
 
     outputs.out = Splice(lo=pc_lo.out, hi=pc_hi.out).out
 
-PC8 = build(mkPC8)
-
 
 # Project 05:
 
@@ -251,7 +243,8 @@ def Not_(x):
     return Not(in_=x).out
 
 
-def mkEightCPU(inputs, outputs):
+@chip
+def EightCPU(inputs, outputs):
     """Implement the 16-bit Hack instruction set using a single 8-bit ALU and a pair of 8-bit
     registers for each architectural register, plus some extra flip-flops to keep track of state
     in between two "half"-cycles.
@@ -323,10 +316,9 @@ def mkEightCPU(inputs, outputs):
     outputs.addressM = a_both_reg                            # Address in data memory (of M) (latched)
     outputs.pc = pc.out                                      # address of next instruction (latched)
 
-EightCPU = build(mkEightCPU)
 
-
-def mkEightComputer(inputs, outputs):
+@chip
+def EightComputer(inputs, outputs):
     reset = inputs.reset
 
     cpu = lazy()
@@ -342,24 +334,22 @@ def mkEightComputer(inputs, outputs):
     outputs.pc = cpu.pc
     outputs.tty_ready = mem.tty_ready
 
-EightComputer = build(mkEightComputer)
-
 
 # 8-bit adapters:
 
-def mkSplice(inputs, outputs):
+@chip
+def Splice(inputs, outputs):
     """Wiring only: assemble two 8-bit signals into a 16-bit signal."""
     for i in range(8):
         outputs.out[i] = inputs.lo[i]
         outputs.out[i+8] = inputs.hi[i]
-Splice = build(mkSplice)
 
-def mkSplit(inputs, outputs):
+@chip
+def Split(inputs, outputs):
     """Wiring only: extract two 8-bit signals from a 16-bit signal."""
     for i in range(8):
         outputs.lo[i] = inputs.in_[i]
         outputs.hi[i] = inputs.in_[i+8]
-Split = build(mkSplit)
 
 
 # Main:
