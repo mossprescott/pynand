@@ -87,7 +87,7 @@ def run_compiled(ic):
     print(f"wrote {temp_path}")
 
     # Yikes:
-    import pyximport
+    import pyximport  # type: ignore
     pyximport.install()
     exec(f"import generated.{module_name}")
     chip_class = eval(f"generated.{module_name}.{class_name}")
