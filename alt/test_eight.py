@@ -768,16 +768,13 @@ def test_vm_statics_multiple_files():
 # Performance. TL;DR, it's worse.
 #
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
-    cycles = test_optimal_08.count_pong_cycles_first_iteration(EightComputer, solved_06.assemble, Translator)
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(platform=EIGHT_PLATFORM)
 
-    assert cycles < 70_000
+    assert cycles < 85_000
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(solved_05.Computer, solved_06.assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(platform=EIGHT_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < 8_000_000
+    assert cycles < 260_000

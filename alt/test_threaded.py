@@ -163,24 +163,19 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ThreadedComputer, assemble=assemble, translator=Translator)
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
-    instruction_count = test_optimal_08.count_pong_instructions(Translator)
+    instruction_count = test_optimal_08.count_pong_instructions(platform=THREADED_PLATFORM)
 
-    # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # ~8_700
+    assert instruction_count < 8_200
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
-    cycles = test_optimal_08.count_pong_cycles_first_iteration(ThreadedComputer, assemble, Translator)
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(platform=THREADED_PLATFORM)
 
-    assert cycles < 1  #?
+    assert cycles < 50_000
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(ThreadedComputer, assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(platform=THREADED_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # ~5.1m
+    assert cycles < 180_000

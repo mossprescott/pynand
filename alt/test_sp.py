@@ -204,21 +204,19 @@ def test_vm_statics_multiple_files():
 def test_vm_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(SP_PLATFORM)
 
-    # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # 15_749
+    assert instruction_count < 14_200
 
 
 def test_pong_first_iteration():
     cycles = test_optimal_08.count_pong_cycles_first_iteration(SP_PLATFORM)
 
-    assert cycles < 1  #?
+    assert cycles < 27_500
 
 
 def test_vm_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(SP_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # 2_612_707
+    assert cycles < 80_000
 
 
 def init_sp(cpu):

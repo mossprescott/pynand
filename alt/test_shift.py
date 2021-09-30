@@ -221,25 +221,19 @@ def test_multiply():
     assert computer.peek(256) == -4182
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
-    instruction_count = test_optimal_08.count_pong_instructions(Translator)
+    instruction_count = test_optimal_08.count_pong_instructions(platform=SHIFT_PLATFORM)
 
-    # compare to the project_08 solution (about 28k)
-    assert instruction_count < 28_300
+    assert instruction_count < 26_100
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
-    cycles = test_optimal_08.count_pong_cycles_first_iteration(ShiftComputer, assemble, Translator)
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(platform=SHIFT_PLATFORM)
 
-    # compare to the project_08 solution (about 34k)
-    assert cycles < 20_000
+    assert cycles < 19_850
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(ShiftComputer, assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(platform=SHIFT_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < 3_970_000
+    assert cycles < 130_000

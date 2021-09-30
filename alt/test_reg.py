@@ -169,19 +169,16 @@ def test_sys_lib():
 def test_pong_instructions():
     instruction_count = test_optimal_08.count_pong_instructions(REG_PLATFORM)
 
-    # compare to the project_08 solution (about 27k)
     assert instruction_count < 21_550
 
 
 def test_pong_first_iteration():
     cycles = test_optimal_08.count_pong_cycles_first_iteration(REG_PLATFORM)
 
-    # Note: this isn't deterministic, but it
-    assert cycles < 16_600
+    assert cycles < 19_200
 
 
 def test_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(REG_PLATFORM)
 
-    # compare to the project_08 solution (about 130k)
     assert cycles < 60_000
