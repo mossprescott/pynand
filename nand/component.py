@@ -5,7 +5,7 @@ import itertools
 
 class Component:
     """Defines the interface for a component, including what traces it reads and writes, and when."""
-    
+
     def __init__(self):
         self.label = self.__class__.__name__
 
@@ -26,17 +26,17 @@ class Component:
 
 
 class Const(Component):
-    """Mostly fictional component which just supplies a constant value. No runtime cost. 
+    """Mostly fictional component which just supplies a constant value. No runtime cost.
     """
-    
+
     def __init__(self, bits, value):
         Component.__init__(self)
         self.bits = bits
         self.value = value
-    
+
     def inputs(self):
         return {}
-    
+
     def outputs(self):
         return {"out": self.bits}
 
@@ -106,7 +106,8 @@ class RAM(Component):
 
 
 class Input(Component):
-    """Single-word device which presents some input from outside the computer.
+    """Single-word device which presents some input from outside the computer
+    (e.g. the keyboard or terminal.)
     """
 
     def __init__(self):
@@ -119,4 +120,23 @@ class Input(Component):
         return {"out": 16}
 
 
-# TODO: Output, (potentially) accepting one word of output on each clock cycle?
+class Output(Component):
+    """Single-word device which allows the computer to write data to some external
+    device (e.g. a printer or terminal.)
+
+    Properly, this component has no output, but in order to be added to a chip's
+    wiring graph, it needs to have some output, so it provides `ready`, which is
+    normally 1, but goes to 0 when a value has been written to the output and
+    not yet consumed by whatever external process might be reading it. Note: a new
+    value can still be written when the previous value has not been read; it will
+    just overwrite it.
+    """
+
+    def __init__(self):
+        Component.__init__(self)
+
+    def inputs(self):
+        return {"in_": 16, "load": 1}
+
+    def outputs(self):
+        return {"ready": 1}

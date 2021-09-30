@@ -21,10 +21,16 @@ def test_backward_compatible_cpu():
 
 def test_backward_compatible_computer_add():
     test_05.test_computer_add(ThreadedComputer)
-    
+
 def test_backward_compatible_computer_max():
     test_05.test_computer_max(ThreadedComputer)
-    
+
+def test_backward_compatible_keyboard():
+    test_05.test_computer_keyboard(ThreadedComputer)
+
+def test_backward_compatible_tty():
+    test_05.test_computer_tty(ThreadedComputer)
+
 def test_backward_compatible_speed():
     test_05.test_speed(ThreadedComputer)
 
@@ -69,12 +75,12 @@ def test_call_and_return(simulator):
 
     cpu.instruction = parse_op("CALL target", symbols)
     cpu.ticktock()
-    
+
     assert cpu.pc == 12345
 
     cpu.instruction = parse_op("RTN")
     cpu.ticktock()
-    assert cpu.pc == 1001    
+    assert cpu.pc == 1001
 
 
 def test_computer_gates():
@@ -84,6 +90,7 @@ def test_computer_gates():
        'roms': 1,
        'rams': 2,
        'inputs': 1,
+       'outputs': 1,
    }
 
 
@@ -108,7 +115,7 @@ def test_backward_compatible_ops():
 def test_assemble_call():
     symbols = {"target": 12345}
     assert unsigned(parse_op("CALL target", symbols))  == 0b1000_0000_0000_0000 | 12345
-    
+
     # with pytest.raises(SyntaxError) as exc_info:
     #     parse_op("CALL ")
     # assert str(exc_info.value).startswith("M not allowed as a destination for pop")
@@ -142,10 +149,10 @@ def test_vm_basic_loop():
 
 def test_vm_fibonacci_series():
     test_08.test_fibonacci_series(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_simple_function():
     test_08.test_simple_function(chip=ThreadedComputer, assemble=assemble, translator=Translator)
-    
+
 def test_vm_nested_call():
     test_08.test_nested_call(chip=ThreadedComputer, assemble=assemble, translator=Translator)
 
@@ -156,24 +163,19 @@ def test_vm_statics_multiple_files():
     test_08.test_statics_multiple_files(chip=ThreadedComputer, assemble=assemble, translator=Translator)
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_pong_instructions():
-    instruction_count = test_optimal_08.count_pong_instructions(Translator)
+    instruction_count = test_optimal_08.count_pong_instructions(platform=THREADED_PLATFORM)
 
-    # compare to the project_08 solution (about 28k)
-    assert instruction_count < -1  # ~8_700
+    assert instruction_count < 8_200
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_pong_first_iteration():
-    cycles = test_optimal_08.count_pong_cycles_first_iteration(ThreadedComputer, assemble, Translator)
+    cycles = test_optimal_08.count_pong_cycles_first_iteration(platform=THREADED_PLATFORM)
 
-    assert cycles < 1  #?
+    assert cycles < 50_000
 
 
-@pytest.mark.skip(reason="Sources aren't in the repo yet")
 def test_vm_cycles_to_init():
-    cycles = test_optimal_08.count_cycles_to_init(ThreadedComputer, assemble, Translator)
+    cycles = test_optimal_08.count_cycles_to_init(platform=THREADED_PLATFORM)
 
-    # compare to the project_08 solution (about 4m)
-    assert cycles < -1  # ~5.1m
+    assert cycles < 180_000

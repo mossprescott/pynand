@@ -1,0 +1,90 @@
+/*
+For test purposes, this implementation of the Output class just writes characters to the "TTY"
+port, and doesn't update the screen at all. That saves a lot of time, and it means we can test
+String operations without trying to inspect the screen buffer (or even having drawing to the
+screen working at all.)
+*/
+class Output {
+    // Not called from minimal_sys_lib
+    function void init() {
+        return;
+    }
+
+    // Ignored.
+    function void moveCursor(int i, int j) {
+        return;
+    }
+
+    function void printChar(char c) {
+        var Array tty;
+
+        let tty = 24576;  // 0x6000
+        let tty[0] = c;
+
+        return;
+    }
+
+    function void printString(String s) {
+        // Note: writing directly here (as opposed to calling printChar) saves some cycles.
+        // However, we don't want this to be *too* efficient, because whoever's polling the TTY
+        // port needs to check it often enough to see each character as it goes by.
+        // That is, you can't just write one value after another to memory as fast as you
+        // please, and there's no way from inside the CPU to see if the last value you wrote
+        // has been consumed yet.
+        // That's probably not going to be a problem, since String.charAt() should involve
+        // plenty of overhead.
+
+        var Array tty;
+        var int length, ptr;
+
+        let tty = 24576;  // 0x6000
+
+        let length = s.length();
+        let ptr = 0;
+        while (ptr < length) {
+            let tty[0] = s.charAt(ptr);
+            let ptr = ptr + 1;
+        }
+
+
+        // // A lot faster and cheaper, by peeking into the internals of the String.
+        // var Array tty;
+        // var Array ptr, end;
+
+        // let tty = 24576;
+
+        // let ptr = s[1];  // String.chars
+        // let end = ptr + s[2];  // String.length
+        // while (ptr < end) {
+        //     let tty[0] = ptr[0];
+        //     let ptr = ptr + 1;
+        // }
+
+        return;
+    }
+
+    function void printInt(int i) {
+        // TODO: avoid allocating a String here, to keep the tests quick (and avoid the dependency?)
+        var String temp;
+
+        let temp = String.new(6);
+        do temp.setInt(i);
+        do Output.printString(temp);
+        do temp.dispose();
+        return;
+    }
+
+    function void println() {
+        var Array tty;
+
+        let tty = 24576;   // 0x6000
+        let tty[0] = 128;  // same as String.newLine()
+
+        return;
+    }
+
+    // Ignored, for now. What should it do? Write a backspace character?
+    function void backSpace() {
+        return;
+    }
+}

@@ -1,20 +1,20 @@
-"""A low-level, precise evaluator, which can simulate _any_ IC based on Nand gates, as well as any 
+"""A low-level, precise evaluator, which can simulate _any_ IC based on Nand gates, as well as any
 custom component which can express its behavior in terms of updating bits in a state vector.
 
-This is fast enough for small tests, about 1 kHz, but not fast enough to run large interactive 
+This is fast enough for small tests, about 1 kHz, but not fast enough to run large interactive
 programs.
 
 This simulation allows all the components of the Nand2Tetris course to be designed and tested,
-without relying on any pre-defined components. However, very large chips such as large RAMs 
+without relying on any pre-defined components. However, very large chips such as large RAMs
 constructed from Nands or even DFFs are too slow to simulate directly, so predefined ROM and RAM
 components are provided instead for use in the full CPU/Computer.
 
 Getting this level of performance out of such a low-level simulation, in Python, is a bit of a feat,
-so there's a lot of low-level bit slicing tricks being employed here. Compare with the much simpler, 
+so there's a lot of low-level bit slicing tricks being employed here. Compare with the much simpler,
 faster, but more limited simulator in codegen.py.
 """
 
-from nand.component import Nand, Const, DFF, RAM, ROM, Input
+from nand.component import Nand, Const, DFF, RAM, ROM, Input, Output
 from nand.integration import Connection, root, clock
 from nand.optimize import simplify
 
@@ -37,10 +37,11 @@ def run(ic, optimize = True):
 def synthesize(ic):
     """Compile the chip down to traces and ops for evaluation.
 
-    Returns a NandVector and a list of stateful components (e.g. RAMs).
+    Returns a NandVector and a list of custom components (e.g. RAMs; anything other than
+    Nand, DFF, and Const.)
     """
     ic = ic.flatten()
-            
+
     # TODO: check for missing wires?
     # TODO: check for unused components?
 
@@ -52,12 +53,12 @@ def synthesize(ic):
     if any_clock_references:
         all_bits[clock] = next_bit
         next_bit += 1
-        
+
     for conn in sorted(set(ic.wires.values()), key=ic._connections_sort_key()):
         if conn != clock:
             all_bits[conn] = next_bit
             next_bit += 1
-    
+
     # Construct map of IC inputs, directly from all_bits:
     inputs = {
         (name, bit): 1 << all_bits[Connection(root, name, bit)]
@@ -65,7 +66,7 @@ def synthesize(ic):
         for bit in range(bits)
         if Connection(root, name, bit) in all_bits  # Not all input bits are necessarily connected.
     }
-    
+
     if any_clock_references:
         inputs[("common.clock", 0)] = 1 << all_bits[clock]
 
@@ -92,10 +93,14 @@ def synthesize(ic):
         for name, bits in comp.outputs().items():
             traces[name] = [1 << all_bits[Connection(comp, name, bit)] for bit in range(bits)]
         ops = component_ops(comp)
-        initialize_ops += ops.initialize(**traces)
-        combine_ops += ops.combine(**traces)
-        sequence_ops += ops.sequence(**traces)
-        stateful.append(ops)
+        init_ops = ops.initialize(**traces)
+        comb_ops = ops.combine(**traces)
+        seq_ops = ops.sequence(**traces)
+        initialize_ops += init_ops
+        combine_ops += comb_ops
+        sequence_ops += seq_ops
+        if not isinstance(ops, (NandOps, ConstOps, DFFOps)):
+            stateful.append(ops)
 
     back_edge_from_components = set()
     for to_input, from_output in ic.wires.items():
@@ -110,9 +115,11 @@ def synthesize(ic):
         if conn.comp not in back_edge_from_components:
             non_back_edge_mask |= 1 << bit
 
-    return NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask), stateful
+    return (NandVector(inputs, outputs, internal, initialize_ops, combine_ops, sequence_ops, non_back_edge_mask),
+            stateful)
 
-    
+
+
 def component_ops(comp):
     if isinstance(comp, Nand):
         return NandOps()
@@ -126,6 +133,8 @@ def component_ops(comp):
         return RAMOps(comp)
     elif isinstance(comp, Input):
         return InputOps(comp)
+    elif isinstance(comp, Output):
+        return OutputOps(comp)
     else:
         raise Exception(f"unrecognized component: {comp}")
 
@@ -135,7 +144,7 @@ class VectorOps:
         """Stage 1: set non-zero initial values.
         """
         return []
-        
+
     def combine(self, **trace_map):
         """Stage 2: define combinational logic, as operations which are performed on the chip's traces
         to propagate signals.
@@ -230,7 +239,7 @@ class RAMOps(VectorOps):
         def write(traces):
             load_val = tst_trace(load[0], traces)
             if load_val:
-                # Tricky: sign extension was never needed here until eight.py, and it will 
+                # Tricky: sign extension was never needed here until eight.py, and it will
                 # hurt performance slightly.
                 in_val = extend_sign(get_multiple_traces(in_, traces))
                 address_val = get_multiple_traces(address, traces)
@@ -254,6 +263,43 @@ class InputOps(VectorOps):
         return [custom_op(read)]
 
 
+class OutputOps(VectorOps):
+    """Note: to the chip, an Output looks like a pure sink, but internally it holds onto the last
+    value it received until it has been consumed.
+
+    Not so fast. The way wiring works required the component to have _some_ output, so now
+    it produces "ready" which is true whenever the value has been reset (or indeed, if someone
+    tried to write the value 0.)
+    """
+    def __init__(self, comp):
+        self.comp = comp
+        self.value = 0
+
+    def read(self):
+        """Consume the last-written value, if any, and reset to 0."""
+        tmp = self.value
+        self.value = 0
+        return tmp
+
+    def combine(self, ready, **unused):
+        """Note: not using the inputs at all."""
+        assert len(ready) == 1
+        def read(traces):
+            return set_trace(ready[0], self.value == 0, traces)
+        return [custom_op(read)]
+
+    def sequence(self, in_, load, ready):
+        assert len(in_) == 16 and len(load) == 1 and len(ready) == 1
+        def write(traces):
+            load_val = tst_trace(load[0], traces)
+            if load_val:
+                in_val = extend_sign(get_multiple_traces(in_, traces))
+                self.value = in_val
+                set_trace(ready[0], in_val == 0, traces)
+            return traces
+        return [custom_op(write)]
+
+
 class NandVector:
     """Tracks the true/false state of each of a set of bits, related by a sequence of Nand ops.
 
@@ -267,12 +313,12 @@ class NandVector:
     sequence (via `_nand_bits`), with just three bit-wise operations on the ints. In case there are
     any out-of-order or circular dependencies, the entire loop is repeated until no more changes are
     seen (or, if no fixed-point is found, an exception is raised.)
-    
-    `non_back_edge_mask` identifies bits which are known to be consumed only by "normal" references, 
-    for which all updates are always seen in a single evaluation pass. If an evaluation pass only 
+
+    `non_back_edge_mask` identifies bits which are known to be consumed only by "normal" references,
+    for which all updates are always seen in a single evaluation pass. If an evaluation pass only
     changes bits which are in this mask, then evaluation is complete. If not, need to do another pass
-    to propagate changes for reference cycles. The default, 0, is never wrong, but using it means 
-    an extra evaluation pass each time to check for any change, with the last pass always making 
+    to propagate changes for reference cycles. The default, 0, is never wrong, but using it means
+    an extra evaluation pass each time to check for any change, with the last pass always making
     no change (and therefore, just a waste.)
     """
 
@@ -288,7 +334,7 @@ class NandVector:
         for op in initialize_ops:
             traces = run_op(op, traces)
         self.traces = traces
-        
+
         self.dirty = True
 
     def set(self, key, value):
@@ -337,7 +383,7 @@ class NandVector:
                         ts |= out_mask
             return ts
 
-        # FIXME: the number of repeats here increased to 3 for the full CPU with the first 
+        # FIXME: the number of repeats here increased to 3 for the full CPU with the first
         # runtime, then increased to 5 when it was re-implemented. That suggests that the
         # sorting of components is not quite right. If anything, now that all the gates are
         # flattened the sort should be more effective.
@@ -361,9 +407,9 @@ class NandVector:
         """Simulate advancing the clock, by copying the input of each flip-flop to its output,
         or whatever else the component needs to make happen.
         """
-        
+
         self._propagate()
-        
+
         for op in self.sequence_ops:
             self.traces = run_op(op, self.traces)
 
@@ -371,8 +417,18 @@ class NandVector:
 
 
 def extend_sign(x):
-    """Extend the sign of the low-16 bits of a value to the full width.
+    """Extend the sign of the low-16 bits of a value to the full width. That is, given the bits
+    of a signed value as they would appear in a 16-bit word, convert to a proper Python int.
+    Helpful for unpacking values that have been assembled from bits.
+
+    >>> extend_sign(1)
+    1
+    >>> extend_sign(1 << 15)
+    -32768
+    >>> extend_sign(0xFFFF)
+    -1
     """
+
     if x & 0x8000 != 0:
         return (-1 & ~0xffff) | x
     else:
@@ -380,8 +436,22 @@ def extend_sign(x):
 
 
 def unsigned(x):
-    """Extend the low 16-bits of an unsigned value to the full width, without sign extension.
+    """Return the bit pattern of the low 16-bits of a (signed) int value, as an unsigned int.
+    These are the bits that would be used to represent the value in a 16-bit word. Sometimes
+    helpful for packing values into words.
+
+    This is the inverse of extend_sign() (for values that fit in 16 bits.)
+
+    >>> unsigned(1)
+    1
+    >>> unsigned(-1)
+    65535
+    >>> unsigned(-64) == 0b1111_1111_1100_0000
+    True
+    >>> for x in range(-10, 10):
+    ...     assert extend_sign(unsigned(x)) == x
     """
+
     return x & 0xffff
 
 
@@ -451,14 +521,14 @@ def custom_op(f):
 class NandVectorWrapper:
     """Convenient syntax around a NandVector. You get one of these from run(chip).
     """
-    
+
     def __init__(self, vector):
         self._vector = vector
-        
+
     def __setattr__(self, name, value):
         """Set the value of a single- or multiple-bit input."""
         if name.startswith('_'): return object.__setattr__(self, name, value)
-        
+
         if (name, None) in self._vector.inputs:
             self._vector.set((name, None), value)
         for i in range(16):
@@ -512,10 +582,10 @@ class NandVectorWrapper:
 
     def internal(self):
         return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
-        
+
     def components(self, types):
         """List of internal components (e.g. RAM, ROM).
-        
+
         Note: types should be one or more of the types defined in nand.component, not the wrappers
         with the same names defined in this module.
         """
@@ -527,7 +597,7 @@ class NandVectorWrapper:
 
 class NandVectorComputerWrapper(NandVectorWrapper):
     """Wrapper with extra operations for the full Computer."""
-    
+
     def __init__(self, vector, stateful):
         NandVectorWrapper.__init__(self, vector)
         self._stateful = stateful
@@ -535,6 +605,7 @@ class NandVectorComputerWrapper(NandVectorWrapper):
         self._mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
         self._screen, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 13]
         self._keyboard, = [c for c in self._stateful if isinstance(c, InputOps)]
+        self._tty, = [c for c in self._stateful if isinstance(c, OutputOps)]
 
     def run_program(self, instructions):
         """Install and run a sequence of instructions, stopping when pc runs off the end."""
@@ -560,12 +631,12 @@ class NandVectorComputerWrapper(NandVectorWrapper):
 
         size = len(instructions)
 
-        # The ROM size limits the size of program that can run, not to mention, e.g. the format of 
+        # The ROM size limits the size of program that can run, not to mention, e.g. the format of
         # instructions used to load jump targets.
         rom_max = 2**self._rom.comp.address_bits
         if size >= rom_max:
             raise Exception(f"Too many instructions: {size:0,d} >= {rom_max:0,d}")
-            
+
         prg = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
@@ -583,17 +654,25 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     def peek_screen(self, address):
         """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
         return self._screen.storage[address]
-    
+
     def poke_screen(self, address, value):
         """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
         self._screen.storage[address] = value
-    
+
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
-        self._keyboard.value = keycode
+        self._keyboard.set(keycode)
+
+    def get_tty(self):
+        """Read one word of output which has been written to the tty port, and reset it to 0."""
+
+        # Tricky: clearing the value in the Output component flips its `ready` output, most of the time.
+        self._vector.dirty = True
+        return self._tty.read()
 
     # Tricky: SP might get special treatment in some implementations, so provide a named property
     # that subclasses can override.
     @property
     def sp(self):
+        """Read the current value of the stack pointer, which is normally stored at RAM[0]."""
         return self.peek(0)

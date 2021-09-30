@@ -1,13 +1,14 @@
 #! /usr/bin/env pytest
 
 import itertools
+import pytest
 
 from nand import run
 
 import project_05, project_06, project_07
 
 
-# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
+# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good
 # coverage, but they don't isolate problems well for debugging.
 
 def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
@@ -31,45 +32,45 @@ def test_simple_add(chip=project_05.Computer, assemble=project_06.assemble, tran
 
 def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
-    
+
     # Executes a sequence of arithmetic and logical operations
-    # on the stack. 
+    # on the stack.
     translate.push_constant(17)
     translate.push_constant(17)
     translate.eq()
-    
+
     translate.push_constant(17)
     translate.push_constant(16)
     translate.eq()
-    
+
     translate.push_constant(16)
     translate.push_constant(17)
     translate.eq()
-    
+
     translate.push_constant(892)
     translate.push_constant(891)
     translate.lt()
-    
+
     translate.push_constant(891)
     translate.push_constant(892)
     translate.lt()
-    
+
     translate.push_constant(891)
     translate.push_constant(891)
     translate.lt()
-    
+
     translate.push_constant(32767)
     translate.push_constant(32766)
     translate.gt()
-    
+
     translate.push_constant(32766)
     translate.push_constant(32767)
     translate.gt()
-    
+
     translate.push_constant(32766)
     translate.push_constant(32766)
     translate.gt()
-    
+
     translate.push_constant(57)
     translate.push_constant(31)
     translate.push_constant(53)
@@ -102,10 +103,38 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
     assert computer.peek(264) == 0
     assert computer.peek(265) == -91
 
+@pytest.mark.skip(reason="A simple lt doesn't handle overflow properly, but programs seem to work anyway.")
+def test_compare_edge_cases(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
+    translate = translator()
+
+    # -1,000 < 2,000: the difference fits in a word
+    translate.push_constant(1000)
+    translate.neg()
+    translate.push_constant(2000)
+    translate.lt()
+
+    # -20,000 < 30,000: the difference overflows
+    translate.push_constant(20000)
+    translate.neg()
+    translate.push_constant(30000)
+    translate.lt()
+
+    translate.finish()
+
+    computer = run(chip, simulator=simulator)
+
+    init_sp(computer)
+
+    translate.asm.run(assemble, computer, stop_cycles=1_000, debug=True)
+
+    assert computer.sp == 258
+    assert computer.peek(256) == -1
+    assert computer.peek(257) == -1
+
 
 def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
-    
+
     # Executes pop and push commands using the virtual memory segments.
     translate.push_constant(10)
     translate.pop_local(0)
@@ -144,9 +173,9 @@ def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assem
     computer.poke(4, 3010)  # base address of the that segment
 
     translate.asm.run(assemble, computer, debug=True)
-    
-    # Note: the original test put the stack in a funky state with LCL and ARG are _above_ SP, 
-    # which actually makes no sense and as a result the trace was confusing, so here they're 
+
+    # Note: the original test put the stack in a funky state with LCL and ARG are _above_ SP,
+    # which actually makes no sense and as a result the trace was confusing, so here they're
     # set to realistic values.
 
     assert computer.peek(256) == 472
@@ -161,7 +190,7 @@ def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assem
 
 def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
-    
+
     # Executes pop and push commands using the
     # pointer, this, and that segments.
     translate.push_constant(3030)
@@ -181,7 +210,7 @@ def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.ass
     translate.add()
 
     translate.finish()
-    
+
     computer = run(chip, simulator=simulator)
 
     init_sp(computer)
@@ -193,11 +222,11 @@ def test_memory_access_pointer(chip=project_05.Computer, assemble=project_06.ass
     assert computer.peek(4) == 3040
     assert computer.peek(3032) == 32
     assert computer.peek(3046) == 46
-    
-    
+
+
 def test_memory_access_static(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
-    
+
     # Executes pop and push commands using the static segment.
     translate.push_constant(111)
     translate.push_constant(333)
@@ -227,8 +256,8 @@ def test_memory_access_static(chip=project_05.Computer, assemble=project_06.asse
 
 def init_sp(computer, address=256):
     """Initialize SP, which may or may not be stored in RAM."""
-    
-    pgm = project_06.assemble([
+
+    pgm, _, _ = project_06.assemble([
         f"@{address}",
         "D=A",
         "@SP",

@@ -1,3 +1,5 @@
+# VM II: Program Control
+#
 # See https://www.nand2tetris.org/project08
 
 import project_07
@@ -27,7 +29,7 @@ class Translator(project_07.Translator):
     #
     # Program Flow — Fibonacci Series:
     #
-    
+
     def goto(self, name):
         # SOLVERS: implement
         return self.solved.goto(name)
@@ -58,7 +60,7 @@ class Translator(project_07.Translator):
     #
     # Function Calls - Fibonacci Element:
     #
-    
+
     def preamble(self):
-        # SOLVERS: emit instructions to be 
+        # SOLVERS: emit instructions to be
         return self.solved.preamble()

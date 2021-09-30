@@ -1,15 +1,15 @@
 #! /usr/bin/env python3
 
-"""An alternative CPU which enables _much_ smaller binaries, and therefore much larger programs, by 
+"""An alternative CPU which enables _much_ smaller binaries, and therefore much larger programs, by
 making a simple non-recursive call/return cost only one instruction in ROM per occurrence. With that,
 a "threaded" interpreter is much more compact (and readable).
 
-Essentially the binary consists of two parts: a fixed "library" of opcode handlers written using the 
-usual Hack machine instructions, and the actual program which is now just a sequence of CALLs into 
-the opcode handlers. Most of these calls are just a single instruction, so the overall size of the 
+Essentially the binary consists of two parts: a fixed "library" of opcode handlers written using the
+usual Hack machine instructions, and the actual program which is now just a sequence of CALLs into
+the opcode handlers. Most of these calls are just a single instruction, so the overall size of the
 binary is roughly the number of opcodes in the VM source, plus the fixed library (roughly 1k).
 
-A register is added to hold the return address, leaving D and A available for arguments, although 
+A register is added to hold the return address, leaving D and A available for arguments, although
 practically speaking the handler always needs to clobber one register or the other.
 
 The result is dramatically smaller executables, which run slower:
@@ -17,13 +17,14 @@ The result is dramatically smaller executables, which run slower:
 - instruction count for Pong: 8.7k (-70% from 29.5k)
 - cycles in Sys.init: 5.1m (+28% from 3.97m)
 
-That means some very large demos can now run. These are programs whose authors probably only ever ran them on the 
+That means some very large demos can now run. These are programs whose authors probably only ever ran them on the
 VM-level simulator.
 """
 
 import re
 
 from nand import *
+from nand.platform import BUNDLED_PLATFORM, Platform
 from nand.translate import AssemblySource, translate_dir
 
 from nand.solutions.solved_01 import And, Or, Not, Xor, Not16, Mux16
@@ -34,10 +35,10 @@ from nand.solutions import solved_06
 from nand.solutions import solved_07
 
 
-# Compare two 16-bit values. Another thing that's easy to simulate in codegen, and seems like it 
-# _should_ have a reasonably efficient representation in Nands, even if this isn't it (e.g. a couple 
+# Compare two 16-bit values. Another thing that's easy to simulate in codegen, and seems like it
+# _should_ have a reasonably efficient representation in Nands, even if this isn't it (e.g. a couple
 # of many-input Nands.)
-# Note: this simplifies to Zero16, if one of the inputs is 0, so maybe should just implement this 
+# Note: this simplifies to Zero16, if one of the inputs is 0, so maybe should just implement this
 # in project_02 instead.
 def mkEq16(inputs, outputs):
     a = inputs.a
@@ -74,11 +75,11 @@ Mask15 = build(mkMask15)
 def mkThreadedCPU(inputs, outputs):
     """Backwards-compatible with the Hack CPU, with two additional instructions and a new register
     storing a return address written by CALL and read by RTN.
-    
+
     CALL [symbol]
     - bit pattern: 10xx_xxxx_xxxx_xxxx
-    - symbol is resolved to a location in ROM, which must be non-zero and fit in 14 bits (the first 
-        half of ROM). Note: the translator actually only needs about 1,000 words for the library, so 
+    - symbol is resolved to a location in ROM, which must be non-zero and fit in 14 bits (the first
+        half of ROM). Note: the translator actually only needs about 1,000 words for the library, so
         10 or 11 bits would actually be sufficient.)
     - RA <- the address of the next instruction (i.e. PC+1)
     - PC <- the resolved address for symbol from instr[0..14]
@@ -110,7 +111,7 @@ def mkThreadedCPU(inputs, outputs):
     That's 2 instructions in ROM and 8 at runtime for pushing a large constant. Compare to 6 each in the standard VM.
     For small values, down to 1 (6 at runtime) from 4.
     """
-    
+
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
@@ -125,7 +126,7 @@ def mkThreadedCPU(inputs, outputs):
     rtn = Eq16(a=instruction, b=0x8000).out
     call = And(a=call_rtn, b=Not(in_=rtn).out).out
     call_target = Mask15(in_=instruction).out
-    
+
     alu = lazy()
     pc = lazy()
     a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=And(a=da, b=Not(in_=call_rtn).out).out).out)
@@ -138,15 +139,15 @@ def mkThreadedCPU(inputs, outputs):
     jump = And(a=i,
                b=Or(a=jump_lt, b=Or(a=jump_eq, b=jump_gt).out).out
               ).out
-              
+
     next_pc = Mux16(
                 a=Mux16(
-                    a=a_reg.out, 
+                    a=a_reg.out,
                     b=ra_reg.out,
                     sel=rtn).out,
-                b=call_target, 
+                b=call_target,
                 sel=call).out
-    
+
     pc.set(PC(in_=next_pc, load=Or(a=jump, b=call_rtn).out, inc=1, reset=reset))
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
@@ -162,7 +163,7 @@ ThreadedCPU = build(mkThreadedCPU)
 
 def mkThreadedComputer(inputs, outputs):
     reset = inputs.reset
-    
+
     cpu = lazy()
 
     rom = ROM(15)(address=cpu.pc)
@@ -174,6 +175,7 @@ def mkThreadedComputer(inputs, outputs):
     # HACK: need some dependency to force the whole thing to be synthesized.
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
+    outputs.tty_ready = mem.tty_ready
 
 ThreadedComputer = build(mkThreadedComputer)
 
@@ -189,19 +191,19 @@ def parse_op(string, symbols={}):
     return solved_06.parse_op(string, symbols)
 
 
-def assemble(lines):
-    return solved_06.assemble(lines, parse_op)
+def assemble(lines, **kw):
+    return solved_06.assemble(lines, parse_op, **kw)
 
 
 class Translator:
-    """Can't really re-use anything from the standard translator. 
+    """Can't really re-use anything from the standard translator.
     """
-    
+
     def __init__(self):
         # Parameters controlling how many specialized opcode variants are emitted.
-        # More specialization means a larger library, but smaller object code and 
+        # More specialization means a larger library, but smaller object code and
         # fewer cycles, generally.
-        # May be manually tweaked. A smart translator would inspect the source and choose them 
+        # May be manually tweaked. A smart translator would inspect the source and choose them
         # to optimize for size/speed.
         self.SPECIALIZED_MAX_PUSH_CONSTANT = 6  # TODO: 12?
         self.SPECIALIZED_MAX_POP_SEGMENT = 6  # TODO: 10?
@@ -217,17 +219,17 @@ class Translator:
         start = self.asm.next_label("start")
         self.asm.instr(f"@{start}")
         self.asm.instr("0;JMP")
-        
+
         # "Microcoded" instructions, which for this translator basically includes _all_ opcodes,
         # plus many special-cases:
-        # If there's a single argument, it's passed in A. If more than one, additional args are 
+        # If there's a single argument, it's passed in A. If more than one, additional args are
         # passed in R13-R15. See each implementation for specifics.
         self._library()
-        
+
         # Early check that the library of opcodes fits in the first half of the ROM, as required.
         # Practically speaking, probably want it to be _much_ smaller than that.
         assert self.asm.instruction_count <= 2**14
-        
+
         self.asm.label(start)
 
     def preamble(self):
@@ -238,15 +240,15 @@ class Translator:
         self.asm.instr("M=D")
 
         self.call("Sys", "init", 0)
-    
+
     def push_constant(self, value):
         """Value to push in A if not specialized.
         """
 
         assert 0 <= value < 2**15
-        
+
         self.asm.start(f"push constant {value}")
-        
+
         if value <= self.SPECIALIZED_MAX_PUSH_CONSTANT:
             self.asm.instr(f"CALL VM.push_constant_{value}")
         else:
@@ -320,7 +322,7 @@ class Translator:
         else:
             self.asm.instr(f"@{index}")
             self.asm.instr(f"CALL VM.pop_that")
-        
+
     def pop_temp(self, index):
         self.asm.start(f"pop temp {index}")
         self.asm.instr(f"CALL VM.pop_temp_{index}")
@@ -333,7 +335,7 @@ class Translator:
     def push_local(self, index):
         self.asm.start(f"push local {index}")
         if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
-            self.asm.instr(f"CALL VM.push_local_{index}")            
+            self.asm.instr(f"CALL VM.push_local_{index}")
         else:
             self.asm.instr(f"@{index}")
             self.asm.instr(f"CALL VM.push_local")
@@ -341,7 +343,7 @@ class Translator:
     def push_argument(self, index):
         self.asm.start(f"push argument {index}")
         if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
-            self.asm.instr(f"CALL VM.push_argument_{index}")            
+            self.asm.instr(f"CALL VM.push_argument_{index}")
         else:
             self.asm.instr(f"@{index}")
             self.asm.instr(f"CALL VM.push_argument")
@@ -349,7 +351,7 @@ class Translator:
     def push_this(self, index):
         self.asm.start(f"push this {index}")
         if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
-            self.asm.instr(f"CALL VM.push_this_{index}")            
+            self.asm.instr(f"CALL VM.push_this_{index}")
         else:
             self.asm.instr(f"@{index}")
             self.asm.instr(f"CALL VM.push_this")
@@ -357,7 +359,7 @@ class Translator:
     def push_that(self, index):
         self.asm.start(f"push that {index}")
         if index <= self.SPECIALIZED_MAX_PUSH_SEGMENT:
-            self.asm.instr(f"CALL VM.push_that_{index}")            
+            self.asm.instr(f"CALL VM.push_that_{index}")
         else:
             self.asm.instr(f"@{index}")
             self.asm.instr(f"CALL VM.push_that")
@@ -366,7 +368,7 @@ class Translator:
         assert 0 <= index < 8
         self.asm.start(f"push temp {index}")
         self.asm.instr(f"CALL VM.push_temp_{index}")
-        
+
     def push_pointer(self, index):
         assert 0 <= index <= 1
         self.asm.start(f"push pointer {index}")
@@ -376,7 +378,7 @@ class Translator:
         self.asm.start(f"push static {index}")
         self.asm.instr(f"@{self.class_namespace}.static{index}")
         self.asm.instr(f"CALL VM.pop_static")
-        
+
     def push_static(self, index):
         self.asm.start(f"pop static {index}")
         self.asm.instr(f"@{self.class_namespace}.static{index}")
@@ -385,7 +387,7 @@ class Translator:
     def label(self, name):
         self.asm.start(f"label {name}")
         self.asm.label(f"{self.function_namespace}${name}")
-    
+
     def if_goto(self, name):
         self.asm.start(f"if-goto {name}")
         self.asm.instr(f"@{self.function_namespace}${name}")
@@ -432,7 +434,7 @@ class Translator:
             self.asm.instr(f"D=A")
             self.asm.instr(f"@R13")
             self.asm.instr(f"M=D")
-        
+
             self.asm.instr(f"@{class_name.lower()}.{function_name}")
             self.asm.instr(f"CALL VM.call")
 
@@ -440,6 +442,14 @@ class Translator:
 
     def rewrite_ops(self, ops):
         return ops
+
+    def finish(self):
+        pass
+
+    def handle(self, op):
+        op_name, args = op
+        self.__getattribute__(op_name)(*args)
+
 
     def _library(self):
 
@@ -455,7 +465,7 @@ class Translator:
             self.asm.instr("@SP")
             self.asm.instr("AM=M-1")
             self.asm.instr("D=M")
-        
+
         # push constant
         for value in (0, 1):
             self.asm.label(f"VM.push_constant_{value}")
@@ -464,7 +474,7 @@ class Translator:
             self.asm.instr("A=M-1")
             self.asm.instr(f"M={value}")
             self.asm.instr("RTN")
-        
+
         for value in range(2, self.SPECIALIZED_MAX_PUSH_CONSTANT+1):
             self.asm.label(f"VM.push_constant_{value}")
             self.asm.instr(f"@{value}")
@@ -508,7 +518,7 @@ class Translator:
             self.asm.instr("D=M")
             push_d()
             self.asm.instr("RTN")
-        
+
         for index in range(self.SPECIALIZED_MAX_PUSH_SEGMENT+1):
             self.asm.label(f"VM.push_local_{index}")
             push_segment("LCL", index)
@@ -528,13 +538,13 @@ class Translator:
         self.asm.label("VM.push_that")
         push_segment_a("THAT")
 
-            
+
         # Pop to one of the memory segments:
         def pop_segment(segment_ptr, index):
             # TODO: specialize 0 and 1 to save two instr.
             self.asm.instr(f"@{index}")
             pop_segment_a(segment_ptr)
-        
+
         def pop_segment_a(segment_ptr):
             # R15 = ptr + index
             self.asm.instr("D=A")
@@ -615,12 +625,12 @@ class Translator:
 
 
         # Push/pop static:
-        
+
         self.asm.label("VM.push_static")
         self.asm.instr("D=M")
         push_d()
         self.asm.instr("RTN")
-        
+
         self.asm.label("VM.pop_static")
         self.asm.instr("D=A")
         self.asm.instr("@R15")  # R15 = target address
@@ -667,11 +677,11 @@ class Translator:
 
 
         # comparisons:
-        
+
         def compare(op):
             label = self.asm.next_label(f"VM._{op.lower()}")
             end_label = self.asm.next_label(f"VM._{op.lower()}$end")
-        
+
             # D = top, M = second from top, SP -= 1 (not 2!)
             self.asm.instr("@SP")
             self.asm.instr("AM=M-1")
@@ -680,13 +690,13 @@ class Translator:
 
             # Compare
             self.asm.instr("D=M-D")
-        
+
             # Set result True, optimistically (since A is already loaded with the destination)
             self.asm.instr("M=-1")
-        
+
             self.asm.instr(f"@{end_label}")
             self.asm.instr(f"D;J{op}")
-        
+
             # Set result False
             self.asm.instr("@SP")
             self.asm.instr("A=M-1")
@@ -694,15 +704,15 @@ class Translator:
 
             self.asm.label(end_label)
             self.asm.instr("RTN")
-        
+
         self.asm.label(f"VM.eq")
         compare("EQ")
         self.asm.label(f"VM.lt")
         compare("LT")
         self.asm.label(f"VM.gt")
         compare("GT")
-        
-        
+
+
         # if-goto:
         not_taken_label = "VM.if_goto$not_taken"
         self.asm.label("VM.if_goto")
@@ -712,11 +722,11 @@ class Translator:
         pop_d()
         self.asm.instr(f"@{not_taken_label}")
         self.asm.instr("D;JEQ")
-        
+
         self.asm.instr("@R15")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
-        
+
         self.asm.label(not_taken_label)
         self.asm.instr("RTN")
 
@@ -741,7 +751,7 @@ class Translator:
         self.asm.instr("D=A")
         self.asm.instr(f"@{test_label}")
         self.asm.instr("0;JMP")
-        
+
         self.asm.label(loop_label)
         self.asm.instr("@SP")
         self.asm.instr("M=M+1")
@@ -756,14 +766,14 @@ class Translator:
 
 
         # return:
-        
+
         self.asm.label("VM.return")
-        
+
         # R13 = result
         pop_d()
         self.asm.instr("@R13")
         self.asm.instr("M=D")
-        
+
         # SP = LCL
         self.asm.instr("@LCL")
         self.asm.instr("D=M")
@@ -860,7 +870,7 @@ class Translator:
         push_d()
 
         # LCL = SP
-        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the 
+        # Note: setting LCL here (as opposed to in "function") feels wrong, but it makes the
         # state of the segment pointers consistent after each opcode, so it's easier to debug.
         self.asm.instr("@SP")
         self.asm.instr("D=M")
@@ -880,7 +890,7 @@ class Translator:
 
 
         # Used to push the return address in call ops:
-        
+
         self.asm.label("VM._push_a")
         self.asm.instr("D=A")
         self.asm.instr("@SP")
@@ -890,18 +900,14 @@ class Translator:
         self.asm.instr("RTN")
 
 
-    def finish(self):
-        pass
+THREADED_PLATFORM = BUNDLED_PLATFORM._replace(
+    chip=ThreadedComputer,
+    assemble=assemble,
+    translator=Translator)
 
 
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
     import computer
-
-    THREADED_PLATFORM = computer.Platform(
-        chip=ThreadedComputer,
-        assemble=assemble,
-        parse_line=solved_07.parse_line,
-        translator=Translator)
 
     computer.main(THREADED_PLATFORM)

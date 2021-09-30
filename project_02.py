@@ -1,3 +1,5 @@
+# Boolean Arithmetic
+#
 # See https://www.nand2tetris.org/project02
 
 from nand import Nand, build
@@ -76,7 +78,7 @@ Zero16 = build(mkZero16)
 
 def mkNeg16(inputs, outputs):
     """Test whether a single 16-bit input is negative."""
-    
+
     in_ = inputs.in_
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
@@ -88,10 +90,10 @@ Neg16 = build(mkNeg16)
 
 
 def mkALU(inputs, outputs):
-    """Combine two 16-bit inputs according to six control bits, producing a 16-bit result and two 
+    """Combine two 16-bit inputs according to six control bits, producing a 16-bit result and two
     condition codes.
     """
-    
+
     x = inputs.x
     y = inputs.y
 
@@ -108,5 +110,5 @@ def mkALU(inputs, outputs):
     outputs.out = n1.out  # the resulting value
     outputs.zr = n1.zr    # is the output equal to 0?
     outputs.ng = n1.ng    # is the output negative?
-    
+
 ALU = build(mkALU)

@@ -11,8 +11,8 @@ def test_my_dff_legit():
     assert list(gate_count(MyDFF).keys()) == ['nands']
 
 
-# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it
 # work, but it seems like this exercise might need to be dropped.
 @pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
 def test_dff_coarse(dff_type, opt):
@@ -37,8 +37,8 @@ def test_dff_coarse(dff_type, opt):
     assert dff.out == 0
 
 
-# Tricky: certain simplifications change the evaluation order such that a latch defined on the 
-# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it 
+# Tricky: certain simplifications change the evaluation order such that a latch defined on the
+# raw clock signal doesn't behave predictably. For now, turning those optimizations off makes it
 # work, but it seems like this exercise might need to be dropped.
 @pytest.mark.parametrize("dff_type,opt", [(MyDFF, False), (DFF, True)])
 def test_dff_fine(dff_type, opt):
@@ -194,7 +194,7 @@ def test_register():
 def ram_test(ram, size):
     # Distribute test values over the address space, but keep the total count small:
     addrs = [0] + list(range(1, size, size//33 + 1)) + [size-1]
-    
+
     ram.load = 1
     for i in addrs:
         ram.in_ = i
@@ -325,4 +325,3 @@ def test_pc():
     pc.in_ = 22222; pc.reset = 1; pc.inc = 0
     pc.tick(); pc.tock()
     assert pc.out == 0
-

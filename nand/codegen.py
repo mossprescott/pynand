@@ -13,26 +13,26 @@ directly in Python:
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
 
-A few more are implemented so that this simulator can also be used (and tested) with smaller 
+A few more are implemented so that this simulator can also be used (and tested) with smaller
 chips:
 - DFF
 - DMux
 - DMux8Way
 - Mux8Way16
-- TODO: RAM
+- TODO: RAM, separately from MemorySystem
 
-Any other ICs that appear are flattened to combinations of these. The downside is that a 
+Any other ICs that appear are flattened to combinations of these. The downside is that a
 moderate amount of flattening will have a significant impact on simulation speed. For example,
-the entire Computer amounts to 35 components; it's basically just decoding the instruction, 
+the entire Computer amounts to 35 components; it's basically just decoding the instruction,
 the ALU function, and a little wiring. That's why this is fast.
 
-If a new design can benefit from some additional components (e.g. ShiftR16), they're not very hard 
+If a new design can benefit from some additional components (e.g. ShiftR16), they're not very hard
 to add, but they should be limited to operations that:
 - are generally useful (i.e. not design-specific logic)
 - are already implemented with Nand, DFF, etc., and shown to be practical
 
-That's right, the entire MemorySystem (mapping main memory, screen memory, and keyboard input 
-into a flat address space) is all implemented with fixed logic. The rationale is that changing 
+That's right, the entire MemorySystem (mapping main memory, screen memory, and keyboard input
+into a flat address space) is all implemented with fixed logic. The rationale is that changing
 the memory layout also entails constructing a new UI harness, which is beside the point.
 """
 
@@ -51,17 +51,50 @@ def run(ic):
 
 def translate(ic):
     """Generate a Python class implementing the IC."""
-    
+
     class_name, lines = generate_python(ic)
-    
+
     # print(ic)
     # print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
             mode='single'))
-    
+
     return locals()[class_name]
+
+
+def run_compiled(ic):
+    """Prepare an IC for simulation, generate a Cython-compatible implementation on the file
+    system, then use pyximport to translate it to C, compile it, and finally return an object
+    which exposes the inputs and outputs as attributes. If the IC is Computer, it also provides
+    access to the ROM, RAM, etc.
+
+    With the simplest possible annotations, which just put the chip's evaluation loop into
+    raw integers, it seems to go about 4x faster than the normal interpreter.
+    """
+
+    class_name, lines = generate_python(ic, prefix_super=True, cython=True)
+
+    module_name = f"compiled_{class_name}"
+    temp_path = f"generated/{module_name}.pyx"
+
+    with open(temp_path, "w") as f:
+        for l in lines:
+            f.write(l)
+            f.write("\n")
+
+    print(f"wrote {temp_path}")
+
+    # Yikes:
+    import pyximport  # type: ignore
+    pyximport.install()
+    exec(f"import generated.{module_name}")
+    chip_class = eval(f"generated.{module_name}.{class_name}")
+
+    print(f"loaded {class_name}")
+
+    return chip_class()
 
 
 PRIMITIVES = set([
@@ -72,12 +105,19 @@ PRIMITIVES = set([
     "MemorySystem",  # Needed for Computer
     # Additional components used in the exercises, but not typically used in a full computer sim:
     "DMux", "DMux8Way", "Mux8Way16",
-    # Additonal for alternative CPUs:
+    # Additional for alternative CPUs:
     "Dec16", "Eq16", "Mask15", "ShiftR16",
 ])
 
 
-def generate_python(ic, inline=True):
+SPECIAL = set([
+    "Register", "ROM",
+    "DMux", "DMux8Way", "Mux8Way16",
+    "Add16", "Inc16", "Dec16",
+])
+"""Primitives that require special handling, and therefore can't be inlined."""
+
+def generate_python(ic, inline=True, prefix_super=False, cython=False):
     """Given an IC, generate the Python source of a class which implements the chip, as a sequence of lines."""
 
     class_name = f"{ic.label}_gen"
@@ -85,13 +125,16 @@ def generate_python(ic, inline=True):
     # ic = simplify(ic.flatten(primitives=PRIMITIVES))  # TODO: don't flatten everything in simplify
 
     # print(ic)
-    
+
     all_comps = ic.sorted_components()
 
     if any(conn == clock for conn in ic.wires.values()):
         raise NotImplementedError("This simulator cannot handle chips that refer to 'clock' directly.")
 
-    supr = 'SOC' if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps) else 'Chip'
+    if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps):
+        supr = "SOC"
+    else:
+        supr = "Chip"
 
     lines = []
     def l(indent, str):
@@ -99,7 +142,7 @@ def generate_python(ic, inline=True):
         lines.append(l)
 
     def inlinable(comp):
-        """If a component has only one output and it's only connected to one input, it can be 
+        """If a component has only one output and it's only connected to one input, it can be
         inlined, and its evaluation may be skipped thanks to short-circuiting.
         This alone is good for about 20% speedup.
         """
@@ -119,7 +162,7 @@ def generate_python(ic, inline=True):
 
     def src_one(comp, name, bit=0):
         conn = ic.wires[Connection(comp, name, bit)]
-        
+
         # TODO: deal with lots of cases
         if isinstance(conn.comp, Const):
             value = conn.comp.value
@@ -139,6 +182,11 @@ def generate_python(ic, inline=True):
             value = f"_{all_comps.index(conn.comp)}_dff"
         elif conn.comp.label == "Register":
             value = f"_{all_comps.index(conn.comp)}_reg"
+        elif conn.comp.label == "MemorySystem" and conn.name == "tty_ready":
+            # Tricky: this seems pretty bogus. MemorySystem is the first primitive
+            # which has more than one output, and it can be computed from the
+            # special state.
+            value = f"self._tty == 0"
         else:
             value = f"_{all_comps.index(conn.comp)}_{conn.name}"
 
@@ -159,7 +207,7 @@ def generate_python(ic, inline=True):
         src_conns = [(i, ic.wires.get(Connection(comp, name, i))) for i in range(bits)]
         if all((c.comp == conn0.comp and c.name == conn0.name and c.bit == bit) for (bit, c) in src_conns):
             conn = conn0
-        
+
             if isinstance(conn.comp, Const):
                 return conn.comp.value
 
@@ -184,7 +232,7 @@ def generate_python(ic, inline=True):
 
     def unary16(comp, template, bits=None):
         return template.format(src_many(comp, 'in_', bits))
-        
+
     def binary16(comp, template):
         return template.format(a=src_many(comp, 'a'), b=src_many(comp, 'b'))
 
@@ -225,11 +273,11 @@ def generate_python(ic, inline=True):
         elif comp.label == 'Dec16':
             return None
         elif comp.label == 'Mask15':
-            # So, yeah, this isn't really all that general in application. Need some way to 
+            # So, yeah, this isn't really all that general in application. Need some way to
             # represent arbitrary mask/shift/rotate operations?
             return unary16(comp, "{} & 0x7fff", bits=15)
         elif comp.label == 'ShiftR16':
-            # So, yeah, this isn't really all that general in application. Need some way to 
+            # So, yeah, this isn't really all that general in application. Need some way to
             # represent arbitrary mask/shift/rotate operations?
             return unary16(comp, "{} >> 1")
         elif comp.label == 'DMux':
@@ -247,13 +295,18 @@ def generate_python(ic, inline=True):
             # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
         elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always 
-            # register A (so, saved in self)
+            # Note: the source of address better not be a big computation. At the moment it's always
+            # register A (so, saved in self). But is that true for chips that add more ways to access
+            # the RAM?
             address = src_many(comp, 'address', 14)
             return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
-    
+
+    if cython:
+        l(0, "import cython")
+        l(0, "from nand.codegen import *")
+        l(0, "")
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
@@ -270,6 +323,16 @@ def generate_python(ic, inline=True):
     l(0, "")
 
     l(1, f"def _eval(self, update_state, cycles=1):")
+
+    if cython:
+        for comp in all_comps:
+            if comp.label in SPECIAL or (comp.label != "Const" and not inlinable(comp)):
+                for name, bits in comp.outputs().items():
+                    cython_type = "bool" if bits == 1 else "int"
+                    comp_name = f"_{all_comps.index(comp)}_{name}"
+                    l(2, f"{comp_name}: cython.{cython_type}")
+        l(2, "")
+
     l(2,   f"for _ in range(cycles):")
     for comp in all_comps:
         if comp.label in ("DFF", "Register"):
@@ -360,7 +423,7 @@ def generate_python(ic, inline=True):
                 l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             any_state = True
         elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always 
+            # Note: the source of address better not be a big computation. At the moment it's always
             # register A (so, saved in self)
             address_expr = src_many(comp, 'address', 14)
             in_name = f"_{all_comps.index(comp)}_in"
@@ -370,6 +433,9 @@ def generate_python(ic, inline=True):
             l(6,     f"self._ram[{address_expr}] = {in_name}")
             l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
             l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
+            l(5,   f"elif {address_expr} == 0x6000:")
+            l(6,     f"self._tty = {in_name}")
+            l(6,     f"self._tty_ready = {in_name} != 0")
             any_state = True
         elif isinstance(comp, (Const, ROM)):
             pass
@@ -382,7 +448,7 @@ def generate_python(ic, inline=True):
     if not any_state:
         l(4,   "pass")
     l(0, "")
-    
+
     for name in ic.inputs():
         l(1, f"def _set_{name}(self, value):")
         l(2,   f"self._{name} = value")
@@ -393,9 +459,9 @@ def generate_python(ic, inline=True):
         l(1, f"@property")
         l(1, f"def {name}(self):")
         l(2,   f"self._eval(False)")
-        l(2,   f"return self._{name}")    
+        l(2,   f"return self._{name}")
         l(0, "")
-    
+
     return class_name, lines
 
 
@@ -407,16 +473,16 @@ def print_lines(lines):
 
 class Chip:
     """Super for generated classes, providing tick, tock, and ticktock.
-    
-    Note: "clock" isn't exposed as an input, and it's state isn't properly updated, so 
+
+    Note: "clock" isn't exposed as an input, and it's state isn't properly updated, so
     chips that refer to it directly aren't simulated properly by this implementation.
-    
+
     TODO: handle "clock" correctly, and also implement the components needed by those tests?
     """
-    
+
     def __init__(self):
         self.__dirty = True
-    
+
     def tick(self):
         """Raise the clock, preparing to advance to the next cycle."""
         pass
@@ -424,37 +490,38 @@ class Chip:
     def tock(self):
         """Lower the clock, causing clocked chips to assume their new values."""
         self._eval(True)
-        
+
     def ticktock(self, cycles=1):
         """Equivalent to tick(); tock()."""
         self._eval(True, cycles)
 
 
 class SOC(Chip):
-    """Super for chips that include a full computer with ROM, RAM, and keyboard input."""
-    
+    """Super for chips that include a full computer with ROM, RAM, keyboard input, and "TTY" output."""
+
     def __init__(self):
         self._rom = []
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0
-        
+        self._tty = 0
+
         self.__dirty = True
-        
-        
+
+
     def init_rom(self, instructions):
         """Overwrite the top of the ROM with a sequence of instructions.
-    
+
         A two-instruction infinite loop is written immediately
         after the program, which could in theory be used to detect termination.
         """
-    
+
         size = len(instructions)
 
         # Assuming a 15-bit ROM, as we do here, we can't address more than 32K of instructions:
         if size >= 2**15:
             raise Exception(f"Too many instructions: {size:0,d} >= {2**15:0,d}")
-            
+
         contents = instructions + [
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
@@ -465,13 +532,13 @@ class SOC(Chip):
 
     def reset_program(self):
         """Reset the PC to 0, so that the program will continue execution as if from startup.
-        
+
         All other state is unaffected.
         """
         self.reset = True
         self.ticktock()
         self.reset = False
-        
+
     def run_program(self, instructions):
         """Install and run a sequence of instructions, stopping when pc runs off the end."""
 
@@ -500,6 +567,12 @@ class SOC(Chip):
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
         self._keyboard = keycode
+
+    def get_tty(self):
+        """Read one word of output which has been written to the tty port, and reset it to 0."""
+        val = self._tty
+        self._tty = 0
+        return val
 
     # Tricky: SP might get special treatment in some implementations, so provide a named property
     # That subclasses can override.

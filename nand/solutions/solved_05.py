@@ -4,7 +4,8 @@ SPOILER ALERT: this files contains complete and optimal solutions for all the ex
 If you want to solve them on your own, stop reading now!
 """
 
-from nand import RAM, ROM, Input, build, lazy
+from nand.component import Const
+from nand import RAM, ROM, Input, Output, build, lazy
 from nand.solutions.solved_01 import *
 from nand.solutions.solved_02 import *
 from nand.solutions.solved_03 import *
@@ -33,15 +34,19 @@ def mkMemorySystem(inputs, outputs):
     ram = RAM(14)(in_=in_, load=Or(a=load_bank.a, b=load_bank.b).out, address=address14)
 
     # addresses 0x4000 to 0x5FFFF
-    # TODO: connect to pygame display
     # note: bit 13 is definitely zero, so address[0..13] == address[0..12]
     screen = RAM(13)(in_=in_, load=load_bank.c, address=address14)
 
     # address 0x6000
-    # TODO: keyboard = Keyboard()
     keyboard = Input()
+    tty = Output(in_=in_, load=load_bank.d)
 
     outputs.out = Mux4Way16(a=ram.out, b=ram.out, c=screen.out, d=keyboard.out, sel=bank).out
+
+    # Tricky: need to expose some "output" from the Output component in order for the component
+    # to be included in the synthesized IC. This ready bit might or might not be useful, but it
+    # gets the job done.
+    outputs.tty_ready = tty.ready
 
 MemorySystem = build(mkMemorySystem)
 
@@ -81,7 +86,7 @@ CPU = build(mkCPU)
 
 def mkComputer(inputs, outputs):
     reset = inputs.reset
-    
+
     cpu = lazy()
 
     rom = ROM(15)(address=cpu.pc)
@@ -93,5 +98,16 @@ def mkComputer(inputs, outputs):
     # HACK: need some dependency to force the whole thing to be synthesized.
     # Exposing the PC also makes it easy to observe what's happening in a dumb way.
     outputs.pc = cpu.pc
+
+    # HACK: similar issues, but in this case it's just the particular component that
+    # needs to be forced to be included.
+    outputs.tty_ready = mem.tty_ready
+
+    # TODO: would it be simpler to just wire up keyboard and tty as an ordinary
+    # input and output of Computer? That's effectively the situation, and it's
+    # currently just being handled in a sneakier way. Not sure how much mayhem that
+    # would create.
+    # keyboard = inputs.keyboard
+    # outputs.tty = mem.tty
 
 Computer = build(mkComputer)

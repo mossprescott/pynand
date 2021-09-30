@@ -1,0 +1,305 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Screen.jack
+
+/**
+ * A library of functions for displaying graphics on the screen.
+ * The Hack physical screen consists of 512 rows (indexed 0..511, top to bottom)
+ * of 256 pixels each (indexed 0..255, left to right). The top left pixel on
+ * the screen is indexed (0,0).
+ */
+class Screen {
+    static boolean color;
+
+    // Array of 16 masks, each with the corresponding pixel set:
+    static Array pixels;
+
+    // Array of 16 masks, each with the corresponding pixel, and its neighbors to the left, set:
+    static Array leftPixels;
+
+    /** Initializes the Screen. */
+    function void init() {
+        var int x, bit, leftBits;
+
+        let color = true;
+
+        let pixels = Array.new(16);
+        let leftPixels = Array.new(16);
+        let x = 0;
+        let bit = 1;
+        let leftBits = 1;
+        while (x < 16) {
+            let pixels[x] = bit;
+            let leftPixels[x] = leftBits;
+            let x = x + 1;
+            let bit = bit + bit;
+            let leftBits = leftBits + leftBits + 1;
+        }
+        // let leftPixels[9] = 5 + 16*5;
+
+        return;
+    }
+
+    /** Erases the entire screen. */
+    function void clearScreen() {
+        var Array screen;
+        var int count;
+
+        let screen = 16384;
+        let count = 8192;
+
+         while (~(count < 0)) {
+            let screen[0] = 0;
+            let screen = screen + 1;
+            let count = count - 1;
+         }
+
+        return;
+    }
+
+    /** Sets the current color, to be used for all subsequent drawXXX commands.
+     *  Black is represented by true, white by false. */
+    function void setColor(boolean b) {
+        // Note: explicitly `true` so *all* the bits are set.
+        if (b) {
+            let color = true;
+        }
+        else {
+            let color = false;
+        }
+
+        return;
+    }
+
+    /** Draws the (x,y) pixel, using the current color. */
+    function void drawPixel(int x, int y) {
+        var int word, mask;
+        var Array ptr;
+
+        if ((x < 0) | (x > 511) | (y < 0) | (y > 255)) {
+            return;
+        }
+
+        let word = x/16;
+        let mask = pixels[x - (word*16)];
+        let ptr = 16384 + (32*y) + word;
+
+        let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+        return;
+    }
+
+    /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
+    function void drawLine(int x1, int y1, int x2, int y2) {
+        var int tmp, dx, dy, cx, cy, diff;
+
+        if ((y1 = y2) | (x1 = x2)) {
+            // Vertical and horizontal lines are handled as one-pixel-wide rectangles,
+            // re-using the same code (saving space in the ROM)
+            do Screen.drawRectangle(x1, y1, x2, y2);
+
+            return;
+        }
+
+
+        // General case:
+
+        // Always draw left-to-right:
+        if (x2 < x1) {
+            let tmp = x2; let x2 = x1; let x1 = tmp;
+            let tmp = y2; let y2 = y1; let y1 = tmp;
+        }
+
+        // Note: no constraint on the extremes; lines can start/end off screen, and the
+        // on-screen portion will be accurate. This does mean wasting some time calculating
+        // the locations of off-screen pixels, though, especially if the input is *way*
+        // out of range.
+
+        // Bresenham's algorithm, with separate cases for when x or y is the "long axis"
+        // see (https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm). This produces
+        // a better result than the simpler algorithm described by the authors; the line
+        // always arrives at the final pixel, and "steps" are distributed evenly around
+        // the middle.
+        if (y1 < y2) {
+            // Positive slope (down and to the right, in these coordinates):
+            let dx = (x2 - x1);
+            let dy = (y2 - y1);
+            let cx = 0;
+            let cy = 0;
+
+            if (~(dx < dy)) {  // i.e. dx >= dy
+                // cx always advances; add to cy as needed
+                let diff = (dy+dy) - dx;
+                while (~(cx > dx)) {  // i.e. cx <= dx
+                    do Screen.drawPixel(x1 + cx, y1 + cy);
+
+                    if (diff > 0) {
+                        let cy = cy + 1;
+                        let diff = diff - (dx+dx);
+                    }
+                    let diff = diff + (dy+dy);
+
+                    let cx = cx + 1;
+                }
+            }
+            else {
+                // cy always advances; add to cx as needed
+                let diff = (dx+dx) - dy;
+                while (~(cy > dy)) {  // i.e. cy <= dy
+                    do Screen.drawPixel(x1 + cx, y1 + cy);
+
+                    if (diff > 0) {
+                        let cx = cx + 1;
+                        let diff = diff - (dy+dy);
+                    }
+                    let diff = diff + (dx+dx);
+
+                    let cy = cy + 1;
+                }
+            }
+        }
+        else {
+            // Negative slope, same thing but draw upside down:
+            let dx = (x2 - x1);
+            let dy = -(y2 - y1);
+            let cx = 0;
+            let cy = 0;
+
+            if (~(dx < dy)) {   // "First octant": dx >= dy
+                let diff = (dy+dy) - dx;
+                while (~(cx > dx)) {  // i.e. cx <= dx
+                    do Screen.drawPixel(x1 + cx, y1 - cy);
+
+                    if (diff > 0) {
+                        let cy = cy + 1;
+                        let diff = diff - (dx+dx);
+                    }
+                    let diff = diff + (dy+dy);
+
+                    let cx = cx + 1;
+                }
+            }
+            else {
+                // cy always advances; add to cx as needed
+                let diff = (dx+dx) - dy;
+                while (~(cy > dy)) {  // i.e. cy <= dy
+                    do Screen.drawPixel(x1 + cx, y1 - cy);
+
+                    if (diff > 0) {
+                        let cx = cx + 1;
+                        let diff = diff - (dy+dy);
+                    }
+                    let diff = diff + (dx+dx);
+
+                    let cy = cy + 1;
+                }
+            }
+        }
+
+        return;
+    }
+
+    /** Draws a filled rectangle whose top left corner is (x1, y1)
+     * and bottom right corner is (x2,y2), using the current color. */
+    function void drawRectangle(int x1, int y1, int x2, int y2) {
+        var int startY, endY;
+        var int startX, endX;
+
+        var int firstWord, firstWordX;
+        var Array firstPtr;
+
+        var int wordX, mask;
+        var Array ptr;
+
+        // TODO: handle *both* coords outside the range
+        let startY = Math.max(0, Math.min(y1, y2));
+        let endY = Math.min(255, Math.max(y1, y2));
+
+        let startX = Math.max(0, Math.min(x1, x2));
+        let endX = Math.min(511, Math.max(x1, x2));
+
+        // All the expensive arithmetic is done here, once, and then each value is updated
+        // for each row with a fast offset operation.
+        let firstWord = startX/16;                       // Index of the word containing the left-most pixel
+        let firstWordX = firstWord*16;                   // The x-coord of the first pixel in that word (i.e. startX % 16)
+        let firstPtr = 16384 + (32*startY) + firstWord;  // Address of the same word in the screen buffer
+
+        while (true) {
+
+            // Make a working copy of each value to mutate:
+            let wordX = firstWordX;
+            let ptr = firstPtr;
+
+            // First mask off a partial word on the left, if needed:
+            if (startX > wordX) {
+                let mask = ~leftPixels[(startX - wordX) - 1];
+                if (endX < (wordX + 15)) {
+                    let mask = mask & leftPixels[endX - wordX];
+                }
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Now a fast loop for any whole words:
+            while (~((wordX+16) > endX)) {  // i.e. wordX + 16 <= endX
+                let ptr[0] = color;
+
+                let wordX = wordX + 16;
+                let ptr = ptr + 1;
+            }
+
+            // Finally, mask off any partial word on the right:
+            if (~(wordX > endX)) {  // i.e. wordX <= endX
+                let mask = leftPixels[endX - wordX];
+                let ptr[0] = (ptr[0] & ~mask) | (color & mask);
+
+                // no need to update the state
+            }
+
+
+            if (startY < endY) {
+                // More rows to draw, so update the initial values for the next row:
+                let startY = startY + 1;
+                let firstPtr = firstPtr + 32;
+            }
+            else {
+                return;
+            }
+        }
+
+        return;
+    }
+
+    /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
+    function void drawCircle(int x, int y, int r) {
+        // Note drawing in one direction (down from the top) is slower (twice as many sqrt()s),
+        // but looks nicer. Actually, the authors' version draws four lines at a time, which
+        // looks super goofy.
+
+        // Subtracting 1/2 from the radius smooths out the compass points, and duplicating
+        // the middle row restores the expected radius, or at least reproduces something close
+        // to the authors' rendering. Actually, theirs isn't even round!
+
+        var int i, dy, dx;
+        var int rSq;
+
+        if (r > 181) {
+            return;
+        }
+
+        let rSq = (r*r) - r;  // (r - 1/2)^2 = r^2 - r (+ 1/4)
+
+        let i = -r + 1;
+        while (~(i > r)) {  // i.e. i <= r
+            if (i > 0) { let dy = i - 1; } else { let dy = i; }
+            let dx = Math.sqrt(rSq - (dy*dy));
+            do Screen.drawRectangle(x - dx, y + dy, x + dx, y + dy);
+            let i = i + 1;
+        }
+
+        return;
+    }
+}

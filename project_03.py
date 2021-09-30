@@ -1,3 +1,5 @@
+# Sequential Logic
+#
 # See https://www.nand2tetris.org/project03
 
 from nand import build, clock
@@ -100,7 +102,7 @@ def mkPC(inputs, outputs):
     load = inputs.load
     inc = inputs.inc
     reset = inputs.reset
-    
+
     # SOLVERS: replace this with one or more Nands and/or components defined above
     n1 = solved_03.PC(in_=in_, load=load, inc=inc, reset=reset)
 

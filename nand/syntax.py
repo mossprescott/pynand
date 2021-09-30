@@ -28,13 +28,16 @@ class Chip:
             if isinstance(val, Ref):
                 return val
             elif isinstance(val, int):
-                return Ref(Instance(nand.component.Const(comp.inputs()[name], val), {}), "out", None)
+                return _const_ref(comp.inputs()[name], val)
             else:
                 raise SyntaxError(f"Expected a reference for input {name!r}, got {val}")
 
         arg_refs = {name: to_ref(name, val) for (name, val) in args.items()}
 
         return Instance(comp, arg_refs)
+
+def _const_ref(bits, val):
+    return Ref(Instance(nand.component.Const(bits, val), {}), "out", None)
 
 
 class Ref:
@@ -76,15 +79,15 @@ class Instance:
 
 
 class Lazy:
-    """Placeholder instance that allows inputs and outputs to be defined before the actual 
+    """Placeholder instance that allows inputs and outputs to be defined before the actual
     implementation is provided, allowing circular references to be created.
-    
+
     >>> def mkCircular(inputs, outputs):
     ...     thing = lazy()
     ...     foo = Not(in_=thing.out)
     ...     thing.set(Not(foo.out))
     ...     outputs.out = thing.out
-    
+
     # TODO: better example?
     """
 
@@ -97,7 +100,7 @@ class Lazy:
             self.inst = inst
         else:
             raise SyntaxError(f"Expected an instance, got {inst}")
-        
+
     @property
     def _ic(self):
         if not self.inst:
@@ -127,10 +130,14 @@ def build(builder):
             if name in ('inst', 'dict'):   # hack for initialization-time
                 return object.__setattr__(self, name, value)
 
-            if not isinstance(value, Ref):
-                raise SyntaxError(f"Expected a reference for output '{name}', got {value}")
-                
-            self.dict[(name, None)] = value
+            if isinstance(value, Ref):
+                ref = value
+            elif isinstance(value, int) and 0 <= value <= 1:
+                ref = _const_ref(1, value)
+            else:
+                raise SyntaxError(f"Expected a reference or single-bit constant for output '{name}', got {value}")
+
+            self.dict[(name, None)] = ref
 
         def __getattr__(self, name):
             """Called when the builder is going to assign to a bit slice of an output."""
@@ -142,11 +149,18 @@ def build(builder):
             self.name = name
 
         def __setitem__(self, key, value):
-            """Value is an int between 0 and 15, or (eventually) a slice object with
+            """Key is an int between 0 and 15, or (eventually) a slice object with
             .start and .step on the same interval.
             """
-            self.output_coll.dict[(self.name, key)] = value
-        
+            if isinstance(value, Ref):
+                ref = value
+            elif isinstance(value, int) and 0 <= value <= 1:
+                ref = _const_ref(1, value)
+            else:
+                raise SyntaxError(f"Expected a reference or single-bit constant for output '{self.name}[{key}]', got {value}")
+
+            self.output_coll.dict[(self.name, key)] = ref
+
     def instances(to_search):
         result = set([])
         while to_search:
@@ -161,7 +175,7 @@ def build(builder):
                 for ref in inst.args.values():
                     if ref.inst not in result:
                         to_search.append(ref.inst)
-                
+
         return result
 
     def constr():
@@ -198,7 +212,7 @@ def build(builder):
                     # an input is copied directly to an output.
                     input_name_bit.append((ref.name, 0))
         ic._inputs = {name: bit+1 for (name, bit) in sorted(input_name_bit)}
-        
+
         output_name_bit = []
         for (name, bit), ref in output_coll.dict.items():
             if bit is not None:
@@ -225,10 +239,10 @@ def build(builder):
             elif ref.inst._ic == ic:
                 from_comp = root
                 from_outputs = ic.inputs()
-            else: 
+            else:
                 from_comp = ref.inst._ic
                 from_outputs = from_comp.outputs()
-            
+
             if bit is None and ref.bit is None:
                 for i in range(from_outputs[ref.name]):
                     ic.wire(Connection(from_comp, ref.name, i), Connection(root, name, i))
@@ -254,7 +268,7 @@ def build(builder):
                     source = Connection(source_comp, ref.name, ref.bit)
                     target = Connection(inst._ic, name, 0)
                     ic.wire(source, target)
-                        
+
 
         # TODO: check for any un-wired or mis-wired inputs (and outputs?)
 
@@ -265,17 +279,21 @@ def build(builder):
 
 def run(chip, optimize=True, simulator='vector', **args):
     """Construct a complete IC, synthesize it, wrap it for easy access, and initialize inputs.
-    
-    `simulator` can be 'vector', for the slow, precise simulator, or 'codegen', for the fast, 
+
+    `simulator` can be 'vector', for the slow, precise simulator, or 'codegen', for the fast,
     less flexible one.
     """
-    
+
     ic = _constr(chip)
 
-    if simulator == 'codegen':
+    if simulator == 'compiled':
+        w = nand.codegen.run_compiled(ic)
+    elif simulator == 'codegen':
         w = nand.codegen.run(ic)
-    else:
+    elif simulator == 'vector':
         w = nand.vector.run(ic, optimize)
+    else:
+        raise Exception(f"Unrecognized simulator: {simulator}")
 
     for name, value in args.items():
         w.__setattr__(name, value)
@@ -284,14 +302,14 @@ def run(chip, optimize=True, simulator='vector', **args):
 
 def gate_count(chip):
     """Count the base Components of each type in all the ICs of a chip.
-    
+
     Note: components that are constructed by the builder but don't actually affect any output
     are not included (since they don't actually appear in the constructed IC).
-    
+
     Note: it would be simpler to count after flattening, but at present flatten() is actually
     removing some gates, and the intended use here is to verify the implementation is as
     expected, before any "optimization" we might be able to do.
-    
+
     TODO: have some variants/options for counting the ICs as well as counting components before
     and after flattening.
     """
@@ -311,7 +329,7 @@ def _constr(chip):
     """Construct an IC. If the Chip wraps a Component, a trivial IC is constructed around it so
     we can treat everything the same.
     """
-    
+
     comp = chip.constr()
     if isinstance(comp, IC):
         ic = comp
@@ -338,3 +356,4 @@ def ROM(address_bits):
 def RAM(address_bits):
     return Chip(lambda: nand.component.RAM(address_bits))
 Input = Chip(nand.component.Input)
+Output = Chip(nand.component.Output)

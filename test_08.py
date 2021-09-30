@@ -9,15 +9,15 @@ import project_05, project_06, test_07
 import project_08
 
 
-# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good 
+# TODO: add fine-grained tests for each opcode. These tests ported from nand2tetris provide good
 # coverage, but they don't isolate problems well for debugging.
 
 
 def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     translate = translator()
-    
-    # Computes the sum 1 + 2 + ... + argument[0] and pushes the 
-    # result onto the stack. Argument[0] is initialized by the test 
+
+    # Computes the sum 1 + 2 + ... + argument[0] and pushes the
+    # result onto the stack. Argument[0] is initialized by the test
     # script before this code starts running.
     translate.push_constant(0)
     translate.pop_local(0)           # initializes sum = 0
@@ -51,49 +51,49 @@ def test_basic_loop(chip=project_05.Computer, assemble=project_06.assemble, tran
 
 def test_fibonacci_series(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     translate = translator()
-    
+
     # Puts the first argument[0] elements of the Fibonacci series
     # in the memory, starting in the address given in argument[1].
-    # Argument[0] and argument[1] are initialized by the test script 
+    # Argument[0] and argument[1] are initialized by the test script
     # before this code starts running.
     translate.push_argument(1)
     translate.pop_pointer(1)           # that = argument[1]
-    
+
     translate.push_constant(0)
     translate.pop_that(0)              # first element in the series = 0
     translate.push_constant(1)
     translate.pop_that(1)              # second element in the series = 1
-    
+
     translate.push_argument(0)
     translate.push_constant(2)
     translate.sub()
     translate.pop_argument(0)          # num_of_elements -= 2 (first 2 elements are set)
-    
+
     translate.label("MAIN_LOOP_START")
-    
+
     translate.push_argument(0)
     translate.if_goto("COMPUTE_ELEMENT") # if num_of_elements > 0, goto COMPUTE_ELEMENT
     translate.goto("END_PROGRAM")        # otherwise, goto END_PROGRAM
-    
+
     translate.label("COMPUTE_ELEMENT")
-    
+
     translate.push_that(0)
     translate.push_that(1)
     translate.add()
     translate.pop_that(2)              # that[2] = that[0] + that[1]
-    
+
     translate.push_pointer(1)
     translate.push_constant(1)
     translate.add()
     translate.pop_pointer(1)           # that += 1
-    
+
     translate.push_argument(0)
     translate.push_constant(1)
     translate.sub()
     translate.pop_argument(0)          # num_of_elements--
-    
+
     translate.goto("MAIN_LOOP_START")
-    
+
     translate.label("END_PROGRAM")
 
     translate.finish()
@@ -161,7 +161,7 @@ def test_simple_function(chip=project_05.Computer, assemble=project_06.assemble,
 def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
     """Multiple function calls, with and without arguments.
     """
-    
+
     translate = translator()
 
     # Performs a simple calculation and returns the result.
@@ -261,19 +261,19 @@ def test_nested_call(chip=project_05.Computer, assemble=project_06.assemble, tra
 
 
 def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
-    """Sys.init, declared out of sequence, requiring the translator to supply initialization and then 
+    """Sys.init, declared out of sequence, requiring the translator to supply initialization and then
     call Sys.init. This is finally a fully legitimate VM program, executed in the normal way.
     """
-    
+
     translate = translator()
-  
+
     # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
     translate.preamble()
-    
+
     # Main.vm:
     # Computes the n'th element of the Fibonacci series, recursively.
-    # n is given in argument[0].  Called by the Sys.init function 
-    # (part of the Sys.vm file), which also pushes the argument[0] 
+    # n is given in argument[0].  Called by the Sys.init function
+    # (part of the Sys.vm file), which also pushes the argument[0]
     # parameter before this code starts running.
     translate.function("Main", "fibonacci", 0)
     translate.push_argument(0)
@@ -282,7 +282,7 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     translate.if_goto("IF_TRUE")
     translate.goto("IF_FALSE")
     translate.label("IF_TRUE")              # if n<2, return n
-    translate.push_argument(0)        
+    translate.push_argument(0)
     translate.return_op()
     translate.label("IF_FALSE")             # if n>=2, returns fib(n-2)+fib(n-1)
     translate.push_argument(0)
@@ -295,11 +295,11 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     translate.call("Main", "fibonacci", 1)  # computes fib(n-1)
     translate.add()                         # returns fib(n-1) + fib(n-2)
     translate.return_op()
-  
+
     # Sys.vm:
     # Pushes a constant, say n, onto the stack, and calls the Main.fibonacci
     # function, which computes the n'th element of the Fibonacci series.
-    # Note that by convention, the Sys.init function is called "automatically" 
+    # Note that by convention, the Sys.init function is called "automatically"
     # by the bootstrap code.
     translate.function("Sys", "init", 0)
     translate.push_constant(4)
@@ -313,7 +313,7 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
     computer = run(chip, simulator=simulator)
 
     # Note: no initialization this time
-    
+
     translate.asm.run(assemble, computer, stop_cycles=2000, debug=True)
 
     assert computer.sp == 262
@@ -321,18 +321,18 @@ def test_fibonacci_element(chip=project_05.Computer, assemble=project_06.assembl
 
 
 def test_statics_multiple_files(chip=project_05.Computer, assemble=project_06.assemble, translator=project_08.Translator, simulator='codegen'):
-    """Tests that different functions, stored in two different classes, manipulate the static 
-    segment correctly. 
-    
+    """Tests that different functions, stored in two different classes, manipulate the static
+    segment correctly.
+
     Note: the original materials actually refer to _files_ not _classes_, but I think in the context
     of this language there's a one-to-one correspondence.
     """
-    
+
     translate = translator()
-  
+
     # Note: seems like this should just happen, but the previous tests actually require it _not_ to.
     translate.preamble()
-    
+
     # Sys.vm:
     translate.function("Sys", "init", 0)
     translate.push_constant(6)

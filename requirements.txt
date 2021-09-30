@@ -1,2 +1,6 @@
 pytest
-# pygame
+pygame
+
+# Install these as well to use the "compiled" simulator mode
+# cython
+# pyximport

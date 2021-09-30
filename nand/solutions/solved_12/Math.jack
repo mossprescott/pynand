@@ -1,0 +1,257 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Math.jack
+
+/**
+ * A library of commonly used mathematical functions.
+ * Note: Jack compilers implement multiplication and division using OS method calls.
+ */
+class Math {
+
+    /** Initializes the library. */
+    function void init() {
+        // TODO?
+        return;
+    }
+
+    /** Returns the absolute value of x. */
+    function int abs(int x) {
+        if (x < 0) {
+            return -x;
+        }
+        else {
+            return x;
+        }
+    }
+
+    /** Returns the product of x and y.
+     *  When a Jack compiler detects the multiplication operator '*' in the
+     *  program's code, it handles it by invoking this method. In other words,
+     *  the Jack expressions x*y and multiply(x,y) return the same value.
+     */
+    function int multiply(int x, int y) {
+        var boolean neg;
+        var int tmp;
+        var int sum, shiftedX, shiftedBit;
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
+        let y = Math.abs(y);
+        let x = Math.abs(x);
+
+        // Put the smaller (abs.) value in y (because this is O(log y)):
+        if (x < y) {
+            let tmp = y;
+            let y = x;
+            let x = tmp;
+        }
+
+        let sum = 0;
+        let shiftedX = x;
+        let shiftedBit = 1;
+
+        while ((shiftedBit > 0) & ~(shiftedBit > y)) {
+            if (y & shiftedBit) {
+                let sum = sum + shiftedX;
+            }
+            let shiftedX = shiftedX + shiftedX;
+            let shiftedBit = shiftedBit + shiftedBit;
+        }
+
+        // Check the original signs and adjust the result:
+        if (neg) {
+            return -sum;
+        }
+        else {
+            return sum;
+        }
+    }
+
+    /** Returns the integer part of x/y.
+     *  When a Jack compiler detects the multiplication operator '/' in the
+     *  program's code, it handles it by invoking this method. In other words,
+     *  the Jack expressions x/y and divide(x,y) return the same value.
+     */
+    function int divide(int x, int y) {
+        // TODO: can this recursion be turned into a loop, to avoid the overhead of function calls?
+        // You would have to put the "shiftedY" value onto a stack or something, since you can't
+        // recover the previous value (unless your ALU provides right-shift, hint, hint.)
+        // Failing that, probably at least inline the multiplication, because we know both
+        // operands are positive.
+
+        var boolean neg;
+        var int q, r;
+
+        if (y = 0) {
+            do Sys.error(3);
+        }
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
+        let y = Math.abs(y);
+        let x = Math.abs(x);
+
+        // No more bits to look at:
+        if (y > x) {
+            return 0;
+        }
+
+        // Try dividing by 2y:
+        if ((y+y) < 0) {
+            // If 2*y overflows, it's definitely > x.
+            let q = 0;
+        }
+        else {
+            let q = Math.divide(x, y+y);
+        }
+        let r = q+q;
+        if (~((x - Math.multiply(r, y)) < y)) {
+            let r = r + 1;
+        }
+
+        if (neg) {
+            return -r;
+        }
+        else {
+            return r;
+        }
+    }
+
+    /** Returns the integer part of the square root of x. */
+    function int sqrt(int x) {
+        var int t, r, n;
+
+        if (x < 0) {
+            do Sys.error(1);
+        }
+
+        let t = 128;
+        let r = 0;
+        while (t > 0) {
+            let n = r + t;
+            if (~(x < (n*n))) {  // i.e. x >= n^2
+                let r = n;
+            }
+
+            let t = t/2;
+        }
+
+        return r;
+
+        // All this inlining of multiply/divide calls saves cycles but inflates the code size
+        // by a huge factor, like maybe 150% for the whole class.
+        // Move it to a "faster and larger" alternative library? Naive translators struggle
+        // to fit programs in ROM. Most programs don't need sqrt to be fast (or need it at all.)
+
+        // var int r, n, rSq, br, nSq;
+
+        // // Hand-unrolled loop: sqrt(32767) = 181, which fits in 8 bits.
+        // if (~(x < 16384)) {  // 128^2
+        //     let r = 128;
+        //     let rSq = 16384;
+        // }
+        // else {
+        //     let r = 0;
+        //     let rSq = 0;
+        // }
+
+        // let n = r + 64;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let br = br+br;  // 32r
+        // // let br = br+br;  // 64r
+        // // let nSq = rSq + (br + br) + 4096;  // n^2 = r^2 + 128r + 64^2
+        // let nSq = rSq + (128*r) + 4096;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 32;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let br = br+br;  // 32r
+        // // let nSq = rSq + (br + br) + 1024;  // n^2 = r^2 + 64r + 32^2
+        // let nSq = rSq + (64*r) + 1024;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 16;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let br = br+br;  // 16r
+        // // let nSq = rSq + (br + br) + 256;  // n^2 = r^2 + 32r + 16^2
+        // let nSq = rSq + (32*r) + 256;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 8;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let br = br+br;  // 8r
+        // // let nSq = rSq + (br + br) + 64;  // n^2 = r^2 + 16r + 8^2
+        // let nSq = rSq + (16*r) + 64;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 4;
+        // // let br = r+r;    // 2r
+        // // let br = br+br;  // 4r
+        // // let nSq = rSq + (br + br) + 16;  // n^2 = r^2 + 8r + 4^2
+        // let nSq = rSq + (8*r) + 16;
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 2;
+        // // let br = r+r;    // 2r
+        // // let nSq = rSq + (br + br) + 4;  // n^2 = r^2 + 4r + 2^2
+        // let nSq = rSq + (4*r) + 4;  // n^2 = r^2 + 4r + 2^2
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // let n = r + 1;
+        // let nSq = rSq + (r + r) + 1;  // n^2 = r^2 + 2r + 1
+        // if (~(x < nSq)) {
+        //     let r = n;
+        //     let rSq = nSq;
+        // }
+
+        // return r;
+    }
+
+    /** Returns the greater number. */
+    function int max(int a, int b) {
+        if (a > b) {
+            return a;
+        }
+        else {
+            return b;
+        }
+    }
+
+    /** Returns the smaller number. */
+    function int min(int a, int b) {
+        if (a < b) {
+            return a;
+        }
+        else {
+            return b;
+        }
+    }
+}

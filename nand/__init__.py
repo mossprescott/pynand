@@ -7,4 +7,4 @@ implemented.
 """
 
 from nand.vector import unsigned
-from nand.syntax import Nand, DFF, ROM, RAM, Input, lazy, clock, build, run, gate_count
+from nand.syntax import Nand, DFF, ROM, RAM, Input, Output, lazy, clock, build, run, gate_count

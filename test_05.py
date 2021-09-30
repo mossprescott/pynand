@@ -91,10 +91,11 @@ def test_memory_system():
 
     ### Keyboard test
 
-    mem.address = 0x6000
-    # TODO: simulate 'k' key pressed
+    ## Note: this test can't be done on the isolated MemorySystem, because the necessary
+    ## connections are only provided when the simulator detects the full Computer is being
+    ## simulated. Instead, we test it below.
+    # mem.address = 0x6000
     # assert mem.out == 75
-    assert mem.out == 0
 
 
     ### Screen test
@@ -306,10 +307,10 @@ def test_cpu(chip=project_05.CPU):
 
 def test_computer_no_program(chip=project_05.Computer):
     computer = run(chip)
-    
+
     for _ in range(100):
         computer.ticktock()
-    
+
     assert computer.pc == 100
 
 
@@ -323,27 +324,27 @@ ADD_PROGRAM = [
     0b1110001100001000,  # M=D
 ]
 
-def test_computer_add(chip=project_05.Computer):
-    computer = run(chip)
-    
+def test_computer_add(chip=project_05.Computer, simulator="vector"):
+    computer = run(chip, simulator=simulator)
+
     # First run (at the beginning PC=0)
     computer.run_program(ADD_PROGRAM)
-    
+
     assert computer.peek(1) == 5
-    
+
 
     # Reset the PC
     computer.reset = 1
     computer.ticktock()
     assert computer.pc == 0
-    
+
     # Second run, to check that the PC was reset correctly.
     computer.poke(1, 12345)
-    computer.reset = 0    
+    computer.reset = 0
     while computer.pc < len(ADD_PROGRAM):
         computer.ticktock()
 
-    assert computer.peek(1) == 5        
+    assert computer.peek(1) == 5
 
 
 MAX_PROGRAM = [
@@ -366,8 +367,8 @@ MAX_PROGRAM = [
     0b1110101010000111,  # 15: JMP    ; infinite loop
 ]
 
-def test_computer_max(chip=project_05.Computer, cycles_per_instr=1):
-    computer = run(chip)
+def test_computer_max(chip=project_05.Computer, simulator="vector", cycles_per_instr=1):
+    computer = run(chip, simulator=simulator)
 
     computer.init_rom(MAX_PROGRAM)
 
@@ -387,14 +388,131 @@ def test_computer_max(chip=project_05.Computer, cycles_per_instr=1):
         computer.ticktock()
     assert computer.peek(3) == 23456
 
- 
+# Copy one keycode value from the address where the keyboard is mapped to the RAM.
+COPY_INPUT_PROGRAM = [
+    24576, # @(0x6000)
+    64528, # D=M     (D = keycode)
+    1,     # @1
+    58120, # M=D     (mem[1] = D)
+    4,     # @4
+    60039, # 0;JMP   (infinite loop)
+]
+
+def test_computer_keyboard(chip=project_05.Computer, simulator="vector", cycles_per_instr=1):
+    """A value which is presented via a special `Input` component can be read from the
+    address 0x6000, where the "keyboard" is mapped.
+
+    Note: can't test this at the level of MemorySystem, because the wrapper for the full
+    computer provides some of the necessary plumbing.
+    """
+
+    computer = run(chip, simulator=simulator)
+
+    computer.init_rom(COPY_INPUT_PROGRAM)
+
+    KEY_A = ord("a")
+
+    computer.set_keydown(KEY_A)
+    for _ in range(4*cycles_per_instr):
+        computer.ticktock()
+
+    assert computer.peek(1) == KEY_A
+
+
+def test_computer_tty_no_program(chip=project_05.Computer, simulator="vector"):
+    """When nothing has been written address 0x6000, no value is available on the TTY "port".
+    """
+
+    computer = run(chip, simulator=simulator)
+
+    for _ in range(100):
+        computer.ticktock()
+
+    assert computer.pc == 100
+    assert computer.tty_ready == True
+    assert computer.get_tty() == 0
+
+
+# Write a few constant values to the external "tty" interface:
+WRITE_TTY_PROGRAM = [
+    1,      # @1
+    60432,  # D=A
+    24576,  # @(0x6000)
+    58120,  # M=D   (write 1)
+
+    0,      # @0
+    60432,  # D=A
+    24576,  # @(0x6000)
+    58120,  # M=D   ("write" 0; no effect)
+
+    12345,  # @12345
+    60432,  # D=A
+    24576,  # @(0x6000)
+    58120,  # M=D   (write 12345)
+
+    12,     # @12
+    60039,  # 0; JMP  (infinite loop)
+]
+
+def test_computer_tty(chip=project_05.Computer, simulator="vector", cycles_per_instr=1):
+    """A value which is written to the address 0x6000 can be read from outside via
+    a special `Output` component.
+
+    Also, the presence of a value in that component is signalled by the `tty_ready`
+
+    Note: can't test this at the level of MemorySystem, because the wrapper for the full
+    computer provides some of the necessary plumbing.
+    """
+
+    computer = run(chip, simulator=simulator)
+
+    computer.init_rom(WRITE_TTY_PROGRAM)
+
+    # Run until a value appears (after 4 instructions):
+
+    cycles = 0
+    while computer.tty_ready and cycles < 1000:
+        computer.ticktock()
+        cycles += 1
+
+    print(f"cycles: {cycles}")
+    assert computer.tty_ready == False
+    assert computer.get_tty() == 1
+    assert computer.tty_ready == True
+    assert cycles == 4*cycles_per_instr   # Bogus?
+
+
+    # Now run four more instructions; nothing written this time:
+
+    for _ in range(4*cycles_per_instr):
+        computer.ticktock()
+
+    assert computer.tty_ready == True
+    assert computer.get_tty() == 0
+    assert computer.tty_ready == True
+
+
+    # One more time, with a different value:
+
+    cycles = 0
+    while computer.tty_ready and cycles < 1000:
+        computer.ticktock()
+        cycles += 1
+
+    assert computer.tty_ready == False
+    assert computer.get_tty() == 12345
+    assert computer.tty_ready == True
+    assert cycles == 4*cycles_per_instr   # Bogus?
+
+
+
 def cycles_per_second(chip, cycles_per_instr=1):
     """Estimate the speed of CPU simulation by running Max repeatedly with random input.
     """
-    
+
     import random
     import timeit
-    
+
     computer = run(chip)
 
     computer.init_rom(MAX_PROGRAM)
@@ -419,4 +537,4 @@ def cycles_per_second(chip, cycles_per_instr=1):
 def test_speed(chip=project_05.Computer, cycles_per_instr=1):
     cps = cycles_per_second(chip, cycles_per_instr)
     print(f"Measured speed: {cps:0,.1f} cycles/s")
-    assert cps > 1000
+    assert cps > 500  # Note: about 1k/s is expected, but include a wide margin for random slowness

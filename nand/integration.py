@@ -81,7 +81,7 @@ class IC:
 
     def copy(self):
         """Construct a new IC with all the same components and wiring. Note: this is a shallow copy,
-        containing the same child components. Therefore, changes to the wiring of the new IC do not 
+        containing the same child components. Therefore, changes to the wiring of the new IC do not
         affect the original, but changes to the wiring of child components do.
         """
         ic = IC(f"{self.label}", self._inputs, self._outputs)
@@ -100,7 +100,7 @@ class IC:
         flat_children = {}
 
         all_wires = {}
-        
+
         for comp in self.sorted_components():
             if isinstance(comp, IC) and comp.label not in primitives:
                 # print(f"flatten: {comp.label}")
@@ -124,47 +124,96 @@ class IC:
 
         ic = IC(f"{self.label}[flat]", self._inputs, self._outputs)
         ic.wires = collapse_internal(all_wires)
-        
+
         # Now prune wires that don't connect to any reachable compononent:
         reachable = set(ic.sorted_components() + [common, root])
         ic.wires = {
-            t: f 
-            for (t, f) in ic.wires.items() 
+            t: f
+            for (t, f) in ic.wires.items()
             if f.comp in reachable and t.comp in reachable
         }
-        
+
         return ic
 
 
     def sorted_components(self):
-        """List of all components (including only direct children), roughly in the order that 
-        signals propagate.
+        """List of all components (including only direct children), in the order that signals
+        propagate.
 
-        That is, when component A has an output that feeds an input of component B, A comes before B 
-        in the list. If there are reference cycles, the components are ordered as if one such 
-        reference (chosen in no particular way) was removed.
-        
-        DFFs (and other components that have _only_ sequential logic) get special treatment: 
-        they appear last in the result no matter what, which allows their inputs to be evaluated 
-        later as well.
+        That is, when component A has an output that feeds an input of component B, A comes before B
+        in the list. If there are reference cycles among "combinational" components, the components
+        are ordered as if one such reference (chosen in no particular way) was removed.
+
+        Components that have partially or completely sequential logic get special treatment:
+        DFFs and Registers appear last in the result no matter what, which allows their inputs to
+        be evaluated later as well. MemorySystem and the components supplying its `address` input
+        are included in the main sequence, but its other inputs can appear later.
+
+        The desired result is:
+        - minimal "back-edges", where an output of a later component feeds an input of an earlier one
+        - a back-edge whose source is definitely latched is ok (DFF/Register.out); these signals
+            are available at any time
+        - a back-edge which is used (by the target) only during the update phase is ok
+            (MemorySystem.in_ and .load)
+
+        Note: str() labels these back-edges so they can be visually confirmed, but these constraints
+        aren't checked for you, and indeed the "vector" simulator can handle some circuits that don't
+        obey them, by repeating propagation until a fixed point is found.
+
+        TODO: generalize this and don't assume the behavior of Register/MemorySystem is as expected.
+        It should be up to the caller to say what assumptions it wants to make; e.g. a simulator
+        (codegen) that's already assuming some particular implementation.
         """
-        
-        # DFF output never changes based on upstream combinational logic
-        # So stop the DFS at a DFF (or other sequential-only output)
-        # Still need to update the _inputs_ of any such component each time, but
-        #   can wait to do it at the end.
-        # 1) find all reachable components, including through DFFs.
-        # 2) add all the DFFs to the list of "roots"
-        # 3) run another search, _not_ traversing the DFF inputs
-        # How to apply this thinking to RAM? Can it be separated?
+
+        # DFF/Register output never changes based on upstream combinational logic, so stop the
+        # search at a DFF or Register.
+        # Still need to update the _inputs_ of any such component each time, but can wait to do
+        # it at the end.
+        # For MemorySystem, the .address input is needed to determine .out, but .in_ and .load
+        # are not used until the update phase.
+        # 1) find all reachable components, including through DFFs, etc.
+        # 2) add all the special components that were found to the list of "roots"
+        # 3) run another search, first traversing only the non-seq. inputs, and then the
+        #    special components after
 
         # Pre-compute wires _into_ each component:
-        wires_by_target_comp = {}  # {target comp: (target name, source comp)}
+        wires_by_target_comp = {}  # {target comp: (target (input) name, source comp)}
         for t, f in self.wires.items():
             if f.comp != root and f.comp != common:
                 wires_by_target_comp.setdefault(t.comp, []).append((t.name, f.comp))
 
-        def dfs(roots, ignore_dffs):
+        def is_seq(from_comp, to_comp, input_name):
+            """True if this particular input is latched, and therefore available in the combination phase.
+
+            Note that the logic here is a bit tangled. Might get the same result more simply by
+            treating the inputs of DFF/Register like the non-address inputs of MemorySystem, but
+            that would change more things more places, so for now they get deferred entirely.
+            """
+
+            if isinstance(from_comp, DFF):
+                return True
+            elif isinstance(from_comp, IC) and from_comp.label == "Register":
+                return True
+            elif isinstance(to_comp, IC) and to_comp.label == "MemorySystem" and input_name != "address":
+                # This is the tricky case. The address is needed to supply the correct output, but
+                # other inputs (in_ and load) are only used at update time.
+                return True
+            else:
+                return False
+
+        def only_seq_output(from_comp):
+            """True if *all* outputs are known to be latched, and therefore the component
+            will be excluded from the initial search.
+            """
+            return isinstance(from_comp, DFF) or (isinstance(from_comp, IC) and from_comp.label == "Register")
+
+        def has_seq_input(to_comp):
+            """True if any input is not needed in the combination phase, and therefore some
+            sources may have been left out.
+            """
+            return isinstance(to_comp, IC) and to_comp.label == "MemorySystem"
+
+        def search(roots, ignore_dffs):
             # Note: a set for fast tests, and a list to remember the order
             visited = []
             visited_set = set()
@@ -176,23 +225,34 @@ class IC:
                 if n not in visited_set and n not in stack:
                     stack.append(n)
                     name_comp = wires_by_target_comp.get(n, [])
-                    for _, nxt in sorted(name_comp, key=lambda t: t[0]):
-                        if not (ignore_dffs and isinstance(nxt, DFF)):
-                            loop(nxt)
+                    for input_name, from_comp in sorted(name_comp, key=lambda t: t[0]):
+                        if not (ignore_dffs and is_seq(from_comp, n, input_name)):
+                            loop(from_comp)
                     stack.remove(n)
                     visited.append(n)
                     visited_set.add(n)
-            to_search = roots
-            while to_search:
-                n, to_search = to_search[0], to_search[1:]
-                loop(n)
+            for n in roots:
+                if n in visited_set:
+                    # Tricky: we already searched the inputs of n which are needed in the
+                    # combinatorial phase. Now also may need to include those which are only
+                    # used during update.
+                    name_comp = wires_by_target_comp.get(n, [])
+                    for _, from_comp in sorted(name_comp, key=lambda t: t[0]):
+                        loop(from_comp)
+                else:
+                    loop(n)
             return visited
 
-        reachable = dfs([root], False)
-        reachable.remove(root)
-        
-        dffs = [n for n in reachable if isinstance(n, DFF)]
-        result = dfs([root] + dffs, True)
+        # First pass: just find all the reachable components with sequential behavior, might need
+        # to be evaluated for update.
+        reachable_seq = [ n
+            for n in search([root], False)
+            if n != root and (only_seq_output(n) or has_seq_input(n))
+        ]
+
+        # Actual search: now search from the root (ignoring inputs for update phase), then from
+        # extra components (and their sequential-only inputs).
+        result = search([root] + reachable_seq, True)
         result.remove(root)
 
         return result
@@ -214,9 +274,9 @@ class IC:
     def __str__(self):
         """A multi-line summary of all the wiring."""
         # Sort wires by topological order of the "from" component, then name, then the "to" component and name.
-        
+
         # TODO: render components in order, one per line, with neatly summarized inputs and outputs.
-        
+
         all_comps = self.sorted_components()
         def to_index(c, root_val):
             if c == root:
@@ -249,13 +309,13 @@ class IC:
 
         def wires(key, bit_pairs):
             (fc, fn), (tc, tn) = key
-            def line(l, r, x): 
+            def line(l, r, x):
                 return f"  {l:21s} -> {r:21s}{x}"
             def comp_name_label(comp, name):
                 if isinstance(comp, Const):
                     return hex(comp.value)
                 elif comp == root or (comp == clock.comp and name == clock.name):
-                    return name 
+                    return name
                 else:
                     return f"{self._comp_label(comp, all_comps)}.{name}"
             def conn_label(comp, name, bit):
@@ -281,8 +341,8 @@ class IC:
                 ]
             else:
                 return [
-                    line(conn_label(fc, fn, fb), 
-                         conn_label(tc, tn, tb), 
+                    line(conn_label(fc, fn, fb),
+                         conn_label(tc, tn, tb),
                          back_edge_label(fc, tc))
                     for fb, tb in sorted(bit_pairs)
                     ]
@@ -310,9 +370,9 @@ class IC:
 def collapse_internal(graph):
     """Collapse _all_ paths, removing _every_ internal node.
     """
-    
+
     result = graph.copy()
-    
+
     to_delete = []
     for src, dst in graph.items():
         while dst in result:
@@ -320,7 +380,7 @@ def collapse_internal(graph):
             result[src] = previous_dst
             to_delete.append(dst)
             dst = previous_dst
-            
+
     for node in to_delete:
         if node in result:
             del result[node]
@@ -330,9 +390,9 @@ def collapse_internal(graph):
 
 class Root:
     """Pseudo-component which stands in for the IC itself in connections. There is exactly one instance
-    this class, `root`, which is used by every IC. Doing it that way makes it trivial to make a copy 
+    this class, `root`, which is used by every IC. Doing it that way makes it trivial to make a copy
     of an IC: just make a shallow copy of the `wires` dictionary.
-    
+
     Note: inputs() and outputs() not defined here, because te result would be wrong. Anyone interested in
     inputs and outputs needs to special case the root and look at the IC itself.
     """
@@ -345,7 +405,7 @@ class Root:
 
     def outputs(self):
         raise NotImplementedError("Not a true component. Input and outputs are available from the IC.")
-        
+
 root = Root()
 """A single instance of Root which should be the only instance ever."""
 

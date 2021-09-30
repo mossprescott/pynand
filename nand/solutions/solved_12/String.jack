@@ -1,0 +1,293 @@
+class String {
+    field int capacity;
+    field Array chars;
+    field int length;
+
+    /** constructs a new empty string with a maximum length of maxLength
+     *  and initial length of 0. */
+    constructor String new(int maxLength) {
+        if (maxLength < 0) {
+            do Sys.error(14);
+        }
+        if (maxLength > 0) {
+            let chars = Memory.alloc(maxLength);
+        }
+        else {
+            let chars = -1;  // terrible idea?
+        }
+        let capacity = maxLength;
+        let length = 0;
+
+        return this;
+    }
+
+    /** Disposes this string. */
+    method void dispose() {
+        if (capacity > 0) {
+            do Array.dispose(chars);
+        }
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Returns the current length of this string. */
+    method int length() {
+        return length;
+    }
+
+    /** Returns the character at the j-th location of this string. */
+    method char charAt(int j) {
+        if ((j < 0) | ~(length > j)) {
+            return 0;
+        }
+        else {
+            return chars[j];
+        }
+    }
+
+    /** Sets the character at the j-th location of this string to c. */
+    method void setCharAt(int j, char c) {
+        // TODO: error checking
+        let chars[j] = c;
+        return;
+    }
+
+    /** Appends c to this string's end and returns this string. */
+    method String appendChar(char c) {
+        if (~(length < capacity)) {
+            do Sys.error(73);   // errorCode?
+        }
+        let chars[length] = c;
+        let length = length + 1;
+        return this;
+    }
+
+    /** Erases the last character from this string. */
+    method void eraseLastChar() {
+        if (length > 0) {
+            let length = length - 1;
+        }
+        return;
+    }
+
+    /** Returns the integer value of this string,
+     *  until a non-digit character is detected. */
+    method int intValue() {
+        // Note: doesn't handle -32768
+
+        var int ptr, sign, x, digit;
+
+        let ptr = 0;
+        let sign = 1;
+        let x = 0;
+
+        if (charAt(ptr) = 45) {  // "-"
+            let ptr = ptr + 1;
+            let sign = -1;
+        }
+
+        while (ptr < length) {
+            let digit = charAt(ptr) - 48;
+            if ((-1 < digit) & (10 > digit)) {
+                let x = (10*x) + digit;
+            }
+            else {
+                return x*sign;
+            }
+            let ptr = ptr + 1;
+        }
+
+        return x*sign;
+    }
+
+    /** Sets this string to hold a representation of the given value. */
+    method void setInt(int val) {
+        var int absVal;
+        var int nextVal;
+        var int lPtr, rPtr;
+        var char tmp;
+
+        // Clear the string:
+        let length = 0;
+
+        if (val = -32767 - 1) {
+            // Special-case the minimum value because -32768 fits in a word, but 32768
+            // doesn't.
+            do appendChar(45);    // "-"
+            do appendChar(48 + 3);
+            do appendChar(48 + 2);
+            do appendChar(48 + 7);
+            do appendChar(48 + 6);
+            do appendChar(48 + 8);
+        }
+        else {
+            if (val = 0) {
+                do appendChar(48);
+            }
+            else {
+                // Any other value is just converted to a positive and then "-" is added if needed:
+                if (val < 0) {
+                    let absVal = -val;
+                }
+                else {
+                    let absVal = val;
+                }
+
+                // Add digits, starting from the ones place and moving to the "left":
+                while (absVal > 0) {
+                    let nextVal = absVal / 10;
+
+                    // Note: this will error/halt if there's not enough space in the string:
+                    do appendChar(48 + (absVal - (nextVal * 10)));
+                    let absVal = nextVal;
+                }
+
+                // Add the sign at the end of the reversed string, if needed:
+                if (val < 0) {
+                    do appendChar(45);  // "-"
+                }
+
+                // Now reverse the characters in place:
+                let lPtr = 0;
+                let rPtr = length - 1;
+                while (lPtr < rPtr) {
+                    let tmp = charAt(lPtr);
+                    do setCharAt(lPtr, charAt(rPtr));
+                    do setCharAt(rPtr, tmp);
+                    let lPtr = lPtr + 1;
+                    let rPtr = rPtr - 1;
+                }
+            }
+        }
+
+        return;
+    }
+
+    // TODO: put this, along with other optimizations, in a "faster and larger" alternative
+    // somewhere for use with more efficient translators.
+
+    // /** Sets this string to hold a representation of the given value. */
+    // method void setInt(int val) {
+    //     // A much more efficient implementation, using no multiply or divide, using
+    //     // a bit of hand-coded testing/looping for each of the potential five digits.
+    //     //
+    //     // This saves ~40% of the cycles for StringTest.
+
+    //     var int absVal, digit, cmp;
+    //     var boolean wroteOne;
+
+    //     // Clear the string:
+    //     let length = 0;
+
+    //     if (val = -32767 - 1) {
+    //         // Special-case the minimum value because -32768 fits in a word, but 32768
+    //         // doesn't.
+    //         do appendChar(45);    // "-"
+    //         do appendChar(48 + 3);
+    //         do appendChar(48 + 2);
+    //         do appendChar(48 + 7);
+    //         do appendChar(48 + 6);
+    //         do appendChar(48 + 8);
+
+    //         return;
+    //     }
+
+    //     // For speed, special-case small values (positive, single-digit):
+    //     if ((val > -1) & (val < 10)) {
+    //         do appendChar(48 + val);
+    //         return;
+    //     }
+
+    //     // Any other value is just converted to a positive, but first a "-" if needed:
+    //     if (val < 0) {
+    //         do appendChar(45);  // "-"
+    //         let absVal = -val;
+    //     }
+    //     else {
+    //         let absVal = val;
+    //     }
+
+    //     let wroteOne = true;
+
+    //     // 10,000s place:
+    //     // Note: can't compare with 40,000, and there are only three possiblities anyway.
+    //     if (absVal < 10000) {
+    //         let wroteOne = false;
+    //     }
+    //     else {
+    //         if (absVal < 20000) {
+    //             do appendChar(49); // "1"
+    //             let absVal = absVal - 10000;
+    //         }
+    //         else {
+    //             if (absVal < 30000) {
+    //                 do appendChar(50); // "2"
+    //                 let absVal = absVal - 20000;
+    //             }
+    //             else {
+    //                 do appendChar(51); // "3"
+    //                 let absVal = absVal - 30000;
+    //             }
+    //         }
+    //     }
+
+    //     // 1000s place:
+    //     let digit = 0;
+    //     let cmp = 1000;
+    //     while (~(cmp > absVal)) {
+    //         let digit = digit + 1;
+    //         let cmp = cmp + 1000;
+    //     }
+    //     if (wroteOne | digit > 0) {
+    //         do appendChar(48 + digit);
+    //         let wroteOne = true;
+    //     }
+    //     let absVal = absVal - (cmp - 1000);
+
+    //     // 100s place:
+    //     let digit = 0;
+    //     let cmp = 100;
+    //     while (~(cmp > absVal)) {
+    //         let digit = digit + 1;
+    //         let cmp = cmp + 100;
+    //     }
+    //     if (wroteOne | digit > 0) {
+    //         do appendChar(48 + digit);
+    //         let wroteOne = true;
+    //     }
+    //     let absVal = absVal - (cmp - 100);
+
+    //     // 10s place:
+    //     let digit = 0;
+    //     let cmp = 10;
+    //     while (~(cmp > absVal)) {
+    //         let digit = digit + 1;
+    //         let cmp = cmp + 10;
+    //     }
+    //     if (wroteOne | digit > 0) {
+    //         do appendChar(48 + digit);
+    //         let wroteOne = true;
+    //     }
+    //     let absVal = absVal - (cmp - 10);
+
+    //     // 1s place:
+    //     do appendChar(48 + absVal);
+
+    //     return;
+    // }
+
+    /** Returns the new line character. */
+    function char newLine() {
+        return 128;
+    }
+
+    /** Returns the backspace character. */
+    function char backSpace() {
+        return 129;
+    }
+
+    /** Returns the double quote (") character. */
+    function char doubleQuote() {
+        return 34;
+    }
+}

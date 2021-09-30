@@ -1,3 +1,5 @@
+# VM I: Stack Arithmetic
+#
 # See https://www.nand2tetris.org/project07
 
 from nand.translate import AssemblySource
@@ -9,7 +11,7 @@ from nand.solutions import solved_07
 class Translator:
     """Translates all the arithmetic and memory access opcodes of the VM to assembly instructions.
     """
-    
+
     def __init__(self):
         # AssemblySource deals with keeping track of emitted instructions, and provides a nice
         # log of execution which makes debugging a lot easier. In any case, the tests assume you use
@@ -31,7 +33,7 @@ class Translator:
         # self.asm.instr(f"@{value}")
         # self.asm.instr("D=A")
         # ...
-        
+
         return self.solved.push_constant(value)
 
     def add(self):
@@ -75,7 +77,7 @@ class Translator:
         # SOLVERS: implement the gt opcode
         return self.solved.gt()
 
-        
+
     #
     # Memory Access - Basic:
     #
@@ -146,7 +148,7 @@ class Translator:
         # SOLVERS: implement
         return self.solved.push_static(index)
 
-    
+
     #
     # (Optional) Cleanup:
     #
@@ -159,13 +161,37 @@ class Translator:
     # (Optional) Optimization:
     #
     def rewrite_ops(self, ops):
-        # SOLVERS: ignore for now. This is a hook to allow the Translator to inspect and modify the 
+        # SOLVERS: ignore for now. This is a hook to allow the Translator to inspect and modify the
         # opcode sequence before it is translated, in case a "better" equivalent sequence is possible.
         return ops
 
 
+    def check_references(self):
+        """Check for obvious "linkage" errors: e.g. functions that are referenced but never defined.
+
+        Raises AssertionFailure if there are any obvious problems.
+        """
+
+        # SOLVERS: this is a big help for debugging programs later on, but you can just return None
+        # and nothing will break (except possibly your sanity.)
+        return self.solved.check_references()
+
+
+    #
+    # Wiring:
+    #
+
+    def handle(self, op):
+        """Dispatch to the handler for an opcode, in the form of a tuple (op_name, [args])."""
+
+        # SOLVERS: this is just plumbing to call one of the methods definied below. Feel
+        # free to leave it here and don't worry about it how it works too much.
+        op_name, args = op
+        self.__getattribute__(op_name)(*args)
+
+
 def parse_line(line):
-    # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of 
-    # the method of Translator which handles the opcode, and a sequence with any arguments. 
+    # SOLVERS: parse one line of VM source. The result should be a tuple which contains the name of
+    # the method of Translator which handles the opcode, and a sequence with any arguments.
     # E.g. ("push_constant", [1]), ("add", []), ("function", ["Main", "main", 2])
     return solved_07.parse_line(line)
