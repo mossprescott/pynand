@@ -294,8 +294,6 @@ EXTERNAL_LIBRARY_PATH = None
 def translate_library(translator, platform):
     if EXTERNAL_LIBRARY_PATH is None:
         for lib_class in platform.library:
-            # TODO: handle VM source (for nand2tetris comparison)
-
             ast = lib_class
 
             asm = AssemblySource()
