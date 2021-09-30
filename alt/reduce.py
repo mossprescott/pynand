@@ -447,18 +447,19 @@ def inject_defs(class_ast: jack_ast.Class, extra_defs: jack_ast.Class) -> jack_a
     else:
         return class_ast
 
-enhanced_library = (
-    [all_transforms.transform(inject_defs(ast, EXTRA_MATH), name_gen) for ast in BUNDLED_PLATFORM.library])
+
+def enhance_platform(platform):
+    """Derive a platform which """
+    return platform._replace(
+        parser=enhance_parser(platform.parser, all_transforms),
+        library=[all_transforms.transform(inject_defs(ast, EXTRA_MATH), name_gen) for ast in platform.library])
 
 # Note: the transformations all run here (over the library classes) when the module is imported.
-REDUCE_PLATFORM = BUNDLED_PLATFORM._replace(
-    parser=enhance_parser(BUNDLED_PLATFORM.parser, all_transforms),
-    library=enhanced_library)
+REDUCE_PLATFORM = enhance_platform(BUNDLED_PLATFORM)
 
-# # HACK: Base on alt/reg instead:
-# REDUCE_PLATFORM = REG_PLATFORM._replace(
-#     parser=enhance_parser(REG_PLATFORM.parser, all_transforms),
-#     library=enhanced_library)
+# HACK: Base on alt/reg instead:
+REDUCE_REG_PLATFORM = enhance_platform(REG_PLATFORM)
+
 
 if __name__ == "__main__":
     # Note: this import requires pygame; putting it here allows the tests to import the module
