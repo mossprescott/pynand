@@ -239,7 +239,6 @@ class Screen {
                 }
                 let ptr[0] = (ptr[0] & ~mask) | (color & mask);
 
-                // let word = word + 1;  // unused
                 let wordX = wordX + 16;
                 let ptr = ptr + 1;
             }
@@ -248,7 +247,6 @@ class Screen {
             while (~((wordX+16) > endX)) {  // i.e. wordX + 16 <= endX
                 let ptr[0] = color;
 
-                // let word = word + 1;  // unused
                 let wordX = wordX + 16;
                 let ptr = ptr + 1;
             }
