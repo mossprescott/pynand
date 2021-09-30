@@ -2,13 +2,13 @@
 #
 # See https://www.nand2tetris.org/project01
 
-from nand import Nand, build
+from nand import Nand, chip
 
 # SOLVERS: remove this import to get started
 from nand.solutions import solved_01
 
-
-def mkNot(inputs, outputs):
+@chip
+def Not(inputs, outputs):
     in_ = inputs.in_
 
     # SOLVERS: replace this with a Nand
@@ -16,10 +16,9 @@ def mkNot(inputs, outputs):
 
     outputs.out = n1.out
 
-Not = build(mkNot)
 
-
-def mkOr(inputs, outputs):
+@chip
+def Or(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -28,10 +27,9 @@ def mkOr(inputs, outputs):
 
     outputs.out = n1.out
 
-Or = build(mkOr)
 
-
-def mkAnd(inputs, outputs):
+@chip
+def And(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -40,10 +38,9 @@ def mkAnd(inputs, outputs):
 
     outputs.out = n1.out
 
-And = build(mkAnd)
 
-
-def mkXor(inputs, outputs):
+@chip
+def Xor(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -52,10 +49,9 @@ def mkXor(inputs, outputs):
 
     outputs.out = n1.out
 
-Xor = build(mkXor)
 
-
-def mkMux(inputs, outputs):
+@chip
+def Mux(inputs, outputs):
     a = inputs.a
     b = inputs.b
     sel = inputs.sel
@@ -65,10 +61,9 @@ def mkMux(inputs, outputs):
 
     outputs.out = n1.out
 
-Mux = build(mkMux)
 
-
-def mkDMux(inputs, outputs):
+@chip
+def DMux(inputs, outputs):
     in_ = inputs.in_
     sel = inputs.sel
 
@@ -78,10 +73,9 @@ def mkDMux(inputs, outputs):
     outputs.a = n1.a
     outputs.b = n1.b
 
-DMux = build(mkDMux)
 
-
-def mkDMux4Way(inputs, outputs):
+@chip
+def DMux4Way(inputs, outputs):
     in_ = inputs.in_
     sel = inputs.sel
 
@@ -94,10 +88,9 @@ def mkDMux4Way(inputs, outputs):
     outputs.c = n1.c
     outputs.d = n1.d
 
-DMux4Way = build(mkDMux4Way)
 
-
-def mkDMux8Way(inputs, outputs):
+@chip
+def DMux8Way(inputs, outputs):
     in_ = inputs.in_
     sel = inputs.sel
 
@@ -113,22 +106,20 @@ def mkDMux8Way(inputs, outputs):
     outputs.g = n1.g
     outputs.h = n1.h
 
-DMux8Way = build(mkDMux8Way)
 
-
-def mkNot16(inputs, outputs):
+@chip
+def Not16(inputs, outputs):
     in_ = inputs.in_
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
-    # Hint: use outputs.out[0]... to connect each bit of the output
+    # Hint: use outputs.out[0] = ... in_[0] ..., etc. to connect each bit of the output
     n1 = solved_01.Not16(in_=in_)
 
     outputs.out = n1.out
 
-Not16 = build(mkNot16)
 
-
-def mkAnd16(inputs, outputs):
+@chip
+def And16(inputs, outputs):
     a = inputs.a
     b = inputs.b
 
@@ -137,10 +128,9 @@ def mkAnd16(inputs, outputs):
 
     outputs.out = n1.out
 
-And16 = build(mkAnd16)
 
-
-def mkMux16(inputs, outputs):
+@chip
+def Mux16(inputs, outputs):
     a = inputs.a
     b = inputs.b
     sel = inputs.sel
@@ -150,10 +140,9 @@ def mkMux16(inputs, outputs):
 
     outputs.out = n1.out
 
-Mux16 = build(mkMux16)
 
-
-def mkMux4Way16(inputs, outputs):
+@chip
+def Mux4Way16(inputs, outputs):
     a = inputs.a
     b = inputs.b
     c = inputs.c
@@ -165,10 +154,9 @@ def mkMux4Way16(inputs, outputs):
 
     outputs.out = n1.out
 
-Mux4Way16 = build(mkMux4Way16)
 
-
-def mkMux8Way16(inputs, outputs):
+@chip
+def Mux8Way16(inputs, outputs):
     a = inputs.a
     b = inputs.b
     c = inputs.c
@@ -183,5 +171,3 @@ def mkMux8Way16(inputs, outputs):
     n1 = solved_01.Mux8Way16(a=a, b=b, c=c, d=d, e=e, f=f, g=g, h=h, sel=sel)
 
     outputs.out = n1.out
-
-Mux8Way16 = build(mkMux8Way16)
