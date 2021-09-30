@@ -2,7 +2,20 @@
 #
 # See https://www.nand2tetris.org/project10
 
-"""Some examples of using parsers defined with nand.parsing:
+"""On parsers:
+
+nand.parsing provides a collection of primitive parsers which can be assembled into the parsers
+you need to implement here. That module includes a tutorial on the basics and documentation for
+each combinator.
+
+Each component parser can act as a function taking a parse location and returning a result value
+and a new location (if it succeeds). If a parser doesn't recognize the tokens at the given location,
+it raises ParseFailure.
+
+Each component parser also provides `parse(tokens)`, which can be called directly to parse a program
+fragment.
+
+For example:
 
 >>> KeywordConstantP.parse([('keyword', 'true')])
 KeywordConstant(value=True)
@@ -58,30 +71,19 @@ KeywordConstantP = (
     | TokenP(("keyword", "null"),  jack_ast.KeywordConstant(None))
     | TokenP(("keyword", "this"),  jack_ast.KeywordConstant("this")))
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.Op`).
+# SOLVERS: replace this with a parser of jack_ast.Op
 UnaryOpP = solved_10.UnaryOpP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.Op`).
+# SOLVERS: replace this with a parser of jack_ast.Op
 BinaryOpP = solved_10.BinaryOpP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.IntegerConstant`).
+# SOLVERS: replace this with a parser of jack_ast.IntegerConstant
 IntegerConstantP = solved_10.IntegerConstantP
-# def IntegerConstantP(loc):
-#     typ, str = loc.current_token()
-#     if typ == INT:
-#         return jack_ast.IntegerConstant(int(str)), loc.advance()
-#     else:
-#         raise ParseFailure("int", loc)
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.StringConstant`).
+# SOLVERS: replace this with a parser of jack_ast.StringConstant
 StringConstantP = solved_10.StringConstantP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.VarRef`).
+# SOLVERS: replace this with a parser of jack_ast.VarRef
 # Note the name discrepancy: the grammar defines `varName` and uses it twice. The AST has `VarRef` and
 # `ArrayRef` for the two cases.
 VarNameP = solved_10.VarNameP
@@ -90,62 +92,59 @@ VarNameP = solved_10.VarNameP
 # Complex Expressions:
 #
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.ArrayRef`).
+# Tricky: the grammar for expressions is recursive, so need a way to refer to this parser before
+# actually giving its own definition.
+ExpressionP = DeferP("ExpressionP")
+
+# SOLVERS: replace this with a parser of jack_ast.ArrayRef
 # Note the name discrepancy: the grammar defines `varName` and uses it twice. The AST has `VarRef` and
 # `ArrayRef` for the two cases.
 VarNameAndArrayIndexP = solved_10.VarNameAndArrayIndexP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.Expression`).
-ExpressionP = solved_10.ExpressionP
+# SOLVERS: replace this with a parser of jack_ast.Expression
+ExpressionP.set(solved_10.ExpressionP)
 
 
 #
 # Statements:
 #
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.DoStatement`).
+# Tricky: the grammar for statements is recursive, so need a way to refer to this parser before
+# actually giving its own definition.
+StatementP = DeferP("StatementP")
+
+# SOLVERS: replace this with a parser of jack_ast.DoStatement
 DoStatementP = solved_10.DoStatementP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.ReturnStatement`).
+# SOLVERS: replace this with a parser of jack_ast.ReturnStatement
 ReturnStatementP = solved_10.ReturnStatementP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.LetStatement`).
+# SOLVERS: replace this with a parser of jack_ast.LetStatement
 LetStatementP = solved_10.LetStatementP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.IfStatement`).
+# SOLVERS: replace this with a parser of jack_ast.IfStatement
 IfStatementP = solved_10.IfStatementP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.WhileStatement`).
+# SOLVERS: replace this with a parser of jack_ast.WhileStatement
 WhileStatementP = solved_10.WhileStatementP
 
+StatementP.set(LetStatementP | IfStatementP | WhileStatementP | DoStatementP | ReturnStatementP)
 
 #
 # Program Structure:
 #
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.Type`).
+# SOLVERS: replace this with a parser of jack_ast.Type (aka str)
 TypeP = solved_10.TypeP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.VarDec`).
+# SOLVERS: replace this with a parser of jack_ast.jack_ast.VarDec
 VarDecP = solved_10.VarDecP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.SubroutineDec`).
+# SOLVERS: replace this with a parser of jack_ast.SubroutineDec
 SubroutineDecP = solved_10.SubroutineDecP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.ClassVarDec`).
+# SOLVERS: replace this with a parser of jack_ast.ClassVarDec
 ClassVarDecP = solved_10.ClassVarDecP
 
-# SOLVERS: replace this with a parser built up from the combinators in nand.parsing
-# (or your own class that provides parse(tokens) -> jack_ast.Class`).
+# SOLVERS: replace this with a parser of jack_ast.Class
 ClassP = solved_10.ClassP
