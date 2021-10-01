@@ -39,6 +39,7 @@ replaces certain function calls with lower-overhead "reduced" alternatives.
 | [alt/threaded.py](threaded.py)   | 1,549 (+23%) |   8,100 (-68%) |    49,600 (+20%) |     173,750 (+34%) |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  |   26,050 (+1%) |    19,800 (-52%) |             _same_ |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) |        _same_  |            +100% |              +100% |
+| [alt/risc/](risc/__init__.py) (simple) | 2,292 (+94%) |  19,011 (-26%) |    21,300 (-49%) |      64,350 (-50%) |
 | [alt/lazy.py](lazy.py)           | _same_       |   23,650 (-8%) |    37,300 (-10%) |     111,000 (-14%) |
 | [alt/reg.py](reg.py)             | _same_       |  20,900 (-19%) |    19,150 (-54%) |      59,000 (-54%) |
 | [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |             _same_ |

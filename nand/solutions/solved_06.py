@@ -106,7 +106,7 @@ def parse_op(string, symbols=None):
 
 
 def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
-    """Parse a sequence of lines them as assembly commands, accounting for
+    """Parse a sequence of lines as assembly commands, accounting for
     builtin symbols, labels, and variables.
 
     "//" denotes a comment and is ignored, along with the remainder of the line.
@@ -169,8 +169,13 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
                         raise Exception(f"Unable to allocate static storage for symbol {name}; already used all {max_static - min_static + 1} available locations")
                     statics[name] = next_static
                     ops.append(next_static)
+                    # print(f"{name}: {next_static}")
                     next_static += 1
             else:
-                ops.append(parse_op(line, symbols))
+                # HACK: risc parser needs all the mappings:
+                names = {}
+                names.update(symbols)
+                names.update(statics)
+                ops.append(parse_op(line, names))
 
     return (ops, symbols, statics)
