@@ -83,7 +83,7 @@ class RiSCCompiler(compiler.Compiler):
     def __init__(self):
         # Note: "r" means a true register, "R" is a low-memory temp location. That's
         # potentially confusing, but these are the conventions for the assembler and
-        # the debugger, so
+        # the debugger.
         self.registers = (
             [compiler.Reg(i+FIRST_LOCAL_REG, "r", "?") for i in range(NUM_LOCAL_REGS)]
             + [compiler.Reg(i+FIRST_MEM_REG, "R", "?") for i in range(NUM_MEM_REGS)])
@@ -223,6 +223,7 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.value)
         if imm == 0:
+            # Only 0 can be written in a single cycle, using r0 as the source
             self._handle(ast.address)
             self.asm.instr(f"sw r0 {TEMP1} 0")
         elif imm is not None:
@@ -530,8 +531,6 @@ class Translator(solved_07.Translator):
         # TODO: even with that being the case, there's a silly amount of redundant copying
         # going on here, just because everything goes through TEMP1 for no particular reason.
 
-        self.asm.comment(f"(temp): binary op; {compiler._Expr_str(ast)}")
-
         # rhs -> TEMP2; lhs -> TEMP1
         self._handle(ast.right)
         self.asm.instr(f"addi {TEMP2} {TEMP1} 0")
@@ -583,7 +582,7 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"beq {TEMP2} r0 +1")   # sign bit not set: >= 0; skip true case
             self.asm.instr(f"addi {TEMP1} r0 -1")  # result = -1
         else:
-            raise Exception(f"TODO: binary {ast.op.symbol}")
+            raise Exception(f"Unknown binary op: {compiler._Expr_str(ast)}")
 
     def handle_Unary(self, ast: compiler.Unary):
         self._handle(ast.value)
