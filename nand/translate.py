@@ -142,7 +142,7 @@ class AssemblySource:
             arg = [computer.peek(i) for i in range(computer.peek(ARG), computer.peek(LCL)-5)]
             saved = [computer.peek(i) for i in range(computer.peek(LCL)-5, computer.peek(LCL))]
             stack = [computer.peek(i) for i in range(computer.peek(LCL) or 256, computer.sp)]
-            print("    SP    LCL    ARG   THIS   THAT     R0     R1     R2     R3     R4     R5     R6     R7     G0     G1     G2")
+            print("    SP    LCL    ARG   THIS   THAT     R5     R6     R7     R8     R9    R10    R11    R12    R13    R14    R15")
             print(" ".join(f"{w:6d}" for w in ([computer.sp] + [computer.peek(addr) for addr in range(1,16)])))
             print(f"  return: {saved[0]}; saved: {saved[1:]}; args: {arg}")
             print(f"  local+stack: {stack[-50:]}")
