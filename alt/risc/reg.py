@@ -76,6 +76,8 @@ ARG_ADDR = 2  # same as @ARG
 TEMP1 = "r6"
 TEMP2 = "r7"
 
+MIN_STATIC = 16
+MAX_STATIC = 255
 
 class RiSCCompiler(compiler.Compiler):
     def __init__(self):
@@ -104,6 +106,11 @@ class Translator(solved_07.Translator):
         self.referenced_functions = []
         self.last_function_start = None
 
+        # Location in memory of the first static variable for the current class.
+        # Need to track this here because the assembler's resolution of undefined labels doesn't
+        # handle the RiSC-16 instruction format:
+        self.static_base = MIN_STATIC
+
         # HACK: some code that's always required, even when preamble is not used.
 
         start_label = self.asm.next_label("start")
@@ -129,6 +136,8 @@ class Translator(solved_07.Translator):
     def translate_class(self, class_ast: compiler.Class):
         for s in class_ast.subroutines:
             self.translate_subroutine(s, class_ast.name)
+
+        self.static_base += class_ast.num_statics
 
     def translate_subroutine(self, subroutine_ast: compiler.Subroutine, class_name: str):
         # print(subroutine_ast)
@@ -236,13 +245,10 @@ class Translator(solved_07.Translator):
         if kind == "static":
             self._handle(ast.value)
 
-            # Note: these are often allocated in low memory, where they could
-            # be indexed statically off of r0, but they're not resolved until
-            # load time (that is, by the assembler), which is too late.
-            storage_label = f"{self.class_namespace}.static{index}"
-            self.asm.instr(f"lui {TEMP2} @{storage_label}")
-            self.asm.instr(f"lli {TEMP2} @{storage_label}")
-            self.asm.instr(f"sw {TEMP1} {TEMP2}")
+            addr = self.static_base + index
+            assert addr <= MAX_STATIC, f"statics must all fit between {MIN_STATIC} and {MAX_STATIC}"
+            assert addr <= 63, f"statics must all fit in a 6-bit offset for one-cycle store"
+            self.asm.instr(f"sw {TEMP1} r0 {addr}")
 
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
@@ -486,13 +492,10 @@ class Translator(solved_07.Translator):
     def handle_Location(self, ast: compiler.Location):
         kind, index = ast.kind, ast.idx
         if kind == "static":
-            # Note: these are often allocated in low memory, where they could
-            # be indexed statically off of r0, but they're not resolved until
-            # load time (that is, by the assembler), which is too late.
-            storage_label = f"{self.class_namespace}.static{index}"
-            self.asm.instr(f"lui {TEMP2} @{storage_label}")
-            self.asm.instr(f"lli {TEMP2} @{storage_label}")
-            self.asm.instr("lw {TEMP1} {TEMP2}")
+            addr = self.static_base + index
+            assert addr <= MAX_STATIC, f"statics must all fit between {MIN_STATIC} and {MAX_STATIC}"
+            assert addr <= 63, f"statics must all fit in a 6-bit offset for one-cycle load"
+            self.asm.instr(f"lw {TEMP1} r0 {addr}")
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
         else:

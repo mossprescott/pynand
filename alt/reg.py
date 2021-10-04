@@ -175,6 +175,7 @@ class Subroutine(NamedTuple):
 
 class Class(NamedTuple):
     name: str
+    num_statics: int
     subroutines: List[Subroutine]
 
 
@@ -187,7 +188,10 @@ def flatten_class(ast: jack_ast.Class) -> Class:
 
     solved_11.handle_class_var_declarations(ast, symbol_table)
 
-    return Class(ast.name, [flatten_subroutine(s, symbol_table) for s in ast.subroutineDecs])
+    return Class(
+        ast.name,
+        sum(len(vd.names) for vd in ast.varDecs if vd.static),
+        [flatten_subroutine(s, symbol_table) for s in ast.subroutineDecs])
 
 
 def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -> Subroutine:
@@ -990,7 +994,9 @@ class Compiler:
 
         # print(flat_class)
 
-        reg_class = Class(ast.name,
+        reg_class = Class(
+            flat_class.name,
+            flat_class.num_statics,
             [phase_two(s, self.registers) for s in flat_class.subroutines])
 
         # print(reg_class)
