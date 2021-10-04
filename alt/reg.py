@@ -318,9 +318,6 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             expr_stmts, expr_value = flatten_expression(expr)
             return expr_stmts, expr_value, "!="
 
-    def negate_cmp(cmp: Cmp) -> Cmp:
-        return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
-
     def flatten_expression(expr: jack_ast.Expression, force=True) -> Tuple[List[Stmt], Expr]:
         """Reduce an expression to something that's definitely trivial, possibly preceded
         by some LetStatements introducing temporary vars.
@@ -464,6 +461,9 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     num_args = symbol_table.count("argument")
     num_vars = None  # bogus, but this isn't meaningful until the next phase anyway
     return Subroutine(ast.name, num_args, num_vars, statements)
+
+def negate_cmp(cmp: Cmp) -> Cmp:
+    return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
 
 
 class LiveStmt(NamedTuple):
