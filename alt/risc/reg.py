@@ -552,10 +552,10 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"nand {TEMP2} {TEMP2} {TEMP2}")  # r7 = !rhs
             self.asm.instr(f"nand {TEMP1} {TEMP1} {TEMP2}")  # r6 = !(!lhs & !rhs) = lhs | rhs
         elif ast.op.symbol == "=":
-            self.asm.instr(f"beq {TEMP1} {TEMP2} +1")  # skip false case
-            self.asm.instr(f"addi {TEMP1} r0 0")
             self.asm.instr(f"beq {TEMP1} {TEMP2} +1")  # skip true case
             self.asm.instr(f"addi {TEMP1} r0 -1")
+            self.asm.instr(f"beq {TEMP1} {TEMP2} +1")  # skip false case
+            self.asm.instr(f"addi {TEMP1} r0 0")
         elif ast.op.symbol == "<":
             self._neg(TEMP2)
             self.asm.instr(f"add {TEMP1} {TEMP1} {TEMP2}")  # r6 = lhs - rhs
