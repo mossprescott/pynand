@@ -1249,8 +1249,11 @@ class Translator(solved_07.Translator):
             for s in ast.when_true:
                 self._handle(s)
 
-            self.asm.instr(f"@{end_label}")
-            self.asm.instr(f"0;JMP")
+            if isinstance(ast.when_true[-1], Return):
+                self.asm.comment("end of body unreachable)")
+            else:
+                self.asm.instr(f"@{end_label}")
+                self.asm.instr(f"0;JMP")
 
             self.asm.label(false_label)
             for s in ast.when_false:
