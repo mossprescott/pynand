@@ -381,9 +381,7 @@ def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=BUNDLED_PLATF
     computer = run(platform.chip, simulator=simulator)
 
     translator.asm.run(platform.assemble, computer, stop_cycles=10_000_000, debug=True)
-    # translator.asm.run(platform.assemble, computer, stop_cycles=100_000, debug=True)
     # translator.asm.trace(platform.assemble, computer, stop_cycles=10_000_000)
-    # translator.asm.trace(platform.assemble, computer, stop_cycles=100_000)
 
     dump_screen(computer)  # For debugging
 
@@ -405,6 +403,9 @@ def test_screen_lib(screen_class=project_12.SCREEN_CLASS, platform=BUNDLED_PLATF
     assert computer.peek_screen(114*32 + 8) == 1 << 12, "6 o-clock ray tip"
     assert computer.peek_screen(60*32 + 5) == -64, "9 o-clock ray tip"
     assert computer.peek_screen(60*32 + 12) == 7, "3 o-clock ray tip"
+
+    assert computer.peek_screen(20*32 + 6) == 1 << 6, "upper-left ray tip (102, 20)"
+    assert computer.peek_screen(21*32 + 6) == 1 << 7, "upper-left ray next (103, 21)"
 
 
 def dump_screen(computer):
