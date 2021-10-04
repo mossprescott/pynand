@@ -26,17 +26,19 @@ class Screen {
 
         let pixels = Array.new(16);
         let leftPixels = Array.new(16);
+
         let x = 0;
         let bit = 1;
         let leftBits = 1;
         while (x < 16) {
             let pixels[x] = bit;
             let leftPixels[x] = leftBits;
+
+            // update for next iteration:
             let x = x + 1;
             let bit = bit + bit;
             let leftBits = leftBits + leftBits + 1;
         }
-        // let leftPixels[9] = 5 + 16*5;
 
         return;
     }
@@ -61,8 +63,9 @@ class Screen {
     /** Sets the current color, to be used for all subsequent drawXXX commands.
      *  Black is represented by true, white by false. */
     function void setColor(boolean b) {
-        // Note: explicitly `true` so *all* the bits are set.
         if (b) {
+            // Note: explicitly set to all 1 bits, even if b is some other non-zero value
+            // that's still treated as "true" by the "if" statement.
             let color = true;
         }
         else {
