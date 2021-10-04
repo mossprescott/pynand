@@ -431,6 +431,7 @@ class Translator(solved_07.Translator):
                 self._handle(ast.expr)
                 self.asm.instr(f"addi {TEMP2} {TEMP1} 0")  # TODO: construct the value in TEMP2 directly
 
+        self.asm.start("return")
         self._jmp(self.return_label)
 
     def handle_Push(self, ast):
