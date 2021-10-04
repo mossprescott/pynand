@@ -108,12 +108,12 @@ class Test {
 
     flat_class = flatten_class(ast)
 
-    sub = phase_two(flat_class.subroutines[0])
+    sub = phase_two(flat_class.subroutines[0],  [Reg(i, "R", "?") for i in range(2)])
 
     print(sub)
 
     assert sub.num_vars == 0, "No locals on the stack"
-    assert sub.body[-1] == Return(Reg(0, "y")), "y is assigned to the first register"
+    assert sub.body[-1] == Return(Reg(0, "R", "y")), "y is assigned to the first register"
 
 def test_loop_allocation():
     src = """
@@ -132,12 +132,12 @@ class Test {
 
     flat_class = flatten_class(ast)
 
-    sub = phase_two(flat_class.subroutines[0])
+    sub = phase_two(flat_class.subroutines[0], [Reg(i, "R", "?") for i in range(2)])
 
     print(sub)
 
     assert sub.num_vars == 0, "No locals on the stack"
-    assert sub.body[0] == Eval(Reg(0, "x"), Const(0)), "x is assigned to the first register"
+    assert sub.body[0] == Eval(Reg(0, "R", "x"), Const(0)), "x is assigned to the first register"
 
 
 def test_array_lib():

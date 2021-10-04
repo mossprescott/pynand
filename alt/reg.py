@@ -36,6 +36,8 @@ Other differences:
     address. It's up to each function to do any saving of registers and adjustment of the stack
     that it wants to. That makes it possible do less work in the case of a simple function.
     Note: it also means that things go (more) haywire if a call provides the wrong number of args.
+- THIS and THAT are otherwise unused; they could be treated as additional registers, but most of the
+    time 8 is more than enough.
 
 These changes mean that the debug/trace logging done by some test cases doesn't always show the
 correct arguments, locals, return addresses, and result values.
@@ -143,6 +145,7 @@ class Reg(NamedTuple):
     """A variable which is local the the subroutine scope, does not need to persist
     across subroutine calls, and has been assigned to a register."""
     idx: int
+    kind: str  # in case there is more than one place where "registers" are stored
     name: str  # include for debugging purposes
 
 Value = Union[Const, Local, Reg]
@@ -912,11 +915,13 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
     return rewrite_statements(stmts)
 
 
-def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
+def phase_two(ast: Subroutine, registers: List[Reg]) -> Subroutine:
     """The input is IR with all locals represented by Local.
 
     Output has Local eliminated, replaced by Reg where possible, or by Load/Store
     with additional temporary variables.
+
+    Note: it looks like reg_count has to be at least 2.
     """
 
     # TODO: treat THIS and THAT as additional locations for "saved" vars.
@@ -952,16 +957,16 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
         local_sets = color_locals(liveness2)
 
-        if len(local_sets) > reg_count:
-            unallocatable_sets = local_sets[reg_count:]
+        if len(local_sets) > len(registers):
+            unallocatable_sets = local_sets[len(registers):]
 
-            print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
+            print(f"Unable to fit local variables in {len(registers)} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
 
             body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
 
         else:
             reg_map = {
-                l: Reg(idx=i, name=l.name)
+                l: registers[i]._replace(name=l.name)
                 for i, ls in enumerate(local_sets)
                 for l in ls
             }
@@ -974,21 +979,23 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
             return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
 
 
-def compile_class(ast: jack_ast.Class) -> Class:
-    """Analyze syntax, flatten expressions, allocate registers, and convert to the register-based IR."""
+class Compiler:
+    def __init__(self):
+        self.registers = [Reg(i+5, "R", "?") for i in range(8)]
 
-    flat_class = flatten_class(ast)
+    def __call__(self, ast: jack_ast.Class) -> Class:
+        """Analyze syntax, flatten expressions, allocate registers, and convert to the register-based IR."""
 
-    # print(flat_class)
+        flat_class = flatten_class(ast)
 
-    reg_class = Class(ast.name,
-        [phase_two(s) for s in flat_class.subroutines])
+        # print(flat_class)
 
-    # print(reg_class)
+        reg_class = Class(ast.name,
+            [phase_two(s, self.registers) for s in flat_class.subroutines])
 
-    # translator.translate_class(reg_class)
+        # print(reg_class)
 
-    return reg_class
+        return reg_class
 
 
 
@@ -1093,34 +1100,34 @@ class Translator(solved_07.Translator):
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX + 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.idx}")
+                        self.asm.instr(f"@R{ast.dest.idx}")
                         self.asm.instr(f"M=M{right_imm:+}")
                 elif op == "-" and right_imm is not None:
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX - 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.idx}")
+                        self.asm.instr(f"@R{ast.dest.idx}")
                         self.asm.instr(f"M=M{-right_imm:+}")
                 else:
                     self._handle(ast.expr.right)  # D = right
-                    self.asm.instr(f"@R{5+ast.dest.idx}")
+                    self.asm.instr(f"@R{ast.dest.idx}")
                     self.asm.instr(f"M=M{op}D")
                 return
         elif isinstance(ast.expr, Binary) and isinstance(ast.expr.right, Reg) and ast.dest.idx == ast.expr.right.idx:
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
                 self._handle(ast.expr.left)  # D = left
-                self.asm.instr(f"@R{5+ast.dest.idx}")
+                self.asm.instr(f"@R{ast.dest.idx}")
                 self.asm.instr(f"M=D{op}M")
                 return
         elif isinstance(ast.expr, Unary) and ast.dest == ast.expr:
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+            self.asm.instr(f"@R{ast.dest.idx}")
             self.asm.instr(f"M={self.unary_op(ast.expr.op)}M")
             return
 
         imm = self.immediate(ast.expr)
         if imm is not None:
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+            self.asm.instr(f"@R{ast.dest.idx}")
             self.asm.instr(f"M={imm}")
         else:
             self._handle(ast.expr)
@@ -1128,7 +1135,7 @@ class Translator(solved_07.Translator):
             if isinstance(ast.expr, CallSub):
                 self.asm.start(f"eval-result {_Expr_str(ast.dest)} = <result>")
 
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+            self.asm.instr(f"@R{ast.dest.idx}")
             self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
@@ -1416,7 +1423,7 @@ class Translator(solved_07.Translator):
             self.asm.instr("D=M")
 
     def handle_Reg(self, ast: Reg):
-        self.asm.instr(f"@R{5+ast.idx}")
+        self.asm.instr(f"@R{ast.idx}")
         self.asm.instr("D=M")
 
     def handle_Binary(self, ast: Binary):
@@ -1425,13 +1432,13 @@ class Translator(solved_07.Translator):
         right_imm = self.immediate(ast.right)
 
         if alu_op == "+" and isinstance(ast.left, Reg) and right_imm is not None:
-            # e.g. r0 + 1  ->  @R5; D=M+1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            # e.g. $0 + 1  ->  @R5; D=M+1
+            self.asm.instr(f"@R{ast.left.idx}")
             self.asm.instr(f"D=M{right_imm:+}")
             return
         elif alu_op == "-" and isinstance(ast.left, Reg) and right_imm is not None:
-            # e.g. r0 - 1  ->  @R5; D=M-1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            # e.g. $0 - 1  ->  @R5; D=M-1
+            self.asm.instr(f"@R{ast.left.idx}")
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
@@ -1497,7 +1504,7 @@ class Translator(solved_07.Translator):
 
     def handle_Unary(self, ast: Unary):
         if isinstance(ast.value, Reg):
-            self.asm.instr(f"@R{5+ast.value.idx}")
+            self.asm.instr(f"@R{ast.value.idx}")
             self.asm.instr(f"D={self.unary_op(ast.op)}M")
         else:
             # Note: ~(Const) isn't being evaluated in the compiler yet, but should be.
@@ -1526,7 +1533,7 @@ class Translator(solved_07.Translator):
         Added to "opcode" tags in the instruction stream, these separate descriptions might be
         helpful for readers; mainly they improve profiling.
         """
-        #
+
         if isinstance(expr, CallSub):
             return "call"
         elif isinstance(expr, Const):
@@ -1552,7 +1559,7 @@ class Translator(solved_07.Translator):
         in some cases."""
 
         if isinstance(ast, Reg):
-            self.asm.instr(f"@R{5+ast.idx}")
+            self.asm.instr(f"@R{ast.idx}")
             self.asm.instr("A=M")
         elif isinstance(ast, Const):
             if -1 <= ast.value <= 1:
@@ -1700,7 +1707,7 @@ def _Expr_str(expr: Expr) -> str:
     elif isinstance(expr, Location):
         return f"{expr.name} ({expr.kind} {expr.idx})"
     elif isinstance(expr, Reg):
-        return f"{expr.name} (r{expr.idx})"
+        return f"{expr.name} ({expr.kind}{expr.idx})"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
@@ -1721,7 +1728,7 @@ def compile_compatible(ast, asm):
     each Class to the stream as a unit.
     """
 
-    ir = compile_class(ast)
+    ir = Compiler()(ast)
 
     # Giant hack: write each class to the AssemblySource as if it was an instruction
     asm.add_line_raw(ir)
