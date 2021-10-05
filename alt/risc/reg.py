@@ -2,7 +2,7 @@
 
 """Alternative compiler targeting RiSC-16.
 
-Uses most of the same "front end" as `alt/reg.py`.
+Uses the same "front end" as `alt/reg.py`, just overriding the selection of registers.
 
 
 # Registers:
@@ -28,9 +28,9 @@ the list); in fact it's not that smart, but it does the right thing much of the 
 Note: accessing a value in the "local" and "argument" segments takes two instructions, because
 the segment pointers are kept in RAM.
 
-An alternative to store LCL in r2, which would make accessing the "local" segment just as efficient
-as accessing low memory (basically, you index off r2 instead of r0). But that would leave one less
-register for temporaries, and we're already pretty tight.
+An alternative would be to store LCL in r2, which would make accessing the "local" segment just
+as efficient as accessing low memory (basically, you index off r2 instead of r0). But that would
+leave one less register for temporaries, and we're already pretty tight.
 
 
 # Branches and jumps:
@@ -38,14 +38,34 @@ register for temporaries, and we're already pretty tight.
 RiSC-16's beq instruction is *less* flexible than HACK's JMP:
 - it can only compare values for equality
 - it can only target instructions within +/- 64 locations
-- on the other hand, it can compare two arbitrary register for equality
+- on the other hand, it can compare two arbitrary registers for equality
 
-Every conditional branch turns into a beq that conditionally skips over a 3-cycle jalr to the
-actual target:
+Currently every conditional branch turns into a beq that conditionally skips over a 3-cycle jalr
+to the actual target:
     beq <value> r0 +3  # value is non-zero if the jump should be taken
     lui r7 @target
     lli r7 @target
     jalr r0 r7
+
+
+# Next steps:
+
+Generate more compact sequences for "=", "<", and ">" binary ops, or eliminate them in favor of
+simpler "if"s, maybe.
+
+Generate some kind of almost-assembly with the local jumps left abstract. Then figure out which
+ones can be turned into "beq r0 r0 <offset>", because the target end up being within 64
+instructions. Or at least quantify how many cycles that would save. Rough estimate: Pong contains
+274 "jalr r0 ..." instructions, so about 500 instructions, but how many cycles?
+That would still leave sequences with multiple overlapping beqs, which possibly could be improved
+further.
+
+Align subroutines to 64-word addresses, and avoid the "lli" on each call? There are about 50 functions
+and 250 calls in Pong, so that would cost roughly 32*50 - 250 = 1,350 words in ROM, and save one cycle
+on every call (or about 0.5% of all cycles, apparently.)
+
+The same trick as I contemplated in alt/reg.py; simplify leaf functions to not save/adjust LCL and ARG.
+Rigth now call/return are about 20 cycles altogether. Could reduce that by 50% or more, maybe.
 """
 
 from typing import Optional
@@ -96,13 +116,13 @@ class RiSCCompiler(compiler.Compiler):
 class Translator(solved_07.Translator):
     def __init__(self):
         self.asm = AssemblySource()
-        # solved_07.Translator.__init__(self, self.asm)
+
+        # Note: not calling super.__init__ because it emits some HACK assembly we don't want.
 
         # If true, emit extra instructions that make it easier to see what's going on
         # in the simulator:
         self.debug = EXTRA_DEBUG_CODE
 
-        # self.asm = asm if asm else AssemblySource()
         self.class_namespace = "static"
         self.function_namespace = "_"
 
@@ -115,8 +135,6 @@ class Translator(solved_07.Translator):
         # handle the RiSC-16 instruction format:
         self.static_base = MIN_STATIC
 
-        # HACK: some code that's always required, even when preamble is not used.
-
         start_label = self.asm.next_label("start")
         self.asm.instr(f"lui {TEMP1} @{start_label}")
         self.asm.instr(f"lli {TEMP1} @{start_label}")
@@ -127,12 +145,8 @@ class Translator(solved_07.Translator):
         # 64, so we can save a cycle every time by doing only addi instead of lui/lli.
         self.return_location = self.asm.instruction_count
 
-        # "Microcoded" instructions:
-        # self.eq_label = self._compare("EQ")
-        # self.lt_label = self._compare("LT")
-        # self.gt_label = self._compare("GT")
+        # Just one common sequence:
         self.return_label = self._return()
-        # self.call_label = self._call()
 
         self.asm.blank()
         self.asm.label(start_label)
@@ -738,41 +752,28 @@ class Translator(solved_07.Translator):
         self.asm.comment(f"common return sequence")
         self.asm.label(label)
 
-        self.asm.comment("SP (r1) = LCL (RAM[1])")
+        # self.asm.comment("SP (r1) = LCL (RAM[1])")
         self.asm.instr(f"lw {SP} r0 {LCL_ADDR}")
 
-        self.asm.comment("r2 = ARG (RAM[2]; previous SP)")
+        # self.asm.comment("r2 = ARG (RAM[2]; previous SP)")
         self.asm.instr(f"lw r2 r0 {ARG_ADDR}")
 
-        self.asm.comment("restore segment pointers from stack (ARG, LCL)")
+        # self.asm.comment("restore segment pointers from stack (ARG, LCL)")
         self.asm.instr(f"lw {TEMP1} {SP} -1")
         self.asm.instr(f"sw {TEMP1} r0 {ARG_ADDR}")
         self.asm.instr(f"lw {TEMP1} {SP} -2")
         self.asm.instr(f"sw {TEMP1} r0 {LCL_ADDR}")
 
-        self.asm.comment("r3 = saved return address from the stack")
+        # self.asm.comment("r3 = saved return address from the stack")
         self.asm.instr(f"lw r3 {SP} -3")
 
-        self.asm.comment("SP = r2 (saved ARG)")
+        # self.asm.comment("SP = r2 (saved ARG)")
         self.asm.instr(f"addi {SP} r2 0")
 
-        self.asm.comment("jmp to r3 (saved return address)")
+        # self.asm.comment("jmp to r3 (saved return address)")
         self.asm.instr("jalr r0 r3")
 
         return label
-
-
-    # Override some unused bits and pieces to save space:
-
-    def _call(self):
-        # not used
-        return "_call_common_unused"
-
-    def _compare(self, op):
-        # This common sequence isn't used; each comparison is compiled to a custom
-        # test/branch sequence.
-        return f"_compare_{op}_unused"
-
 
 
 #
