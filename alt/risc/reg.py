@@ -123,6 +123,10 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"jalr r0 {TEMP1}")
         self.asm.blank()
 
+        # Capture the location of the return sequence, which is going to be less than
+        # 64, so we can save a cycle every time by doing only addi instead of lui/lli.
+        self.return_location = self.asm.instruction_count
+
         # "Microcoded" instructions:
         # self.eq_label = self._compare("EQ")
         # self.lt_label = self._compare("LT")
@@ -445,7 +449,9 @@ class Translator(solved_07.Translator):
             self.asm.comment("DEBUG: copy return value to R15")
             self.asm.instr(f"sw {TEMP2} r0 15")
 
-        self._jmp(self.return_label)
+        assert self.return_location <= 63
+        self.asm.instr(f"addi {TEMP1} r0 {self.return_location}")
+        self.asm.instr(f"jalr r0 r6")
 
     def handle_Push(self, ast):
         if not isinstance(ast.expr, compiler.CallSub):

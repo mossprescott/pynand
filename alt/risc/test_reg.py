@@ -102,8 +102,8 @@ def test_translate_unary_from_mem():
 def test_translate_return_expr():
     x_reg = compiler.Reg(3, "r", "x")
     stmt = compiler.Return(compiler.Binary(x_reg, jack_ast.Op("+"), compiler.Const(1)))
-    # Note: ignore the three-cycle jump to return-common
-    assert translate_stmt(stmt)[:-3] == ["addi r7 r3 1"]
+    # Note: ignore the two-cycle jump to return-common
+    assert translate_stmt(stmt)[:-2] == ["addi r7 r3 1"]
 
 
 def test_translate_simple_compare():
