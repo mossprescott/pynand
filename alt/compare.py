@@ -19,6 +19,9 @@ from alt.threaded import THREADED_PLATFORM
 from alt.risc.main import RiSC_PLATFORM
 from alt.risc.reg import RiSC_REG_PLATFORM
 
+from alt.reduce import REDUCE_REG_PLATFORM
+from alt.reduce import REDUCE_RiSC_REG_PLATFORM
+
 def main():
     std = measure(BUNDLED_PLATFORM)
     print_result("solutions", std)
@@ -40,6 +43,9 @@ def main():
     print_relative_result("alt/risc/vm.py", std, measure(RiSC_PLATFORM))
     print_relative_result("alt/risc/reg.py", std, measure(RiSC_REG_PLATFORM))
 
+    # Finally, the really impressive stuff (not shown in the table):
+    print_relative_result("alt/reg.py (+reduce)", std, measure(REDUCE_REG_PLATFORM))
+    print_relative_result("alt/risc/reg.py (+reduce)", std, measure(REDUCE_RiSC_REG_PLATFORM))
 
 
 def print_result(name, t):

@@ -34,6 +34,7 @@ from typing import Generic, List, Optional, Sequence, Tuple, TypeVar
 from nand import jack_ast
 from nand.platform import BUNDLED_PLATFORM
 from alt.reg import REG_PLATFORM
+from alt.risc.reg import RiSC_REG_PLATFORM
 
 Context = TypeVar("Context")
 
@@ -457,8 +458,11 @@ def enhance_platform(platform):
 # Note: the transformations all run here (over the library classes) when the module is imported.
 REDUCE_PLATFORM = enhance_platform(BUNDLED_PLATFORM)
 
-# HACK: Base on alt/reg instead:
+# Experimental: on top of alt/reg instead
 REDUCE_REG_PLATFORM = enhance_platform(REG_PLATFORM)
+
+# Experimental: on top of alt/risc/reg instead
+REDUCE_RiSC_REG_PLATFORM = enhance_platform(RiSC_REG_PLATFORM)
 
 
 if __name__ == "__main__":
