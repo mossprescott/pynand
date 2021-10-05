@@ -17,6 +17,7 @@ from alt.shift import SHIFT_PLATFORM
 from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
 from alt.risc.main import RiSC_PLATFORM
+from alt.risc.reg import RiSC_REG_PLATFORM
 
 def main():
     std = measure(BUNDLED_PLATFORM)
@@ -29,13 +30,16 @@ def main():
     print_relative_result("alt/shift.py", std, measure(SHIFT_PLATFORM))
     print_relative_result("alt/reg.py", std, measure(REG_PLATFORM))
     print_relative_result("alt/reduce.py", std, measure(REDUCE_PLATFORM))
-    print_relative_result("alt/risc/main.py", std, measure(RiSC_PLATFORM))
 
     # print_relative_result("alt/eight.py", std, measure(EIGHT_PLATFORM, "vector"))
     print_relative_result("alt/eight.py", std, (gate_count(EIGHT_PLATFORM.chip)['nands'], std[1], std[2]*2, std[3]*2))  # Cheeky
     # Note: currently the eight-bit CPU doesn't run correctly in the "codegen" simulator, so it's
     # a little painful to measure its performance directly. However, by design it takes exactly
     # two cycles per instruction, so we can just report that with a relatively clear conscience.
+
+    print_relative_result("alt/risc/vm.py", std, measure(RiSC_PLATFORM))
+    print_relative_result("alt/risc/reg.py", std, measure(RiSC_REG_PLATFORM))
+
 
 
 def print_result(name, t):
