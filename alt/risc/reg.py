@@ -435,9 +435,8 @@ class Translator(solved_07.Translator):
             if imm is not None:
                 self.asm.instr(f"addi {TEMP2} r0 {imm}")
             else:
-                value_reg = self._handle_Expr(ast.expr)
+                value_reg = self._handle_Expr(ast.expr, TEMP2)
                 if value_reg != TEMP2:
-                    # TODO: construct the value in TEMP2 directly
                     self.asm.instr(f"addi {TEMP2} {value_reg} 0")
 
         self.asm.start("return")

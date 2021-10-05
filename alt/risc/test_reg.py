@@ -86,6 +86,26 @@ def test_translate_subtract():
     ]
 
 
+def test_translate_simple_unary_minus():
+    x_reg = compiler.Reg(2, "r", "x")
+    y_reg = compiler.Reg(3, "r", "y")
+    stmt = compiler.Eval(y_reg, compiler.Unary(jack_ast.Op("-"), x_reg))
+    assert translate_stmt(stmt) == ["nand r3 r2 r2", "addi r3 r3 1"]
+
+def test_translate_unary_from_mem():
+    x_reg = compiler.Reg(12, "R", "x")
+    y_reg = compiler.Reg(3, "r", "y")
+    stmt = compiler.Eval(y_reg, compiler.Unary(jack_ast.Op("~"), x_reg))
+    assert translate_stmt(stmt) == ["lw r3 r0 12", "nand r3 r3 r3"]
+
+
+def test_translate_return_expr():
+    x_reg = compiler.Reg(3, "r", "x")
+    stmt = compiler.Return(compiler.Binary(x_reg, jack_ast.Op("+"), compiler.Const(1)))
+    # Note: ignore the three-cycle jump to return-common
+    assert translate_stmt(stmt)[:-3] == ["addi r7 r3 1"]
+
+
 def test_translate_simple_compare():
     """Note: using no temps."""
     x_reg = compiler.Reg(3, "r", "x")
