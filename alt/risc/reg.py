@@ -209,22 +209,25 @@ class Translator(solved_07.Translator):
         if not isinstance(ast.expr, compiler.CallSub):
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {compiler._Stmt_str(ast)}")
 
-        # TODO: when dest is a true register, assemble the result there direcly
-        value_reg = self._handle_Expr(ast.expr)
+        if ast.dest.kind == "r":
+            dest_reg = f"r{ast.dest.idx}"
+            value_reg = self._handle_Expr(ast.expr, dest_reg)
+            if isinstance(ast.expr, compiler.CallSub):
+                self.asm.start(f"eval-result {compiler._Expr_str(ast.dest)} = <result>")
+            if value_reg != dest_reg:
+                self.asm.instr(f"addi {dest_reg} {value_reg} 0")
+        elif ast.dest.kind == "R":
+            value_reg = self._handle_Expr(ast.expr)
+            if isinstance(ast.expr, compiler.CallSub):
+                self.asm.start(f"eval-result {compiler._Expr_str(ast.dest)} = <result>")
+            self.asm.instr(f"sw {value_reg} r0 {ast.dest.idx}")
+        else:
+            raise Exception(f"Unknown register: {ast.dest}")
 
         if self.debug:
             self.asm.comment("DEBUG: copy result to R15")
             self.asm.instr(f"sw {value_reg} r0 15")
 
-        if isinstance(ast.expr, compiler.CallSub):
-            self.asm.start(f"eval-result {compiler._Expr_str(ast.dest)} = <result>")
-
-        if ast.dest.kind == "r":
-            self.asm.instr(f"addi r{ast.dest.idx} {value_reg} 0")  # move result to destination register (somewhat wastefully)
-        elif ast.dest.kind == "R":
-            self.asm.instr(f"sw {value_reg} r0 {ast.dest.idx}")
-        else:
-            raise Exception(f"Unknown register: {ast.dest}")
 
     def handle_IndirectWrite(self, ast: compiler.IndirectWrite):
         self.asm.start(f"write {compiler._Stmt_str(ast)}")
@@ -240,14 +243,11 @@ class Translator(solved_07.Translator):
             assert addr_reg != TEMP2
             self.asm.instr(f"sw {TEMP2} {addr_reg} 0")
         else:
-            # Construct the value, move it to TEMP2:
-            # TODO: just put it in the right place to begin with
-            value_reg = self._handle_Expr(ast.value)
-            self.asm.instr(f"addi {TEMP2} {value_reg} 0")
-
-            addr_reg = self._handle_Expr(ast.address)
-            assert addr_reg != TEMP2
-            self.asm.instr(f"sw {TEMP2} {addr_reg} 0")
+            # Note: we know that value and address are both Reg/Const, so
+            # we won't overwrite one with the other.
+            value_reg = self._handle_Expr(ast.value, TEMP1)
+            addr_reg = self._handle_Expr(ast.address, TEMP2)
+            self.asm.instr(f"sw {value_reg} {addr_reg} 0")
 
     def handle_Store(self, ast: compiler.Store):
         self.asm.start(f"store {compiler._Stmt_str(ast)}")
@@ -477,21 +477,28 @@ class Translator(solved_07.Translator):
 
     # Expressions:
 
-    def _handle_Expr(self, ast: compiler.Expr, *args) -> str:
-        """Emit instructions to compute the value of an expression, returning the location, which
-        is always a "true" register.
+    def _handle_Expr(self, ast: compiler.Expr, dst_reg: str = TEMP1) -> str:
+        """Emit instructions to compute the value of an expression, putting the result in `dst_reg`
+        if it isn't already available in a "true" register.
+
+        Return the actual location, always a true register.
+
+        ...What registers can be overwritten?
 
         The caller should not assume that it's safe to overwrite the register where the value
         is found, unless it knows otherwise. However, it's always safe to overwrite TEMP1 and TEMP2.
         """
 
-        return self.__getattribute__(f"handle_Expr_{ast.__class__.__name__}")(ast, *args)
+        return self.__getattribute__(f"handle_Expr_{ast.__class__.__name__}")(ast, dst_reg)
 
-    def handle_Expr_CallSub(self, ast: compiler.CallSub) -> str:
+    def handle_Expr_CallSub(self, ast: compiler.CallSub, _dst_reg: str) -> str:
+        """Call a subroutine, whose arguments have already been pushed onto the stack.
+
+        The result is always in TEMP2.
+        """
+
         self.call(ast)
-
         return TEMP2
-
 
     def call(self, ast: compiler.CallSub):
         """Note: no need to label the return address; jalr captures it for us."""
@@ -505,29 +512,34 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"lli {TEMP1} @{target_label}")
         self.asm.instr(f"jalr {TEMP2} {TEMP1}")
 
-    def handle_Expr_Const(self, ast: compiler.Const, reg: str = TEMP1) -> str:
-        """Construct the value in the requested location.
+    def handle_Expr_Const(self, ast: compiler.Const, dst_reg: str) -> str:
+        """Construct the value in the requested register.
 
         Note: no other register is overwritten.
         """
-
-        if -64 <= ast.value <= 63:
-            self.asm.instr(f"addi {reg} r0 {ast.value}")
+        if ast.value == 0:
+            return "r0"
+        elif -64 <= ast.value <= 63:
+            self.asm.instr(f"addi {dst_reg} r0 {ast.value}")
         else:
             high10 = ast.value & ~0x3F
             low6 = ast.value & 0x3F
-            self.asm.instr(f"lui {reg} {high10}")
+            self.asm.instr(f"lui {dst_reg} {high10}")
             if low6 != 0:
-                self.asm.instr(f"addi {reg} {reg} {low6}")
-        return reg
+                self.asm.instr(f"addi {dst_reg} {dst_reg} {low6}")
+        return dst_reg
 
-    def handle_Expr_Location(self, ast: compiler.Location) -> str:
+    def handle_Expr_Location(self, ast: compiler.Location, dst_reg: str) -> str:
+        """Load the value into the requested register.
+
+        Note: no other register is overwritten.
+        """
         kind, index = ast.kind, ast.idx
         if kind == "static":
             addr = self.static_base + index
             assert addr <= MAX_STATIC, f"statics must all fit between {MIN_STATIC} and {MAX_STATIC}"
             assert addr <= 63, f"statics must all fit in a 6-bit offset for one-cycle load"
-            self.asm.instr(f"lw {TEMP1} r0 {addr}")
+            self.asm.instr(f"lw {dst_reg} r0 {addr}")
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
         else:
@@ -539,13 +551,13 @@ class Translator(solved_07.Translator):
                 raise Exception(f"Unknown location: {ast}")
 
             if 0 <= index <= 63:
-                self.asm.instr(f"lw {TEMP2} r0 {segment_ptr}")
-                self.asm.instr(f"lw {TEMP1} {TEMP2} {index}")
+                self.asm.instr(f"lw {dst_reg} r0 {segment_ptr}")
+                self.asm.instr(f"lw {dst_reg} {dst_reg} {index}")
             else:
                 raise Exception(f"TODO: segment offset > 64: {kind} {index}")
-        return TEMP1
+        return dst_reg
 
-    def handle_Expr_Reg(self, ast: compiler.Reg, reg: str = TEMP1) -> str:
+    def handle_Expr_Reg(self, ast: compiler.Reg, dst_reg: str) -> str:
         """If the value is already in a (true) register, just return the actual location,
         otherwise copy it to `reg` and return that.
 
@@ -554,89 +566,102 @@ class Translator(solved_07.Translator):
         if ast.kind == "r":
             return f"r{ast.idx}"
         elif ast.kind == "R":
-            self.asm.instr(f"lw {reg} r0 {ast.idx}")
-            return reg
+            self.asm.instr(f"lw {dst_reg} r0 {ast.idx}")
+            return dst_reg
         else:
             raise Exception(f"Unknown register: {ast}")
 
-    def handle_Expr_Binary(self, ast: compiler.Binary) -> str:
+    def handle_Expr_Binary(self, ast: compiler.Binary, dst_reg: str) -> str:
         # TODO: the compiler's first phase *should* be rewriting these to be trivial for this
         # CPU, but it doesn't at the moment so where does that leave us for now?
 
-        # TODO: take a "reg" parameter, and put the result there, minimizing copying.
+        left_imm = self.immediate(ast.left)
+        right_imm = self.immediate(ast.right)
+
+        # First, some special cases with constant opaerands:
+        if ast.op.symbol == "+" and right_imm is not None:
+            left_reg = self._handle_Expr(ast.left, dst_reg)
+            self.asm.instr(f"addi {dst_reg} {left_reg} {right_imm}")
+            return dst_reg
+        elif ast.op.symbol == "+" and left_imm is not None:
+            right_reg = self._handle_Expr(ast.right, dst_reg)
+            self.asm.instr(f"addi {dst_reg} {right_reg} {left_imm}")
+            return dst_reg
+        elif ast.op.symbol == "-" and right_imm is not None and right_imm != -64:
+            left_reg = self._handle_Expr(ast.left, dst_reg)
+            self.asm.instr(f"addi {dst_reg} {left_reg} {-right_imm}")
+            return dst_reg
+
 
         # Load the left and right operands, either in their source registers, or in TEMP1 or
         # TEMP2, respectively. Because both operands must be either Reg or Const, we can
         # be sure that they don't overwrite each other.
         left_reg = self._handle_Expr(ast.left, TEMP1)
         right_reg = self._handle_Expr(ast.right, TEMP2)
-        assert left_reg != TEMP2
-        assert right_reg != TEMP1
 
         # Note: each case may overwrite TEMP1, TEMP2, or both, but never overwrite
         # any other register which might appear as a source.
         if ast.op.symbol == "+":
-            # TODO: special-case for Const with addi
-            self.asm.instr(f"add {TEMP1} {left_reg} {right_reg}")
-            return TEMP1
+            self.asm.instr(f"add {dst_reg} {left_reg} {right_reg}")
+            return dst_reg
         elif ast.op.symbol == "-":
             # First negate rhs:
             self._neg(right_reg, TEMP2)
-            self.asm.instr(f"add {TEMP1} {left_reg} {TEMP2}")
-            return TEMP1
+            self.asm.instr(f"add {dst_reg} {left_reg} {TEMP2}")
+            return dst_reg
         elif ast.op.symbol == "&":
-            self.asm.instr(f"nand {TEMP1} {left_reg} {right_reg}")
-            self.asm.instr(f"nand {TEMP1} {TEMP1} {TEMP1}")
-            return TEMP1
+            self.asm.instr(f"nand {dst_reg} {left_reg} {right_reg}")
+            self.asm.instr(f"nand {dst_reg} {dst_reg} {dst_reg}")
+            return dst_reg
         elif ast.op.symbol == "|":
             self.asm.instr(f"nand {TEMP1} {left_reg} {left_reg}")  # r6 = !lhs
             self.asm.instr(f"nand {TEMP2} {right_reg} {right_reg}")  # r7 = !rhs
-            self.asm.instr(f"nand {TEMP1} {TEMP1} {TEMP2}")  # r6 = !(!lhs & !rhs) = lhs | rhs
-            return TEMP1
+            self.asm.instr(f"nand {dst_reg} {TEMP1} {TEMP2}")  # r6 = !(!lhs & !rhs) = lhs | rhs
+            return dst_reg
         elif ast.op.symbol == "=":
             self.asm.instr(f"beq {left_reg} {right_reg} +2")  # skip true case
-            self.asm.instr(f"addi {TEMP1} r0 0")
+            self.asm.instr(f"addi {dst_reg} r0 0")
             self.asm.instr(f"beq r0 r0 +1")  # skip false case
-            self.asm.instr(f"addi {TEMP1} r0 -1")
-            return TEMP1
+            self.asm.instr(f"addi {dst_reg} r0 -1")
+            return dst_reg
         elif ast.op.symbol == "<":
             self._neg(right_reg, TEMP2)
             self.asm.instr(f"add {TEMP1} {left_reg} {TEMP2}")  # r6 = lhs - rhs
 
             self._sign(TEMP1, TEMP2)  # r7 = 0x8000 if (lhs - rhs) < 0
 
-            self.asm.instr(f"addi {TEMP1} r0 0")  # result = 0 (false) unless overwritten
+            self.asm.instr(f"addi {dst_reg} r0 0")  # result = 0 (false) unless overwritten
             self.asm.instr(f"beq {TEMP2} r0 +1")   # sign bit not set: >= 0; skip true case
-            self.asm.instr(f"addi {TEMP1} r0 -1")  # result = -1 (true)
-            return TEMP1
+            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1 (true)
+            return dst_reg
         elif ast.op.symbol == ">":
             self._neg(left_reg, TEMP1)
             self.asm.instr(f"add {TEMP1} {TEMP1} {right_reg}")  # r6 = rhs - lhs
 
             self._sign(TEMP1, TEMP2)  # r7 = 0x8000 if (rhs - lhs) < 0
 
-            self.asm.instr(f"addi {TEMP1} r0 0")  # result = 0 (true) unless overwritten
+            self.asm.instr(f"addi {dst_reg} r0 0")  # result = 0 (true) unless overwritten
             self.asm.instr(f"beq {TEMP2} r0 +1")   # sign bit not set: >= 0; skip true case
-            self.asm.instr(f"addi {TEMP1} r0 -1")  # result = -1
-            return TEMP1
+            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1
+            return dst_reg
         else:
             raise Exception(f"Unknown binary op: {compiler._Expr_str(ast)}")
 
-    def handle_Expr_Unary(self, ast: compiler.Unary) -> str:
-        value_reg = self._handle_Expr(ast.value)
+    def handle_Expr_Unary(self, ast: compiler.Unary, dst_reg: str) -> str:
+        value_reg = self._handle_Expr(ast.value, dst_reg)
         if ast.op.symbol == "-":
-            self._neg(value_reg, TEMP1)
-            return TEMP1
+            self._neg(value_reg, dst_reg)
+            return dst_reg
         elif ast.op.symbol == "~":
-            self.asm.instr(f"nand {TEMP1} {value_reg} {value_reg}")
-            return TEMP1
+            self.asm.instr(f"nand {dst_reg} {value_reg} {value_reg}")
+            return dst_reg
         else:
             raise Exception(f"Unknown unary op: {compiler._Expr_str(ast)}")
 
-    def handle_Expr_IndirectRead(self, ast: compiler.IndirectRead) -> str:
-        addr_reg = self._handle_Expr(ast.address)
-        self.asm.instr(f"lw {TEMP1} {addr_reg} 0")
-        return TEMP1
+    def handle_Expr_IndirectRead(self, ast: compiler.IndirectRead, dst_reg: str) -> str:
+        addr_reg = self._handle_Expr(ast.address, dst_reg)
+        self.asm.instr(f"lw {dst_reg} {addr_reg} 0")
+        return dst_reg
 
 
     def immediate(self, ast: compiler.Expr) -> Optional[int]:
