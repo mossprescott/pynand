@@ -214,15 +214,14 @@ def test_screen_lib():
 def test_code_size_pong():
     instruction_count = test_optimal_08.count_pong_instructions(alt.risc.reg.RiSC_REG_PLATFORM)
 
-    assert instruction_count < -1  # 19_100
+    assert instruction_count < 10_150
 
 def test_pong_first_iteration():
     cycles = test_optimal_08.count_pong_cycles_first_iteration(alt.risc.reg.RiSC_REG_PLATFORM)
 
-    assert cycles < -1 # 27_500
-
+    assert cycles < 11_000
 
 def test_cycles_to_init():
     cycles = test_optimal_08.count_cycles_to_init(alt.risc.reg.RiSC_REG_PLATFORM)
 
-    assert cycles < -1 # 80_000
+    assert cycles < 22_500
