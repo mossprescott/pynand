@@ -59,9 +59,12 @@ def main():
     elif False:
         import alt.reg
         platform = alt.reg.REG_PLATFORM
-    elif True:
+    elif False:
         import alt.reduce
         platform = alt.reduce.REDUCE_PLATFORM
+    elif True:
+        import alt.risc.reg
+        platform = alt.risc.reg.RiSC_REG_PLATFORM
 
 
     translate = platform.translator()
