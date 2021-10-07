@@ -539,19 +539,22 @@ class Translator(solved_07.Translator):
     def handle_Expr_Const(self, ast: compiler.Const, dst_reg: str) -> str:
         """Construct the value in the requested register.
 
+        0, 1, or 2 cycles, depending on the value.
+
         Note: no other register is overwritten.
         """
         if ast.value == 0:
             return "r0"
         elif -64 <= ast.value <= 63:
             self.asm.instr(f"addi {dst_reg} r0 {ast.value}")
+            return dst_reg
         else:
             high10 = ast.value & ~0x3F
             low6 = ast.value & 0x3F
             self.asm.instr(f"lui {dst_reg} {high10}")
             if low6 != 0:
                 self.asm.instr(f"addi {dst_reg} {dst_reg} {low6}")
-        return dst_reg
+            return dst_reg
 
     def handle_Expr_Location(self, ast: compiler.Location, dst_reg: str) -> str:
         """Load the value into the requested register.
