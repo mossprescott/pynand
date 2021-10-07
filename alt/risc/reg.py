@@ -458,14 +458,9 @@ class Translator(solved_07.Translator):
         else:
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {compiler._Expr_str(ast.expr)} (for return)")
 
-            # Save a cycle for "return 0" (and other constant values):
-            imm = self.immediate(ast.expr)
-            if imm is not None:
-                self.asm.instr(f"addi {TEMP2} r0 {imm}")
-            else:
-                value_reg = self._handle_Expr(ast.expr, TEMP2)
-                if value_reg != TEMP2:
-                    self.asm.instr(f"addi {TEMP2} {value_reg} 0")
+            value_reg = self._handle_Expr(ast.expr, TEMP2)
+            if value_reg != TEMP2:
+                self.asm.instr(f"addi {TEMP2} {value_reg} 0")
 
         self.asm.start("return")
 
