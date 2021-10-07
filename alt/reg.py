@@ -473,10 +473,8 @@ def negate_cmp(cmp: Cmp) -> Cmp:
 class LiveStmt(NamedTuple):
     statement: Stmt
     before: Set[str]
-    during: Set[str]
-    after: Set[str]
 
-def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> List[LiveStmt]:
+def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Tuple[List[LiveStmt], Set[str]]:
     """Analyze variable lifetimes; a variable is live within all statements which
     follow an assignment (not including the assignment), up to the last statement
     that uses the value (including that statement.)
@@ -487,16 +485,8 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
 
     This is the first step to allocating variables to locations (i.e. registers.)
 
-    Because I can't figure out how this should work, currently producing three results:
-    "live before" (e.g. the arguments of a subroutine call are live before the call is
-    performed) and "live after" (e.g. the arguments are no longer live once the call
-    happens, unless they're otherwise needed.) For now, the "after" of one statement is
-    identical to the "before" of the next. "during" may be different from them both,
-    in the case that the statement both reads and writes the same variable.
-    Update: now that the IR is much simpler, the difference is no longer very interesting
-    and it seems like "before" is good enough: we're only going to want to know what's
-    live when a CallSub happens, and CallSubs don't read anything now, so their before
-    and during are the same.
+    Return a list of annotated stmts, and the set of variables that are live at the
+    start.
     """
 
     def analyze_if(stmt: If, live_at_end: Set[str]) -> Tuple[Stmt, Set[str]]:
@@ -504,18 +494,10 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         be an "else" block to thread the information through.
         """
 
-        when_true_liveness = analyze_liveness(stmt.when_true, live_at_end=live_at_end)
-        if len(when_true_liveness) > 0:
-            live_at_when_true_start = when_true_liveness[0].before
-        else:
-            live_at_when_true_start = live_at_end
+        when_true_liveness, live_at_when_true_start = analyze_liveness(stmt.when_true, live_at_end=live_at_end)
 
         if stmt.when_false is not None:
-            when_false_liveness = analyze_liveness(stmt.when_false, live_at_end=live_at_end)
-            if len(when_false_liveness) > 0:
-                live_at_when_false_start = when_false_liveness[0].before
-            else:
-                live_at_when_false_start = live_at_end
+            when_false_liveness, live_at_when_false_start = analyze_liveness(stmt.when_false, live_at_end=live_at_end)
         else:
             when_false_liveness = None
             live_at_when_false_start = live_at_end
@@ -535,25 +517,16 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         arrive at a fixed point after one more pass.
         """
 
-        body_liveness = analyze_liveness(stmt.body, live_at_end=live_at_end)
-        if len(body_liveness) > 0:
-            live_at_body_start = body_liveness[0].before
-        else:
-            live_at_body_start = live_at_end
+        body_liveness, live_at_body_start = analyze_liveness(stmt.body, live_at_end=live_at_end)
 
         live_at_test_end = live_at_body_start.union(refs(stmt.value))
 
-        test_liveness = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
-        if len(test_liveness) > 0:
-            live_at_test_start = test_liveness[0].before
-        else:
-            live_at_test_start = live_at_body_start
+        test_liveness, live_at_test_start = analyze_liveness(stmt.test, live_at_end=live_at_test_end)
 
         stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
         live = live_at_test_start
 
         return stmt, live.copy()
-
 
     result = []
     live_set = live_at_end.copy()
@@ -595,14 +568,12 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         else:
             raise Exception(f"Unknown statement: {stmt}")
 
-        after = live_set.copy()
         live_set.difference_update(written)
-        during = live_set.copy()
         live_set.update(read)
         before = live_set.copy()
-        result.insert(0, LiveStmt(stmt, before, during, after))
+        result.insert(0, LiveStmt(stmt, before))
 
-    return result
+    return (result, live_set)
 
 
 def refs(expr: Expr) -> Set[str]:
@@ -922,10 +893,16 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
 def phase_two(ast: Subroutine, registers: List[Reg]) -> Subroutine:
     """The input is IR with all locals represented by Local.
 
-    Output has Local eliminated, replaced by Reg where possible, or by Load/Store
+    Output has Local eliminated, replaced by Reg where possible, or by Location (i.e. the stack)
     with additional temporary variables.
 
-    Note: it looks like reg_count has to be at least 2.
+    Note: it looks like there must be at least 2 available registers.
+
+    Tricky: anything variable found to be live at the start wasn't explicitly initialized, so
+    it needs to be initialized to zero. A more precise way to do that would be to find the first
+    use, inject an assignment, and re-run the analysis, but a simpler way to get a correct result
+    for this very unusual case is just to promote the variable; stack-allocated variables are
+    always initialized on function entry. See KeyboardTest.jack for the relevant example.
     """
 
     # TODO: treat THIS and THAT as additional locations for "saved" vars.
@@ -938,18 +915,20 @@ def phase_two(ast: Subroutine, registers: List[Reg]) -> Subroutine:
         promoted_count += 1
         return loc
 
-    liveness = analyze_liveness(ast.body)
+    liveness, live_at_start = analyze_liveness(ast.body)
 
-    need_promotion = need_saving(liveness)
+    need_promotion = need_saving(liveness).union(live_at_start)
 
     # for s in liveness:
     #     print(_Stmt_str(s))
     # print(f"need saving: {need_promotion}")
+    # if len(live_at_start) > 0:
+    #     print(f"uninitialized locals in {ast.name}: {live_at_start} (will probably be promoted)")
 
     body = promote_locals(ast.body, { Local(l): next_location(Local(l)) for l in need_promotion }, "p_")
 
     while True:
-        liveness2 = analyze_liveness(body)
+        liveness2, live_at_start2 = analyze_liveness(body)
         need_promotion2 = need_saving(liveness2)
 
         # Sanity check: additional promotion
@@ -958,6 +937,8 @@ def phase_two(ast: Subroutine, registers: List[Reg]) -> Subroutine:
             #     print(_Stmt_str(s))
             # print(f"need saving after one round: {need_promotion2}")
             raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
+        if len(live_at_start2) > 0:
+            raise Exception(f"Uninitialized locals: {live_at_start2}")
 
         local_sets = color_locals(liveness2)
 

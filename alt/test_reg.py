@@ -40,7 +40,7 @@ class Main {
 
     ir = flatten_class(ast)
 
-    liveness = analyze_liveness(ir.subroutines[0].body)
+    liveness, live_at_start = analyze_liveness(ir.subroutines[0].body)
     for s in liveness:
         print(_Stmt_str(s))
 
@@ -49,6 +49,7 @@ class Main {
     assert if_stmt.before == {"x", "y"}
     assert all([s.before == {"x"} for s in if_stmt.statement.when_true])
     assert all([s.before == {"y"} for s in if_stmt.statement.when_false])
+    assert live_at_start == set()
 
 
 def test_loop_liveness():
@@ -78,7 +79,7 @@ class Main {
 
     ir = flatten_class(ast)
 
-    liveness = analyze_liveness(ir.subroutines[0].body)
+    liveness, live_at_start = analyze_liveness(ir.subroutines[0].body)
     for s in liveness:
         print(_Stmt_str(s))
 
@@ -89,6 +90,44 @@ class Main {
 
     assert while_stmt.before == x
     assert all([s.before == x for s in while_stmt.statement.body])
+    assert live_at_start == set()
+
+
+def test_degenerate_loop_liveness():
+    """Taken directly from KeyboardTest.jack, and answering the question, "Does anybody rely
+    on local variables being initialized to zero?"
+    """
+    src = """
+class Main {
+    function void main() {
+        var char key;
+        var int x;
+
+        // key is never initialized, and referred to only in the loop test.
+        while (key = 0) {
+            let key = Keyboard.keyPressed();
+        }
+
+        return;
+    }
+}"""
+
+    ast = solved_10.parse_class(src)
+
+    ir = flatten_class(ast)
+
+    liveness, live_at_start = analyze_liveness(ir.subroutines[0].body)
+    for s in liveness:
+        print(_Stmt_str(s))
+
+    key = {"key"}  # key is live
+    no_key = set()  # nothing live
+
+    while_stmt, = [s for s in liveness if isinstance(s.statement, While)]
+
+    assert while_stmt.before == key
+    assert all([s.before == no_key for s in while_stmt.statement.body])
+    assert live_at_start == key
 
 
 def test_if_allocation():
