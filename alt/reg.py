@@ -91,7 +91,7 @@ class Store(NamedTuple):
     location: "Location"
     value: "Value"
 
-Cmp = str  # requires 3.8: Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
+Cmp = str  # requires 3.8: Literal["!=", "=", "<", ">", "<=", ">=""]
 
 class If(NamedTuple):
     value: "Value"
@@ -677,7 +677,7 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         elif isinstance(stmt, If):
             value_stmts, value = rewrite_expr(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
-            when_false = rewrite_statements(stmt.when_false)
+            when_false = stmt.when_false and rewrite_statements(stmt.when_false)
             return value_stmts + [If(value, stmt.cmp, when_true, when_false)]
         elif isinstance(stmt, While):
             test = rewrite_statements(stmt.test)
@@ -695,11 +695,8 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
-    def rewrite_statements(stmts: Optional[Sequence[Stmt]]) -> Optional[List[Stmt]]:
-        if stmts is not None:
-            return [rs for s in stmts for rs in rewrite_statement(s)]
-        else:
-            return None
+    def rewrite_statements(stmts: Sequence[Stmt]) -> List[Stmt]:
+        return [rs for s in stmts for rs in rewrite_statement(s)]
 
     return rewrite_statements(stmts)
 
@@ -863,7 +860,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
         elif isinstance(stmt, If):
             value = rewrite_value(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
-            when_false = rewrite_statements(stmt.when_false)
+            when_false = stmt.when_false and rewrite_statements(stmt.when_false)
             return If(value, stmt.cmp, when_true, when_false)
         elif isinstance(stmt, While):
             test = rewrite_statements(stmt.test)
@@ -881,11 +878,8 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
-    def rewrite_statements(stmts: Optional[Sequence[Stmt]]) -> Optional[List[Stmt]]:
-        if stmts is not None:
-            return [rewrite_statement(s) for s in stmts ]
-        else:
-            return None
+    def rewrite_statements(stmts: Sequence[Stmt]) -> List[Stmt]:
+        return [rewrite_statement(s) for s in stmts ]
 
     return rewrite_statements(stmts)
 
@@ -1544,7 +1538,7 @@ class Translator(solved_07.Translator):
 
     # Helpers:
 
-    def value_to_a(self, ast: Union[Reg, Const]):
+    def value_to_a(self, ast: Value):
         """Load a register or constant value into A, without overwriting D, and in one less cycle,
         in some cases."""
 
@@ -1559,6 +1553,8 @@ class Translator(solved_07.Translator):
             else:
                 self.asm.instr(f"@{-ast.value}")
                 self.asm.instr("A=-A")
+        elif isinstance(ast, Local):
+            raise Exception(f"Local should have been rewritten to Reg or Location: {ast}")
         else:
             raise Exception(f"Unknown Value: {ast}")
 
@@ -1645,13 +1641,12 @@ class Translator(solved_07.Translator):
 def _Class_str(self: Class) -> str:
     return "\n".join([f"class {self.name}"]
                      + [jack_ast._indent(str(s)) for s in self.subroutines])
-Class.__str__ = _Class_str
+Class.__str__ = _Class_str  # type: ignore
 
 def _Subroutine_str(self: Subroutine) -> str:
-    return "\n".join([f"function {self.name} {self.num_vars} (args: {self.num_args})"]
+    return "\n".join([f"function {self.name} {self.num_vars} (args: {self.num_args}; leaf: {self.leaf})"]
                      + [jack_ast._indent(_Stmt_str(s)) for s in self.body])
-
-Subroutine.__str__ = _Subroutine_str
+Subroutine.__str__ = _Subroutine_str  # type: ignore
 
 def _Stmt_str(stmt: Stmt) -> str:
     if isinstance(stmt, Eval):
