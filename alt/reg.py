@@ -171,6 +171,7 @@ class Subroutine(NamedTuple):
     name: str
     num_args: int
     num_vars: int
+    leaf: Optional[bool]
     body: List[Stmt]
 
 class Class(NamedTuple):
@@ -464,10 +465,51 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
 
     num_args = symbol_table.count("argument")
     num_vars = None  # bogus, but this isn't meaningful until the next phase anyway
-    return Subroutine(ast.name, num_args, num_vars, statements)
+    any_callsub = any(isinstance(n, CallSub) for s in statements for n in traverse_nodes(s))
+    return Subroutine(ast.name, num_args, num_vars, not any_callsub, statements)
 
 def negate_cmp(cmp: Cmp) -> Cmp:
     return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
+
+
+def traverse_nodes(ast: object):
+    """Generator yielding every node in the tree, in pre-order."""
+    yield ast
+
+    if isinstance(ast, Eval):
+        yield from traverse_nodes(ast.dest)
+        yield from traverse_nodes(ast.expr)
+    elif isinstance(ast, IndirectWrite):
+        yield from traverse_nodes(ast.address)
+        yield from traverse_nodes(ast.value)
+    elif isinstance(ast, Store):
+        yield from traverse_nodes(ast.location)
+        yield from traverse_nodes(ast.value)
+    elif isinstance(ast, If):
+        yield from (traverse_nodes(s) for s in ast.when_true)
+        if ast.when_false is not None:
+            yield from (traverse_nodes(s) for s in ast.when_false)
+    elif isinstance(ast, While):
+        yield from (traverse_nodes(s) for s in ast.body)
+    elif isinstance(ast, Return):
+        yield from traverse_nodes(ast.expr)
+    elif isinstance(ast, Push):
+        yield from traverse_nodes(ast.expr)
+    elif isinstance(ast, Discard):
+        yield from traverse_nodes(ast.expr)
+
+    elif isinstance(ast, (CallSub, Const, Local, Location, Reg)):
+        pass
+    elif isinstance(ast, Binary):
+        yield ast.left
+        yield ast.right
+    elif isinstance(ast, Unary):
+        yield ast.value
+    elif isinstance(ast, IndirectRead):
+        yield ast.address
+
+    else:
+        raise Exception(f"Unknown node: {ast}")
 
 
 class LiveStmt(NamedTuple):
@@ -955,7 +997,7 @@ def phase_two(ast: Subroutine, registers: List[Reg]) -> Subroutine:
 
             reg_body = lock_down_locals(body, reg_map)
 
-            return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
+            return Subroutine(ast.name, ast.num_args, promoted_count, ast.leaf, reg_body)
 
 
 class Compiler:
