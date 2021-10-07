@@ -599,13 +599,18 @@ class Translator(solved_07.Translator):
             raise Exception(f"Unknown register: {ast}")
 
     def handle_Expr_Binary(self, ast: compiler.Binary, dst_reg: str) -> str:
+        """Ranges from 1 cycle (e.g. r2 + r3) to 11 cycles (e.g. R7 < R9).
+
+        May overwrite TEMP1 and/or TEMP2.
+        """
+
         # TODO: the compiler's first phase *should* be rewriting these to be trivial for this
         # CPU, but it doesn't at the moment so where does that leave us for now?
 
         left_imm = self.immediate(ast.left)
         right_imm = self.immediate(ast.right)
 
-        # First, some special cases with constant opaerands:
+        # First, some special cases with constant operands:
         if ast.op.symbol == "+" and right_imm is not None:
             left_reg = self._handle_Expr(ast.left, dst_reg)
             self.asm.instr(f"addi {dst_reg} {left_reg} {right_imm}")
@@ -618,7 +623,38 @@ class Translator(solved_07.Translator):
             left_reg = self._handle_Expr(ast.left, dst_reg)
             self.asm.instr(f"addi {dst_reg} {left_reg} {-right_imm}")
             return dst_reg
+        elif ast.op.symbol == "<" and isinstance(ast.right, compiler.Const):
+            left_reg = self._handle_Expr(ast.left, TEMP1)
+            right_reg = self.handle_Expr_Const(compiler.Const(-ast.right.value), TEMP2) # right_reg = -rhs
+            # 6 or 7 cycles:
+            if right_reg == "r0":
+                diff_reg = left_reg                  # left_reg = lhs - rhs = lhs (i.e. "x < 0")
+            else:
+                self.asm.instr(f"add {TEMP1} {left_reg} {right_reg}")  # r6 = lhs - rhs
+                diff_reg = TEMP1
+            self._sign(diff_reg, TEMP2)              # r7 = 0x8000 if (lhs - rhs) < 0
+            self.asm.instr(f"addi {dst_reg} r0 0")   # result = 0 (false) unless overwritten
+            self.asm.instr(f"beq {TEMP2} r0 +1")     # sign bit not set: >= 0; skip true case
+            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1 (true)
+            return dst_reg
+        elif ast.op.symbol == ">" and isinstance(ast.right, compiler.Const):
+            left_reg = self._handle_Expr(ast.left, TEMP1)
+            right_reg = self.handle_Expr_Const(compiler.Const(-ast.right.value - 1), TEMP2) # right_reg = -rhs - 1
+            # 6 or 7 cycles:
+            if right_reg == "r0":
+                diff_reg = left_reg                  # left_reg = lhs - rhs - 1 = lhs (i.e "x > -1")
+            else:
+                self.asm.instr(f"add {TEMP1} {left_reg} {right_reg}")  # r6 = lhs - rhs - 1
+                diff_reg = TEMP1
+            self._sign(diff_reg, TEMP2)              # r7 = 0x8000 if (lhs - rhs - 1) < 0
+            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1 (true) unless overwritten
+            self.asm.instr(f"beq {TEMP2} r0 +1")     # sign bit not set: >= 0; skip true case
+            self.asm.instr(f"addi {dst_reg} r0 0")   # result = 0 (false)
+            return dst_reg
 
+        if self.debug:
+            if left_imm is not None or right_imm is not None:
+                print(f"not optimized: {compiler._Expr_str(ast)}")
 
         # Load the left and right operands, either in their source registers, or in TEMP1 or
         # TEMP2, respectively. Because both operands must be either Reg or Const, we can
@@ -646,12 +682,14 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"nand {dst_reg} {TEMP1} {TEMP2}")  # r6 = !(!lhs & !rhs) = lhs | rhs
             return dst_reg
         elif ast.op.symbol == "=":
+            # 4 cycles:
             self.asm.instr(f"beq {left_reg} {right_reg} +2")  # skip true case
             self.asm.instr(f"addi {dst_reg} r0 0")
             self.asm.instr(f"beq r0 r0 +1")  # skip false case
             self.asm.instr(f"addi {dst_reg} r0 -1")
             return dst_reg
         elif ast.op.symbol == "<":
+            # 9 cycles:
             self._neg(right_reg, TEMP2)
             self.asm.instr(f"add {TEMP1} {left_reg} {TEMP2}")  # r6 = lhs - rhs
 
@@ -662,14 +700,15 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1 (true)
             return dst_reg
         elif ast.op.symbol == ">":
+            # 9 cycles:
             self._neg(left_reg, TEMP1)
             self.asm.instr(f"add {TEMP1} {TEMP1} {right_reg}")  # r6 = rhs - lhs
 
             self._sign(TEMP1, TEMP2)  # r7 = 0x8000 if (rhs - lhs) < 0
 
-            self.asm.instr(f"addi {dst_reg} r0 0")  # result = 0 (true) unless overwritten
+            self.asm.instr(f"addi {dst_reg} r0 0")  # result = 0 (false) unless overwritten
             self.asm.instr(f"beq {TEMP2} r0 +1")   # sign bit not set: >= 0; skip true case
-            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1
+            self.asm.instr(f"addi {dst_reg} r0 -1")  # result = -1 (true)
             return dst_reg
         else:
             raise Exception(f"Unknown binary op: {compiler._Expr_str(ast)}")
