@@ -486,11 +486,18 @@ def traverse_nodes(ast: object):
         yield from traverse_nodes(ast.location)
         yield from traverse_nodes(ast.value)
     elif isinstance(ast, If):
-        yield from (traverse_nodes(s) for s in ast.when_true)
+        yield from traverse_nodes(ast.value)
+        for s in ast.when_true:
+            yield from traverse_nodes(s)
         if ast.when_false is not None:
-            yield from (traverse_nodes(s) for s in ast.when_false)
+            for s in ast.when_false:
+                yield from traverse_nodes(s)
     elif isinstance(ast, While):
-        yield from (traverse_nodes(s) for s in ast.body)
+        for s in ast.test:
+            yield from traverse_nodes(s)
+        yield from traverse_nodes(ast.value)
+        for s in ast.body:
+            yield from traverse_nodes(s)
     elif isinstance(ast, Return):
         yield from traverse_nodes(ast.expr)
     elif isinstance(ast, Push):
