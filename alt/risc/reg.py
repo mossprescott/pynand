@@ -470,7 +470,7 @@ class Translator(solved_07.Translator):
 
         assert self.return_location <= 63
         self.asm.instr(f"addi {TEMP1} r0 {self.return_location}")
-        self.asm.instr(f"jalr r0 r6")
+        self.asm.instr(f"jalr r0 {TEMP1}")
 
     def handle_Push(self, ast):
         if not isinstance(ast.expr, compiler.CallSub):
