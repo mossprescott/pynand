@@ -364,49 +364,45 @@ class Translator(solved_07.Translator):
         Try to keep branching to a minimum, but it's tricky since the beq instruction is so limited.
         """
 
-        value_reg = self._handle_Expr(value)
+        value_reg = self._handle_Expr(value, TEMP1)
         if cmp == "=":
+            # 2 cycles, plus the jump
             # Easy case: if value = 0 then do the jump (by not skipping it)
             self.asm.instr(f"beq {value_reg} r0 +1")
             self.asm.instr(f"beq r0 r0 +3")
             self._jmp(target_label)
 
         elif cmp == "!=":
+            # 1 cycle, plus the jump
             # Easy case: if value = 0 then don't jump
             self.asm.instr(f"beq {value_reg} r0 +3")
             self._jmp(target_label)
 
         elif cmp == "<":
+            # 4 cycles, plus the jump
             # If the sign bit is set, then jump
             self._sign(src=value_reg, dst=TEMP2)  # r7 = sign bit
-
             self.asm.instr(f"beq {TEMP2} r0 +3")
             self._jmp(target_label)
 
         elif cmp == ">":
-            # Negate, then if sign bit is set, jump
-            # TODO: addi -1 is one less cycle than negate
-            self._neg(value_reg, TEMP1)
-            self._sign(src=TEMP1, dst=TEMP2)  # r7 = sign bit of -value
-
-            self.asm.instr(f"beq {TEMP2} r0 +3")
+            # 5 cycles, plus the jump, or only 1 if the value is 0
+            self.asm.instr(f"beq {value_reg} r0 +7")  # short-cut for 0
+            self._sign3(src=value_reg, tmp=TEMP2, dst=TEMP1)  # r6 = sign bit; r7 = 0x8000
+            self.asm.instr(f"beq {TEMP1} {TEMP2} +3")
             self._jmp(target_label)
 
         elif cmp == "<=":
-            # Negate, then if the sign bit is not set, jump
-            self._neg(value_reg, TEMP1)
-            self._sign(src=TEMP1, dst=TEMP2)  # r7 = sign bit of -value
-
-            self.asm.instr(f"beq {TEMP2} r0 +1")
-            self.asm.instr(f"beq r0 r0 +3")
+            # 5 cycles, plus the jump, or only 1 if the value is 0
+            self.asm.instr(f"beq {value_reg} r0 +4")  # short-cut for 0
+            self._sign(src=value_reg, dst=TEMP2)  # r7 = sign bit
+            self.asm.instr(f"beq {TEMP2} r0 +3")
             self._jmp(target_label)
 
         elif cmp == ">=":
-            # If the sign bit is not set, then jump
-            self._sign(src=value_reg, dst=TEMP2)  # r7 = sign bit
-
-            self.asm.instr(f"beq {TEMP2} r0 +1")
-            self.asm.instr(f"beq r0 r0 +3")
+            # 4 cycles, plus the jump
+            self._sign3(src=value_reg, tmp=TEMP2, dst=TEMP1)  # r6 = sign bit; r7 = 0x8000
+            self.asm.instr(f"beq {TEMP1} {TEMP2} +3")
             self._jmp(target_label)
 
         else:
@@ -433,10 +429,24 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"addi {dst} {dst} 1")
 
     def _sign(self, src, dst):
-        """Mask off the sign bit of the value in the given (true) register, into a separate register, in 3 cycles."""
+        """Mask off the sign bit of the value in the given (true) register, into a separate
+        register, in 3 cycles.
+        src and dst must be different registers; src is never overwritten.
+        """
         assert src != dst, "src and dst must be different registers"
         self.asm.instr(f"lui {dst} -32768")
         self.asm.instr(f"nand {dst} {src} {dst}")
+        self.asm.instr(f"nand {dst} {dst} {dst}")  # dst = src & 0x8000
+
+    def _sign3(self, src, tmp, dst):
+        """Mask off the sign bit of the value in the given (true) register, in 3 cycles, keeping
+        the value 0x8000 in a register for future use.
+        tmp, and dst must be different registers.
+        If src and dst are different, src is not overwritten.
+        """
+        assert src != tmp, "src and tmp must be different registers"
+        self.asm.instr(f"lui {tmp} -32768")
+        self.asm.instr(f"nand {dst} {src} {tmp}")
         self.asm.instr(f"nand {dst} {dst} {dst}")  # dst = src & 0x8000
 
 
