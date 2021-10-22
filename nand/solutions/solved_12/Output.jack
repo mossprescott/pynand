@@ -255,7 +255,15 @@ class Output {
             let row = row + 1;
         }
 
-        let cursorX = cursorX + 1;
+        // Advance the cursor, wrapping to the next line.
+        if (cursorX < 63) {
+            let cursorX = cursorX + 1;
+        }
+        else {
+            let cursorX = 0;
+            // TODO: wrap to top of screen? Something more clever?
+            let cursorY = cursorY + 1;
+        }
 
         return;
     }
