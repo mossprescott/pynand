@@ -5,7 +5,6 @@ String operations without trying to inspect the screen buffer (or even having dr
 screen working at all.)
 */
 class Output {
-    // Not called from minimal_sys_lib
     function void init() {
         return;
     }
