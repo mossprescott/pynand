@@ -180,7 +180,12 @@ def ThreadedComputer(inputs, outputs):
 def parse_op(string, loc=None, symbols={}):
     m = re.match(r"CALL ([^ ]+)", string)
     if m:
-        return 0b1000_0000_0000_0000 | symbols[m.group(1)]
+        target = symbols[m.group(1)]
+        if target == 0:
+            raise SyntaxError("Target address for CALL must be non-zero: {string}")
+        elif target >= (1 << 14):
+            raise SyntaxError("Target address for CALL does not fit in 14 bits: {string}; {target}")
+        return 0b1000_0000_0000_0000 | target
 
     if string == "RTN":
         return 0b1000_0000_0000_0000

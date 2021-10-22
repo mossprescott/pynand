@@ -73,7 +73,7 @@ def test_call_and_return(simulator):
     cpu.instruction = parse_op("0;JMP")
     cpu.ticktock()
 
-    cpu.instruction = parse_op("CALL target", symbols)
+    cpu.instruction = parse_op("CALL target", symbols=symbols)
     cpu.ticktock()
 
     assert cpu.pc == 12345
@@ -113,12 +113,16 @@ def test_backward_compatible_ops():
 #
 
 def test_assemble_call():
-    symbols = {"target": 12345}
-    assert unsigned(parse_op("CALL target", symbols))  == 0b1000_0000_0000_0000 | 12345
+    symbols = {"target": 12345, "zero": 0, "too_high": 16384}
+    assert unsigned(parse_op("CALL target", symbols=symbols)) == 0b1000_0000_0000_0000 | 12345
 
-    # with pytest.raises(SyntaxError) as exc_info:
-    #     parse_op("CALL ")
-    # assert str(exc_info.value).startswith("M not allowed as a destination for pop")
+    with pytest.raises(SyntaxError) as exc_info:
+        parse_op("CALL zero", symbols=symbols)
+    assert str(exc_info.value).startswith("Target address for CALL must be non-zero")
+
+    with pytest.raises(SyntaxError) as exc_info:
+        parse_op("CALL too_high", symbols=symbols)
+    assert str(exc_info.value).startswith("Target address for CALL does not fit in 14 bits")
 
 def test_assemble_return():
     assert unsigned(parse_op("RTN"))  == 0b1000_0000_0000_0000
