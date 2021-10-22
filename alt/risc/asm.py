@@ -50,7 +50,7 @@ class MatchP(parsing.Parser):
             raise parsing.ParseFailure(f"a token matching {self.pattern!r}", loc)
 
 
-def parse_op(string, symbols):
+def parse_op(string, loc, symbols):
     """Tricky: RiSC instructions can have references to labels embedded in them in more than one way.
 
     Since we've got a proper parser combinator library and know how to use it, might as well do that.

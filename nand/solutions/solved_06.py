@@ -59,15 +59,18 @@ BUILTIN_SYMBOLS = {
 }
 
 
-def parse_op(string, symbols=None):
+def parse_op(string, loc=None, symbols=None):
     """Parse a single assembly op directly to the corresponding Hack instruction word.
 
     The op may be a numeric symbol (an A-command) or a C-command, but not a reference
     to a symbol or variable.
 
+    :param loc: the position of the current instruction; that is, the address it will
+      occupy in ROM when the program is loaded. Note: not used in this implementation,
+      but included in the signature in so that other compatible parsers can use it.
     :param symbols: a dictionary mapping symbol names to addresses (of labels in the code
-    and memory locations allocated for "static" variables.) Note: not used in this implementation,
-    but included in the signature in so that other compatible parsers can use it.
+      and memory locations allocated for "static" variables.) Note: not used in this implementation,
+      but included in the signature in so that other compatible parsers can use it.
     """
 
     m = re.match(r"@((?:0x)?\d+)", string)
@@ -151,6 +154,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
     ops = []
     statics = {}
     next_static = min_static
+    loc = 0
     for line in code_lines:
         if "(" in line:
             pass
@@ -176,6 +180,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
                 names = {}
                 names.update(symbols)
                 names.update(statics)
-                ops.append(parse_op(line, names))
+                ops.append(parse_op(line, loc, names))
+            loc += 1
 
     return (ops, symbols, statics)
