@@ -48,6 +48,23 @@ to the actual target:
     jalr r0 r7
 
 
+# Leaf function optimization:
+
+When a function makes no calls, it's simplified:
+
+- on entry, only the return address is saved on the stack and SP is immediately reset for the caller
+  (saving about 10 cycles)
+- LCL and ARG are not used at all
+- on return, no stack adjustment is needed at all (saving about 9 cycles)
+- "local" and "argument" references are indexed directly from SP (saving one cycle)
+
+In total, the overhead per function call is reduced to 4 cycles, plus 1 for each
+stack-allocated local, plus pushing the arguments and recovering the result from r7.
+
+Note: this same optimization has not yet been applied to the alt/reg.py compiler, so the comparison
+is currently somewhat unfair.
+
+
 # Next steps:
 
 Generate more compact sequences for "=", "<", and ">" binary ops, or eliminate them in favor of
@@ -174,40 +191,61 @@ class Translator(solved_07.Translator):
         self.class_namespace = class_name.lower()
         self.function_namespace = f"{class_name.lower()}.{subroutine_ast.name}"
 
+        self.current_subroutine = subroutine_ast
+
         instr_count_before = self.asm.instruction_count
 
-        self.asm.start(f"function {class_name}.{subroutine_ast.name} {subroutine_ast.num_vars} (args: {subroutine_ast.num_args})")
+        self.asm.start(f"function {class_name}.{subroutine_ast.name} {subroutine_ast.num_vars} (args: {subroutine_ast.num_args}; leaf: {subroutine_ast.leaf})")
         self.asm.label(f"{self.function_namespace}")
 
-        # Note: this could be done with a common sequence in the preamble, but jumping there and
-        # back would cost at least 6 cycles or so, and the goal here is to get small by generating
-        # tighter code, not save space in ROM by adding runtime overhead.
-        # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
-        # at all.
-        # self.asm.comment("push the return address, then LCL and ARG")
-        self.asm.instr(f"sw {TEMP2} {SP} 0")
-        self.asm.instr(f"lw {TEMP1} r0 {LCL_ADDR}")
-        self.asm.instr(f"sw {TEMP1} {SP} +1")
-        self.asm.instr(f"lw {TEMP1} r0 {ARG_ADDR}")
-        self.asm.instr(f"sw {TEMP1} {SP} +2")
-        self.asm.instr(f"addi {SP} {SP} 3")  # collapsed stack adjustment
+        if subroutine_ast.leaf:
+            # Lightweight enty sequence: save only the return address, and immediately reset
+            # the stack pointer for the caller. All local and argument access will index from there.
+            self.asm.comment("save return address")
+            self.asm.instr(f"sw {TEMP2} {SP} 0")
 
-        # self.asm.comment("LCL (RAM[1]) = SP (r1)")
-        self.asm.instr(f"sw {SP} r0 {LCL_ADDR}")
+            if subroutine_ast.num_vars == 0:
+                pass
+            elif subroutine_ast.num_args + subroutine_ast.num_vars <= 63:
+                self.asm.comment(f"initialize locals ({subroutine_ast.num_vars})")
+                for i in range(subroutine_ast.num_vars):
+                    self.asm.instr(f"sw r0 {SP} +{subroutine_ast.num_args + i}")
+            else:
+                raise Exception(f"Too many args and/or local variables: {subroutine_ast}")
 
-        # self.asm.comment("ARG (RAM[2]) = SP (r1) - (num_args + 3)")
-        self.asm.instr(f"addi {TEMP1} {SP} {-(subroutine_ast.num_args + 3)}")
-        self.asm.instr(f"sw {TEMP1} r0 {ARG_ADDR}")
+            if subroutine_ast.num_args > 0:
+                self.asm.comment("adjust stack for the caller")
+                self.asm.instr(f"addi {SP} {SP} {-subroutine_ast.num_args}")
 
-        if subroutine_ast.num_vars == 0:
-            pass
-        elif subroutine_ast.num_vars <= 63:
-            # self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
-            for i in range(subroutine_ast.num_vars):
-                self.asm.instr(f"sw r0 {SP} +{i}")
-            self.asm.instr(f"addi {SP} {SP} {subroutine_ast.num_vars}")  # collapsed stack adjustment
         else:
-            raise Exception(f"Too many local variables: {subroutine_ast}")
+            # Note: this could be done with a common sequence in the preamble, but jumping there and
+            # back would cost at least 6 cycles or so, and the goal here is to get small by generating
+            # tighter code, not save space in ROM by adding runtime overhead.
+
+            # self.asm.comment("push the return address, then LCL and ARG")
+            self.asm.instr(f"sw {TEMP2} {SP} 0")
+            self.asm.instr(f"lw {TEMP1} r0 {LCL_ADDR}")
+            self.asm.instr(f"sw {TEMP1} {SP} +1")
+            self.asm.instr(f"lw {TEMP1} r0 {ARG_ADDR}")
+            self.asm.instr(f"sw {TEMP1} {SP} +2")
+            self.asm.instr(f"addi {SP} {SP} 3")  # collapsed stack adjustment
+
+            # self.asm.comment("LCL (RAM[1]) = SP (r1)")
+            self.asm.instr(f"sw {SP} r0 {LCL_ADDR}")
+
+            # self.asm.comment("ARG (RAM[2]) = SP (r1) - (num_args + 3)")
+            self.asm.instr(f"addi {TEMP1} {SP} {-(subroutine_ast.num_args + 3)}")
+            self.asm.instr(f"sw {TEMP1} r0 {ARG_ADDR}")
+
+            if subroutine_ast.num_vars == 0:
+                pass
+            elif subroutine_ast.num_vars <= 63:
+                # self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
+                for i in range(subroutine_ast.num_vars):
+                    self.asm.instr(f"sw r0 {SP} +{i}")
+                self.asm.instr(f"addi {SP} {SP} {subroutine_ast.num_vars}")  # collapsed stack adjustment
+            else:
+                raise Exception(f"Too many local variables: {subroutine_ast}")
 
         # Now the body:
         for s in subroutine_ast.body:
@@ -283,20 +321,35 @@ class Translator(solved_07.Translator):
             raise Exception(f"should have been rewritten: {ast}")
 
         else:
-            if kind == "argument":
-                segment_ptr = ARG_ADDR
-            elif kind == "local":
-                segment_ptr = LCL_ADDR
-            else:
-                raise Exception(f"Unknown location: {ast}")
+            if self.current_subroutine.leaf:
+                if kind == "argument":
+                    offset = index
+                elif kind == "local":
+                    offset = self.current_subroutine.num_args + 1 + index
+                else:
+                    raise Exception(f"Unknown location: {ast}")
 
-            if 0 <= index <= 63:
-                value_reg = self._handle_Expr(ast.value)
-                assert value_reg != TEMP2
-                self.asm.instr(f"lw {TEMP2} r0 {segment_ptr}")
-                self.asm.instr(f"sw {value_reg} {TEMP2} {index}")
+                if 0 <= index <= 63:
+                    value_reg = self._handle_Expr(ast.value)
+                    self.asm.instr(f"sw {value_reg} {SP} {offset}")
+                else:
+                    raise Exception(f"TODO: stack offset >= 64: {kind} {index}")
+
             else:
-                raise Exception(f"TODO: segment offset > 64: {kind} {index}")
+                if kind == "argument":
+                    segment_ptr = ARG_ADDR
+                elif kind == "local":
+                    segment_ptr = LCL_ADDR
+                else:
+                    raise Exception(f"Unknown location: {ast}")
+
+                if 0 <= index <= 63:
+                    value_reg = self._handle_Expr(ast.value)
+                    assert value_reg != TEMP2
+                    self.asm.instr(f"lw {TEMP2} r0 {segment_ptr}")
+                    self.asm.instr(f"sw {value_reg} {TEMP2} {index}")
+                else:
+                    raise Exception(f"TODO: segment offset > 64: {kind} {index}")
 
     def handle_If(self, ast: compiler.If):
         self.asm.comment("if...")
@@ -468,9 +521,14 @@ class Translator(solved_07.Translator):
             self.asm.comment("DEBUG: copy return value to R15")
             self.asm.instr(f"sw {TEMP2} r0 15")
 
-        assert self.return_location <= 63
-        self.asm.instr(f"addi {TEMP1} r0 {self.return_location}")
-        self.asm.instr(f"jalr r0 {TEMP1}")
+        if self.current_subroutine.leaf:
+            self.asm.comment("fast leaf function return sequence")
+            self.asm.instr(f"lw {TEMP1} {SP} +{self.current_subroutine.num_args}")
+            self.asm.instr(f"jalr r0 {TEMP1}")
+        else:
+            assert self.return_location <= 63
+            self.asm.instr(f"addi {TEMP1} r0 {self.return_location}")
+            self.asm.instr(f"jalr r0 {TEMP1}")
 
     def handle_Push(self, ast):
         if not isinstance(ast.expr, compiler.CallSub):
@@ -527,6 +585,9 @@ class Translator(solved_07.Translator):
     def call(self, ast: compiler.CallSub):
         """Note: no need to label the return address; jalr captures it for us."""
 
+        if self.current_subroutine.leaf:
+            raise Exception(f"Unexpected CallSub while translating leaf function: {self.current_subroutine}; {ast}")
+
         self.referenced_functions.append(f"{ast.class_name}.{ast.sub_name}")
 
         self.asm.start(f"call {ast.class_name}.{ast.sub_name} {ast.num_args}")
@@ -570,18 +631,34 @@ class Translator(solved_07.Translator):
         elif kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
         else:
-            if kind == "argument":
-               segment_ptr = ARG_ADDR
-            elif kind == "local":
-                segment_ptr = LCL_ADDR
-            else:
-                raise Exception(f"Unknown location: {ast}")
 
-            if 0 <= index <= 63:
-                self.asm.instr(f"lw {dst_reg} r0 {segment_ptr}")
-                self.asm.instr(f"lw {dst_reg} {dst_reg} {index}")
+            if self.current_subroutine.leaf:
+                if kind == "argument":
+                    offset = index
+                elif kind == "local":
+                    offset = self.current_subroutine.num_args + 1 + index
+                else:
+                    raise Exception(f"Unknown location: {ast}")
+
+                if 0 <= index <= 63:
+                    self.asm.instr(f"lw {dst_reg} {SP} {offset}")
+                else:
+                    raise Exception(f"TODO: stack offset >= 64: {kind} {index}")
+
             else:
-                raise Exception(f"TODO: segment offset > 64: {kind} {index}")
+                if kind == "argument":
+                    segment_ptr = ARG_ADDR
+                elif kind == "local":
+                    segment_ptr = LCL_ADDR
+                else:
+                    raise Exception(f"Unknown location: {ast}")
+
+                if 0 <= index <= 63:
+                    self.asm.instr(f"lw {dst_reg} r0 {segment_ptr}")
+                    self.asm.instr(f"lw {dst_reg} {dst_reg} {index}")
+                else:
+                    raise Exception(f"TODO: segment offset >= 64: {kind} {index}")
+
         return dst_reg
 
     def handle_Expr_Reg(self, ast: compiler.Reg, dst_reg: str) -> str:

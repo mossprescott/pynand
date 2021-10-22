@@ -193,12 +193,16 @@ def test_translate_push_zero():
     ]
 
 
-def translate_stmt(stmt):
+def translate_stmt(stmt, leaf_context=False):
     """Run the translator with a single statement and extract just the fragment of assembly that
     was generated for it, not including any preamble or comments.
     """
 
     translator = alt.risc.reg.Translator()
+
+    # Hack: poke the translators state as needed
+    translator.current_subroutine = compiler.Subroutine("none", 3, 5, leaf_context, [])
+
     translator._handle(stmt)
     lines = translator.asm.lines
 
