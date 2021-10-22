@@ -195,7 +195,7 @@ def SPComputer(inputs, outputs):
     outputs.tty_ready = mem.tty_ready
 
 
-def parse_op(string, symbols={}):
+def parse_op(string, loc=None, symbols={}):
     m = re.match(r"([ADM]+)=--SP", string)
     if m:
         dest_a = 'A' in m.group(1)

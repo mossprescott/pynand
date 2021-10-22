@@ -98,7 +98,7 @@ def ShiftComputer(inputs, outputs):
     outputs.tty_ready = mem.tty_ready
 
 
-def parse_op(string, symbols={}):
+def parse_op(string, loc=None, symbols={}):
     m = re.match(r"(.+)>>1", string)
     if m:
         return 0xdfff & solved_06.parse_op(m.group(1), symbols)
