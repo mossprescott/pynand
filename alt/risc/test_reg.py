@@ -6,10 +6,11 @@ import alt.risc.reg
 import test_07, test_08, test_12, test_optimal_08
 
 import alt.reg as compiler
+import alt.test_reg
 from nand import jack_ast
 
 
-# Some simple statments should get translated with no extraneous copying:
+# Some simple statements should get translated with no extraneous copying:
 
 def test_translate_simple_copy():
     x_reg = compiler.Reg(2, "r", "x")
@@ -209,6 +210,12 @@ def translate_stmt(stmt, leaf_context=False):
     start_index, = [i for (i, l) in enumerate(lines) if l.startswith("(start")]
 
     return [ l.strip() for l in lines[start_index+1:] if not l.startswith("//") ]
+
+
+# A couple of extra tests inherited from alt/reg.py:
+
+def test_compare_edge_cases():
+    alt.test_reg.test_compare_edge_cases(platform=alt.risc.reg.RiSC_REG_PLATFORM)
 
 
 # All the "OS" tests work, because they compile and run complete Jack programs:

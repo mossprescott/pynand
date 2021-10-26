@@ -4,8 +4,10 @@ import pytest
 
 from nand import run
 from nand.solutions import solved_05, solved_06, solved_10, solved_12
+from nand.translate import translate_jack
 import test_12, test_optimal_08
 
+import alt.reg
 from alt.reg import *
 from alt.reg import _Stmt_str
 
@@ -177,6 +179,97 @@ class Test {
 
     assert sub.num_vars == 0, "No locals on the stack"
     assert sub.body[0] == Eval(Reg(0, "R", "x"), Const(0)), "x is assigned to the first register"
+
+
+def test_compare_edge_cases(platform=REG_PLATFORM, simulator='codegen'):
+    """See test_07.test_compare_edge_cases, which uses naked VM ops, so has to be reproduced here."""
+
+    def gen_expr(dst, left, op, right):
+        return f"""
+        let x = {left};
+        let y = {right};
+        let RAM[{dst}] = x {op} y;
+"""
+
+    def gen_test(dst, left, op, right):
+        return f"""
+        let x = {left};
+        let y = {right};
+        if (x {op} y) {{
+            let RAM[{dst}] = true;
+        }}
+"""
+
+    src = ("""
+class Main {
+    function void main() {
+        var Array RAM;
+        var int x, y;
+
+        let RAM = 0;
+"""
+    + gen_expr(8000, -1000, "<", 2000)
+    + gen_expr(8001, -20000, "<", 30000)  # overflows
+    + gen_expr(8002, -1000, ">", 2000)
+    + gen_expr(8003, -20000, ">", 30000)  # overflows
+
+    + gen_test(8010, -1000, "<", 2000)
+    + gen_test(8011, -20000, "<", 30000)  # overflows
+    + gen_test(8012, -1000, ">", 2000)
+    + gen_test(8013, -20000, ">", 30000)  # overflows
+
+    # Finally, a spot-check for the pattern that gets translated to "<="
+    + """
+        let x = -20000;
+        let y = 30000;
+        let RAM[8021] = ~(x > y);  // x <= y
+
+        if (~(x > y)) {  // x <= y
+            let RAM[8031] = true;
+        }
+
+        return;
+    }
+}
+""")
+
+    print(src)
+
+    # HACK: turn on the necessary option, in a gross way. If we had some kind of "compiler flags"
+    # mechanism, this wouldn't be needed.
+    saved_flag = alt.reg.PRECISE_COMPARISON
+    alt.reg.PRECISE_COMPARISON = True
+    try:
+        translator = platform.translator()
+
+        translator.preamble()
+
+        translate_jack(translator, platform, src)
+
+        test_12._translate_dependencies(translator, platform, [])
+
+        translator.finish()
+
+        translator.check_references()
+    finally:
+        alt.reg.PRECISE_COMPARISON = saved_flag
+
+
+    computer = run(platform.chip, simulator=simulator)
+    translator.asm.run(platform.assemble, computer, stop_cycles=10_000, debug=True)
+
+    assert computer.peek(8000) == -1  # -1000 < 2000
+    assert computer.peek(8001) == -1  # -20000 < 30000  (overflows)
+    assert computer.peek(8002) == 0  # -1000 > 2000
+    assert computer.peek(8003) == 0  # -20000 > 30000  (overflows)
+
+    assert computer.peek(8010) == -1  # -1000 < 2000
+    assert computer.peek(8011) == -1  # -20000 < 30000  (overflows)
+    assert computer.peek(8012) == 0  # -1000 > 2000
+    assert computer.peek(8013) == 0  # -20000 > 30000  (overflows)
+
+    assert computer.peek(8021) == -1  # -20000 <= 30000  (overflows)
+    assert computer.peek(8031) == -1  # -20000 <= 30000  (overflows)
 
 
 def test_array_lib():

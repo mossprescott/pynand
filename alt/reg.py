@@ -195,6 +195,15 @@ def flatten_class(ast: jack_ast.Class) -> Class:
         [flatten_subroutine(s, symbol_table) for s in ast.subroutineDecs])
 
 
+PRECISE_COMPARISON = False
+"""If true, then generate extra code to correctly handle comparing values whose difference overflows.
+
+Note: later stages (the Translator) ignore this issue and just assume that comparisons never overflow.
+"""
+# TODO: somehow make this configurable at the command-line, because the impact is significant
+# and I still don't have any example programs that require it. For the time being, the test
+# reaches in to turn it on so the code won't rot.
+
 def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -> Subroutine:
     """Rewrite the body of a subroutine so that it contains no complex/nested expressions,
     by introducing a temporary variable to hold the result of each sub-expression.
@@ -316,9 +325,38 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             else:
                 left_stmts, left_value = flatten_expression(expr.left)
                 right_stmts, right_value = flatten_expression(expr.right)
-                diff_var = next_var()
-                diff_stmt = Eval(diff_var, Binary(left_value, jack_ast.Op("-"), right_value))
-                return left_stmts + right_stmts + [diff_stmt], diff_var, expr.op.symbol
+                diff_expr = Binary(left_value, jack_ast.Op("-"), right_value)
+
+                if PRECISE_COMPARISON and expr.op.symbol in ("<", ">", "<=", ">="):
+                    cmp = expr.op.symbol
+                    comp_var = next_var()
+
+                    # TODO: flatten/special-case constant operands, e.g. x < 16 (they can still involve overflow)
+
+                    # About 34 words in memory, and between 14 and 18 cycles.
+                    # Compare with about 6 words/cycles for the naive subtraction.
+
+                    # Note: the actual subtract op is generated twice, but executed only once,
+                    # so uses space but not time. Probably would be more cycles to avoid that.
+                    comp_stmts = [
+                        # TODO: if left is a constant, we know its sign and can skip this test
+                        If(left_value, "<",
+                            # TODO: if right is a constant, we know its sign and can skip these tests
+                            [ If(right_value, ">=",
+                                [Eval(comp_var, Const(-1))],  # x < 0, y >= 0 -> compare with -1
+                                [Eval(comp_var, diff_expr)]), # x < 0, y < 0  -> compare with x - y
+                            ],
+                            [ If(right_value, "<",
+                                [Eval(comp_var, Const(1))],   # x >= 0, y < 0   -> compare with 1
+                                [Eval(comp_var, diff_expr)]), # x >= 0, y >= 0  -> compare with x - y
+                            ]),
+                    ]
+                    return left_stmts + right_stmts + comp_stmts, comp_var, expr.op.symbol
+                else:
+                    # When overflow is not an issue, just compare the difference with zero:
+                    diff_var = next_var()
+                    diff_stmt = Eval(diff_var, diff_expr)
+                    return left_stmts + right_stmts + [diff_stmt], diff_var, expr.op.symbol
         else:
             expr_stmts, expr_value = flatten_expression(expr)
             return expr_stmts, expr_value, "!="
@@ -420,6 +458,17 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 return flatten_expression(jack_ast.SubroutineCall("Math", None, "multiply", [expr.left, expr.right]), force=force)
             elif expr.op.symbol == "/":
                 return flatten_expression(jack_ast.SubroutineCall("Math", None, "divide", [expr.left, expr.right]), force=force)
+            elif PRECISE_COMPARISON and expr.op.symbol in ("<", ">"):
+                # Note: this is
+                # TODO: "<=", ">="
+                comp_var = next_var()
+                cond_stmts, cond_expr, cond_cmp = flatten_condition(expr)
+                stmts = cond_stmts + [
+                    If(cond_expr, cond_cmp,
+                        [Eval(comp_var, Const(-1))],
+                        [Eval(comp_var, Const(0))])
+                ]
+                flat_expr = comp_var
             else:
                 left_stmts, left_expr = flatten_expression(expr.left)
                 right_stmts, right_expr = flatten_expression(expr.right)
