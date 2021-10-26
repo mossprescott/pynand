@@ -249,6 +249,18 @@ class MultiplyByConstant(JackTransform[NameGen]):
                 return ([jack_ast.VarDec(type="int", names=[tmp])],
                         [jack_ast.LetStatement(name=tmp, array_index=None, expr=expr)],
                         fix_sign(plus(tmp_ref, tmp_ref)))
+        elif abs(const.value) == 3:
+            # Note: separating this case makes it easier to generalize the all the others below.
+            tmp = name_gen.next_name()
+            tmp_x = f"{tmp}_x"
+            tmp_acc = f"{tmp}_acc"
+            x_ref = jack_ast.VarRef(tmp_x)
+            acc_ref = jack_ast.VarRef(tmp_acc)
+            return ([jack_ast.VarDec(type="int", names=[tmp_x, tmp_acc])],
+                    [jack_ast.LetStatement(name=tmp_x, array_index=None, expr=expr),
+                     jack_ast.LetStatement(name=tmp_acc, array_index=None, expr=plus(x_ref, x_ref))
+                    ],
+                    fix_sign(plus(acc_ref, x_ref)))
         else:
             # If we get this far, the constant is not trivial, and the expression may not be a simple VarRef.
             # We want to unroll the multiplication using a pair of temporaries.
