@@ -32,10 +32,10 @@ replaces certain function calls with lower-overhead "reduced" alternatives.
 
 ## Results
 
-| Location                         | Nands        | ROM size       | Cycles per frame | Cycles for init    |
-|----------------------------------|-------------:|---------------:|-----------------:|-------------------:|
-| project_0*.py                    | 1,262        |         25,700 |           41,450 |            129,200 |
-| [alt/sp.py](sp.py)               | 1,844 (+46%) |  14,150 (-45%) |    27,440 (-34%) |      76,240 (-41%) |
+| Location                         | Nands        | ROM size       | Cycles per frame | Cycles for init    | Translator LoC   |
+|----------------------------------|-------------:|---------------:|-----------------:|-------------------:|-----------------:|
+| project_0*.py                    | 1,262        |         25,700 |           41,450 |            129,200 |              123 |
+| [alt/sp.py](sp.py)               | 1,844 (+46%) |  14,150 (-45%) |    27,440 (-34%) |      76,240 (-41%) |             2000 |
 | [alt/threaded.py](threaded.py)   | 1,549 (+23%) |   8,100 (-68%) |    49,600 (+20%) |     173,750 (+34%) |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  |   26,050 (+1%) |    19,800 (-52%) |             _same_ |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) |        _same_  |            +100% |              +100% |
