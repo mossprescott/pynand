@@ -65,6 +65,9 @@ def main():
     elif True:
         import alt.risc.reg
         platform = alt.risc.reg.RiSC_REG_PLATFORM
+    elif False:
+        import alt.reduce
+        platform = alt.reduce.REDUCE_RiSC_REG_PLATFORM
 
 
     translate = platform.translator()
