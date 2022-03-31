@@ -321,7 +321,7 @@ class ParseFailure(Exception, Generic[T]):
         self.loc = loc
 
     def __str__(self):
-        return f"Expected {self.expected} at location {self.loc.pos}; next token: {'<eof>' if self.loc.at_eof() else repr(self.loc.current_token())}"
+        return f"Expected {self.expected} at location {self.loc.pos}; next token(s): {repr(self.loc.tokens[self.loc.pos:self.loc.pos+5])}"
 
 
 #
