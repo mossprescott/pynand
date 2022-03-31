@@ -166,6 +166,11 @@ def test_compile_keyboard_lib(keyboard_class=project_12.OUTPUT_CLASS, platform=B
     assert len(asm.lines) > 0
 
 def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=BUNDLED_PLATFORM, simulator='codegen'):
+    """This test contains a loop with a bare test on an uninitialized variable:
+        while (key = 0) { key = Keyboard.keyPressed(); }
+    That turns out to make it especially tricky for compilers that want to get fancy with locals.
+    """
+
     keyboard_test = _parse_jack_file("examples/project_12/KeyboardTest.jack", platform)
 
     translator = platform.translator()
