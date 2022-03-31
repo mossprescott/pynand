@@ -400,10 +400,6 @@ class Translator:
 
 
     def _compare(self, op):
-        # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
-        #    -30,000 > 30,000
-        #    30,000 - (-30,000) = 60,000 = -whatever, which is less than 0
-
         # Common implementation for compare opcodes:
         label = self.asm.next_label(f"{op.lower()}_common")
         end_label = self.asm.next_label(f"{op.lower()}_common$end")
@@ -420,9 +416,8 @@ class Translator:
 
             # TODO: something much more clever
 
-            self.asm.instr("@16384")  # 0x4000 (because you can't load a "negative" value with "@-")
-            self.asm.instr("D=A")
-            self.asm.instr("D=D+A")
+            self.asm.instr("@32767")  # 0x7FFF (because you can't load a "negative" value with "@-")
+            self.asm.instr("D=A+1")
             self.asm.instr("@R14")
             self.asm.instr("M=D")     # R14 = 0x8000 (mask for the sign bit)
 
