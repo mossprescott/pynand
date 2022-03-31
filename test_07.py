@@ -103,7 +103,7 @@ def test_stack_ops(chip=project_05.Computer, assemble=project_06.assemble, trans
     assert computer.peek(264) == 0
     assert computer.peek(265) == -91
 
-@pytest.mark.skip(reason="A simple lt doesn't handle overflow properly, but programs seem to work anyway.")
+@pytest.mark.skip(reason="A simple lt doesn't handle overflow properly, but (most) programs seem to work anyway.")
 def test_compare_edge_cases(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):
     translate = translator()
 
@@ -119,6 +119,12 @@ def test_compare_edge_cases(chip=project_05.Computer, assemble=project_06.assemb
     translate.push_constant(30000)
     translate.lt()
 
+    # 20,000 > -30,000: the difference overflows
+    translate.push_constant(20000)
+    translate.push_constant(30000)
+    translate.neg()
+    translate.gt()
+
     translate.finish()
 
     computer = run(chip, simulator=simulator)
@@ -127,9 +133,23 @@ def test_compare_edge_cases(chip=project_05.Computer, assemble=project_06.assemb
 
     translate.asm.run(assemble, computer, stop_cycles=1_000, debug=True)
 
-    assert computer.sp == 258
+    assert computer.sp == 259
     assert computer.peek(256) == -1
     assert computer.peek(257) == -1
+    assert computer.peek(258) == 0
+
+
+# This test verifies that the included solution is able to handle overflowing comparisons, when
+# configured to do so. Feel free to ignore it.
+def test_compare_edge_cases_solution():
+    from nand.solutions import solved_07
+
+    saved_flag = solved_07.PRECISE_COMPARISON
+    solved_07.PRECISE_COMPARISON = True
+
+    test_compare_edge_cases(translator=solved_07.Translator)
+
+    solved_07.PRECISE_COMPARISON = saved_flag
 
 
 def test_memory_access_basic(chip=project_05.Computer, assemble=project_06.assemble, translator=project_07.Translator, simulator='codegen'):

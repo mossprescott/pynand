@@ -19,6 +19,19 @@ On the other hand, one test does require that behavior (test_08.test_nested_call
 spend the cycles.
 """
 
+PRECISE_COMPARISON = False
+"""If true, then generate extra code to correctly handle comparing values whose difference overflows.
+
+Note: later stages (the Translator) ignore this issue and just assume that comparisons never overflow.
+
+Currently unimplemented; provokes a failure at runtime. There are no example programs that actually
+require this, and the impact on performance will be significant. However, a correct implementation
+is available in one of the alternate compilers (alt/reg.py), so the flag is included here to clarify
+the situation.
+"""
+# TODO: somehow make this configurable at the command-line, because the impact is significant
+# and I still don't have any example programs that require it. For the time being, the test
+# reaches in to turn it on so the code won't rot.
 
 class Translator:
     """Translate all VM opcodes to assembly instructions.
@@ -399,25 +412,95 @@ class Translator:
         self.asm.instr("@R15")    # R15 = D (the return address)
         self.asm.instr("M=D")
 
-        # D = top, M = second from top, SP -= 1 (not 2!)
-        self.asm.instr("@SP")
-        self.asm.instr("AM=M-1")
-        self.asm.instr("D=M")
-        self.asm.instr("A=A-1")
+        if PRECISE_COMPARISON and op != "EQ":
+            # Extra branches to handle overflow cases, adding cycles
+            # But "=" is always a simple test, because overflow isn't an issue.
 
-        # Compare
-        self.asm.instr("D=M-D")
+            no_overflow_label = self.asm.next_label(f"{op.lower()}_common$no_overflow")
 
-        # Set result True, optimistically (since A is already loaded with the destination)
-        self.asm.instr("M=-1")  # note: true == -1 (all bits set)
+            # TODO: something much more clever
 
-        self.asm.instr(f"@{end_label}")
-        self.asm.instr(f"D;J{op}")
+            self.asm.instr("@16384")  # 0x4000 (because you can't load a "negative" value with "@-")
+            self.asm.instr("D=A")
+            self.asm.instr("D=D+A")
+            self.asm.instr("@R14")
+            self.asm.instr("M=D")     # R14 = 0x8000 (mask for the sign bit)
 
-        # Set result False
-        self.asm.instr("@SP")
-        self.asm.instr("A=M-1")
-        self.asm.instr("M=0")
+            self.asm.instr("@SP")
+            self.asm.instr("AM=M-1") # Note: decrementing SP here
+            self.asm.instr("D=M")    # D = y
+            self.asm.instr("@R14")
+            self.asm.instr("D=M&D")  # D = sign bit of y (i.e. -32768, if negative, or 0 if not)
+            self.asm.instr("@R13")
+            self.asm.instr("M=D")    # R13 = sign bit of y
+
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            self.asm.instr("D=M")    # D = x
+            self.asm.instr("@R14")
+            self.asm.instr("D=M&D")  # D = sign bit of x (i.e. -32768, if negative, or 0 if not)
+
+            self.asm.instr("@R13")
+            self.asm.instr("D=D-M")  # D = sign(x) - sign(y) (in the high bit)
+
+            # Note: can't use the trick to preload the result, because we can't yet overwrite x
+            self.asm.instr(f"@{no_overflow_label}")
+            self.asm.instr("D;JGE")
+
+            # Overflow detected:
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            if op == "LT":
+                self.asm.instr("M=-1")  # overflow ==> x < y
+            elif op == "GT":
+                self.asm.instr("M=0")  # overflow ==> not(x > y)
+            else:
+                raise Exception(f"Unexpected op: {op}")
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"0;JMP")
+
+            self.asm.label(no_overflow_label)
+            # Otherwise, the difference doesn't overflow, so compare directly:
+            # D = top (y), M = second from top (x), SP not decremented
+            self.asm.instr("@SP")
+            self.asm.instr("A=M")    # tricky: SP was decremented above, already points to y
+            self.asm.instr("D=M")    # D = y
+            self.asm.instr("A=A-1")
+
+            # Compare
+            self.asm.instr("D=M-D")  # D = x - y
+
+            # Set result True, optimistically (since A is already loaded with the destination)
+            self.asm.instr("M=-1")  # note: true == -1 (all bits set)
+
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"D;J{op}")
+
+            # Set result False
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=0")
+
+        else:
+            # D = top (y), M = second from top (x), SP -= 1 (not 2!)
+            self.asm.instr("@SP")
+            self.asm.instr("AM=M-1")
+            self.asm.instr("D=M")
+            self.asm.instr("A=A-1")
+
+            # Compare
+            self.asm.instr("D=M-D")  # D = x - y
+
+            # Set result True, optimistically (since A is already loaded with the destination)
+            self.asm.instr("M=-1")  # note: true == -1 (all bits set)
+
+            self.asm.instr(f"@{end_label}")
+            self.asm.instr(f"D;J{op}")
+
+            # Set result False
+            self.asm.instr("@SP")
+            self.asm.instr("A=M-1")
+            self.asm.instr("M=0")
 
         self.asm.label(end_label)
         self.asm.instr("@R15")   # JMP to R15
