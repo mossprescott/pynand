@@ -1,7 +1,6 @@
 #! /usr/bin/env pytest
 
 from alt.risc.chip import RiSCComputer
-import alt.risc.main
 import alt.risc.vm
 import test_07, test_08, test_12, test_optimal_08
 
@@ -26,28 +25,28 @@ def test_fibonacci_element():
 # All the "OS" tests work, because they compile and run complete Jack programs:
 
 def test_array_lib():
-    test_12.test_array_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_array_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_string_lib():
-    test_12.test_string_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_string_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_memory_lib():
-    test_12.test_memory_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_memory_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_keyboard_lib():
-    test_12.test_keyboard_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_keyboard_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_output_lib():
-    test_12.test_keyboard_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_keyboard_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_math_lib():
-    test_12.test_math_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_math_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 def test_screen_lib():
-    test_12.test_screen_lib(platform=alt.risc.main.RiSC_PLATFORM)
+    test_12.test_screen_lib(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
 
 def test_code_size_pong():
-    instruction_count = test_optimal_08.count_pong_instructions(platform=alt.risc.main.RiSC_PLATFORM)
+    instruction_count = test_optimal_08.count_pong_instructions(platform=alt.risc.vm.RiSC_VM_PLATFORM)
 
     assert instruction_count < 19_100

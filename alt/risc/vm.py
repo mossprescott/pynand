@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 """Translator for the standard VM, generating RiSC assembly.
 
 SP, LCL, ARG, THIS, and THAT are stored in r1-r5.
@@ -15,7 +17,15 @@ This something like 30% smaller in ROM than the similar translation for HACK,
 mostly because it takes only two cycles to push/pop the stack.
 """
 
+# from nand import jack_ast
+from nand.platform import BUNDLED_PLATFORM
 from nand.translate import AssemblySource
+# from nand.solutions import solved_07
+
+# import alt.reg as compiler
+import alt.risc.asm
+import alt.risc.chip
+
 
 # Each register is assigned a specific role, and gets a symbolic name
 Z = "r0"  # just a name for zero, for consistency. Bad idea?
@@ -445,3 +455,16 @@ class Translator:
     def check_references(self):
         # Probably don't use this translator to validate your compiler
         pass
+
+
+
+RiSC_VM_PLATFORM = BUNDLED_PLATFORM._replace(
+    chip=alt.risc.chip.RiSCComputer,
+    assemble=alt.risc.asm.assemble,
+    translator=Translator)
+
+if __name__ == "__main__":
+    # Note: this import requires pygame; putting it here allows the tests to import the module
+    import computer
+
+    computer.main(RiSC_VM_PLATFORM)
