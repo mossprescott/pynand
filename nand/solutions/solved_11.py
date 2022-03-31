@@ -152,9 +152,11 @@ def compile_subroutineDec(ast: SubroutineDec, symbol_table: SymbolTable, asm: As
         instance_word_count = symbol_table.count("this")
         num_vars = symbol_table.count("local")
 
+        # See ChunkyImage.newBitmap
         if ast.name != "new":
-            raise Exception(f'Must be named "new": {symbol_table.context()}')
-        elif ast.result != symbol_table.class_name:
+            print(f'Warning: constructor not named "new": {symbol_table.context()}')
+
+        if ast.result != symbol_table.class_name:
             raise Exception(f'Result type does not match: {symbol_table.context()}')
         elif ast.body.statements[-1] != ReturnStatement(KeywordConstant("this")):
             raise Exception(f'Does not return "this": {symbol_table.context()}')
