@@ -250,7 +250,7 @@ class MultiplyByConstant(JackTransform[NameGen]):
                         [jack_ast.LetStatement(name=tmp, array_index=None, expr=expr)],
                         fix_sign(plus(tmp_ref, tmp_ref)))
         elif abs(const.value) == 3:
-            # Note: separating this case makes it easier to generalize the all the others below.
+            # Note: separating this case makes it easier to generalize all the others below.
             tmp = name_gen.next_name()
             tmp_x = f"{tmp}_x"
             tmp_acc = f"{tmp}_acc"
@@ -326,7 +326,6 @@ class DivideByConstant(JackTransform[Context]):
             if isinstance(ast.right, jack_ast.IntegerConstant):
                 for n in range(15):
                     if ast.right.value == 2**n:
-                        print(f"divide: {ast.left}; 2^{n}")
                         return ([], [], jack_ast.SubroutineCall(
                                             class_name="Math", var_name=None, sub_name="shiftr",
                                             args=[ast.left, jack_ast.IntegerConstant(n)]))
