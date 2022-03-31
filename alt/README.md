@@ -49,8 +49,8 @@ When the "reg" compiler is retargeted to it, it gets a lot more done in every cy
 | [alt/lazy.py](lazy.py)           | _same_       |   23,650 (-8%) |    37,300 (-10%) |     111,000 (-14%) |
 | [alt/reg.py](reg.py)             | _same_       |  20,900 (-19%) |    19,150 (-54%) |      59,000 (-54%) |
 | [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |             _same_ |
-| [alt/risc/](risc/__init__.py) (simple) | 2,455 (+94%) |  19,011 (-26%) |    21,300 (-49%) |      64,350 (-50%) |
-| [alt/risc/](risc/reg.py) (reg)   | 2,455 (+94%) |  10,000 (-61%) |    10,500 (-75%) |      22,000 (-83%) |
+| [alt/risc/](risc/vm.py) (simple) | 2,455 (+94%) |  19,011 (-26%) |    21,300 (-49%) |      64,350 (-50%) |
+| [alt/risc/](risc/reg.py) (reg)   | 2,455 (+94%) |   9,625 (-63%) |     8.850 (-79%) |      21,625 (-83%) |
 
 **ROM Size** is the total number of instructions in ROM when Pong is compiled and translated
 from the Jack source.
