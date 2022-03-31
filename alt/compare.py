@@ -16,7 +16,7 @@ from alt.reduce import REDUCE_PLATFORM
 from alt.shift import SHIFT_PLATFORM
 from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
-from alt.risc.main import RiSC_PLATFORM
+from alt.risc.vm import RiSC_VM_PLATFORM
 from alt.risc.reg import RiSC_REG_PLATFORM
 
 from alt.reduce import REDUCE_REG_PLATFORM
@@ -40,10 +40,11 @@ def main():
     # a little painful to measure its performance directly. However, by design it takes exactly
     # two cycles per instruction, so we can just report that with a relatively clear conscience.
 
-    print_relative_result("alt/risc/vm.py", std, measure(RiSC_PLATFORM))
+    print_relative_result("alt/risc/vm.py", std, measure(RiSC_VM_PLATFORM))
     print_relative_result("alt/risc/reg.py", std, measure(RiSC_REG_PLATFORM))
 
     # Finally, the really impressive stuff (not shown in the table):
+    print("\nBonus combos:\n")
     print_relative_result("alt/reg.py (+reduce)", std, measure(REDUCE_REG_PLATFORM))
     print_relative_result("alt/risc/reg.py (+reduce)", std, measure(REDUCE_RiSC_REG_PLATFORM))
 
