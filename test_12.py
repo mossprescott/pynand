@@ -198,8 +198,8 @@ def test_keyboard_lib(keyboard_class=project_12.KEYBOARD_CLASS, platform=BUNDLED
     def crank(cycles=100_000):
         """Run for a while, checking the tty for output every few cycles."""
         nonlocal output
-        for _ in range(cycles//100):
-            computer.ticktock(cycles=100)
+        for _ in range(cycles//50):
+            computer.ticktock(cycles=50)
             computer.ticktock()
             c = computer.get_tty()
             if c != 0:
