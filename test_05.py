@@ -132,9 +132,6 @@ def test_memory_system():
 
 def a_contents(cpu):
     """Inspect the contents of the A register, by applying a bit pattern that forces it onto the memory input."""
-    # cpu.instruction = 0b1111010011010000  # D=D-M
-    # cpu.instruction = 0b1110110000010000  # D=A
-    # cpu.instruction = 0b1111110000010000  # D=M
     cpu.instruction = 0b1110110000001000  # M=A
     return cpu.outM
 
