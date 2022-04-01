@@ -77,10 +77,13 @@ def CPU(inputs, outputs):
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
+    # Tricky: the memory now requires the address to be presented one-cycle ahead, so "pipeline"
+    # it from the instruction if it is being written to A in this cycle.
+    addr = Mux16(a=instruction, b=a_reg.out, sel=i).out
 
     outputs.outM = alu.out                   # M value output
     outputs.writeM = And(a=dm, b=i).out      # Write to M?
-    outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
+    outputs.addressM = addr                  # Address in data memory (of M) (latched)
     outputs.pc = pc.out                      # address of next instruction (latched)
 
 
