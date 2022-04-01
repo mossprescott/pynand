@@ -109,7 +109,7 @@ class RAM(Component):
     For example, to pop from a stack that grows upward:
       A=0     // location of the stack pointer
       AM=M-1  // decrement the stack pointer in memory (read and write address 0)
-      D=M     // read from the
+      D=M     // read from the updated address
     """
     def __init__(self, address_bits):
         Component.__init__(self)
