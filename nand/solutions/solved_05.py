@@ -65,7 +65,11 @@ def CPU(inputs, outputs):
     not_i = Not(in_=i).out
 
     alu = lazy()
-    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
+
+    a_in = Mux16(a=instruction, b=alu.out, sel=i).out
+    a_load = Or(a=not_i, b=da).out
+
+    a_reg = Register(in_=a_in, load=a_load)
     d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
     jump_lt = And(a=alu.ng, b=jlt).out
     jump_eq = And(a=alu.zr, b=jeq).out
@@ -78,8 +82,8 @@ def CPU(inputs, outputs):
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
     # Tricky: the memory now requires the address to be presented one-cycle ahead, so "pipeline"
-    # it from the instruction if it is being written to A in this cycle.
-    addr = Mux16(a=instruction, b=a_reg.out, sel=i).out
+    # it from the instruction/alu which is being written to A in this cycle.
+    addr = Mux16(a=a_reg.out, b=a_in, sel=a_load).out
 
     outputs.outM = alu.out                   # M value output
     outputs.writeM = And(a=dm, b=i).out      # Write to M?
