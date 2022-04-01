@@ -29,9 +29,11 @@ def test_memory_system():
     assert mem.out == 0
 
     # Set RAM[2000] = 2222
-    mem.in_ = 2222
-    mem.load = 1
+    # Tricky: this now takes a two-cycle sequence
     mem.address = 0x2000
+    mem.tick(); mem.tock()
+    mem.load = 1
+    mem.in_ = 2222
     mem.tick(); mem.tock()
     assert mem.out == 2222
 
@@ -67,7 +69,9 @@ def test_memory_system():
     mem.address = 0x2000; mem.tick(); mem.tock(); assert mem.out == 2222
 
     # RAM[0x1234] = 1234
+    # Tricky: this now takes a two-cycle sequence
     mem.address = 0x1234
+    mem.tick(); mem.tock()
     mem.in_ = 1234
     mem.load = 1
     mem.tick(); mem.tock()
@@ -83,7 +87,9 @@ def test_memory_system():
     assert mem.out == 0
 
     # RAM[0x2345] = 2345
+    # Tricky: this now takes a two-cycle sequence
     mem.address = 0x2345
+    mem.tick(); mem.tock()
     mem.in_ = 2345
     mem.load = 1
     mem.tick(); mem.tock()
@@ -110,15 +116,19 @@ def test_memory_system():
 
     ### Screen test
 
+    # Tricky: this now takes a two-cycle sequence
+    mem.address = 0x4fcf
+    mem.tick(); mem.tock()
     mem.load = 1
     mem.in_ = -1
-    mem.address = 0x4fcf
     mem.tick(); mem.tock()
     assert mem.out == -1
 
     mem.address = 0x504f
-    mem.tick(); mem.tock()
+    mem.tick(); mem.tock()  # latch the address
+    mem.tick(); mem.tock()  # store the value
     assert mem.out == -1
+
 
 def a_contents(cpu):
     """Inspect the contents of the A register, by applying a bit pattern that forces it onto the memory input."""
