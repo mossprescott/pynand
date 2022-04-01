@@ -435,19 +435,18 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             any_state = True
         elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always
-            # register A (so, saved in self)
-            address_expr = src_many(comp, 'address', 14)
+            # Note: we also write to the latched address, because that's what's most useful
             in_name = f"_{all_comps.index(comp)}_in"
             l(4, f"if {src_one(comp, 'load')}:")
             l(5,   f"{in_name} = {src_many(comp, 'in_')}")
-            l(5,   f"if 0 <= {address_expr} < 0x4000:")
-            l(6,     f"self._ram[{address_expr}] = {in_name}")
-            l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
-            l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
-            l(5,   f"elif {address_expr} == 0x6000:")
+            l(5,   f"if 0 <= self._latched_address < 0x4000:")
+            l(6,     f"self._ram[self._latched_address] = {in_name}")
+            l(5,   f"elif 0x4000 <= self._latched_address < 0x6000:")
+            l(6,     f"self._screen[self._latched_address & 0x1fff] = {in_name}")
+            l(5,   f"elif self._latched_address == 0x6000:")
             l(6,     f"self._tty = {in_name}")
             l(6,     f"self._tty_ready = {in_name} != 0")
+            address_expr = src_many(comp, 'address', 14)
             l(4, f"self._latched_address = {address_expr}")
             any_state = True
         elif isinstance(comp, (Const, ROM)):

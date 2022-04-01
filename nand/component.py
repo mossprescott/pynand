@@ -97,15 +97,19 @@ class ROM(Component):
 
 class RAM(Component):
     """Memory containing 2^n words which can be read and written by the chip, with fixed
-    read latency of one cycle. Throughput is one write and/or read per cycle, but since there's
-    only one address input, you can't do unrelated read/write ops (specifically, a read always
-    reads the value written by the previous write, which probably isn't useful.)
-
-    To store a value, set all three inputs. The update value becomes available
-    on the next cycle.
+    latency of one cycle for both reads and writes. Throughput is one write and/or read per cycle.
 
     To read a previously set value, set `address`, wait one cycle, and then
     inspect `out`. This delay is meant to model the inherent trade-off of moving storage off-chip.
+
+    To store a value, set `address` and `load`, wait one cycle, set `in_`, then wait again. The
+    value provided in the second cycle is stored at the address provided in the first. That probably
+    seems perverse. It turns out to be what you need to usefully read and write in the same cycle.
+
+    For example, to pop from a stack that grows upward:
+      A=0     // location of the stack pointer
+      AM=M-1  // decrement the stack pointer in memory (read and write address 0)
+      D=M     // read from the
     """
     def __init__(self, address_bits):
         Component.__init__(self)

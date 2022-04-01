@@ -237,17 +237,16 @@ class RAMOps(VectorOps):
         """Note: not using `out`."""
         assert len(in_) == 16 and len(load) == 1 and len(address) == self.comp.address_bits
         def update(traces):
-            address_val = get_multiple_traces(address, traces)
-
             # Store the new value, if `load` is high:
             load_val = tst_trace(load[0], traces)
             if load_val:
                 # Tricky: sign extension was never needed here until eight.py, and it will
                 # hurt performance slightly.
                 in_val = extend_sign(get_multiple_traces(in_, traces))
-                self.set(address_val, in_val)
+                self.set(self.latched_address, in_val)
 
-            # Store the address, regardless:
+            # Store the address for next cycle:
+            address_val = get_multiple_traces(address, traces)
             self.latched_address = address_val
 
             return traces
