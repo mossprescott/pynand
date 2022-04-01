@@ -194,9 +194,7 @@ class IC:
                 return True
             elif isinstance(from_comp, IC) and from_comp.label == "Register":
                 return True
-            elif isinstance(to_comp, IC) and to_comp.label == "MemorySystem" and input_name != "address":
-                # This is the tricky case. The address is needed to supply the correct output, but
-                # other inputs (in_ and load) are only used at update time.
+            elif isinstance(from_comp, IC) and from_comp.label == "MemorySystem":
                 return True
             else:
                 return False

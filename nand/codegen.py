@@ -157,6 +157,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             return f"_{all_comps.index(comp)}_dff"
         elif comp.label == "Register":
             return f"_{all_comps.index(comp)}_reg"
+        elif comp.label == "MemorySystem":
+            return f"_{all_comps.index(comp)}_mem"
         else:
             return f"_{all_comps.index(comp)}_out"
 
@@ -215,6 +217,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 return f"self._{conn.name}"
             elif conn.comp.label == "Register":
                 return f"_{all_comps.index(conn.comp)}_reg"
+            elif conn.comp.label == "MemorySystem":
+                return f"_{all_comps.index(conn.comp)}_mem"
             elif inlinable(conn.comp):
                 expr = component_expr(conn.comp)
                 if expr:
@@ -289,13 +293,13 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             return None
         elif comp.label == "Register":
             return None
+        elif comp.label == "MemorySystem":
+            return None
         elif isinstance(comp, DFF):
             return None
         elif isinstance(comp, ROM):
             # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
-        elif comp.label == "MemorySystem":
-            return f"self._ram[self._latched_address] if 0 <= self._latched_address < 0x4000 else (self._screen[self._latched_address & 0x1fff] if 0x4000 <= self._latched_address < 0x6000 else (self._keyboard if self._latched_address == 0x6000 else 0))"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
 
@@ -334,10 +338,22 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         if comp.label in ("DFF", "Register"):
             comp_name = output_name(comp)
             l(3, f"{comp_name} = self.{comp_name}")
+        elif comp.label == "MemorySystem":
+            comp_name = output_name(comp)
+            l(3, f"if 0 <= self._latched_address < 0x4000:")
+            l(4,   f"{comp_name} = self._ram[self._latched_address]")
+            l(3, f"elif 0x4000 <= self._latched_address < 0x6000:")
+            l(4,   f"{comp_name} = self._screen[self._latched_address & 0x1fff]")
+            l(3, f"elif self._latched_address == 0x6000:")
+            l(4,   f"{comp_name} = self._keyboard")
+            l(3, f"else:")
+            l(4,   f"{comp_name} = 0")
+
+            # l(3, f"{comp_name} = self._ram[self._latched_address] if 0 <= self._latched_address < 0x4000 else (self._screen[self._latched_address & 0x1fff] if 0x4000 <= self._latched_address < 0x6000 else (self._keyboard if self._latched_address == 0x6000 else 0))")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
-        elif comp.label == "Register":
+        elif comp.label in ("Register", "MemorySystem"):
             pass
         elif isinstance(comp, ROM):
             # TODO: trap index errors with try/except
