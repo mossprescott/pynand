@@ -42,6 +42,8 @@ def MemorySystem(inputs, outputs):
     keyboard = Input()
     tty = Output(in_=in_, load=load_bank.d)
 
+    # Note: this is mapping keyboard/input to _all_ high addresses, which definitely seems like
+    # cheating.
     outputs.out = Mux4Way16(a=ram.out, b=ram.out, c=screen.out, d=keyboard.out, sel=bank).out
 
     # Tricky: need to expose some "output" from the Output component in order for the component
