@@ -44,6 +44,11 @@ def Register(inputs, outputs):
         outputs.out[i] = Bit(in_=inputs.in_[i], load=inputs.load).out
 
 
+# Note: these RAMs don't latch the address and delay delivery of the output until the following
+# cycle, as the "real" RAM is allowed/required to do. That's ok, because implementing RAM from
+# DFFs like this is an unrealistic exercise anyway. The tests for this project allow either
+# behavior.
+
 @chip
 def RAM8(inputs, outputs):
     load = DMux8Way(in_=inputs.load, sel=inputs.address)

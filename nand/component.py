@@ -78,6 +78,10 @@ class ROM(Component):
 
     The entire contents can be over-written from outside when initializing the assembled chip
     (so, really it's an EEPROM.)
+
+    Note: this component imposes no timing constraint; you can supply `address` and read the
+    corresponding value from `out` without waiting for the next cycle. Not sure how realistic
+    that is.
     """
 
     def __init__(self, address_bits):
@@ -92,7 +96,16 @@ class ROM(Component):
 
 
 class RAM(Component):
-    """Memory containing 2^n words which can be read and written by the chip.
+    """Memory containing 2^n words which can be read and written by the chip, with fixed
+    read latency of one cycle. Throughput is one write and/or read per cycle, but since there's
+    only one address input, you can't do unrelated read/write ops (specifically, a read always
+    reads the value written by the previous write, which probably isn't useful.)
+
+    To store a value, set all three inputs. The update value becomes available
+    on the next cycle.
+
+    To read a previously set value, set `address`, wait one cycle, and then
+    inspect `out`. This delay is meant to model the inherent trade-off of moving storage off-chip.
     """
     def __init__(self, address_bits):
         Component.__init__(self)
