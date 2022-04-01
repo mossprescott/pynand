@@ -13,7 +13,7 @@ def test_nand():
     traces = {"a": [0b001], "b": [0b010], "out": [0b100]}
 
     ops = component_ops(nand)
-    
+
     op, = ops.combine(**traces)
     assert run_op(op, 0b000) == 0b100
     assert run_op(op, 0b001) == 0b101
@@ -84,26 +84,34 @@ def test_ram():
         "out": [0b1 << (i+21) for i in range(16)]
     }
 
+    # Get a handle to the RAM impl.
     ops = component_ops(ram)
 
-    op, = ops.combine(**traces)
+    # Exactly one op to run on each event:
+    update_op, = ops.combine(**traces)
+    tick_op, = ops.sequence(**traces)
 
+    # poke a value into every cell
     for i in range(16):
         ops.set(i, i)
 
     for i in range(16):
         addr = i << 17
         out = i << 21
-        assert run_op(op, addr) == out | addr
+        bits0 = addr
+        bits1 = run_op(tick_op, bits0)    # latch the address
+        bits2 = run_op(update_op, bits1)  # read the value
+        assert bits2 == out | addr
 
-
-    op, = ops.sequence(**traces)
 
     for i in range(16):
         in_ = 12345 + i
         load = 0b1 << 16
         addr = i << 17
-        run_op(op, addr | load | in_)
+        bits0 = addr
+        bits1 = run_op(tick_op, bits0)    # latch the address
+        bits2 = bits1 | load | in_
+        bits3 = run_op(tick_op, bits2)    # write the value
         assert ops.get(i) == 12345 + i
 
 
