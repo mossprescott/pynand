@@ -85,10 +85,18 @@ def CPU(inputs, outputs):
     # it from the instruction/alu which is being written to A in this cycle.
     addr = Mux16(a=a_reg.out, b=a_in, sel=a_load).out
 
-    outputs.outM = alu.out                   # M value output
-    outputs.writeM = And(a=dm, b=i).out      # Write to M?
-    outputs.addressM = addr                  # Address in data memory (of M) (latched)
-    outputs.pc = pc.out                      # address of next instruction (latched)
+    # Don't write to memory if a reset is happening, mostly because there's a test from the
+    # original materials that checks. Note: writes to A and D are not suppressed; I suppose
+    # one could argue that it doesn't matter becuse the program shouldn't assume they're zero?
+    write = And(a=And(
+                a=dm,
+                b=i).out,
+                b=Not(in_=reset).out).out
+
+    outputs.outM = alu.out    # M value output
+    outputs.writeM = write    # Write to M?
+    outputs.addressM = addr   # Address in data memory (of M)
+    outputs.pc = pc.out       # address of next instruction (latched)
 
 
 @chip
