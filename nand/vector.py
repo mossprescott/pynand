@@ -210,6 +210,7 @@ class ROMOps(VectorOps):
 class RAMOps(VectorOps):
     def __init__(self, comp):
         self.comp = comp
+        self.latched_address = 0
         self.storage = [0]*(2**comp.address_bits)
 
     def get(self, address):
@@ -228,24 +229,29 @@ class RAMOps(VectorOps):
         """Note: only using one of the inputs."""
         assert len(address) == self.comp.address_bits and len(out) == 16
         def read(traces):
-            address_val = get_multiple_traces(address, traces)
-            out_val = self.get(address_val)
+            out_val = self.get(self.latched_address)
             return set_multiple_traces(out, out_val, traces)
         return [custom_op(read)]
 
     def sequence(self, in_, load, address, **_unused):
         """Note: not using `out`."""
         assert len(in_) == 16 and len(load) == 1 and len(address) == self.comp.address_bits
-        def write(traces):
+        def update(traces):
+            address_val = get_multiple_traces(address, traces)
+
+            # Store the new value, if `load` is high:
             load_val = tst_trace(load[0], traces)
             if load_val:
                 # Tricky: sign extension was never needed here until eight.py, and it will
                 # hurt performance slightly.
                 in_val = extend_sign(get_multiple_traces(in_, traces))
-                address_val = get_multiple_traces(address, traces)
                 self.set(address_val, in_val)
+
+            # Store the address, regardless:
+            self.latched_address = address_val
+
             return traces
-        return [custom_op(write)]
+        return [custom_op(update)]
 
 class InputOps(VectorOps):
     def __init__(self, comp):

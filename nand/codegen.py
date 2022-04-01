@@ -295,11 +295,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
         elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always
-            # register A (so, saved in self). But is that true for chips that add more ways to access
-            # the RAM?
-            address = src_many(comp, 'address', 14)
-            return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
+            return f"self._ram[self._latched_address] if 0 <= self._latched_address < 0x4000 else (self._screen[self._latched_address & 0x1fff] if 0x4000 <= self._latched_address < 0x6000 else (self._keyboard if self._latched_address == 0x6000 else 0))"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
 
@@ -436,6 +432,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             l(5,   f"elif {address_expr} == 0x6000:")
             l(6,     f"self._tty = {in_name}")
             l(6,     f"self._tty_ready = {in_name} != 0")
+            l(4, f"self._latched_address = {address_expr}")
             any_state = True
         elif isinstance(comp, (Const, ROM)):
             pass
@@ -501,6 +498,7 @@ class SOC(Chip):
 
     def __init__(self):
         self._rom = []
+        self._latched_address = 0
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0
