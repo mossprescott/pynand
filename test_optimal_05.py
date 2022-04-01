@@ -64,13 +64,13 @@ def test_memory_latency(simulator, memory=project_05.MemorySystem):
 
 def test_cpu():
     assert gate_count(project_05.CPU) == {
-        'nands': 1099,  # ?
+        'nands': 1151,  # ?
         'dffs': 48,  # 3 registers
     }
 
 def test_computer():
     assert gate_count(project_05.Computer) == {
-        'nands': 1262,  # ?
+        'nands': 1314,  # ?
         'dffs': 48,  # 3 registers
         'roms': 1,
         'rams': 2,
