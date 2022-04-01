@@ -120,199 +120,263 @@ def test_memory_system():
     mem.tick(); mem.tock()
     assert mem.out == -1
 
+def a_contents(cpu):
+    """Inspect the contents of the A register, by applying a bit pattern that forces it onto the memory input."""
+    # cpu.instruction = 0b1111010011010000  # D=D-M
+    # cpu.instruction = 0b1110110000010000  # D=A
+    # cpu.instruction = 0b1111110000010000  # D=M
+    cpu.instruction = 0b1110110000001000  # M=A
+    return cpu.outM
+
+def d_contents(cpu):
+    """Inspect the contents of the D register, by applying a bit pattern that forces it onto the memory input."""
+    cpu.instruction = 0b1110001100001000  # M=D
+    return cpu.outM
+
 
 def test_cpu(chip=project_05.CPU):
-    cpu = run(chip)
+    cpu = run(chip, simulator="codegen")
 
     cpu.instruction = 0b0011000000111001  # @12345
+    assert cpu.writeM == 0 and cpu.addressM == 12345
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 12345 and cpu.pc == 1 # and DRegister == 0
+    assert cpu.pc == 1 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110110000010000  # D=A
+    assert cpu.writeM == 0 and cpu.addressM == 12345
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 12345 and cpu.pc == 2 # and DRegister == 12345
+    assert cpu.pc == 2 and d_contents(cpu) == 12345
 
     cpu.instruction = 0b0101101110100000  # @23456
+    assert cpu.writeM == 0 and cpu.addressM == 23456
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 23456 and cpu.pc == 3 # and DRegister == 12345
+    assert cpu.pc == 3 and d_contents(cpu) == 12345
 
     cpu.instruction = 0b1110000111010000  # D=A-D
+    assert cpu.writeM == 0 and cpu.addressM == 23456
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 23456 and cpu.pc == 4 # and DRegister == 11111
+    assert cpu.pc == 4 and d_contents(cpu) == 11111
 
     cpu.instruction = 0b0000001111101000  # @1000
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 5 # and DRegister == 11111
+    assert cpu.pc == 5 and d_contents(cpu) == 11111
 
     cpu.instruction = 0b1110001100001000  # M=D
+    assert cpu.outM == 11111 and cpu.writeM == 1 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.outM == 11111 and cpu.writeM == 1 and cpu.addressM == 1000 and cpu.pc == 6 # and DRegister == 11111
+    assert cpu.pc == 6 and d_contents(cpu) == 11111
 
     cpu.instruction = 0b0000001111101001  # @1001
+    assert cpu.writeM == 0 and cpu.addressM == 1001
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1001 and cpu.pc == 7 # and DRegister == 11111
+    assert cpu.pc == 7 and d_contents(cpu) == 11111
 
     # Note confusing timing here: outM has the value to be written to memory when the clock falls. Afterward,
     # outM has a nonsense value.
     # TODO: always assert outM and writeM before tick/tock?
     cpu.instruction = 0b1110001110011000  # MD=D-1
-    assert cpu.outM == 11110 and cpu.writeM == 1 and cpu.addressM == 1001 and cpu.pc == 7 # and DRegister == 11111
+    assert cpu.outM == 11110 and cpu.writeM == 1 and cpu.addressM == 1001
     cpu.ticktock()
-    assert cpu.outM == 11109 and cpu.writeM == 1 and cpu.addressM == 1001 and cpu.pc == 8 # and DRegister == 11110
+    # assert cpu.pc == 7 and d_contents(cpu) == 11111
+    # cpu.ticktock()
+    # assert cpu.outM == 11109 and cpu.writeM == 1 and cpu.addressM == 1001
+    # cpu.ticktock()
+    assert cpu.pc == 8 and d_contents(cpu) == 11110
 
     cpu.instruction = 0b0000001111101000  # @1000
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 9 # and DRegister == 11110
+    assert cpu.pc == 9 and d_contents(cpu) == 11110
 
     cpu.instruction = 0b1111010011010000  # D=D-M
     cpu.inM = 11111
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 10 # and DRegister == -1
+    assert cpu.pc == 10 and d_contents(cpu) == -1
 
     cpu.instruction = 0b0000000000001110  # @14
+    assert cpu.writeM == 0 and cpu.addressM == 14
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 11 # and DRegister == -1
+    assert cpu.pc == 11 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000100  # D;jlt
+    assert cpu.writeM == 0 and cpu.addressM == 14
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 14 and cpu.pc == 14 # and DRegister == -1
+    assert cpu.pc == 14 and d_contents(cpu) == -1
 
     cpu.instruction = 0b0000001111100111  # @999
+    assert cpu.writeM == 0 and cpu.addressM == 999
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 999 and cpu.pc == 15 # and DRegister == -1
+    assert cpu.pc == 15 and d_contents(cpu) == -1
 
+    # Note: when the instruction both reads and writes A, the addressM output will change at the
+    # cycle boundary, so the timing of the tests matters.
     cpu.instruction = 0b1110110111100000  # A=A+1
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 16 # and DRegister == -1
+    assert cpu.pc == 16 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100001000  # M=D
+    assert cpu.outM == -1 and cpu.writeM == 1 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.outM == -1 and cpu.writeM == 1 and cpu.addressM == 1000 and cpu.pc == 17 # and DRegister == -1
+    assert cpu.pc == 17 and d_contents(cpu) == -1
 
     cpu.instruction = 0b0000000000010101  # @21
+    assert cpu.writeM == 0 and cpu.addressM == 21
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 21 and cpu.pc == 18 # and DRegister == -1
+    assert cpu.pc == 18 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110011111000010  # D+1;jeq
+    assert cpu.writeM == 0 and cpu.addressM == 21
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 21 and cpu.pc == 21 # and DRegister == -1
+    assert cpu.pc == 21 and d_contents(cpu) == -1
 
     cpu.instruction = 0b0000000000000010  # @2
+    assert cpu.writeM == 0 and cpu.addressM == 2
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 22 # and DRegister == -1
+    assert cpu.pc == 22 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110000010010000  # D=D+A
+    assert cpu.writeM == 0 and cpu.addressM == 2
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 2 and cpu.pc == 23 # and DRegister == 1
+    assert cpu.pc == 23 and d_contents(cpu) == 1
 
     cpu.instruction = 0b0000001111101000  # @1000
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 24 # and DRegister == -1
+    assert cpu.pc == 24 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110111010010000  # D=-1
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 25 # and DRegister == -1
+    assert cpu.pc == 25 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000001  # D;JGT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 26 # and DRegister == -1
+    assert cpu.pc == 26 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000010  # D;JEQ
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 27 # and DRegister == -1
+    assert cpu.pc == 27 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000011  # D;JGE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 28 # and DRegister == -1
+    assert cpu.pc == 28 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000100  # D;JLT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+    assert cpu.pc == 1000 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000101  # D;JNE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+    assert cpu.pc == 1000 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000110  # D;JLE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+    assert cpu.pc == 1000 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110001100000111  # D;JMP
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == -1
+    assert cpu.pc == 1000 and d_contents(cpu) == -1
 
     cpu.instruction = 0b1110101010010000  # D=0
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+    assert cpu.pc == 1001 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000001  # D;JGT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+    assert cpu.pc == 1002 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000010  # D;JEQ
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+    assert cpu.pc == 1000 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000011  # D;JGE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+    assert cpu.pc == 1000 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000100  # D;JLT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 0
+    assert cpu.pc == 1001 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000101  # D;JNE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1002 # and DRegister == 0
+    assert cpu.pc == 1002 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000110  # D;JLE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+    assert cpu.pc == 1000 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110001100000111  # D;JMP
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 0
+    assert cpu.pc == 1000 and d_contents(cpu) == 0
 
     cpu.instruction = 0b1110111111010000  # D=1
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+    assert cpu.pc == 1001 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000001  # D;JGT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+    assert cpu.pc == 1000 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000010  # D;JEQ
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+    assert cpu.pc == 1001 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000011  # D;JGE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+    assert cpu.pc == 1000 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000100  # D;JLT
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+    assert cpu.pc == 1001 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000101  # D;JNE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+    assert cpu.pc == 1000 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000110  # D;JLE
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1001 # and DRegister == 1
+    assert cpu.pc == 1001 and d_contents(cpu) == 1
 
     cpu.instruction = 0b1110001100000111  # D;JMP
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 1000 # and DRegister == 1
+    assert cpu.pc == 1000 and d_contents(cpu) == 1
 
     cpu.reset = 1
+    assert cpu.writeM == 0 and cpu.addressM == 1000
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 1000 and cpu.pc == 0 # and DRegister == 1
+    assert cpu.pc == 0 and d_contents(cpu) == 1
 
     cpu.instruction = 0b0111111111111111  # @32767
     cpu.reset = 0
+    assert cpu.writeM == 0 and cpu.addressM == 32767
     cpu.ticktock()
-    assert cpu.writeM == 0 and cpu.addressM == 32767 and cpu.pc == 1 # and DRegister == 1
+    assert cpu.pc == 1 and d_contents(cpu) == 1
 
 
 def test_computer_no_program(chip=project_05.Computer):
