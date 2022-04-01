@@ -87,7 +87,7 @@ def CPU(inputs, outputs):
 
     # Don't write to memory if a reset is happening, mostly because there's a test from the
     # original materials that checks. Note: writes to A and D are not suppressed; I suppose
-    # one could argue that it doesn't matter becuse the program shouldn't assume they're zero?
+    # one could argue that it doesn't matter because the program shouldn't assume they're zero?
     write = And(a=And(
                 a=dm,
                 b=i).out,
