@@ -22,8 +22,10 @@ def test_memory_system():
 
     # Did not also write to upper RAM or Screen
     mem.address = 0x2000
+    mem.tick(); mem.tock()
     assert mem.out == 0
     mem.address = 0x4000
+    mem.tick(); mem.tock()
     assert mem.out == 0
 
     # Set RAM[2000] = 2222
@@ -41,26 +43,28 @@ def test_memory_system():
 
     # Did not also write to lower RAM or Screen
     mem.address = 0
+    mem.tick(); mem.tock()
     assert mem.out == -1
     mem.address = 0x4000
+    mem.tick(); mem.tock()
     assert mem.out == 0
 
     # Low order address bits connected
     # (note: not actually testing anything in this system?)
-    mem.address = 0x0001; assert mem.out == 0
-    mem.address = 0x0002; assert mem.out == 0
-    mem.address = 0x0004; assert mem.out == 0
-    mem.address = 0x0008; assert mem.out == 0
-    mem.address = 0x0010; assert mem.out == 0
-    mem.address = 0x0020; assert mem.out == 0
-    mem.address = 0x0040; assert mem.out == 0
-    mem.address = 0x0080; assert mem.out == 0
-    mem.address = 0x0100; assert mem.out == 0
-    mem.address = 0x0200; assert mem.out == 0
-    mem.address = 0x0400; assert mem.out == 0
-    mem.address = 0x0800; assert mem.out == 0
-    mem.address = 0x1000; assert mem.out == 0
-    mem.address = 0x2000; assert mem.out == 2222
+    mem.address = 0x0001; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0002; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0004; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0008; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0010; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0020; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0040; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0080; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0100; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0200; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0400; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x0800; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x1000; mem.tick(); mem.tock(); assert mem.out == 0
+    mem.address = 0x2000; mem.tick(); mem.tock(); assert mem.out == 2222
 
     # RAM[0x1234] = 1234
     mem.address = 0x1234
@@ -70,9 +74,12 @@ def test_memory_system():
     assert mem.out == 1234
 
     # Did not also write to upper RAM or Screen
+    mem.load = 0
     mem.address = 0x2234
+    mem.tick(); mem.tock()
     assert mem.out == 0
     mem.address = 0x6234
+    mem.tick(); mem.tock()
     assert mem.out == 0
 
     # RAM[0x2345] = 2345
@@ -83,9 +90,12 @@ def test_memory_system():
     assert mem.out == 2345
 
     # Did not also write to lower RAM or Screen
+    mem.load = 0
     mem.address = 0x0345
+    mem.tick(); mem.tock()
     assert mem.out == 0
     mem.address = 0x4345
+    mem.tick(); mem.tock()
     assert mem.out == 0
 
 
