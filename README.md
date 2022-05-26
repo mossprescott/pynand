@@ -95,10 +95,14 @@ What language do you like to write? Can you compile _that_ language, or somethin
 the Hack VM? Or directly to assembly?
 
 
-## Credit
+## License
+
+This code is open source (MIT License), to the extent that I created it. However, if you want 
+to base your own work on it you should be aware that the original work is covered by a different
+license, and I can provide no advice on the implications.
 
 The entire CPU design, the breakdown of projects, most of the tests, and some example programs
-are directly taken from  the original
+are directly taken from the original
 [From Nand to Tetris course materials](https://www.nand2tetris.org/course). Solvers are encouraged
 to acquire a copy of the text; many questions are answered there.
 
