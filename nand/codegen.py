@@ -176,14 +176,14 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 value = f"({expr})"
             elif conn.comp.label == "DFF":
                 value = f"_{all_comps.index(conn.comp)}_dff"
-            elif conn.comp.label == "Register":
-                value = f"_{all_comps.index(conn.comp)}_reg"
+            # elif conn.comp.label == "Register":
+            #     value = f"_{all_comps.index(conn.comp)}_reg"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
         elif conn.comp.label == "DFF":
             value = f"_{all_comps.index(conn.comp)}_dff"
-        elif conn.comp.label == "Register":
-            value = f"_{all_comps.index(conn.comp)}_reg"
+        # elif conn.comp.label == "Register":
+        #     value = f"_{all_comps.index(conn.comp)}_reg"
         elif conn.comp.label == "MemorySystem" and conn.name == "tty_ready":
             # Tricky: this seems pretty bogus. MemorySystem is the first primitive
             # which has more than one output, and it can be computed from the
