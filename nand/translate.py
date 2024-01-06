@@ -243,7 +243,8 @@ def translate_dir(translator, platform, path, print_ops=False):
                 translate_jack(translator, platform, chars, print_ops)
 
         else:
-            raise Exception(f"Don't know what to do with file: {file_path}")
+            print(f"ignoring unrecognized file: {file_path}")
+            #raise Exception(f"Don't know what to do with file: {file_path}")
 
     if os.path.isdir(path):
         for fn in os.listdir(path):

@@ -1,0 +1,63 @@
+class Glyph {
+    field Array pixels;
+
+
+    constructor Glyph new(
+        int pixels0,
+        int pixels1,
+        int pixels2,
+        int pixels3,
+        int pixels4,
+        int pixels5,
+        int pixels6,
+        int pixels7,
+        int pixels8,
+        int pixels9,
+        int pixels10,
+        int pixels11,
+        int pixels12,
+        int pixels13,
+        int pixels14)
+    {
+        let pixels = Array.new(15);
+        let pixels[0] = pixels0;
+        let pixels[1] = pixels1;
+        let pixels[2] = pixels2;
+        let pixels[3] = pixels3;
+        let pixels[4] = pixels4;
+        let pixels[5] = pixels5;
+        let pixels[6] = pixels6;
+        let pixels[7] = pixels7;
+        let pixels[8] = pixels8;
+        let pixels[9] = pixels9;
+        let pixels[10] = pixels10;
+        let pixels[11] = pixels11;
+        let pixels[12] = pixels12;
+        let pixels[13] = pixels13;
+        let pixels[14] = pixels14;
+
+        return this;
+    }
+
+    method void draw(int x, int y) {
+        var Array ptr;
+        var int i;
+
+        // Let's not overwrite random locations:
+        if (x < 0) { return; }
+        if (x > 31) { return; }
+        if (y < 0) { return; }
+        if (y > 15) { return; }
+
+        let ptr = 16384 + (y*512) + x;
+        let i = 0;
+        while (i < 15) {
+            let ptr[0] = pixels[i];
+
+            let ptr = ptr + 32;
+            let i = i + 1;
+        }
+
+        return;
+    }
+}

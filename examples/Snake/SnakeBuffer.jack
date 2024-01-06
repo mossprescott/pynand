@@ -1,0 +1,100 @@
+/*
+Circular buffer of coordinates, supporting insertion at the head and removal at the tail.
+*/
+class SnakeBuffer {
+    static int capacity;
+    static Array buffer;
+
+    /* Index of the "head", which is the location that was added most recently. Following entries
+    are at successively smaller indexes, wrapping around to the end of the buffer.
+    */
+    static int headIndex;
+
+    /* Number of entries currently occupied. */
+    static int length;
+
+    function void init(int maxEntries) {
+        let capacity = maxEntries;  // two words for each location on the screen is 2*32*16 = 1024 (and probably overkill)
+        let buffer = Array.new(capacity*2);
+
+        let headIndex = 0;
+        let length = 0;
+
+        return;
+    }
+
+// Accessors:
+
+    function int getLength() {
+        return length;
+    }
+
+    /* X coordinate of the head entry, if any. If the buffer is empty, undefined. */
+    function int getHeadX() {
+        return buffer[2*headIndex];
+    }
+
+    /* Y coordinate of the head entry, if any. If the buffer is empty, undefined. */
+    function int getHeadY() {
+        return buffer[(2*headIndex) + 1];
+    }
+
+    /* X coordinate of the tail entry, if any. If the buffer is empty, undefined. */
+    function int getTailX() {
+        return buffer[2*SnakeBuffer.tailIndex()];
+    }
+
+    /* Y coordinate of the head entry, if any. If the buffer is empty, undefined. */
+    function int getTailY() {
+        return buffer[(2*SnakeBuffer.tailIndex()) + 1];
+    }
+
+// Mutators:
+
+    /* Add a new entry at the head of the buffer. */
+    function void insert(int x, int y) {
+        // TODO: check for overflow
+        let headIndex = SnakeBuffer.nextIndex(headIndex);
+        let length = length + 1;
+
+        let buffer[2*headIndex] = x;
+        let buffer[(2*headIndex) + 1] = y;
+
+        return;
+    }
+
+    /* Remove the oldest entry (the tail), if any. */
+    function void dropLast() {
+        if (length > 0) {
+            let length = length - 1;
+        }
+        return;
+    }
+
+    /* Reset the buffer to its initial, empty state. */
+    function void dropAll() {
+        let headIndex = 0;
+        let length = 0;
+        return;
+    }
+
+
+// Private:
+    function int nextIndex(int idx) {
+        let idx = idx + 1;
+        if (idx = capacity) {
+            let idx = 0;
+        }
+        return idx;
+    }
+
+    function int tailIndex() {
+        var int idx;
+
+        let idx = headIndex - (length - 1);
+        if (idx < 0) {
+            let idx = idx + capacity;
+        }
+        return idx;
+    }
+}

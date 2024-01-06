@@ -1,0 +1,98 @@
+class Random {
+    static int nextValue;
+
+    /*
+    Call this to initialize the PRNG with a value that's different every time the program runs.
+    That's harder than it might sound on a computer that has no clock, no network stack, etc.
+    The traditional approach is to loop and wait for keyboard input, then use the number of
+    iterations as the seed. As long as the loop gets to run more than few times, that should be
+    random enough.
+     */
+    function void seed(int value) {
+        let nextValue = Random.xor(value & 32767, 28671);
+        // do Output.printString("seed: ");
+        // do Output.printInt(nextValue);
+        // do Output.println();
+        return;
+    }
+
+
+    /*
+    Pseudo-random positive integer, between 0 and 32,767, inclusive. Actually not all that random,
+    but at least be should be well distributed and "appear" random.
+
+    Fibonacci linear feedback shift register, as used in NES Tetris according to "Game
+    Development in Eight Bits", Kevin Zurawel, Strange Loop, 2021.
+
+    It's not clear from the talk, but here we run 15 cycles of shifting for each value, so
+    we always have 15 fresh bits. That seems to be fast enough, if coded right.
+
+
+    */
+    function int random() {
+        var int result;
+
+        let result = nextValue;
+
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+
+        do Random.cycle();
+        do Random.cycle();
+        do Random.cycle();
+
+        return result;
+    }
+
+    function void cycle() {
+        // XOR bits 1 and 9, store (the opposite of) the result in bit 15, then shift right one bit.
+        // Except shift first, because it's easier to set bit 14 in this language, and treat the
+        // bits as reversed because we can "shift" left much more cheaply than right.
+        // Also, negate the xor-ed bit so we don't spin on 0.
+        // let nextValue = nextValue/2;
+        // // do Output.printInt(nextValue);
+        // if (~Random.xor(Random.test_bit(1, nextValue), Random.test_bit(256, nextValue))) {
+        //     let nextValue = nextValue | 16384;
+        //     // do Output.printString(" -> ");
+        //     // do Output.printInt(nextValue);
+        // }
+        // // do Output.println();
+
+        var boolean inputBit;
+
+        // HACK: avoid cycling on 0, in the most inelegant way. You still get a predictable
+        // sequence if you fail to seed the generator, but at least it's not all zeros.
+        if (nextValue = 0) {
+            let nextValue = 12345;
+        }
+
+        // TODO: is this the right other bit? want them to be 8 bits apart, if following Tetris's lead
+        let inputBit = Random.xor(Random.test_bit(16384, nextValue), Random.test_bit(64, nextValue));
+        let nextValue = (nextValue + nextValue) & 32767;  // shift left, dropping the sign bit
+        if (inputBit) {
+            let nextValue = nextValue | 1;
+        }
+
+        return;
+    }
+
+    function boolean test_bit(int mask, int word) {
+        return ~((mask & word) = 0);
+    }
+
+    function int xor(int x, int y) {
+        return (x & ~y) | (~x & y);
+    }
+}

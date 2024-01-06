@@ -1,0 +1,373 @@
+class Main {
+    static Glyph gray,
+        snakeHeadUp, snakeHeadDown, snakeHeadLeft, snakeHeadRight,
+        snakeBodyVert, snakeBodyHoriz,
+        snakeBodyUpRight, snakeBodyRightDown, snakeBodyDownLeft, snakeBodyLeftUp,
+        snakeTailUp, snakeTailRight, snakeTailDown, snakeTailLeft,
+        blank;
+
+    function void main() {
+        var int y;
+        var boolean paused;
+        var boolean wasPressed;
+
+        // let gray = Glyph.new(
+        //            21845, 10922, 21845,
+        //     10922, 21845, 10922, 21845,
+        //     10922, 21845, 10922, 21845,
+        //     10922, 21845, 10922, 21845);
+
+        // do gray.draw(21, 11);
+        // do gray.draw(23, 11);
+        // do gray.draw(22, 12);
+        // do gray.draw(23, 12);
+
+        // See glyphs.py
+        let snakeHeadUp = Glyph.new(448, 544, 1040, 2056, 4100, 8194, 8194, 16385, 16385, 17745, 16929, 17745, 8866, 8514, 8322);
+        let snakeHeadRight = Glyph.new(248, 775, 1024, 2048, 4136, 8212, 16426, 16389, 16426, 8212, 4136, 2048, 1024, 775, 248);
+        let snakeHeadDown = Glyph.new(8322, 8514, 8866, 17745, 16929, 17745, 16385, 16385, 8194, 8194, 4100, 2056, 1040, 544, 448);
+        let snakeHeadLeft = Glyph.new(3968, 28768, 16, 8, 2564, 5122, 10753, 20481, 10753, 5122, 2564, 8, 16, 28768, 3968);
+        let snakeBodyVert = Glyph.new(8322, 8514, 8864, 9554, 8866, 322, 8322, 8194, 8322, 8512, 8866, 9554, 8866, 8514, 8322);
+        let snakeBodyHoriz = Glyph.new(0, 28639, 0, 0, 2056, 5140, 10794, 21845, 10794, 5140, 2056, 0, 0, 32255, 0);
+        let snakeBodyUpRight = Glyph.new(8322, 16706, 674, 320, 132, 4100, 10244, 21508, 10248, 4104, 16, 32, 448, 31744, 0);
+        let snakeBodyRightDown = Glyph.new(0, 28672, 1920, 96, 16, 4104, 10244, 21508, 10244, 4096, 130, 322, 674, 16706, 8322);
+        let snakeBodyDownLeft = Glyph.new(0, 31, 448, 512, 1024, 2052, 2058, 4117, 4106, 4100, 4224, 320, 8864, 8513, 8322);
+        let snakeBodyLeftUp = Glyph.new(8322, 8513, 8864, 8512, 8320, 4, 4106, 4117, 4106, 2052, 1024, 768, 240, 7, 0);
+        let snakeTailUp = Glyph.new(8322, 8514, 8866, 4420, 4228, 2056, 1040, 544, 320, 544, 544, 320, 544, 544, 448);
+        let snakeTailRight = Glyph.new(0, 28672, 3072, 512, 256, 4278, 10313, 21505, 10313, 4278, 256, 512, 3072, 28672, 0);
+        let snakeTailDown = Glyph.new(448, 544, 544, 320, 544, 544, 320, 544, 1040, 2056, 4228, 4420, 8866, 8514, 8322);
+        let snakeTailLeft = Glyph.new(0, 7, 24, 32, 64, 13956, 18698, 16405, 18698, 13956, 64, 32, 24, 7, 0);
+        let blank = Glyph.new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        // do snakeHeadUp.draw(5, 5);
+        // do snakeHeadRight.draw(6, 6);
+        // do snakeHeadDown.draw(5, 7);
+        // do snakeHeadLeft.draw(4, 6);
+
+        // do snakeHeadUp.draw(7, 9);
+        // do snakeBodyVert.draw(7, 10);
+        // do snakeBodyUpRight.draw(7, 11);
+        // do snakeBodyLeftUp.draw(8, 11);
+        // do snakeBodyRightDown.draw(8, 10);
+        // do snakeBodyHoriz.draw(9, 10);
+        // do snakeBodyDownLeft.draw(10, 10);
+        // do snakeBodyVert.draw(10, 11);
+
+        // let snakeHeadUp = Glyph.new(
+        //     64 + 128 + 256,
+        //     32 + 512,
+        //     16 + 1024,
+        //     8 + 2048,
+        //     4 + 4096,
+        //     2 + 8192,
+        //     2 + 8192,
+        //     1 + 16384, // center
+        //     1 + 16384,
+        //     1 + 16384,
+        //     1 + 16384,
+        //     2 + 8192,
+        //     2 + 8192,
+        //     2 + 8192,
+        //     2 + 8192);
+
+        // // TODO: two or three different styles, chosen by distance from the head, to give a sense
+        // // of motion? This is getting awfully fancy.
+        // let snakeBodyVert = Glyph.new(
+        //     2 + 128 + 8192,
+        //     2 + 64 + 256 + 8192,
+        //     0 + 32 + 128 + 512 + 8192,
+        //     2 + 16 + 64 + 256 + 1024 + 8192,
+        //     2 + 32 + 128 + 512 + 8192,
+        //     2 + 64 + 256 + 0,
+        //     2 + 128 + 8192,
+        //     2 + 8192, // center
+        //     2 + 128 + 8192,
+        //     0 + 64 + 256 + 8192,
+        //     2 + 32 + 128 + 512 + 8192,
+        //     2 + 16 + 64 + 256 + 1024 + 8192,
+        //     2 + 32 + 128 + 512 + 8192,
+        //     2 + 64 + 256 + 8192,
+        //     2 + 128 + 8192);
+
+        // let blank = Glyph.new(
+        //        0, 0, 0,
+        //     0, 0, 0, 0,
+        //     0, 0, 0, 0,
+        //     0, 0, 0, 0);
+
+        // let y = 15;
+        // while (true) {
+        //     do blank.draw(22, y);
+        //     do blank.draw(22, y+1);
+        //     do blank.draw(22, y+2);
+
+        //     if (y > -3) {
+        //         let y = y - 1;
+        //     }
+        //     else {
+        //         let y = 15;
+        //     }
+
+        //     do snakeHeadUp.draw(22, y);
+        //     do snakeBodyVert.draw(22, y+1);
+        //     do snakeBodyVert.draw(22, y+2);
+
+        //     do Sys.wait(50);
+        // }
+
+    // HACK
+        // do Main.demoRNG();
+        // do Main.seedRNG();
+
+
+        // Initialize both the display and the buffer:
+        do SnakeBuffer.init(1024);
+        do SnakeBuffer.insert(17, 0);
+        do snakeTailLeft.draw(17, 0);
+        do SnakeBuffer.insert(16, 0);
+        do snakeBodyHoriz.draw(16, 0);
+        do SnakeBuffer.insert(15, 0);
+        do snakeBodyHoriz.draw(15, 0);
+        do SnakeBuffer.insert(14, 0);
+        do snakeBodyHoriz.draw(14, 0);
+        do SnakeBuffer.insert(13, 0);
+        do snakeBodyHoriz.draw(13, 0);
+        do SnakeBuffer.insert(12, 0);
+        do snakeHeadLeft.draw(12, 0);
+
+
+        // do Output.moveCursor(11, 20);
+        // do Output.printString("Press any key to start");
+
+        let paused = false;
+        let wasPressed = false;
+
+        while (true) {
+            if (~wasPressed & (Keyboard.keyPressed() = 32)) {
+               let paused = ~paused;
+               let wasPressed = true;
+            }
+            else {
+                if (Keyboard.keyPressed() = 32) {
+                    let wasPressed = false;
+                }
+            }
+
+            if (~paused) {
+                do Main.moveSnakeDemo();
+            }
+
+            // TODO: wait for a keypress, and seed the RNG
+            do Sys.wait(50);
+        }
+
+        return;
+    }
+
+    function void moveSnakeDemo() {
+        var int x, y;
+        var int tx, ty;
+
+        let x = SnakeBuffer.getHeadX();
+        let y = SnakeBuffer.getHeadY();
+
+        if ((y = 0) & (x < 31)) {  // implies moving left
+            if (x > 0) {
+                do snakeHeadLeft.draw(x-1, y);
+                do SnakeBuffer.insert(x-1, y);
+                do snakeBodyHoriz.draw(x, y);
+            }
+            else {
+                // turn down:
+                do snakeHeadDown.draw(0, 1);
+                do SnakeBuffer.insert(0, 1);
+                do snakeBodyRightDown.draw(0, 0);
+            }
+        }
+        else {
+            if (x = 0) {  // implies moving down
+                if (y < 15) {
+                    do snakeHeadDown.draw(x, y+1);
+                    do SnakeBuffer.insert(x, y+1);
+                    do snakeBodyVert.draw(x, y);
+                }
+                else {
+                    // turn right:
+                    do snakeHeadRight.draw(1, 15);
+                    do SnakeBuffer.insert(1, 15);
+                    do snakeBodyUpRight.draw(0, 15);
+                }
+            }
+            else {
+                if (y = 15) {  // implies moving right
+                    if (x < 31) {
+                        do snakeHeadRight.draw(x+1, y);
+                        do SnakeBuffer.insert(x+1, y);
+                        do snakeBodyHoriz.draw(x, y);
+                    }
+                    else {
+                        // turn up:
+                        do snakeHeadUp.draw(31, 14);
+                        do SnakeBuffer.insert(31, 14);
+                        do snakeBodyLeftUp.draw(31, 15);
+                    }
+                }
+                else {
+                    if (x = 31) {  // implies moving up
+                        if (y > 0) {
+                            do snakeHeadUp.draw(x, y-1);
+                            do SnakeBuffer.insert(x, y-1);
+                            do snakeBodyVert.draw(x, y);
+                        }
+                        else {
+                            // turn left:
+                            do snakeHeadLeft.draw(30, 0);
+                            do SnakeBuffer.insert(30, 0);
+                            do snakeBodyDownLeft.draw(31, 0);
+                        }
+                    }
+                }
+            }
+        }
+
+
+
+        if ((x > 0) | (y > 0)) {
+            do blank.draw(SnakeBuffer.getTailX(), SnakeBuffer.getTailY());
+            do SnakeBuffer.dropLast();
+            let tx = SnakeBuffer.getTailX();
+            let ty = SnakeBuffer.getTailY();
+            if ((ty = 0) & (tx > 0)) {
+                do snakeTailLeft.draw(tx, ty);
+            }
+            else {
+                if ((tx = 0) & (ty < 15)) {
+                    do snakeTailDown.draw(tx, ty);
+                }
+                else {
+                    if ((ty = 15) & tx < x) {
+                        do snakeTailRight.draw(tx, ty);
+                    }
+                    else {
+                        if (ty > y) {
+                            do snakeTailUp.draw(tx, ty);
+                        }
+                    }
+                }
+            }
+        }
+
+        return;
+    }
+
+
+    function void demoRNG() {
+        // First up, no seed. Should still look random.
+        do Main.sampleRNG(7);
+
+        // Now, seed with 0 explicitly:
+        do Random.seed(0);
+        do Main.sampleRNG(7);
+
+        // Seed from keystroke timing:
+        do Main.seedRNG();
+        do Main.sampleRNG(7);
+
+        // Test the period with two different seeds:
+        // Note: it's entirely possible that either test loops forever, if the PRNG enters
+        // a cycle that doesn't happen to include the first value
+        do Random.seed(0);
+        do Main.testRNGPeriod();
+
+        do Main.seedRNG();
+        do Main.testRNGPeriod();
+
+        return;
+    }
+
+    function void sampleRNG(int mask) {
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.printString(",");
+        do Output.printInt(Random.random() & mask);
+        do Output.println();
+
+        return;
+    }
+
+    function void seedRNG() {
+        var int count;
+
+        do Output.printString("Press any key");
+        do Output.println();
+
+        let count = 0;
+        while (Keyboard.keyPressed() = 0) {
+            let count = count + 1;
+        }
+
+        // TODO: if the count is too small, try again, to make it hard to force.
+
+        // Debug:
+        do Output.printString("  seed: ");
+        do Output.printInt(count);
+
+        do Output.println();
+        do Random.seed(count);
+
+        return;
+    }
+
+    // Waddayaknow, this say 32,767 for any seed I try. Shocking.
+    function void testRNGPeriod() {
+        var int start, count;
+
+        let start = Random.random();
+        let count = 1;
+
+        do Output.printString("testing the period... ");
+
+        while (~(Random.random() = start)) {
+            let count = count + 1;
+
+            if (count < 0) {
+                do Output.printString("(overflowed) ");
+            }
+        }
+
+        do Output.printInt(count);
+        do Output.println();
+
+        return;
+    }
+}
