@@ -1,0 +1,4 @@
+# run with . bin/start
+
+. env/bin/activate
+export PYTHONPATH=.
