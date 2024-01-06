@@ -328,7 +328,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         for comp in all_comps:
             if comp.label in SPECIAL or (comp.label != "Const" and not inlinable(comp)):
                 for name, bits in comp.outputs().items():
-                    cython_type = "bool" if bits == 1 else "int"
+                    cython_type = "int"
                     comp_name = f"_{all_comps.index(comp)}_{name}"
                     l(2, f"{comp_name}: cython.{cython_type}")
         l(2, "")
