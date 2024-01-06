@@ -77,4 +77,4 @@ def Computer(inputs, outputs):
     n1 = solved_05.Computer(reset=reset)
 
     outputs.pc = n1.pc
-    outputs.tty_ready = n1.tty_ready  # Note: wire this the output from MemorySystem
+    outputs.tty_ready = n1.tty_ready  # Note: wire this to the output from MemorySystem
