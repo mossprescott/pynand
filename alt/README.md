@@ -8,15 +8,24 @@ See each module for instructions.
 
 ## Enhanced chips
 
-Four alternative implementations use more or less chip hardware to make programs run faster, or to fit larger programs in ROM:
+Four alternative implementations use more or less chip hardware to make programs run faster, or to
+fit larger programs in ROM:
 
-[alt/sp.py](sp.py) adds instructions for pushing/popping values to/from the stack, making programs more compact.
+[alt/sp.py](sp.py) adds instructions for pushing/popping values to/from the stack, making programs
+more compact.
 
-[alt/threaded.py](threaded.py) adds lightweight CALL/RTN instructions, enabling a very compact "threaded interpreter" translation, which runs a little slower.
+[alt/threaded.py](threaded.py) adds lightweight CALL/RTN instructions, enabling a very compact
+"threaded interpreter" translation, which runs a little slower.
 
-[alt/shift.py](shift.py) adds a "shiftr" instruction, and rewrites "push constant 16; call Math.divide" to use it instead; also a more efficient Math.multiply using shiftr.
+[alt/shift.py](shift.py) adds a "shiftr" instruction, and rewrites
+"push constant 16; call Math.divide" to use it instead; also a more efficient Math.multiply using shiftr.
 
 [alt/eight.py](eight.py) is, finally, a _smaller_ CPU, by using an 8-bit ALU and 2 cycles per instruction.
+
+[alt/big.py](big.py) has a single, flat memory space, with maximum RAM and the ability to read
+data from ROM (and code from RAM.) This is much more flexible and realistic, but adds a cycle to
+fetch each instruction from the shared memory system.
+
 
 ## Enhanced compiler/translators
 
@@ -39,9 +48,11 @@ replaces certain function calls with lower-overhead "reduced" alternatives.
 | [alt/threaded.py](threaded.py)   | 1,549 (+23%) |   8,100 (-68%) |    49,600 (+20%) |     173,750 (+34%) |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  |   26,050 (+1%) |    19,800 (-52%) |             _same_ |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) |        _same_  |            +100% |              +100% |
+| [alt/big.py](big.py)             | 1,444 (+14%) | *TBD*          |            +100% |              +100% |
 | [alt/lazy.py](lazy.py)           | _same_       |   23,650 (-8%) |    37,300 (-10%) |     111,000 (-14%) |
 | [alt/reg.py](reg.py)             | _same_       |  20,900 (-19%) |    19,150 (-54%) |      59,000 (-54%) |
 | [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |             _same_ |
+
 
 **ROM Size** is the total number of instructions in ROM when Pong is compiled and translated
 from the Jack source.
