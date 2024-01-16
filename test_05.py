@@ -106,6 +106,7 @@ def test_memory_system():
     mem.tick(); mem.tock()
     assert mem.out == -1
 
+    # ...load still set
     mem.address = 0x504f
     mem.tick(); mem.tock()
     assert mem.out == -1
