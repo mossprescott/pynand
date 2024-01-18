@@ -85,16 +85,15 @@ def FlatMemory(inputs, outputs):
 
 @chip
 def IdlableCPU(inputs, outputs):
-    """Same as the standard CPU,
-    """
+    """Same as the standard CPU, plus an 'idle' input that suspends all state updates."""
 
     inM = inputs.inM                 # M value input (M = contents of RAM[A])
     instruction = inputs.instruction # Instruction for execution
     reset = inputs.reset             # Signals whether to re-start the current
                                      # program (reset==1) or continue executing
                                      # the current program (reset==0).
-    # Extra for extension:
-    idle = inputs.idle               # When set, *don't* increment any state
+    # Extra for fetch/execute cycles:
+    idle = inputs.idle               # When set, *don't* update any state
 
     i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
 
@@ -129,11 +128,18 @@ def BigComputer(inputs, outputs):
     """A computer with the standard CPU, but mapping RAM, ROM, and I/O into the same large, flat
     memory space.
 
-    In every odd cycle, an instruction is read from memory and stored in an extra Register
+    In every even (fetch) cycle, an instruction is read from memory and stored in an extra Register.
+    In odd (execute) cycles, memory and cpu state are updated as required by the instruction.
 
     Note: on start/reset, instructions from address 0 are read. Since a zero-value instruction
     just loads 0 into A, we effectively execute 2K no-op "@0" instructions before reaching the
     first actual ROM address.
+
+    TODO: some instructions don't require access to the memory; they don't read or write from/to M.
+    In that case, we could fetch and execute in a single cycle if the CPU exposed that info or took
+    over control of the cycles. It looks like possibly as much as 50% of all instructions could
+    execute in one cycle for 25% speedup. On the other hand, it would complicate tests somewhat
+    unless we add "performance counters" to the CPU to keep track.
     """
 
     reset = inputs.reset
