@@ -49,16 +49,14 @@ M=D
 (copy_loop)
 // D = MEM[R1++]
 @R1
-A=M
-D=M
-@R1
 M=M+1
+A=M-1
+D=M
 // MEM[R0++] = D
 @R0
-A=M
-M=D
-@R0
 M=M+1
+A=M-1
+M=D
 
 // Check for end of table:
 @R1
