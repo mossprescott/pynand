@@ -3,16 +3,16 @@
 // A                                                                              B
 //
 //         00  01  02  03  04  05  06  07  08  09  0A  0B  0C  0D  0E  0F
-//     00                                                                    (0)
-//     10                                                                   (16)
-//     20       !   "   #   $   %   &   '   (   )   *   +   ,   -   .   /   (32)
-//     30   0   1   2   3   4   5   6   7   8   9   :   ;   <   =   >   ?   (48)
-//     40   @   A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   (64)
-//     50   P   Q   R   S   T   U   V   W   X   Y   Z   [   /   ]   ^   _   (80)
-//     60   `   a   b   c   d   e   f   g   h   i   j   k   l   m   n   o   (96)
-//     70   p   q   r   s   t   u   v   w   x   y   z   {   |   }   ~      (112)
+//     00
+//     10
+//     20       !   "   #   $   %   &   '   (   )   *   +   ,   -   .   /
+//     30   0   1   2   3   4   5   6   7   8   9   :   ;   <   =   >   ?
+//     40   @   A   B   C   D   E   F   G   H   I   J   K   L   M   N   O
+//     50   P   Q   R   S   T   U   V   W   X   Y   Z   [   /   ]   ^   _
+//     60   `   a   b   c   d   e   f   g   h   i   j   k   l   m   n   o
+//     70   p   q   r   s   t   u   v   w   x   y   z   {   |   }   ~
 //
-//          0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+// ...
 //
 // C                                                                              D
 
@@ -34,7 +34,6 @@ D=A
 @2023
 M=D
 
-// TODO: copy from @table to @SCREEN_BASE + 2*80
 (copy_start)
 // R0 = start of third row of screen buffer
 @1104
@@ -52,9 +51,6 @@ M=D
 @R1
 A=M
 D=M
-//@R2
-//M=D
-// R1 = R1+1
 @R1
 M=M+1
 // MEM[R0++] = D
