@@ -299,6 +299,12 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
 
         if cycles % 100 == 0 or halted:
             key = kvm.process_events()
+            computer.set_keydown(key or 0)
+
+            tty_char = computer.get_tty()
+            if tty_char:
+                print(f"tty: {tty_char} ('{chr(tty_char)}')")
+
             kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
 
             msgs = [
