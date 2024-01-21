@@ -92,7 +92,7 @@ def FlatMemory(inputs, outputs):
     rom = ROM(15)(address=address)  # Based at 0 and sized to 32K, but partially hidden by RAM
     # screen = RAM(10) # Separate RAM would make life easier for the harness?
     keyboard = Input()
-    tty = Output(in_=in_, load=is_io)
+    tty = Output(in_=in_, load=And(a=load, b=is_io).out)
 
     outputs.out = Mux16(sel=is_io,
                         a=Mux16(sel=is_rom, a=ram.out, b=rom.out).out,
