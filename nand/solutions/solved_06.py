@@ -45,6 +45,11 @@ JMP_CONTROL = {
     "MP": 0b111,
 }
 
+def register_names(count):
+    """Names for the first locations in low memory: R0, R1, ..."""
+    return { f"R{i}": i for i in range(count) }
+
+
 BUILTIN_SYMBOLS = {
     **{
         "SP":       0,
@@ -55,7 +60,7 @@ BUILTIN_SYMBOLS = {
         "SCREEN":   0x4000,
         "KEYBOARD": 0x6000,
     },
-    **{ f"R{i}": i for i in range(16)}
+    **register_names(16)
 }
 
 
@@ -68,11 +73,17 @@ def parse_op(string, symbols=None):
     :param symbols: a dictionary mapping symbol names to addresses (of labels in the code
     and memory locations allocated for "static" variables.) Note: not used in this implementation,
     but included in the signature in so that other compatible parsers can use it.
+
+    Extra syntax:
+    - Constant values may be specified in hex, e.g. @0x5555
     """
 
     m = re.match(r"@((0x[0-9a-fA-F]+)|([1-9][0-9]*)|0)", string)
     if m:
-        return eval(m.group(1))
+        value = eval(m.group(1))
+        if value < 0 or value > 0x7FFF:
+            raise ParseError(f"A-command value out of range: {value}")
+        return value
     else:
         m = re.match(r"(?:([ADM]+)=)?([^;]+)(?:;J(..))?", string)
         if m:
@@ -90,7 +101,7 @@ def parse_op(string, symbols=None):
                 alu = ALU_CONTROL[alu_str]
                 m_for_a = int('M' in m.group(2))
             else:
-                raise Exception(f"unrecognized alu op: {m.group(2)}")
+                raise ParseError(f"unrecognized alu op: {m.group(2)}")
 
             jmp_str = m.group(3)
             if jmp_str is None:
@@ -98,14 +109,14 @@ def parse_op(string, symbols=None):
             elif jmp_str in JMP_CONTROL:
                 jmp = JMP_CONTROL[jmp_str]
             else:
-                raise Exception(f"unrecognized jump: J{m.group(3)}")
+                raise ParseError(f"unrecognized jump: J{m.group(3)}")
 
             return (0b111 << 13) | (m_for_a << 12) | (alu << 6) | (dest << 3) | jmp
         else:
-            raise Exception(f"unrecognized: {string}")
+            raise ParseError(f"unrecognized: {string}")
 
 
-def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr=0):
+def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr=0, builtins=BUILTIN_SYMBOLS):
     """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
 
@@ -137,8 +148,8 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr
         m = re.match(r"\((.*)\)", line)
         if m:
             name = m.group(1)
-            if name in BUILTIN_SYMBOLS:
-                raise Exception(f"Attempt to redefine builtin symbol {name} at location {loc}")
+            if name in builtins:
+                raise ParseError(f"Attempt to redefine builtin symbol {name} at location {loc}")
             elif name in symbols:
                 # This isn't an error because allowing re-definition makes it easy to hackishly
                 # override something (see alt/shift.py). Sorry, world.
@@ -158,19 +169,27 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr
             m = re.match(r"@(\D.*)", line)
             if m:
                 name = m.group(1)
-                if name in BUILTIN_SYMBOLS:
-                    ops.append(BUILTIN_SYMBOLS[name])
+                if name in builtins:
+                    ops.append(builtins[name])
                 elif name in symbols:
                     ops.append(symbols[name])
                 elif name in statics:
                     ops.append(statics[name])
                 else:
-                    if next_static > max_static:
-                        raise Exception(f"Unable to allocate static storage for symbol {name}; already used all {max_static - min_static + 1} available locations")
-                    statics[name] = next_static
-                    ops.append(next_static)
-                    next_static += 1
+                    if next_static is None:
+                        raise ParseError(f"Unable to allocate static storage for symbol {name}; no static allocation space available")
+                    elif next_static > max_static:
+                        raise ParseError(f"Unable to allocate static storage for symbol {name}; already used all {max_static - min_static + 1} available locations")
+                    else:
+                        statics[name] = next_static
+                        ops.append(next_static)
+                        next_static += 1
             else:
                 ops.append(parse_op(line, symbols))
 
     return (ops, symbols, statics)
+
+
+class ParseError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
