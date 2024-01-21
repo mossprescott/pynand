@@ -19,7 +19,7 @@
 // Print "A", "B", "C", "D in the four corners:
 @65
 D=A
-@1024
+@SCREEN
 M=D
 @16896
 D=A
