@@ -105,7 +105,7 @@ def parse_op(string, symbols=None):
             raise Exception(f"unrecognized: {string}")
 
 
-def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
+def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr=0):
     """Parse a sequence of lines them as assembly commands, accounting for
     builtin symbols, labels, and variables.
 
@@ -132,7 +132,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
 
     # Second pass: resolve labels to locations
     symbols = {}
-    loc = 0
+    loc = start_addr
     for line in code_lines:
         m = re.match(r"\((.*)\)", line)
         if m:
@@ -148,7 +148,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255):
             loc += 1
 
     # Third pass: parse all other instructions, and resolve non-label symbols (i.e. "static" allocations.)
-    ops = []
+    ops = [0]*start_addr
     statics = {}
     next_static = min_static
     for line in code_lines:

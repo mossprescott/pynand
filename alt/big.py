@@ -1,4 +1,4 @@
-#! python
+#! /usr/bin/env python
 
 """A computer with a single 16-bit address space for ROM and RAM.
 
@@ -33,13 +33,20 @@ starting at 0x8000 = -32768. In fact, this range extends all the way to the bott
 at 0x0800 = 2048.
 
 TODO: make the size of the ROM configurable, so you can trade off heap space vs runtime size.
+
+For authentic Macintosh fonts, see https://archive.org/details/AppleMacintoshSystem753
 """
 
 from nand import chip, lazy, RAM, ROM, Input, Output, DFF
+import nand.syntax
 from project_01 import And, Or, Not
 from project_03 import Mux, Mux16, Register, PC, ALU
 import project_05
+from nand.solutions import solved_06
 from alt.threaded import Eq16
+
+import computer
+import pygame.image
 
 
 SCREEN_BASE   = 0x0400
@@ -112,7 +119,7 @@ def IdlableCPU(inputs, outputs):
     jump = And(a=i,
                b=Or(a=jump_lt, b=Or(a=jump_eq, b=jump_gt).out).out
               ).out
-    pc = PC(in_=a_reg.out, load=jump, inc=not_idle, reset=reset)
+    pc = PC(in_=a_reg.out, load=And(a=not_idle, b=jump).out, inc=not_idle, reset=reset)
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
@@ -155,11 +162,13 @@ def BigComputer(inputs, outputs):
 
     cpu = lazy()
 
+    addr = Mux16(a=cpu.pc, b=cpu.addressM, sel=execute).out
+
     mem = FlatMemory(in_=cpu.outM,
                      load=And(a=execute, b=cpu.writeM).out,
-                     address=Mux16(a=cpu.pc, b=cpu.addressM, sel=execute).out)
+                     address=addr)
 
-    instr_reg = Register(in_=cpu.pc, load=fetch)
+    instr_reg = Register(in_=mem.out, load=fetch)
 
     # TODO: Set an instruction code that results in less computation during simulation, or is
     # there a way to do that that's more realistic? Maybe just leave the instruction unchanged
@@ -178,3 +187,141 @@ def BigComputer(inputs, outputs):
     # needs to be forced to be included.
     outputs.tty_ready = mem.tty_ready
 
+    # TEMP:
+    outputs.fetch = fetch
+    # outputs.execute = execute
+    outputs.addr = addr
+    # outputs.addressM = cpu.addressM
+    outputs.writeM = cpu.writeM
+    outputs.outM = cpu.outM
+    outputs.instr = instr_reg.out
+
+
+class TextKVM(computer.KVM):
+    """Keyboard and display, displaying characters using a set of baked-in glyphs.
+
+    Each word of the screen buffer stores a pair of 8-bit characters.
+    """
+
+    def __init__(self, title, char_width, char_height, glyph_width, glyph_height, bitmap_path):
+        computer.KVM.__init__(self, title, char_width*glyph_width, char_height*glyph_height)
+
+        self.char_width = char_width
+        self.char_height = char_height
+        self.glyph_width = glyph_width
+        self.glyph_height = glyph_height
+
+        self.glyph_sheet = pygame.image.load(bitmap_path)
+
+
+    def update_display(self, get_chars):
+        self.screen.fill(computer.COLORS[0])
+
+        stride = self.char_width//2
+        for y in range(0, self.char_height):
+            for x in range(0, self.char_width, 2):
+                pair = get_chars(y*stride + x//2)
+                self.render(  x, y, pair & 0xFF)
+                self.render(x+1, y, pair >> 8)
+
+        pygame.display.flip()
+
+
+    def render(self, x, y, c):
+        g_x = (c & 0x0F)*self.glyph_width
+        g_y = (c >> 4)*self.glyph_height
+        self.screen.blit(self.glyph_sheet,
+                         dest=(x*self.glyph_width,
+                               y*self.glyph_height),
+                         area=pygame.Rect(g_x,
+                                          g_y,
+                                          self.glyph_width,
+                                          self.glyph_height))
+
+
+
+
+
+def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
+    """Run with keyboard and text-mode graphics."""
+
+    # TODO: font
+
+    computer = nand.syntax.run(chip, simulator="vector")
+    # print(dir(computer))
+
+    computer.init_rom(program)
+
+    # Jump over low memory that we might be using for debugging:
+    computer.poke(0, solved_06.parse_op(f"@{ROM_BASE}"))
+    computer.poke(1, solved_06.parse_op("0;JMP"))
+    # print(f"ROM={computer._rom.storage[ROM_BASE:ROM_BASE+10]}")
+
+    # TEMP: splat some chars into the screen ROM
+    # computer.poke(SCREEN_BASE,      0x41 + 25)
+    # computer.poke(SCREEN_BASE+40+1, 0x6162)
+    # computer.poke(SCREEN_BASE+999,  0x40)
+
+    # print(f"{computer._stateful}")
+
+    kvm = TextKVM(name, 80, 25, 6, 10, "alt/big/Monaco9.png")
+
+    # TODO: use computer.py's "run", for many more features
+    cycles = 0
+    halted = False
+    while True:
+        if not halted and computer.pc == halt_addr:
+            halted = True
+            print(f"halted after {cycles} cycles")
+
+        # if not halted:
+        #     print(f"@{computer.pc}; outputs: {computer.outputs()}")
+        #     print(f"  R0: {computer.peek(0)}; R1: {computer.peek(1)}")
+
+        # computer.ticktock(100)
+        # cycles += 100
+        computer.ticktock()
+        cycles += 1
+
+
+        if cycles % 100 == 0:
+            key = kvm.process_events()
+            kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
+
+            msgs = [
+                f"{cycles/1000:0.1f}k cycles",
+                f"@{computer.pc}",
+                f"MEM[SCREEN_BASE]={computer.peek(SCREEN_BASE)}"
+            ]
+            pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Run assembly source with text-mode display and keyboard")
+    parser.add_argument("path", help="Path to source (<file>.asm)")
+    # parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
+    # parser.add_argument("--trace", action="store_true", help="(VM/Jack-only) print cycle counts during initialization. Note: runs almost 3x slower.")
+    # parser.add_argument("--print", action="store_true", help="(VM/Jack-only) print translated assembly.")
+    # TODO: "--debug" showing opcode-level trace. Breakpoints, stepping, peek/poke?
+    # parser.add_argument("--no-waiting", action="store_true", help="(VM/Jack-only) substitute a no-op function for Sys.wait.")
+    # parser.add_argument("--max-fps", action="store", type=int, help="Experimental! (VM/Jack-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).\nMay or may not work, depending on the translator.")
+    # TODO: "--max-cps"; limit the clock speed directly. That will allow different chips to be compared (in a way).
+    # TODO: "--headless" with no UI, with Keyboard and TTY connected to stdin/stdout
+
+    args = parser.parse_args()
+
+    print(f"Reading assembly from file: {args.path}")
+    with open(args.path, mode='r') as f:
+        prg, symbols, statics = solved_06.assemble(f, start_addr=ROM_BASE)
+
+
+    print(f"Size in ROM: {len(prg) - ROM_BASE:0,d}")
+    print(f"symbols: {symbols}")
+    print(f"statics: {statics}")
+
+    run(chip=BigComputer, program=prg, halt_addr=symbols["halt"])
+
+
+if __name__ == "__main__":
+    main()
