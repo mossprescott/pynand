@@ -70,7 +70,7 @@ def parse_op(string, symbols=None):
     but included in the signature in so that other compatible parsers can use it.
     """
 
-    m = re.match(r"@((?:0x)?\d+)", string)
+    m = re.match(r"@((0x[0-9a-fA-F]+)|([1-9][0-9]*)|0)", string)
     if m:
         return eval(m.group(1))
     else:
