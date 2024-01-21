@@ -47,6 +47,7 @@ from alt.threaded import Eq16
 
 import computer
 import pygame.image
+import time
 
 
 SCREEN_BASE   = 0x0400
@@ -239,7 +240,21 @@ class TextKVM(computer.KVM):
                                           self.glyph_height))
 
 
+BUILTIN_SYMBOLS = {
+    **{
+        "SCREEN": SCREEN_BASE,
+        "KEYBOARD": KEYBOARD_ADDR,
+        "ROM": ROM_BASE,
+        "HEAP": HEAP_BASE,
+    },
+    **solved_06.register_names(16)
+}
 
+
+def assemble(f):
+    return solved_06.assemble(f, min_static=None,
+                              start_addr=ROM_BASE,
+                              builtins=BUILTIN_SYMBOLS)
 
 
 def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
@@ -247,22 +262,19 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
 
     # TODO: font
 
+    # A little sanity checking:
+    if len(program) > 32768:
+        raise Exception(f"Program too large for ROM: {(len(program) - ROM_BASE)/1024:0.1f}K > 30K")
+    elif any(b != 0 for b in program[:ROM_BASE]):
+        print("WARNING: non-zero words found in the program image below ROM_BASE; this memory is hidden by low RAM")
+
     computer = nand.syntax.run(chip, simulator="vector")
-    # print(dir(computer))
 
     computer.init_rom(program)
 
     # Jump over low memory that we might be using for debugging:
     computer.poke(0, solved_06.parse_op(f"@{ROM_BASE}"))
     computer.poke(1, solved_06.parse_op("0;JMP"))
-    # print(f"ROM={computer._rom.storage[ROM_BASE:ROM_BASE+10]}")
-
-    # TEMP: splat some chars into the screen ROM
-    # computer.poke(SCREEN_BASE,      0x41 + 25)
-    # computer.poke(SCREEN_BASE+40+1, 0x6162)
-    # computer.poke(SCREEN_BASE+999,  0x40)
-
-    # print(f"{computer._stateful}")
 
     kvm = TextKVM(name, 80, 25, 6, 10, "alt/big/Monaco9.png")
 
@@ -274,24 +286,25 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
             halted = True
             print(f"halted after {cycles} cycles")
 
-        # if not halted:
-        #     print(f"@{computer.pc}; outputs: {computer.outputs()}")
-        #     print(f"  R0: {computer.peek(0)}; R1: {computer.peek(1)}")
+        if not halted:
+            # print(f"@{computer.pc}; outputs: {computer.outputs()}")
+            # print(f"  R0: {computer.peek(0)}; R1: {computer.peek(1)}")
 
-        # computer.ticktock(100)
-        # cycles += 100
-        computer.ticktock()
-        cycles += 1
+            # computer.ticktock(100)
+            # cycles += 100
+            computer.ticktock()
+            cycles += 1
+        else:
+            time.sleep(0.1)
 
 
-        if cycles % 100 == 0:
+        if cycles % 100 == 0 or halted:
             key = kvm.process_events()
             kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
 
             msgs = [
                 f"{cycles/1000:0.1f}k cycles",
                 f"@{computer.pc}",
-                f"MEM[SCREEN_BASE]={computer.peek(SCREEN_BASE)}"
             ]
             pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
 
@@ -313,12 +326,10 @@ def main():
 
     print(f"Reading assembly from file: {args.path}")
     with open(args.path, mode='r') as f:
-        prg, symbols, statics = solved_06.assemble(f, start_addr=ROM_BASE)
-
+        prg, symbols, statics = assemble(f)
 
     print(f"Size in ROM: {len(prg) - ROM_BASE:0,d}")
     print(f"symbols: {symbols}")
-    print(f"statics: {statics}")
 
     run(chip=BigComputer, program=prg, halt_addr=symbols["halt"])
 
