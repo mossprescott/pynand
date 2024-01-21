@@ -225,7 +225,7 @@ BUILTIN_SYMBOLS = {
 }
 
 
-def parse_op(string, symbols):
+def parse_op(string, symbols={}):
     """Handle 16-bit constants (e.g. #-10 or #0xFF00); these are not necessarily valid instructions.
     """
     m = re.match(r"#(-?((0x[0-9a-fA-F]+)|([1-9][0-9]*)|0))", string)
@@ -262,8 +262,8 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
     # TODO: font
 
     # A little sanity checking:
-    if len(program) > 32768:
-        raise Exception(f"Program too large for ROM: {(len(program) - ROM_BASE)/1024:0.1f}K > 30K")
+    if len(program) > HEAP_BASE:
+        raise Exception(f"Program too large for ROM: {(len(program) - ROM_BASE)/1024:0.1f}K > {(HEAP_BASE - ROM_BASE)//1024}K")
     elif any(b != 0 for b in program[:ROM_BASE]):
         print("WARNING: non-zero words found in the program image below ROM_BASE; this memory is hidden by low RAM")
 
@@ -272,8 +272,8 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
     computer.init_rom(program)
 
     # Jump over low memory that we might be using for debugging:
-    computer.poke(0, solved_06.parse_op(f"@{ROM_BASE}"))
-    computer.poke(1, solved_06.parse_op("0;JMP"))
+    computer.poke(0, ROM_BASE)
+    computer.poke(1, parse_op("0;JMP"))
 
     kvm = TextKVM(name, 80, 25, 6, 10, "alt/big/Monaco9.png")
 
@@ -369,7 +369,9 @@ def main():
     with open(args.path, mode='r') as f:
         prg, symbols, statics = assemble(f)
 
-    print(f"Size in ROM: {len(prg) - ROM_BASE:0,d}")
+    prg_size = len(prg) - ROM_BASE
+    max_size = HEAP_BASE - ROM_BASE
+    print(f"Size in ROM: {prg_size:0,d} ({100*prg_size/max_size:0.1f}% of {max_size//1024}K)")
     print(f"symbols: {symbols}")
 
     run(chip=BigComputer, program=prg, halt_addr=symbols["halt"])
