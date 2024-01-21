@@ -251,8 +251,24 @@ BUILTIN_SYMBOLS = {
 }
 
 
+def parse_op(string, symbols):
+    """Handle 16-bit constants (e.g. #-10 or #0xFF00); these are not necessarily valid instructions.
+    """
+    m = re.match(r"#(-?((0x[0-9a-fA-F]+)|([1-9][0-9]*)|0))", string)
+    if m:
+        value = eval(m.group(1))
+        if value < -32768 or value > 65535:
+            raise Exception(f"Constant value out of range: {value} ({string})")
+        return unsigned(value)
+    else:
+        return solved_06.parse_op(string, symbols)
+
+
 def assemble(f):
-    return solved_06.assemble(f, min_static=None,
+    """Standard assembler, except: no statics, shift the base address, symbols for our base addresses, and 16-bit data."""
+    return solved_06.assemble(f,
+                              parse_op=parse_op,
+                              min_static=None,
                               start_addr=ROM_BASE,
                               builtins=BUILTIN_SYMBOLS)
 
