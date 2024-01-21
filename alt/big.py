@@ -2,9 +2,13 @@
 
 """A computer with a single 16-bit address space for ROM and RAM.
 
-Uses the same ISA and assembler as the normal Hack CPU.
+Uses the same ISA and assembler as the normal Hack CPU, with a few extensions.
 
-Both instructions and data can be read from any address.
+Both instructions and data can be read from any address. *Note: because instructions and
+data share the single memory bus, it now takes 2 cycles to fetch and execute most if not
+all instructions.* This is more or less authentic to early integrated CPUs, which were
+designed to minimize pinout while making effective use of whatever memory the customer
+was able to afford.
 
 Writes to ROM addresses are ignored.
 
@@ -21,7 +25,6 @@ Layout considerations:
 - The ROM lives in the 15-bit addressable range, so a code address can always be loaded in one cycle
 - "negative" addresses are a uniform block of RAM, useful for heap
 
-
 | Address Range | Size (words) | Storage | Contents                       |
 | 0x0000–0x03FF | 1K           | RAM     | Temporaries, "registers", etc. |
 | 0x0400–0x07FF | 1K           | RAM     | Screen buffer and I/O          |
@@ -33,27 +36,33 @@ starting at 0x8000 = -32768. In fact, this range extends all the way to the bott
 at 0x0800 = 2048.
 
 TODO: make the size of the ROM configurable, so you can trade off heap space vs runtime size.
+That means synthesizing the logic to overlay the right adress range, so maybe you just select
+one of a few available sizes, e.g. 2K, 6K, 10K, 14K, 30K?
+
+"Character-mode" graphics make more efficient use of memory, with only 1k allocated to the screen
+as opposed to 8K for a similar number of pixels (assuming 9-point font.) It also means at least
+8x faster updates,
 
 For authentic Macintosh fonts, see https://archive.org/details/AppleMacintoshSystem753
 """
 
 from nand import chip, lazy, RAM, ROM, Input, Output, DFF
 import nand.syntax
+from nand.vector import unsigned
 from project_01 import And, Or, Not
 from project_03 import Mux, Mux16, Register, PC, ALU
-import project_05
 from nand.solutions import solved_06
 from alt.threaded import Eq16
-
-import computer
-import pygame.image
-import time
-
 
 SCREEN_BASE   = 0x0400
 KEYBOARD_ADDR = 0x07FF
 ROM_BASE      = 0x0800
 HEAP_BASE     = 0x8000
+
+
+#
+# Components:
+#
 
 @chip
 def FlatMemory(inputs, outputs):
@@ -188,56 +197,21 @@ def BigComputer(inputs, outputs):
     # needs to be forced to be included.
     outputs.tty_ready = mem.tty_ready
 
-    # TEMP:
-    outputs.fetch = fetch
-    # outputs.execute = execute
-    outputs.addr = addr
-    # outputs.addressM = cpu.addressM
-    outputs.writeM = cpu.writeM
-    outputs.outM = cpu.outM
-    outputs.instr = instr_reg.out
+    # # TEMP:
+    # outputs.fetch = fetch
+    # # outputs.execute = execute
+    # outputs.addr = addr
+    # # outputs.addressM = cpu.addressM
+    # outputs.writeM = cpu.writeM
+    # outputs.outM = cpu.outM
+    # outputs.instr = instr_reg.out
 
 
-class TextKVM(computer.KVM):
-    """Keyboard and display, displaying characters using a set of baked-in glyphs.
+#
+# Assembler:
+#
 
-    Each word of the screen buffer stores a pair of 8-bit characters.
-    """
-
-    def __init__(self, title, char_width, char_height, glyph_width, glyph_height, bitmap_path):
-        computer.KVM.__init__(self, title, char_width*glyph_width, char_height*glyph_height)
-
-        self.char_width = char_width
-        self.char_height = char_height
-        self.glyph_width = glyph_width
-        self.glyph_height = glyph_height
-
-        self.glyph_sheet = pygame.image.load(bitmap_path)
-
-
-    def update_display(self, get_chars):
-        self.screen.fill(computer.COLORS[0])
-
-        stride = self.char_width//2
-        for y in range(0, self.char_height):
-            for x in range(0, self.char_width, 2):
-                pair = get_chars(y*stride + x//2)
-                self.render(  x, y, pair & 0xFF)
-                self.render(x+1, y, pair >> 8)
-
-        pygame.display.flip()
-
-
-    def render(self, x, y, c):
-        g_x = (c & 0x0F)*self.glyph_width
-        g_y = (c >> 4)*self.glyph_height
-        self.screen.blit(self.glyph_sheet,
-                         dest=(x*self.glyph_width,
-                               y*self.glyph_height),
-                         area=pygame.Rect(g_x,
-                                          g_y,
-                                          self.glyph_width,
-                                          self.glyph_height))
+import re
 
 
 BUILTIN_SYMBOLS = {
@@ -271,6 +245,15 @@ def assemble(f):
                               min_static=None,
                               start_addr=ROM_BASE,
                               builtins=BUILTIN_SYMBOLS)
+
+
+#
+# Harness:
+#
+
+import computer
+import pygame.image
+import time
 
 
 def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
@@ -323,6 +306,48 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
                 f"@{computer.pc}",
             ]
             pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
+
+
+class TextKVM(computer.KVM):
+    """Keyboard and display, displaying characters using a set of baked-in glyphs.
+
+    Each word of the screen buffer stores a pair of 8-bit characters.
+    """
+
+    def __init__(self, title, char_width, char_height, glyph_width, glyph_height, bitmap_path):
+        computer.KVM.__init__(self, title, char_width*glyph_width, char_height*glyph_height)
+
+        self.char_width = char_width
+        self.char_height = char_height
+        self.glyph_width = glyph_width
+        self.glyph_height = glyph_height
+
+        self.glyph_sheet = pygame.image.load(bitmap_path)
+
+
+    def update_display(self, get_chars):
+        self.screen.fill(computer.COLORS[0])
+
+        stride = self.char_width//2
+        for y in range(0, self.char_height):
+            for x in range(0, self.char_width, 2):
+                pair = get_chars(y*stride + x//2)
+                self.render(  x, y, pair & 0xFF)
+                self.render(x+1, y, pair >> 8)
+
+        pygame.display.flip()
+
+
+    def render(self, x, y, c):
+        g_x = (c & 0x0F)*self.glyph_width
+        g_y = (c >> 4)*self.glyph_height
+        self.screen.blit(self.glyph_sheet,
+                         dest=(x*self.glyph_width,
+                               y*self.glyph_height),
+                         area=pygame.Rect(g_x,
+                                          g_y,
+                                          self.glyph_width,
+                                          self.glyph_height))
 
 
 def main():
