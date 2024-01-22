@@ -4,7 +4,7 @@
 
 The program to run must be in the form of Hack assembly (.asm) or VM opcodes (a directory
 of .vm files) and is specified by sys.argv[1].
-The `codegen` simulator is used unless --vector is used.
+The `codegen` simulator is used unless --simulator is specified.
 
 $ ./computer.py examples/Blink.asm
 
