@@ -36,8 +36,8 @@ starting at 0x8000 = -32768. In fact, this range extends all the way to the bott
 at 0x0800 = 2048.
 
 TODO: make the size of the ROM configurable, so you can trade off heap space vs runtime size.
-That means synthesizing the logic to overlay the right adress range, so maybe you just select
-one of a few available sizes, e.g. 2K, 6K, 10K, 14K, 30K?
+That means synthesizing the logic to overlay the right address range, so maybe you just select
+one of a few available sizes, e.g. 2K, 6K, 14K, 30K?
 
 "Character-mode" graphics make more efficient use of memory, with only 1k allocated to the screen
 as opposed to 8K for a similar number of pixels (assuming 9-point font.) It also means at least
