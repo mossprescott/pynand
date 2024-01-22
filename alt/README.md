@@ -12,7 +12,7 @@ Four alternative implementations use more or less chip hardware to make programs
 fit larger programs in ROM:
 
 [alt/sp.py](sp.py) adds instructions for pushing/popping values to/from the stack, making programs
-more compact.
+more compact and efficient.
 
 [alt/threaded.py](threaded.py) adds lightweight CALL/RTN instructions, enabling a very compact
 "threaded interpreter" translation, which runs a little slower.
@@ -24,7 +24,11 @@ more compact.
 
 [alt/big.py](big.py) has a single, flat memory space, with maximum RAM and the ability to read
 data from ROM (and code from RAM.) This is much more flexible and realistic, but adds a cycle to
-fetch each instruction from the shared memory system.
+fetch each instruction from the shared memory system. Moving static data to ROM can dramtically
+improve code size and performance, but because the computer uses character-mode graphics, these
+metrics don't provide a direct comparison (even if you did port the VM and OS, which I haven't.)
+This architecture is intended to support more sophisticated languages (e.g. BASIC, Scheme, or Forth),
+and interactive programming.
 
 
 ## Enhanced compiler/translators
@@ -48,7 +52,7 @@ replaces certain function calls with lower-overhead "reduced" alternatives.
 | [alt/threaded.py](threaded.py)   | 1,549 (+23%) |   8,100 (-68%) |    49,600 (+20%) |     173,750 (+34%) |
 | [alt/shift.py](shift.py)         | 1,311 (+4%)  |   26,050 (+1%) |    19,800 (-52%) |             _same_ |
 | [alt/eight.py](eight.py)         | 1,032 (-18%) |        _same_  |            +100% |              +100% |
-| [alt/big.py](big.py)             | 1,444 (+14%) | *TBD*          |            +100% |              +100% |
+| [alt/big.py](big.py)             | 1,448 (+14%) |              ? |                ? |                  ? |
 | [alt/lazy.py](lazy.py)           | _same_       |   23,650 (-8%) |    37,300 (-10%) |     111,000 (-14%) |
 | [alt/reg.py](reg.py)             | _same_       |  20,900 (-19%) |    19,150 (-54%) |      59,000 (-54%) |
 | [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |             _same_ |
