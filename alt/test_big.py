@@ -7,7 +7,7 @@ from alt.big import *
 
 def test_memory_system():
     # FIXME: not handled by "codegen" yet
-    mem = run(FlatMemory, simulator="vector")
+    mem = nand.run(FlatMemory, simulator="vector")
 
     # set RAM[0] = -1
     mem.in_ = -1
@@ -114,7 +114,7 @@ def test_memory_system():
 
 
 def test_rom():
-    mem = run(FlatMemory, simulator="vector")
+    mem = nand.run(FlatMemory, simulator="vector")
 
     # Writes to any ROM-mapped address are ignored:
     for addr in (ROM_BASE, ROM_BASE + 1234, ROM_BASE + 29000, HEAP_BASE - 1):
@@ -147,7 +147,7 @@ def test_gates_mem():
     This would have been extra chips on the board, not extra gates in the CPU, presumably.
     """
 
-    assert gate_count(FlatMemory)['nands'] == 220
+    assert gate_count(FlatMemory)['nands'] == 222
 
     import project_05
     assert gate_count(project_05.MemorySystem)['nands'] == 163
@@ -350,14 +350,14 @@ def test_gates_mem():
 def test_gates_cpu():
     """Portion of the extra chip size that's in the CPU's "idle" state."""
 
-    assert gate_count(IdlableCPU)['nands'] == 1104
+    assert gate_count(IdlableCPU)['nands'] == 1106
 
     import project_05
     assert gate_count(project_05.CPU)['nands'] == 1099
 
 
 def test_computer_no_program():
-    computer = run(BigComputer)
+    computer = nand.run(BigComputer)
 
     for _ in range(100):
         computer.ticktock()
@@ -595,7 +595,7 @@ def test_computer_no_program():
 def test_gates_computer():
     """Overall extra chip size."""
 
-    assert gate_count(BigComputer)['nands'] == 1444
+    assert gate_count(BigComputer)['nands'] == 1448
 
     import project_05
     assert gate_count(project_05.Computer)['nands'] == 1262
