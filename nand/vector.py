@@ -716,8 +716,13 @@ class NandVectorWrapper:
     # that subclasses can override.
     @property
     def sp(self):
-        """Read the current value of the stack pointer, which is normally stored at RAM[0]."""
-        return self.peek(0)
+        """Read the current value of the stack pointer, which is normally stored at RAM[0], but may
+        be an ordinary output in some cases.
+        """
+        if "sp" in self.outputs():
+            return self.__getattr__("sp")
+        else:
+            return self.peek(0)
 
     def __repr__(self):
         return str(self.outputs())
