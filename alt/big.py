@@ -68,8 +68,9 @@ HEAP_BASE     = 0x8000
 def FlatMemory(inputs, outputs):
     """The same interface as MemorySystem, but also maps the ROM and extends address to the full 16 bits.
 
-    Note: this will need some additional support in the "codegen" simulator, which otherwise implements
-    the standard MemoryStstem directly.
+    FIXME: this will need some additional support in the "codegen" simulator, which otherwise implements
+    the standard MemorySystem directly. But that support will be useful to any Computer with different
+    memory layout.
     """
 
     in_ = inputs.in_
@@ -226,7 +227,7 @@ BUILTIN_SYMBOLS = {
 
 
 def parse_op(string, symbols={}):
-    """Handle 16-bit constants (e.g. #-10 or #0xFF00); these are not necessarily valid instructions.
+    """Handle 16-bit constants (e.g. #-10 or #0xFF00); used for data to be read from ROM.
     """
     m = re.match(r"#(-?((0x[0-9a-fA-F]+)|([1-9][0-9]*)|0))", string)
     if m:
@@ -238,11 +239,12 @@ def parse_op(string, symbols={}):
         return solved_06.parse_op(string, symbols)
 
 
-def assemble(f):
-    """Standard assembler, except: no statics, shift the base address, symbols for our base addresses, and 16-bit data."""
+def assemble(f, min_static=16, max_static=1023):
+    """Standard assembler, except: shift the ROM base address, symbols for other base addresses, and 16-bit data."""
     return solved_06.assemble(f,
                               parse_op=parse_op,
-                              min_static=None,
+                              min_static=min_static,
+                              max_static=max_static,
                               start_addr=ROM_BASE,
                               builtins=BUILTIN_SYMBOLS)
 
@@ -379,6 +381,7 @@ def main():
     max_size = HEAP_BASE - ROM_BASE
     print(f"Size in ROM: {prg_size:0,d} ({100*prg_size/max_size:0.1f}% of {max_size//1024}K)")
     print(f"symbols: {symbols}")
+    print(f"statics: {statics}")
 
     run(chip=BigComputer, program=prg, halt_addr=symbols["halt"])
 

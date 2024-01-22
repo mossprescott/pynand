@@ -35,31 +35,31 @@ D=A
 M=D
 
 (copy_start)
-// R0 = start of third row of screen buffer
+// DST = start of third row of screen buffer
 @1104
 D=A
-@R0
+@DST
 M=D
-// R1 = @table_start (start of the table in ROM)
+// SRC = @table_start (start of the table in ROM)
 @table_start
 D=A
-@R1
+@SRC
 M=D
 
 (copy_loop)
-// D = MEM[R1++]
-@R1
+// D = MEM[SRC++]
+@SRC
 M=M+1
 A=M-1
 D=M
-// MEM[R0++] = D
-@R0
+// MEM[DST++] = D
+@DST
 M=M+1
 A=M-1
 M=D
 
 // Check for end of table:
-@R1
+@SRC
 D=M
 @table_end
 D=D-A

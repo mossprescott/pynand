@@ -12,17 +12,17 @@
 // Initialize some state:
 //
 
-// R0: previous key code
-@R0
+// PREVIOUS_KEY: key code that was down on previous iteration
+@PREVIOUS_KEY
 M=0
-// R1: insertion point column/2
-@R1
+// INSERTION_COLUMN: insertion point column/2
+@INSERTION_COLUMN
 M=0
-// R2: insertion point column odd/even flag (i.e. the low bit)
-@R2
+// INSERTION_HIGH: insertion point column odd/even flag (i.e. the low bit)
+@INSERTION_HIGH
 M=0
-// R3: current line
-@R3
+// CURRENT_LINE: current line
+@CURRENT_LINE
 M=0
 
 
@@ -36,16 +36,16 @@ M=0
 D=M
 
 // Compare with previous:
-@R5
-M=D
 @R0
+M=D
+@PREVIOUS_KEY
 D=M-D
 @loop
 D;JEQ
-@R5
+@R0
 D=M
 // Store current key:
-@R0
+@PREVIOUS_KEY
 M=D
 
 // Compare with zero (no key down):
@@ -55,7 +55,7 @@ D;JEQ
 // Compare with ESC:
 @140
 D=A
-@R0
+@PREVIOUS_KEY
 D=M-D
 @halt
 D;JEQ
@@ -63,18 +63,18 @@ D;JEQ
 // TODO: backspace (@129)
 // TODO: newline (@128)
 
-// R5 = address of insertion point:
+// R0 = address of insertion point:
 // TODO: half-word
-@R1
+@INSERTION_COLUMN
 D=M
 @SCREEN
 D=D+A
-@R5
+@R0
 M=D
 // Write current key to the screen
-@R0
+@PREVIOUS_KEY
 D=M
-@R5
+@R0
 A=M
 M=D
 // Also echo to the TTY for debug purposes
@@ -83,7 +83,7 @@ M=D
 
 // Move to the right:
 // TODO: half-word at a time
-@R1
+@INSERTION_COLUMN
 M=M+1
 
 @loop
