@@ -305,7 +305,7 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
 
             tty_char = computer.get_tty()
             if tty_char:
-                print(f"tty: {tty_char} ('{chr(tty_char)}')")
+                print(chr(tty_char), end="", flush=True)
 
             kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
 
