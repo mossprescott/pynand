@@ -154,6 +154,16 @@ KEY_MAP = dict([
 ] +
 [ (c, c) for c in range(32, 127) ])   # Printable characters, plus a few odd-balls
 
+SHIFTED_KEY_MAP = {
+    **KEY_MAP,
+    **dict((ord(x), ord(y)) for x, y in
+           zip("abcdefghijklmnopqrstuvwxyz`1234567890-=[]\\;',./",
+               "ABCDEFGHIJKLMNOPQRSTUVWXYZ~!@#$%^&*()_+{}|:\"<>?"))
+}
+"""Map from raw key code to the code produced when (any) shift modifier is down.
+Note: this is definitely not correct if your keyboard layout isn't a typical US layout.
+Not sure
+"""
 
 class KVM:
     def __init__(self, title, width, height):
@@ -189,7 +199,9 @@ class KVM:
             return typed_keys[0]
 
         keys = pygame.key.get_pressed()
-        for idx, key in KEY_MAP.items():
+        mods = pygame.key.get_mods()
+        shifted = mods & pygame.KMOD_SHIFT or mods & pygame.KMOD_LSHIFT or mods & pygame.KMOD_RSHIFT
+        for idx, key in (KEY_MAP if not shifted else SHIFTED_KEY_MAP).items():
             if keys[idx]:
                 return key
 
