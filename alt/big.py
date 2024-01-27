@@ -58,6 +58,7 @@ SCREEN_BASE   = 0x0400
 KEYBOARD_ADDR = 0x07FF
 ROM_BASE      = 0x0800
 HEAP_BASE     = 0x8000
+HEAP_TOP      = 0xFFFF
 
 
 #
@@ -198,8 +199,8 @@ def BigComputer(inputs, outputs):
     # needs to be forced to be included.
     outputs.tty_ready = mem.tty_ready
 
-    # # TEMP:
-    # outputs.fetch = fetch
+    outputs.fetch = fetch # exposed so debuggers can track half-cycles
+    # DEBUG:
     # # outputs.execute = execute
     # outputs.addr = addr
     # # outputs.addressM = cpu.addressM
@@ -258,7 +259,7 @@ import pygame.image
 import time
 
 
-def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
+def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None, trace=None):
     """Run with keyboard and text-mode graphics."""
 
     # TODO: font
@@ -299,13 +300,23 @@ def run(chip, program, name="Flat!", font="monaco-9", halt_addr=None):
             time.sleep(0.1)
 
 
-        if cycles % 100 == 0 or halted:
+        if trace is not None:
+            trace(computer, cycles)
+            CYCLES_PER_UPDATE = 5
+        else:
+            CYCLES_PER_UPDATE = 100
+
+        if cycles % CYCLES_PER_UPDATE == 0 or halted:
             key = kvm.process_events()
             computer.set_keydown(key or 0)
 
             tty_char = computer.get_tty()
             if tty_char:
-                print(chr(tty_char), end="", flush=True)
+                # print(chr(tty_char), end="", flush=True)
+                if 32 < tty_char <= 127:
+                    print(f"TTY: {repr(chr(tty_char))} ({tty_char})")
+                else:
+                    print(f"TTY:     ({tty_char:6d}; 0x{unsigned(tty_char):04x})")
 
             kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
 
@@ -383,7 +394,7 @@ def main():
     print(f"symbols: {symbols}")
     print(f"statics: {statics}")
 
-    run(chip=BigComputer, program=prg, halt_addr=symbols["halt"])
+    run(program=prg, halt_addr=symbols["halt"])
 
 
 if __name__ == "__main__":
