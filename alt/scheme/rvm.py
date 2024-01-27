@@ -48,11 +48,11 @@ def run(program):
 
         runtime_words = len(instrs) - big.ROM_BASE
         total_rom = big.HEAP_BASE - big.ROM_BASE
-        # TODO: count Ribs in the ROM
+        # TODO: count ribs in the ROM separate from the fixed runtime
         # program_words = len(encoded)
         reserved_words = 8 + 22  # Interpreter/decoder state, and the primitive vectors
         # available_ram = 0x4000 - reserved_words
-        print(f"Runtime: {runtime_words:,d} ({100*runtime_words/total_rom:0.2f}%)")
+        print(f"ROM: {runtime_words:,d} ({100*runtime_words/total_rom:0.2f}%)")
         # print(f"Encoded program: {program_words} ({100*program_words/available_ram:0.2f}%)")
         print()
 
@@ -77,7 +77,7 @@ def run(program):
             next_rib = unsigned(computer.peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
-            print(f"  heap: {current_ribs} ({100*current_ribs/max_ribs:0.1f}%)")
+            print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
 
 
     big.run(program=instrs,
@@ -177,9 +177,11 @@ def decode(input, asm):
         # return n+x if x < 46 else get_int(n + x - 46)
 
 
-    def emit_rib(lbl, x, y, z):
+    def emit_rib(lbl, x, y, z, comment=None):
         if lbl:
             asm.label(lbl)
+        if comment:
+            asm.comment(comment)
         asm.instr(x)
         asm.instr(y)
         asm.instr(z)
@@ -200,7 +202,7 @@ def decode(input, asm):
 
     # First byte(s): number of symbols without names
     n = get_int(0)
-    sym_names = n*["rib_string_empty"]
+    sym_names = n*[("rib_string_empty", "")]
 
     accum = "@rib_nil"
     acc_str = ""
@@ -215,7 +217,7 @@ def decode(input, asm):
                 lbl = f"rib_string_{idx}"
                 emit_string(lbl, accum, len(acc_str))
                 idx += 1
-            sym_names += [lbl]
+            sym_names.insert(0, (lbl, acc_str))
 
             accum = "@rib_nil"
             acc_str = ""
@@ -234,12 +236,16 @@ def decode(input, asm):
     # block of address space?
     asm.comment("Table of pointers to symbol name ribs in ROM:")
     asm.label("symbol_names_start")
-    for lbl in reversed(sym_names):
+    for lbl, s in sym_names:
+        if s != "":
+            asm.comment(f'"{s}"')
         asm.instr(f"@{lbl}")
     asm.label("symbol_names_end")
 
 
     # Decode RVM instructions:
+
+    asm.comment("Instructions:")
 
     stack = None
     def pop():
@@ -250,11 +256,48 @@ def decode(input, asm):
         nonlocal stack
         stack = (x, stack)
 
+    def symbol_ref(idx):
+        """Statically resolve a reference to the symbol table, to an address in RAM where that
+        rib will be allocated during initialization.
+
+        The table is written from the end, and each entry is made of of two ribs, the `symbol`
+        and a `pair`.
+        """
+        # TODO: fix the inevitable of-by-one error(s) here
+        asm.comment(f'symbol_ref({idx}); "{sym_names[idx][1]}"')
+        return f"#{FIRST_RIB + 6*(len(sym_names) - idx)}"
+
+    def emit_instr(op, arg, next):
+        lbl = asm.next_label("instr")
+
+        asm.label(lbl)
+
+        if op == 0 and next == "#0":
+            asm.comment(f"jump {arg} ")
+        elif op == 0:
+            asm.comment(f"call {arg} -> {next}")
+        elif op == 1:
+            asm.comment(f"set {arg} -> {next}")
+        elif op == 2:
+            asm.comment(f"get {arg} -> {next}")
+        elif op == 3:
+            asm.comment(f"const {arg} -> {next}")
+        elif op == 4:
+            asm.comment(f"if -> {arg} else {next}")
+        else:
+            raise Exception(f"Unknown op: {op} ({arg}, {next})")
+
+        asm.instr(f"#{op}")
+        asm.instr(arg)
+        asm.instr(next)
+
+        return lbl
 
     # For each encoded instruction, emit three words of data into the ROM:
     # - references to symbols are statically resolved to addresses in *RAM*,
     #   where the references
 
+    # TODO: reverse the instruction stream so it reads *forward* in the commented assembly listing?
 
     # FIXME: this horribleness is ripped off from https://github.com/udem-dlteam/ribbit/blob/dev/src/host/py/rvm.py directly
     # What part of this happens at runtime?
@@ -262,7 +305,7 @@ def decode(input, asm):
         if pos >= len(input)-1: break  # TEMP
 
         x = get_code()
-        asm.comment(f"x = get_code() = {x}")
+        # asm.comment(f"x = get_code() = {x}")
         n = x
         d = 0
         op = 0
@@ -272,50 +315,70 @@ def decode(input, asm):
             if n <= 2+d: break
             n -= d+3; op += 1
 
-        asm.comment(f"op: {op}; n: {n}")
+        # asm.comment(f"op: {op}; n: {n}")
 
         if x > 90:
             n = pop()
-            asm.comment(f"[if] x: {x}; n = {n}")
+            # asm.comment(f"[if] x: {x}; n = {n}")
         else:
             if op == 0:
-                push(0)
-                stack = [0, stack]
-                asm.comment(f"op == 0; TODO: stack = cons(0, stack)")
+                push("#0")
+                # stack = [0, stack]
+                # asm.comment(f"op == 0; TODO: stack = cons(0, stack)")
                 op += 1
 
             if n == d:
-                n = get_int(0)
-                asm.comment(f"n = get_int(0) = {n}")
+                n = f"#{get_int(0)}"
+                # print(f"n = get_int(0) = {n}")
+                # asm.comment(f"n = get_int(0) = {n}")
             elif n >= d:
                 #n = symbol_ref(get_int(n-d-1))
                 idx = get_int(n-d-1)
-                asm.comment(f"idx = get_int({n-d-1}) = {idx}")
-                n = f"symbol_ref({idx})"
-                asm.comment(f"{n} >= {d}; TODO: n = symbol_ref({idx})")
+                # asm.comment(f"idx = get_int({n-d-1}) = {idx}")
+                n = symbol_ref(idx)
+                # asm.comment(f"{n} >= {d}; TODO: n = symbol_ref({idx})")
             elif op < 3:
-                # n = symbol_ref(n)
-                n = f"symbol_ref({n})"
-                asm.comment(f"{op} < 3; TODO: n = {n}")
+                n = symbol_ref(n)
+                # asm.comment(f"{op} < 3; TODO: n = {n}")
 
             if op > 4:
-                # n = rib(rib(n, 0, pop()), nil, 1)  # a proc, obviously
-                m = pop()
-                n = [[n, 0, m], "@rib_nil", 1]
-                asm.comment(f"proc: {n}, ...")
-                if not stack: break
-                op = 4
+                # This is either a lambda, or the outer proc that wraps the whole program.
+                body = pop()
+                if not stack:
+                    n = body
+                    break
+                else:
+                    params_lbl = asm.next_label("params")
+                    emit_rib(params_lbl, n, "#0", body)
+                    # FIXME: is this even close?
+                    proc_label = asm.next_label("proc")
+                    asm.label(proc_label)
+                    asm.instr(f"@{params_lbl}")
+                    asm.instr("@rib_nil")
+                    asm.instr("#1")
+                    # n = [[n, 0, m], "@rib_nil", 1]
+                    # asm.comment(f"proc: {n}, ...")
+                    n = f"@{proc_label}"
+                    op = 4
 
-            # FIXME: this is making a rib...
-            asm.comment(f"TOS = rib({op-1}, {n}, {stack[0]})")
-            # stack = ([op-1, n, stack[0]], stack[1])
-            push([op-1, n, pop()])
+            # HACK: this seems to happen with integer constants and slot numbers.
+            # Make it happen in the right place?
+            if isinstance(n, int):
+                n = f"#{n}"
 
-    # FIXME: initialize PC
-    # This definitely needs to happen at runtime, not here
-    asm.comment(f"TODO: pc = n[0][2] = {n[0][2]}")
+            instr_lbl = emit_instr(op-1, n, pop())
+            push(f"@{instr_lbl}")
+
+    # This will be the body of the outer proc, so just "jump" straight to it:
+    start_instr = n
+    # Note: emit_instr would want to choose the label...
+    emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
 
 
+FIRST_RIB = big.HEAP_BASE
+"""Start of runtime-allocated ribs, which is the first word of RAM after the space which is mapped
+to ROM.
+"""
 
 def interpreter(asm):
     """ROM program implementing the RVM runtime, which interprets a program stored as "ribs" in ROM and RAM."""
@@ -333,8 +396,6 @@ def interpreter(asm):
     num_primitives = 22
     FIRST_PRIMITIVE = 8
     LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
-
-    FIRST_RIB = big.HEAP_BASE
 
     FALSE = "rib_false"
     TRUE = "rib_true"
@@ -357,12 +418,12 @@ def interpreter(asm):
     #     asm.instr("A=M")
     #     asm.instr("0;JMP")
 
-    def push_d():
-        """Push the value in D onto the stack, without over-writing it."""
-        asm.instr(f"@{SP}")
-        asm.instr("M=M-1")
-        asm.instr("A=M+1")  # i.e., point to the previous location
-        asm.instr("M=D")
+    # def push_d():
+    #     """Push the value in D onto the stack, without over-writing it."""
+    #     asm.instr(f"@{SP}")
+    #     asm.instr("M=M-1")
+    #     asm.instr("A=M+1")  # i.e., point to the previous location
+    #     asm.instr("M=D")
 
     # def rib(x, y, z):
     #     asm.comment(f"rib: {x}, {y}, {z}")
@@ -501,9 +562,9 @@ def interpreter(asm):
     # asm.instr(f"@{SP}")
     # asm.instr("M=D")
 
-    asm.comment("PC = ?")
-    asm.comment("TODO")
-    # asm.instr("D=?")
+    asm.comment("PC = @main")
+    asm.instr("@main")
+    asm.instr("D=A")
     asm.instr(f"@{PC}")
     asm.instr("M=D")
 
