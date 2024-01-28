@@ -221,7 +221,7 @@ BUILTIN_SYMBOLS = {
         "SCREEN": SCREEN_BASE,
         "KEYBOARD": KEYBOARD_ADDR,
         "ROM": ROM_BASE,
-        "HEAP": HEAP_BASE,
+        "HEAP_MINUS_ONE": HEAP_BASE-1,  # doesn't fit in 15 bits, so this points to the address before
     },
     **solved_06.register_names(16)
 }
@@ -240,14 +240,14 @@ def parse_op(string, symbols={}):
         return solved_06.parse_op(string, symbols)
 
 
-def assemble(f, min_static=16, max_static=1023):
+def assemble(f, min_static=16, max_static=1023, builtins=BUILTIN_SYMBOLS):
     """Standard assembler, except: shift the ROM base address, symbols for other base addresses, and 16-bit data."""
     return solved_06.assemble(f,
                               parse_op=parse_op,
                               min_static=min_static,
                               max_static=max_static,
                               start_addr=ROM_BASE,
-                              builtins=BUILTIN_SYMBOLS)
+                              builtins=builtins)
 
 
 #
@@ -287,6 +287,8 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
         if not halted and computer.pc == halt_addr:
             halted = True
             print(f"halted after {cycles} cycles")
+            trace(computer, cycles)
+
 
         if not halted:
             # print(f"@{computer.pc}; outputs: {computer.outputs()}")

@@ -24,7 +24,7 @@ def run(program):
     # TODO: custom BUILTIN_SYMBOLS
     # min_static =
     # max_static =
-    instrs, symbols, statics = big.assemble(asm.lines)
+    instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
 
 
 
@@ -71,8 +71,8 @@ def run(program):
             print(f"{cycles:3,d}:")
 
             # TODO: decode these ribs/values
-            print(f"  PC: @{computer.peek(0)}")
-            print(f"  SP: @{computer.peek(1)}, ...")
+            print(f"  SP: @{computer.peek(0)}, ...")
+            print(f"  PC: @{computer.peek(1)}")
 
             next_rib = unsigned(computer.peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
@@ -265,7 +265,7 @@ def decode(input, asm):
         """
         # TODO: fix the inevitable of-by-one error(s) here
         asm.comment(f'symbol_ref({idx}); "{sym_names[idx][1]}"')
-        return f"#{FIRST_RIB + 6*(len(sym_names) - idx)}"
+        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx)}"
 
     def emit_instr(op, arg, next):
         lbl = asm.next_label("instr")
@@ -375,27 +375,42 @@ def decode(input, asm):
     emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
 
 
-FIRST_RIB = big.HEAP_BASE
-"""Start of runtime-allocated ribs, which is the first word of RAM after the space which is mapped
-to ROM.
-"""
+BUILTINS = {
+    **big.BUILTIN_SYMBOLS,
+
+    # Low-memory "registers":
+    "SP": 0,
+    "PC": 1,
+    "NEXT_RIB": 2,
+
+    "SYMBOL_TABLE": 4,  # Only used during intiialization?
+
+    # General-purpose temporary storage:
+    "TEMP_0": 5,
+    "TEMP_1": 6,
+
+    # Useful values/addresses:
+    "FIRST_RIB_MINUS_ONE": big.HEAP_BASE-1,
+    "MAX_RIB": big.HEAP_TOP,
+}
+
 
 def interpreter(asm):
     """ROM program implementing the RVM runtime, which interprets a program stored as "ribs" in ROM and RAM."""
 
     # Interpreter variables in low memory:
-    PC = 0
-    SP = 1
-    NEXT_RIB = 2
+    # SP = 0
+    # PC = 1
+    # NEXT_RIB = 2
 
     # RETURN = 3
 
     # used only during initialization?
-    SYMBOL_TABLE = 4
+    # SYMBOL_TABLE = 4
 
     num_primitives = 22
-    FIRST_PRIMITIVE = 8
-    LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
+    # FIRST_PRIMITIVE = 8
+    # LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
 
     FALSE = "rib_false"
     TRUE = "rib_true"
@@ -441,63 +456,45 @@ def interpreter(asm):
         The value is either "D" (the default), or a value the ALU can produce (0 or 1, basically).
         """
 
-        asm.instr(f"@{NEXT_RIB}")
+        asm.instr("@NEXT_RIB")
         asm.instr("M=M+1")
         asm.instr("A=M-1")
         asm.instr(f"M={val}")
 
 
     # TODO: find end of encoded program; initialize stack pointer below it
-    decode_stack_start = 16384//2 - 1
-    asm.comment("SP = below the encoded program")
-    asm.instr(f"@{decode_stack_start}")
-    asm.instr("D=A")
-    asm.instr(f"@{SP}")
+    # decode_stack_start = 16384//2 - 1
+    # asm.comment("SP = below the encoded program")
+    # asm.instr(f"@{decode_stack_start}")
+    # asm.instr("D=A")
+    # asm.instr(f"@{SP}")
+    # asm.instr("M=D")
+
+    asm.comment("NEXT_RIB = FIRST_RIB (HEAP_BASE)")
+    asm.instr("@FIRST_RIB_MINUS_ONE")  # Note: this value is one lower than the actual start of the heap, to fit in 15 bits
+    asm.instr("D=A+1")                 # Tricky: add 1 to bring the address up to 0x8000
+    asm.instr("@NEXT_RIB")
     asm.instr("M=D")
-    asm.comment(f"NEXT_RIB = {FIRST_RIB} (HEAP_BASE)")
-    asm.instr(f"@{FIRST_RIB-1}")
-    asm.instr("D=A+1")
-    asm.instr(f"@{NEXT_RIB}")
-    asm.instr("M=D")
-
-    # prim_rib_label = asm.next_label("prim_rib")
-
-    # asm.comment("Initialize primitive vectors")
-    # for i, l in enumerate([prim_rib_label]):
-    #     asm.instr(f"@{l}")
-    #     asm.instr("D=A")
-    #     asm.instr(f"@{FIRST_PRIMITIVE + i}")
-    #     asm.instr("M=D")
-
-    # asm.comment("Initialize shared constants")
-    # for n in ("false", "true", "nil"):
-    #     asm.comment(f"{n} = rib(0, 0, 5)")
-    #     asm.instr("D=0")
-    #     push_d()
-    #     push_d()
-    #     asm.instr("@5")
-    #     asm.instr("D=A")
-    #     push_d()
-    #     call_primitive(prim_rib_label)
+    asm.blank()
 
     asm.comment("Construct the symbol table in RAM:")
     asm.comment("SYMBOL_TABLE = '()")
     asm.instr("@rib_nil")
     asm.instr("D=A")
-    asm.instr(f"@{SYMBOL_TABLE}")
+    asm.instr("@SYMBOL_TABLE")
     asm.instr("M=D")
 
-    asm.comment("R5 = ptr")
-    asm.instr(f"@symbol_names_start")
+    asm.comment("R5 = table start")
+    asm.instr("@symbol_names_start")
     asm.instr("D=A")
-    asm.instr("@R5")
+    asm.instr("@TEMP_0")
     asm.instr("M=D")
 
-    loop = "symbol_table_loop"
-    asm.label(loop)
+    symbol_table_loop = "symbol_table_loop"
+    asm.label(symbol_table_loop)
 
     asm.comment("DEBUG: log the pointer to tty")
-    asm.instr("@R5")
+    asm.instr("@TEMP_0")
     asm.instr("D=M")
     asm.instr("@KEYBOARD")
     asm.instr("M=D")
@@ -506,78 +503,109 @@ def interpreter(asm):
     asm.instr("@rib_false")
     asm.instr("D=A")
     rib_append()
-    asm.instr("@R5")
+    asm.instr("@TEMP_0")
     asm.instr("D=M")
     rib_append()
     asm.instr("@2")  # symbol
     asm.instr("D=A")
     rib_append()
+    asm.blank()
 
+    # TODO: these `pair` ribs are actually constant and could live in the ROM, with pre-computed
+    # addresses pointing to the `symbol` ribs being allocated just above.
+    # Actually, is this list even used by the library (`string->symbol`)?
     asm.comment("SYMBOL_TABLE = new pair")
     asm.comment("car = the rib we just wrote")
-    asm.instr(f"@{NEXT_RIB}")
+    asm.instr("@NEXT_RIB")
     asm.instr("D=M")
     asm.instr("@3")
     asm.instr("D=D-A")
     rib_append()
     asm.comment("cdr = (old) SYMBOL_TABLE")
-    asm.instr(f"@{SYMBOL_TABLE}")
+    asm.instr("@SYMBOL_TABLE")
     asm.instr("D=M")
     rib_append()
     rib_append("0")  # pair
-    asm.instr(f"@{NEXT_RIB}")
+    asm.blank()
+
+    asm.comment("update SYMBOL_TABLE")
+    asm.instr("@NEXT_RIB")
     asm.instr("D=M")
     asm.instr("@3")
     asm.instr("D=D-A")
-    asm.instr(f"@{SYMBOL_TABLE}")
+    asm.instr("@SYMBOL_TABLE")
     asm.instr("M=D")
 
     asm.comment("DEBUG: log NEXT_RIB to tty")
-    asm.instr(f"@{NEXT_RIB}")
+    asm.instr("@NEXT_RIB")
     asm.instr("D=M")
     asm.instr("@KEYBOARD")
     asm.instr("M=D")
 
     asm.comment("increment R5")
-    asm.instr("@R5")
+    asm.instr("@TEMP_0")
     asm.instr("M=M+1")
 
     asm.comment("D = compare(R5, symbol_names_end)")
     asm.instr("D=M")
     asm.instr("@symbol_names_end")
-    asm.instr("D=D-M")
-    asm.instr(f"@{loop}")
+    asm.instr("D=D-A")
+    asm.instr(f"@{symbol_table_loop}")
     asm.instr("D;JLT")
 
+    asm.blank()
 
-    # decode_label = "decode_loop"
-    # asm.label(decode_label)
-    # asm.instr(f"@{decode_label}")
-    # asm.instr("0;JMP")
 
-    # # Now move the stack pointer to the top of memory (over-writing the encoded program)
-    # asm.comment("SP = top of memory")
-    # asm.instr("@16384")
-    # asm.instr("D=A")
-    # asm.instr(f"@{SP}")
-    # asm.instr("M=D")
+    #
+    # Initialize interpreter state:
+    #
+
+    asm.comment("SP = '()")
+    asm.instr("@rib_nil")
+    asm.instr("D=A")
+    asm.instr("@SP")
+    asm.instr("M=D")
 
     asm.comment("PC = @main")
     asm.instr("@main")
     asm.instr("D=A")
-    asm.instr(f"@{PC}")
+    asm.instr("@PC")
     asm.instr("M=D")
+
+    asm.blank()
 
     #
     # Exec loop:
     #
 
-    exec_label = "exec_loop"
-    asm.label(exec_label)
+    asm.comment("First time: jump to the main loop")
+    asm.instr("@exec_loop")
+    asm.instr("0;JMP")
+
+    asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
+    asm.label("continue_next")
+    asm.instr("@PC")
+    asm.instr("A=M+1")
+    asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
+    asm.instr("D=M")
+    asm.instr("@PC")
+    asm.instr("M=D")
+
+    asm.comment("sanity check: zero is never the address of a valid instr")
+    asm.instr("@halt_loop")
+    asm.instr("D;JEQ")
+    asm.comment("...fallthrough")
+    asm.blank()
+
+    asm.label("exec_loop")
     asm.comment("TODO")
     asm.instr("D=D")
     # asm.instr(f"@{exec_label}")
     # asm.instr("0;JMP")
+
+    asm.comment("TEMP: just go to 'next' no matter what")
+    asm.instr("@continue_next")
+    asm.instr("0;JMP")
 
 
     #
@@ -589,10 +617,116 @@ def interpreter(asm):
     asm.instr(f"@{halt_label}")
     asm.instr("0;JMP")
 
-    # asm.label("prim_rib_label")
-    # asm.comment("TODO:")
+
+    #
+    # Primitive handlers:
+    #
+
+    asm.label("primitive_rib")
+    asm.comment("primitive 0; rib :: x y z -- rib(x, y, z)")
+    asm.comment("TODO:")
     # asm.comment("- check for stack-heap collision")
     # asm.comment("- allocate space for new rib")
     # asm.comment("- pop three values and copy them into the new rib")
-    # return_from_primitive()
+    asm.instr("@exec_loop")
+    asm.instr("0;JMP")
+    asm.blank()
 
+    asm.comment("TODO: for now, all these just fall through to halt/unimp")
+    asm.label("primitive_id")
+    asm.comment("primitive 1; id :: x -- x")
+    asm.label("primitive_arg1")
+    asm.comment("primitive 2; arg1 :: x y -- x")
+    asm.label("primitive_arg2")
+    asm.comment("primitive 3; arg2 :: x y -- y")
+    asm.label("primitive_close")
+    asm.comment("primitive 4; close :: x -- rib(x[0], stack, 1)")
+    asm.label("primitive_rib?")
+    asm.comment("primitive 5; rib? :: x -- bool(x is a rib)")
+    asm.label("primitive_field0")
+    asm.comment("primitive 6; field0 :: rib(x, _, _) -- x")
+    asm.label("primitive_field1")
+    asm.comment("primitive 7; field1 :: rib(_, y, _) -- y")
+    asm.label("primitive_field2")
+    asm.comment("primitive 8; field2 :: rib(_, _, z) -- z")
+    asm.label("primitive_field0-set!")
+    asm.comment("primitive 9; field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))")
+    asm.label("primitive_field1-set!")
+    asm.comment("primitive 10; field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))")
+    asm.label("primitive_field2-set!")
+    asm.comment("primitive 11; field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))")
+    asm.label("primitive_eqv?")
+    asm.comment("primitive 12; eqv? :: x y -- bool(x is identical to y)")
+    asm.label("primitive_<")
+    asm.comment("primitive 13; < :: x y -- bool(x < y)")
+    asm.label("primitive_+")
+    asm.comment("primitive 14; + :: x y -- x + y")
+    asm.label("primitive_-")
+    asm.comment("primitive 15; - :: x y -- x - y")
+    asm.label("primitive_*")
+    asm.comment("primitive 16; - :: x y -- x * y")
+    asm.label("primitive_peek")
+    asm.comment("primitive 19; peek :: x -- RAM[x]")
+    asm.label("primitive_poke")
+    asm.comment("primitive 20; poke :: x y -- y (and write the valu y at RAM[x])")
+
+    asm.label("primitive_halt")
+    asm.comment("primitive 21; halt :: -- (no more instructions are executed)")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+    asm.label("primitive_unimp")
+    asm.comment("Note: the current instr will be logged if tracing is enabled")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+    asm.comment("=== Primitive vectors ===")
+    asm.label("primitive_vector_table_start")
+    asm.comment("0")
+    asm.instr("@primitive_rib")
+    asm.comment("1")
+    asm.instr("@primitive_id")
+    asm.comment("2")
+    asm.instr("@primitive_arg1")
+    asm.comment("3")
+    asm.instr("@primitive_arg2")
+    asm.comment("4")
+    asm.instr("@primitive_close")
+    asm.comment("5")
+    asm.instr("@primitive_rib?")
+    asm.comment("6")
+    asm.instr("@primitive_field0")
+    asm.comment("7")
+    asm.instr("@primitive_field1")
+    asm.comment("8")
+    asm.instr("@primitive_field2")
+    asm.comment("9")
+    asm.instr("@primitive_field0-set!")
+    asm.comment("10")
+    asm.instr("@primitive_field1-set!")
+    asm.comment("11")
+    asm.instr("@primitive_field2-set!")
+    asm.comment("12")
+    asm.instr("@primitive_eqv?")
+    asm.comment("13")
+    asm.instr("@primitive_<")
+    asm.comment("14")
+    asm.instr("@primitive_+")
+    asm.comment("15")
+    asm.instr("@primitive_-")
+    asm.comment("16")
+    asm.instr("@primitive_*")
+    asm.comment("17 (quotient: not implemented)")
+    asm.instr("@primitive_unimp")
+    asm.comment("18 (getchar: not implemented)")
+    asm.instr("@primitive_unimp")
+    asm.comment("19 (putchar: not implemented)")
+    asm.instr("@primitive_unimp")
+    asm.comment("20")
+    asm.instr("@primitive_peek")
+    asm.comment("21")
+    asm.instr("@primitive_poke")
+    asm.comment("22")
+    asm.instr("@primitive_halt")
+    # fatal?
+    asm.label("primitive_vectors_end")
