@@ -11,7 +11,18 @@ from nand.translate import AssemblySource
 from alt import big
 from nand.vector import unsigned
 
-def run(program):
+
+TRACE_NONE = 0
+"""No logging of Ribbit instructions."""
+TRACE_COARSE = 1
+"""Log each Ribbit instruction before it's interpreted, with a summary of the stack and heap."""
+TRACE_FINE = 2
+"""Log at each branch point of the interpreter loop (in addition to the COARSE logging.)"""
+TRACE_ALL = 3
+"""Log every CPU instruction (in addition to COARSE and FINE logging.)"""
+
+
+def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
     encoded = compile(program)
     print(f"encoded program: {repr(encoded)}")
@@ -29,22 +40,7 @@ def run(program):
     instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
 
 
-
-# Example: "(poke 16384 21845)"
-# proc(nil):
-#   call(#0)
-#   const(#21)
-#   const(#0)
-#   const(#1)
-#   call(symbol(#f, 'rib')@4378049088)
-#   set(symbol(#f, 'poke')@4378050432)
-#   const(#16384)
-#   const(#21845)
-#   jump(symbol(#f, 'poke')@4378050432)
-
-
-    PRINT = True
-    if PRINT:
+    if print_asm:
         for l in asm.lines: print(l)
         print()
 
@@ -58,17 +54,31 @@ def run(program):
         # print(f"Encoded program: {program_words} ({100*program_words/available_ram:0.2f}%)")
         print()
 
-        for name, addr in sorted(symbols.items(), key=lambda t: t[1]):
-            print(f"  {name}: {addr}")
 
-    # # This is enough to get minimal tracing from the standard driver in computer.py.
-    # # It will just log the cycle count each time we go through each of the main loops.
-    # src_map = {
-    #     # symbols["decode_loop"]: "decode",
-    #     symbols["exec_loop"]: "exec"
-    # }
+        def show_map(label, m):
+            print("\n".join(
+                [ f"{label}:" ] +
+                [ f"  {addr:5d}: {name}"
+                  for name, addr in sorted(m.items(), key=lambda t: t[1])
+                ] +
+                [""]
+            ))
+
+        show_map("Symbols", symbols)
+
+        if statics != {}:
+            show_map("Statics", statics)
+
+
+    last_traced_exec = None
 
     def trace(computer, cycles):
+        nonlocal last_traced_exec
+
+        # Only log on one of the half-cycles:
+        if not computer.fetch:
+            return
+
         def peek(addr):
             """Read from RAM or ROM."""
             if big.ROM_BASE <= addr < big.HEAP_BASE:
@@ -99,8 +109,12 @@ def run(program):
             elif peek(addr+2) == 0:  # pair
                 return f"{peek(addr)} : {show_stack(peek(addr+1))}"
 
-        if computer.fetch and computer.pc == symbols["exec_loop"]:
-            print(f"{cycles:3,d}:")
+        if trace_level >= TRACE_COARSE and computer.pc == symbols["exec_loop"]:
+            if last_traced_exec is None:
+                print(f"{cycles:,d}:")
+            else:
+                print(f"{cycles:,d} (+{cycles - last_traced_exec:,d}):")
+            last_traced_exec = cycles
 
             print(f"  SP: @{peek(0)}, {show_stack(peek(0))}")
             print(f"  PC: @{peek(1)}; {show_instr(peek(1))}")
@@ -109,15 +123,16 @@ def run(program):
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-        elif computer.fetch and computer.pc in symbols:
+        elif trace_level >= TRACE_FINE and computer.pc in symbols:
             print(f"{cycles:3,d}: ({symbols[computer.pc]})")
-        elif computer.fetch:
+        elif trace_level >= TRACE_ALL:
             print(f"{cycles:3,d}: {computer.pc}")
 
     big.run(program=instrs,
             name="Scheme",
             halt_addr=symbols["halt_loop"],
-            trace=trace)
+            trace=trace if trace_level > TRACE_NONE else None,
+            verbose_tty=verbose_tty)
 
 
 def compile(src):

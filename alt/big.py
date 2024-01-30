@@ -259,7 +259,7 @@ import pygame.image
 import time
 
 
-def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None, trace=None):
+def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True):
     """Run with keyboard and text-mode graphics."""
 
     # TODO: font
@@ -291,20 +291,19 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
 
 
         if not halted:
-            # print(f"@{computer.pc}; outputs: {computer.outputs()}")
-            # print(f"  R0: {computer.peek(0)}; R1: {computer.peek(1)}")
-
-            # computer.ticktock(100)
-            # cycles += 100
-            computer.ticktock()
-            cycles += 1
+            if trace is not None:
+                cycles_per_call = 1
+            else:
+                cycles_per_call = 10  # has to be a factor of CYCLES_PER_UPDATE
+            computer.ticktock(cycles_per_call)
+            cycles += cycles_per_call
         else:
             time.sleep(0.1)
 
 
         if trace is not None:
             trace(computer, cycles)
-            CYCLES_PER_UPDATE = 5
+            CYCLES_PER_UPDATE = 2  # HACK: to ensure we see all the TTY output
         else:
             CYCLES_PER_UPDATE = 100
 
@@ -314,9 +313,11 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
 
             tty_char = computer.get_tty()
             if tty_char:
-                # print(chr(tty_char), end="", flush=True)
                 if 32 < tty_char <= 127:
-                    print(f"TTY: {repr(chr(tty_char))} ({tty_char})")
+                    if not verbose_tty:
+                        print(chr(tty_char), end="", flush=True)
+                    else:
+                        print(f"TTY: {repr(chr(tty_char))} ({tty_char})")
                 else:
                     print(f"TTY:     ({tty_char:6d}; 0x{unsigned(tty_char):04x})")
 
