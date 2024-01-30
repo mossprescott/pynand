@@ -67,14 +67,43 @@ def run(program):
     # }
 
     def trace(computer, cycles):
+        def peek(addr):
+            """Read from RAM or ROM."""
+            if big.ROM_BASE <= addr < big.HEAP_BASE:
+                return computer._rom.storage[addr]
+            else:
+                return computer.peek(addr)
+
+        def show_instr(addr):
+            x, y, z = peek(addr), peek(addr+1), peek(addr+2)
+            if x == 0 and z == 0:
+                return f"jump {y}"
+            elif x == 0:
+                return f"call {y} -> {z}"
+            elif x == 1:
+                return f"set {y} -> {z}"
+            elif x == 2:
+                return f"get {y} -> {z}"
+            elif x == 3:
+                return f"const {y} -> {z}"
+            elif x == 4:
+                return f"if -> {y} else {z}"
+            else:
+                return f"not an instr: {(x, y, z)}"
+
+        def show_stack(addr):
+            if addr == symbols["rib_nil"]:
+                return "'()"
+            elif peek(addr+2) == 0:  # pair
+                return f"{peek(addr)} : {show_stack(peek(addr+1))}"
+
         if computer.fetch and computer.pc == symbols["exec_loop"]:
             print(f"{cycles:3,d}:")
 
-            # TODO: decode these ribs/values
-            print(f"  SP: @{computer.peek(0)}, ...")
-            print(f"  PC: @{computer.peek(1)}")
+            print(f"  SP: @{peek(0)}, {show_stack(peek(0))}")
+            print(f"  PC: @{peek(1)}; {show_instr(peek(1))}")
 
-            next_rib = unsigned(computer.peek(2))
+            next_rib = unsigned(peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
@@ -178,8 +207,7 @@ def decode(input, asm):
 
 
     def emit_rib(lbl, x, y, z, comment=None):
-        if lbl:
-            asm.label(lbl)
+        asm.label(lbl)
         if comment:
             asm.comment(comment)
         asm.instr(x)
