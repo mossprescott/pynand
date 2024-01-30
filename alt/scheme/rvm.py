@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 
 """Ribbit VM implementation.
+
+See http://www.iro.umontreal.ca/~feeley/papers/YvonFeeleyVMIL21.pdf for the general picture.
 """
 
 import computer
@@ -107,7 +109,10 @@ def run(program):
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-
+        elif computer.fetch and computer.pc in symbols:
+            print(f"{cycles:3,d}: ({symbols[computer.pc]})")
+        elif computer.fetch:
+            print(f"{cycles:3,d}: {computer.pc}")
 
     big.run(program=instrs,
             name="Scheme",
@@ -171,6 +176,8 @@ def decode(input, asm):
     special("rib_true")
     special("rib_nil")
 
+    asm.blank()
+
     # asm.label("input_start")
 
     # # TODO: decode from characters into raw byte/int values
@@ -232,6 +239,8 @@ def decode(input, asm):
     n = get_int(0)
     sym_names = n*[("rib_string_empty", "")]
 
+    asm.blank()
+
     accum = "@rib_nil"
     acc_str = ""
     idx = 0
@@ -270,6 +279,7 @@ def decode(input, asm):
         asm.instr(f"@{lbl}")
     asm.label("symbol_names_end")
 
+    asm.blank()
 
     # Decode RVM instructions:
 
@@ -424,7 +434,10 @@ BUILTINS = {
 
 
 def interpreter(asm):
-    """ROM program implementing the RVM runtime, which interprets a program stored as "ribs" in ROM and RAM."""
+    """ROM program implementing the RVM runtime, which interprets a program stored as "ribs" in ROM and RAM.
+
+    This part of the ROM is the same, independent of the Scheme program that's being interpreted.
+    """
 
     # Interpreter variables in low memory:
     # SP = 0
@@ -439,6 +452,9 @@ def interpreter(asm):
     num_primitives = 22
     # FIRST_PRIMITIVE = 8
     # LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
+
+    # The largest value that can ever refer to a slot, as opposed to a
+    MAX_SLOT = big.ROM_BASE-1
 
     FALSE = "rib_false"
     TRUE = "rib_true"
@@ -606,16 +622,33 @@ def interpreter(asm):
     # Exec loop:
     #
 
+    def pc_x_to_d():
+        """Load the first field of the current instruction to D."""
+        asm.instr("@PC")
+        asm.instr("A=M")
+        asm.instr("D=M")
+
+    def pc_y_to_d():
+        """Load the middle field of the current instruction to D."""
+        asm.instr("@PC")
+        asm.instr("A=M+1")
+        asm.instr("D=M")
+
+    def pc_z_to_d():
+        """Load the last field of the current instruction to D."""
+        # Note: could save an instruction here if the pointer pointed to the *middle* field.
+        asm.instr("@PC")
+        asm.instr("A=M+1")
+        asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
+        asm.instr("D=M")
+
     asm.comment("First time: jump to the main loop")
     asm.instr("@exec_loop")
     asm.instr("0;JMP")
 
     asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
     asm.label("continue_next")
-    asm.instr("@PC")
-    asm.instr("A=M+1")
-    asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
-    asm.instr("D=M")
+    pc_z_to_d()
     asm.instr("@PC")
     asm.instr("M=D")
 
@@ -626,10 +659,46 @@ def interpreter(asm):
     asm.blank()
 
     asm.label("exec_loop")
+
+    asm.comment("Sanity check: negative instruction type is impossible")
+    pc_x_to_d()
+    asm.instr("@halt_loop")
+    asm.instr("D;JLT")
+
+    asm.instr("@code_gt_zero")
+    asm.instr("D;JGT")
+
+    asm.comment("type 0: jump/call")
+    pc_z_to_d()
+    asm.instr("@handle_call")
+    asm.instr("D;JNE")
+    pc_y_to_d()
+    asm.instr(f"@{MAX_SLOT}")
+    asm.instr("D=D-A")
+    asm.instr("@handle_jump_to_slot")
+    asm.instr("D;JLT")
+    pc_y_to_d()
+    asm.instr("@PC")
+    asm.instr("M=D")
+    asm.instr("@exec_loop")
+    asm.instr("0;JMP")
+
+    asm.label("handle_jump_to_slot")
     asm.comment("TODO")
-    asm.instr("D=D")
-    # asm.instr(f"@{exec_label}")
-    # asm.instr("0;JMP")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+
+    asm.label("handle_call")
+    asm.comment("TODO")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+
+    asm.label("code_gt_zero")
+    asm.comment("TODO")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
 
     asm.comment("TEMP: just go to 'next' no matter what")
     asm.instr("@continue_next")
@@ -696,7 +765,7 @@ def interpreter(asm):
     asm.label("primitive_peek")
     asm.comment("primitive 19; peek :: x -- RAM[x]")
     asm.label("primitive_poke")
-    asm.comment("primitive 20; poke :: x y -- y (and write the valu y at RAM[x])")
+    asm.comment("primitive 20; poke :: x y -- y (and write the value y at RAM[x])")
 
     asm.label("primitive_halt")
     asm.comment("primitive 21; halt :: -- (no more instructions are executed)")
@@ -758,3 +827,5 @@ def interpreter(asm):
     asm.instr("@primitive_halt")
     # fatal?
     asm.label("primitive_vectors_end")
+
+    asm.blank()
