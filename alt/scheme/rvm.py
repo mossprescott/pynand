@@ -25,7 +25,7 @@ TRACE_ALL = 3
 def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
     encoded = compile(program)
-    print(f"encoded program: {repr(encoded)}")
+    # print(f"encoded program: {repr(encoded)}")
 
     asm = AssemblySource()
 
@@ -33,11 +33,9 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
     decode(encoded, asm)
 
-    # TODO: how many statics?
-    # TODO: custom BUILTIN_SYMBOLS
-    # min_static =
-    # max_static =
     instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
+
+    assert symbols["start"] == big.ROM_BASE
 
 
     if print_asm:
@@ -71,6 +69,7 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
 
     last_traced_exec = None
+    symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
 
     def trace(computer, cycles):
         nonlocal last_traced_exec
@@ -124,8 +123,8 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
             print(f"  PC: @{peek(1)}")
             print(f"  {show_instr(peek(1))}")
-        elif trace_level >= TRACE_FINE and computer.pc in symbols:
-            print(f"{cycles:3,d}: ({symbols[computer.pc]})")
+        elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr:
+            print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
         elif trace_level >= TRACE_ALL:
             print(f"{cycles:3,d}: {computer.pc}")
 
@@ -146,11 +145,6 @@ def compile(src):
         raise Exception(f"Compiler failed: {result.stdout}")
     return result.stdout
 
-
-# $2gra,ekop,,,,;'v[_LvXs+!'?X&lkv8i)!):ok:okw#!(:lkny
-#
-# symbol table: ","-separated, ";"-terminated:
-#
 
 def decode(input, asm):
     """Decode the compiler's output as data in ROM.
@@ -194,18 +188,6 @@ def decode(input, asm):
 
     asm.blank()
 
-    # asm.label("input_start")
-
-    # # TODO: decode from characters into raw byte/int values
-    # for c in input:
-    #     asm.instr(f"#{hex(ord(c))}")
-
-    # asm.label("input_end")
-
-    # def emit_cons(x, y): return emit_rib(x, y, "#0")
-    # def emit_symbol(x)
-
-
     # for comprehension:
     pos = -1
     def get_byte():
@@ -225,8 +207,6 @@ def decode(input, asm):
             return 46*n + x
         else:
             return get_int(46*n + x-46)
-        # n *= 46
-        # return n+x if x < 46 else get_int(n + x - 46)
 
 
     def emit_rib(lbl, x, y, z, comment=None):
@@ -284,6 +264,7 @@ def decode(input, asm):
             accum = f"@{lbl}"
             acc_str = chr(c) + acc_str
 
+    asm.blank()
 
     # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
     # block of address space?
@@ -530,6 +511,7 @@ def interpreter(asm):
     # asm.instr(f"@{SP}")
     # asm.instr("M=D")
 
+    asm.label("start")
     asm.comment("NEXT_RIB = FIRST_RIB (HEAP_BASE)")
     asm.instr("@FIRST_RIB_MINUS_ONE")  # Note: this value is one lower than the actual start of the heap, to fit in 15 bits
     asm.instr("D=A+1")                 # Tricky: add 1 to bring the address up to 0x8000
