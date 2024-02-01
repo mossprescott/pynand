@@ -340,7 +340,6 @@ def decode(input, asm):
         if pos >= len(input)-1: break  # TEMP
 
         x = get_code()
-        # asm.comment(f"x = get_code() = {x}")
         n = x
         d = 0
         op = 0
@@ -350,31 +349,20 @@ def decode(input, asm):
             if n <= 2+d: break
             n -= d+3; op += 1
 
-        # asm.comment(f"op: {op}; n: {n}")
-
         if x > 90:
             n = pop()
-            # asm.comment(f"[if] x: {x}; n = {n}")
         else:
             if op == 0:
                 push("#0")
-                # stack = [0, stack]
-                # asm.comment(f"op == 0; TODO: stack = cons(0, stack)")
                 op += 1
 
             if n == d:
                 n = f"#{get_int(0)}"
-                # print(f"n = get_int(0) = {n}")
-                # asm.comment(f"n = get_int(0) = {n}")
             elif n >= d:
-                #n = symbol_ref(get_int(n-d-1))
                 idx = get_int(n-d-1)
-                # asm.comment(f"idx = get_int({n-d-1}) = {idx}")
                 n = symbol_ref(idx)
-                # asm.comment(f"{n} >= {d}; TODO: n = symbol_ref({idx})")
             elif op < 3:
                 n = symbol_ref(n)
-                # asm.comment(f"{op} < 3; TODO: n = {n}")
 
             if op > 4:
                 # This is either a lambda, or the outer proc that wraps the whole program.
