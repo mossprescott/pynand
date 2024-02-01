@@ -694,13 +694,68 @@ def interpreter(asm):
 
 
     asm.label("code_gt_zero")
+    asm.instr("D=D-1")
+    asm.instr("@code_gt_one")
+    asm.instr("D;JGT")
+
+    asm.comment("type 1: set")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
 
-    asm.comment("TEMP: just go to 'next' no matter what")
+    asm.label("code_gt_one")
+    asm.instr("D=D-1")
+    asm.instr("@code_gt_two")
+    asm.instr("D;JGT")
+
+    asm.comment("type 2: get")
+    asm.comment("TODO")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+    asm.label("code_gt_two")
+    asm.instr("D=D-1")
+    asm.instr("@code_gt_three")
+    asm.instr("D;JGT")
+
+    asm.comment("type 3: const")
+    pc_y_to_d()
+    asm.comment("TODO: check tag")
+    asm.comment("Allocate rib: x = pc.y")
+    rib_append()
+    asm.comment("y = SP")
+    asm.instr("@SP")
+    asm.instr("D=M")
+    rib_append()
+    asm.comment("z = 0 (pair)")
+    rib_append("0")
+
+    asm.comment("SP = just-allocated rib")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@3")
+    asm.instr("D=D-A")
+    asm.instr("@SP")
+    asm.instr("M=D")
+
     asm.instr("@continue_next")
     asm.instr("0;JMP")
+
+    asm.label("code_gt_three")
+    asm.instr("D=D-1")
+    asm.instr("@halt_loop")
+    asm.instr("D;JGT")
+
+    asm.comment("type 4: if")
+    asm.comment("TODO")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+
+    asm.blank()
+
+    # asm.comment("TEMP: just go to 'next' no matter what")
+    # asm.instr("@continue_next")
+    # asm.instr("0;JMP")
 
 
     #
