@@ -117,12 +117,13 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
             last_traced_exec = cycles
 
             print(f"  SP: @{peek(0)}, {show_stack(peek(0))}")
-            print(f"  PC: @{peek(1)}; {show_instr(peek(1))}")
 
             next_rib = unsigned(peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
+            print(f"  PC: @{peek(1)}")
+            print(f"  {show_instr(peek(1))}")
         elif trace_level >= TRACE_FINE and computer.pc in symbols:
             print(f"{cycles:3,d}: ({symbols[computer.pc]})")
         elif trace_level >= TRACE_ALL:
