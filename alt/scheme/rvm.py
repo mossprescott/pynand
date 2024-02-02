@@ -86,27 +86,53 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
                 return computer.peek(addr)
 
         def show_instr(addr):
+            def show_target(val):
+                if val <= BUILTINS["MAX_SLOT"]:
+                    return f"#{val}"
+                else:
+                    return show_addr(val)
+
             x, y, z = peek(addr), peek(addr+1), peek(addr+2)
             if x == 0 and z == 0:
-                return f"jump {y}"
+                return f"jump {show_target(y)}"
             elif x == 0:
-                return f"call {y} -> {z}"
+                return f"call {show_target(y)} -> {show_addr(z)}"
             elif x == 1:
-                return f"set {y} -> {z}"
+                return f"set {show_target(y)} -> {show_addr(z)}"
             elif x == 2:
-                return f"get {y} -> {z}"
+                return f"get {show_target(y)} -> {show_addr(z)}"
             elif x == 3:
-                return f"const {y} -> {z}"
+                return f"const {show_obj(y)} -> {show_addr(z)}"
             elif x == 4:
-                return f"if -> {y} else {z}"
+                return f"if -> {show_addr(y)} else {show_addr(z)}"
             else:
                 return f"not an instr: {(x, y, z)}"
 
+        def show_obj(val, deep=True):
+            # FIXME: check tag
+            if val < big.ROM_BASE:
+                return f"{val}"
+            else:
+                x, y, z = peek(val), peek(val+1), peek(val+2)
+                if deep:
+                    return f"({show_obj(x), show_obj(y), show_obj(z)}"
+                else:
+                    return f"({x, y, z}"
+
         def show_stack(addr):
+            def go(addr):
             if addr == symbols["rib_nil"]:
-                return "'()"
+                    return []
             elif peek(addr+2) == 0:  # pair
-                return f"{peek(addr)} : {show_stack(peek(addr+1))}"
+                    return go(peek(addr+1)) + [show_obj(peek(addr))]
+            return ", ".join(go(addr))
+
+        def show_addr(addr):
+            """Show an address (with "@"), using the symbol for addresses in ROM."""
+            if addr in symbols_by_addr:
+                return f"@{symbols_by_addr[addr]}"
+            else:
+                return f"@{unsigned(addr)}"
 
         if trace_level >= TRACE_COARSE and computer.pc == symbols["exec_loop"]:
             if last_traced_exec is None:
@@ -115,13 +141,13 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
                 print(f"{cycles:,d} (+{cycles - last_traced_exec:,d}):")
             last_traced_exec = cycles
 
-            print(f"  SP: @{peek(0)}, {show_stack(peek(0))}")
+            print(f"  stack: ({show_addr(peek(0))}) {show_stack(peek(0))}")
 
             next_rib = unsigned(peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-            print(f"  PC: @{peek(1)}")
+            print(f"  PC: {show_addr(peek(1))}")
             print(f"  {show_instr(peek(1))}")
         elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr:
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
@@ -415,6 +441,9 @@ BUILTINS = {
     # Useful values/addresses:
     "FIRST_RIB_MINUS_ONE": big.HEAP_BASE-1,
     "MAX_RIB": big.HEAP_TOP,
+
+    # The largest value that can ever by the index of a slot, as opposed to the address of a global (symbol)
+    "MAX_SLOT": big.ROM_BASE-1,
 }
 
 
@@ -437,9 +466,6 @@ def interpreter(asm):
     num_primitives = 22
     # FIRST_PRIMITIVE = 8
     # LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
-
-    # The largest value that can ever refer to a slot, as opposed to a
-    MAX_SLOT = big.ROM_BASE-1
 
     FALSE = "rib_false"
     TRUE = "rib_true"
@@ -659,7 +685,7 @@ def interpreter(asm):
     asm.instr("@handle_call")
     asm.instr("D;JNE")
     pc_y_to_d()
-    asm.instr(f"@{MAX_SLOT}")
+    asm.instr(f"@MAX_SLOT")
     asm.instr("D=D-A")
     asm.instr("@handle_jump_to_slot")
     asm.instr("D;JLT")
