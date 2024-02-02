@@ -421,7 +421,10 @@ def decode(input, asm):
     # This will be the body of the outer proc, so just "jump" straight to it:
     start_instr = n
     # Note: emit_instr would want to choose the label...
-    emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
+    # emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
+    # Note: there is no true no-op, and "id" is not yet initialized. This will leave junk on the
+    # stack. What we really want is to put the "main" label on start_instr when it's emitted.
+    emit_rib("main", "#3", "#-42", start_instr)
 
 
 BUILTINS = {
@@ -689,11 +692,17 @@ def interpreter(asm):
     asm.instr("D=D-A")
     asm.instr("@handle_jump_to_slot")
     asm.instr("D;JLT")
-    pc_y_to_d()
-    asm.instr("@PC")
-    asm.instr("M=D")
-    asm.instr("@exec_loop")
-    asm.instr("0;JMP")
+
+    asm.comment("TODO: TEMP_? = target proc, ...")
+    asm.instr("@halt_loop")
+    # asm.instr("0;JMP")
+    # asm.comment("HACK: PC = PC.y; bogus!")
+    # y_to_d("PC")
+    # asm.instr("@PC")
+    # asm.instr("M=D")
+    # asm.instr("@exec_loop")
+    # asm.instr("0;JMP")
+    asm.blank()
 
     asm.label("handle_jump_to_slot")
     asm.comment("TODO")
@@ -736,8 +745,7 @@ def interpreter(asm):
     pc_y_to_d()
     asm.comment("TODO: check tag")
     asm.comment("Allocate rib: x = pc.y")
-    rib_append()
-    asm.comment("y = SP")
+    rib_append()    asm.comment("y = SP")
     asm.instr("@SP")
     asm.instr("D=M")
     rib_append()
