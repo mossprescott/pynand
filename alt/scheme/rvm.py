@@ -451,15 +451,17 @@ BUILTINS = {
 
     "SYMBOL_TABLE": 4,  # Only used during intiialization?
 
-    # General-purpose temporary storage:
+    # General-purpose temporary storage for the interpreter/primitives:
     "TEMP_0": 5,
     "TEMP_1": 6,
+    "TEMP_2": 7,
+    "TEMP_3": 7,
 
     # Useful values/addresses:
     "FIRST_RIB_MINUS_ONE": big.HEAP_BASE-1,
     "MAX_RIB": big.HEAP_TOP,
 
-    # The largest value that can ever by the index of a slot, as opposed to the address of a global (symbol)
+    # The largest value that can ever be the index of a slot, as opposed to the address of a global (symbol)
     "MAX_SLOT": big.ROM_BASE-1,
 }
 
@@ -533,6 +535,21 @@ def interpreter(asm):
         asm.instr("M=M+1")
         asm.instr("A=M-1")
         asm.instr(f"M={val}")
+
+    def pop(dest):
+        asm.comment("TODO: check SP[2] == 0")
+        asm.comment(f"{dest} = SP[0]")
+        asm.instr("@SP")
+        asm.instr("A=M")
+        asm.instr("D=M")
+        asm.instr(dest)
+        asm.instr("M=D")
+        asm.comment("SP = SP[1]")
+        asm.instr("@SP")
+        asm.instr("A=M+1")
+        asm.instr("D=M")
+        asm.instr("@SP")
+        asm.instr("M=D")
 
 
     # TODO: find end of encoded program; initialize stack pointer below it
@@ -673,22 +690,22 @@ def interpreter(asm):
     # Exec loop:
     #
 
-    def pc_x_to_d():
-        """Load the first field of the current instruction to D."""
-        asm.instr("@PC")
+    def x_to_d(rib_addr_loc):
+        """Load the first field of a rib to D."""
+        asm.instr(f"@{rib_addr_loc}")
         asm.instr("A=M")
         asm.instr("D=M")
 
-    def pc_y_to_d():
-        """Load the middle field of the current instruction to D."""
-        asm.instr("@PC")
+    def y_to_d(rib_addr_loc):
+        """Load the middle field of a rib to D."""
+        asm.instr(f"@{rib_addr_loc}")
         asm.instr("A=M+1")
         asm.instr("D=M")
 
-    def pc_z_to_d():
-        """Load the last field of the current instruction to D."""
+    def z_to_d(rib_addr_loc):
+        """Load the last field of a rib to D."""
         # Note: could save an instruction here if the pointer pointed to the *middle* field.
-        asm.instr("@PC")
+        asm.instr(f"@{rib_addr_loc}")
         asm.instr("A=M+1")
         asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
         asm.instr("D=M")
@@ -699,7 +716,7 @@ def interpreter(asm):
 
     asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
     asm.label("continue_next")
-    pc_z_to_d()
+    z_to_d("PC")
     asm.instr("@PC")
     asm.instr("M=D")
 
@@ -711,19 +728,39 @@ def interpreter(asm):
 
     asm.label("exec_loop")
 
-    asm.comment("Sanity check: negative instruction type is impossible")
-    pc_x_to_d()
+    asm.comment("Sanity check: instruction type between 0 and 4")
+    x_to_d("PC")
     asm.instr("@halt_loop")
     asm.instr("D;JLT")
-
-    asm.instr("@code_gt_zero")
+    asm.instr("@4")
+    asm.instr("D=D-A")
+    asm.instr("@halt_loop")
     asm.instr("D;JGT")
 
+    # Note: this indexed jump doesn't seem to save any cycles vs 5 branches, but it's parallel
+    # to the primitive handler dispatcher, so maybe easier to follow?
+    asm.comment("indexed jump to instruction handler")
+    x_to_d("PC")
+    asm.instr("@opcode_handler_table")
+    asm.instr("A=A+D")
+    asm.instr("A=M")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("opcode_handler_table")
+    asm.instr("@opcode_0")
+    asm.instr("@opcode_1")
+    asm.instr("@opcode_2")
+    asm.instr("@opcode_3")
+    asm.instr("@opcode_4")
+    asm.blank()
+
+    asm.label("opcode_0")
     asm.comment("type 0: jump/call")
-    pc_z_to_d()
+    z_to_d("PC")
     asm.instr("@handle_call")
     asm.instr("D;JNE")
-    pc_y_to_d()
+    y_to_d("PC")
     asm.instr(f"@MAX_SLOT")
     asm.instr("D=D-A")
     asm.instr("@handle_jump_to_slot")
@@ -744,49 +781,139 @@ def interpreter(asm):
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
-
+    asm.blank()
 
     asm.label("handle_call")
+    y_to_d("PC")
+    asm.instr(f"@MAX_SLOT")
+    asm.instr("D=D-A")
+    asm.instr("@handle_call_to_slot")
+    asm.instr("D;JLT")
+
+    asm.comment("TEMP_3 = proc rib from symbol")
+    y_to_d("PC")
+    asm.instr("A=D")  # HACK
+    asm.instr("D=M")
+    asm.instr("@TEMP_3")
+    asm.instr("M=D")
+    asm.instr("@handle_call_start")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("handle_call_to_slot")
+    asm.comment("TEMP_3 = proc rib from stack")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
+    asm.blank()
+
+    asm.comment("call protocol:")
+
+    asm.label("handle_call_start")
+
+    asm.comment("Check is proc rib:")
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("A=A+1")
+    asm.instr("A=A+1")
+    asm.instr("D=M-1")
+    asm.instr("@halt_loop")
+    asm.instr("D;JNE")
+
+    asm.comment("Check primitive or closure:")
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr("@0x1F")  # Mask off bits that are zero iff it's a primitive
+    asm.instr("A=!A")
+    asm.instr("D=D&A")
+    asm.instr("@handle_call_closure")
+    asm.instr("D;JNE")
+
+    asm.label("handle_call_primitive")
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr("@primitive_vector_table_start")
+    asm.instr("A=A+D")
+    asm.instr("A=M")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("handle_call_closure")
+    asm.comment("R5 = new rib for the continuation")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@TEMP_0")
+    rib_append(0)
+    rib_append(0)
+    rib_append(0)
+    asm.blank()
+
+    asm.comment("- pop num_params values from stack, forming list with cont as tail:")  # re-use the ribs?
+    asm.comment("R6 = num_params")
+    y_to_d("PC")  # target proc
+    asm.instr("@TEMP_1")
+    asm.instr("M=D")
+    asm.comment("R7 = acc")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.instr("@TEMP_2")
+    asm.instr("M=D")
+
+    asm.label("pop_params_loop")
+    asm.instr("@TEMP_1")
+    asm.instr("D=M")
+    asm.instr("@pop_params_end")
+    asm.instr("D;JLE")
 
 
-    asm.label("code_gt_zero")
-    asm.instr("D=D-1")
-    asm.instr("@code_gt_one")
-    asm.instr("D;JGT")
 
+    asm.instr("@TEMP_1")
+    asm.instr("M=M-1")
+    asm.instr("@pop_params_loop")
+    asm.instr("0;JMP")
+    asm.label("pop_params_end")
+    asm.blank()
+
+    asm.comment("- cont.x = SP")
+    asm.comment("- cont.y = PC.y (proc)")
+    asm.comment("- cont.z = PC.z")
+    asm.comment("- SP = arg_list")
+    asm.comment("- PC = PC.y.z (proc entry point)")
+
+
+    asm.instr("@continue_next")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("opcode_1")
     asm.comment("type 1: set")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
+    asm.blank()
 
-    asm.label("code_gt_one")
-    asm.instr("D=D-1")
-    asm.instr("@code_gt_two")
-    asm.instr("D;JGT")
-
+    asm.label("opcode_2")
     asm.comment("type 2: get")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
+    asm.blank()
 
-    asm.label("code_gt_two")
-    asm.instr("D=D-1")
-    asm.instr("@code_gt_three")
-    asm.instr("D;JGT")
-
+    asm.label("opcode_3")
     asm.comment("type 3: const")
-    pc_y_to_d()
+    y_to_d("PC")
     asm.comment("TODO: check tag")
     asm.comment("Allocate rib: x = pc.y")
-    rib_append()    asm.comment("y = SP")
+    rib_append()
+    asm.comment("y = SP")
     asm.instr("@SP")
     asm.instr("D=M")
     rib_append()
     asm.comment("z = 0 (pair)")
     rib_append("0")
+    asm.blank()
 
     asm.comment("SP = just-allocated rib")
     asm.instr("@NEXT_RIB")
@@ -795,25 +922,18 @@ def interpreter(asm):
     asm.instr("D=D-A")
     asm.instr("@SP")
     asm.instr("M=D")
+    asm.blank()
 
     asm.instr("@continue_next")
     asm.instr("0;JMP")
+    asm.blank()
 
-    asm.label("code_gt_three")
-    asm.instr("D=D-1")
-    asm.instr("@halt_loop")
-    asm.instr("D;JGT")
-
+    asm.label("opcode_4")
     asm.comment("type 4: if")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
-
     asm.blank()
-
-    # asm.comment("TEMP: just go to 'next' no matter what")
-    # asm.instr("@continue_next")
-    # asm.instr("0;JMP")
 
 
     #
@@ -832,11 +952,39 @@ def interpreter(asm):
 
     asm.label("primitive_rib")
     asm.comment("primitive 0; rib :: x y z -- rib(x, y, z)")
-    asm.comment("TODO:")
-    # asm.comment("- check for stack-heap collision")
-    # asm.comment("- allocate space for new rib")
-    # asm.comment("- pop three values and copy them into the new rib")
-    asm.instr("@exec_loop")
+
+    pop("@TEMP_2")
+    pop("@TEMP_1")
+    pop("@TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    rib_append()
+    asm.instr("@TEMP_1")
+    asm.instr("D=M")
+    rib_append()
+    asm.instr("@TEMP_2")
+    asm.instr("D=M")
+    rib_append()
+
+    # TODO: pop only two, then modify the top of stack in place to save one allocation
+    asm.comment("push allocated rib")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@3")
+    asm.instr("D=D-A")
+    rib_append()
+    asm.instr("@SP")
+    asm.instr("D=M")
+    rib_append()
+    rib_append("0")  # pair
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@3")
+    asm.instr("D=D-A")
+    asm.instr("@SP")
+    asm.instr("M=D")
+
+    asm.instr("@continue_next")
     asm.instr("0;JMP")
     asm.blank()
 
@@ -937,6 +1085,16 @@ def interpreter(asm):
     asm.comment("22")
     asm.instr("@primitive_halt")
     # fatal?
+    asm.comment("dummy handlers for 23-31 to simplify range check above:")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
+    asm.instr("@primitive_unimp")
     asm.label("primitive_vectors_end")
 
     asm.blank()
