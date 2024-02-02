@@ -210,6 +210,12 @@ def decode(input, asm):
 
     asm.comment("===  Data  ===")
 
+    # Exactly one primitive proc rib is pre-defined: `rib`
+    asm.label("rib_rib")
+    asm.instr("#0")
+    asm.instr("#0")
+    asm.instr("#1")
+
     # Three constants the runtime can refer to by name:
     def special(name):
         asm.label(name)
@@ -304,7 +310,7 @@ def decode(input, asm):
     # block of address space?
     asm.comment("Table of pointers to symbol name ribs in ROM:")
     asm.label("symbol_names_start")
-    for lbl, s in sym_names:
+    for lbl, s in reversed(sym_names):
         if s != "":
             asm.comment(f'"{s}"')
         asm.instr(f"@{lbl}")
@@ -332,9 +338,9 @@ def decode(input, asm):
         The table is written from the end, and each entry is made of of two ribs, the `symbol`
         and a `pair`.
         """
-        # TODO: fix the inevitable of-by-one error(s) here
+        # TODO: fix the inevitable off-by-one error(s) here
         asm.comment(f'symbol_ref({idx}); "{sym_names[idx][1]}"')
-        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx)}"
+        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx - 1)}"
 
     def emit_instr(op, arg, next):
         lbl = asm.next_label("instr")
@@ -478,6 +484,7 @@ def interpreter(asm):
     # FIRST_PRIMITIVE = 8
     # LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
 
+    RIB_PROC = "rib_rib"
     FALSE = "rib_false"
     TRUE = "rib_true"
     NIL = "rib_nil"
@@ -571,6 +578,7 @@ def interpreter(asm):
     asm.instr("D=A")
     rib_append()
     asm.instr("@TEMP_0")
+    asm.instr("A=M")
     asm.instr("D=M")
     rib_append()
     asm.instr("@2")  # symbol
@@ -619,6 +627,26 @@ def interpreter(asm):
     asm.instr("D=D-A")
     asm.instr(f"@{symbol_table_loop}")
     asm.instr("D;JLT")
+
+    asm.comment("HACK: initialize standard symbols (rib, false, true, nil)")
+    def inject_symbol_value(idx, val):
+        asm.comment(f"global({idx}) = {val}")
+        asm.instr("@NEXT_RIB")
+        asm.instr("D=M")
+        asm.instr(f"@{(idx+1)*6}")
+        asm.instr("D=D-A")
+        asm.instr("@TEMP_0")
+        asm.instr("M=D")
+        asm.instr("@KEYBOARD"); asm.instr("M=D")  # HACK
+        asm.instr(val)
+        asm.instr("D=A")
+        asm.instr("@TEMP_0")
+        asm.instr("A=M")
+        asm.instr("M=D")
+    inject_symbol_value(0, "@rib_rib")
+    inject_symbol_value(1, "@rib_false")
+    inject_symbol_value(2, "@rib_true")
+    inject_symbol_value(3, "@rib_nil")
 
     asm.blank()
 
