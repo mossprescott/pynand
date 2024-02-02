@@ -150,14 +150,14 @@ def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
             print(f"  PC: {show_addr(peek(1))}")
 
-            # HACK?
-            print(f"  symbols (n..0): ({show_addr(peek(4))}) {show_stack(peek(4))}")
-            print(f"  ribs:")
-            for addr in range(big.HEAP_BASE, unsigned(computer.peek(BUILTINS["NEXT_RIB"])), 3):
-                print(f"    @{addr}; {show_obj(addr, deep=False)}")
+            # # HACK?
+            # print(f"  symbols (n..0): ({show_addr(peek(4))}) {show_stack(peek(4))}")
+            # print(f"  ribs:")
+            # for addr in range(big.HEAP_BASE, unsigned(computer.peek(BUILTINS["NEXT_RIB"])), 3):
+            #     print(f"    @{addr}; {show_obj(addr, deep=False)}")
 
             print(f"  {show_instr(peek(1))}")
-        elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr:
+        elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr and symbols_by_addr[computer.pc] != "halt_loop":
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
         elif trace_level >= TRACE_ALL:
             print(f"{cycles:3,d}: {computer.pc}")
