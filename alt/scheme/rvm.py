@@ -472,58 +472,11 @@ def interpreter(asm):
     This part of the ROM is the same, independent of the Scheme program that's being interpreted.
     """
 
-    # Interpreter variables in low memory:
-    # SP = 0
-    # PC = 1
-    # NEXT_RIB = 2
-
-    # RETURN = 3
-
-    # used only during initialization?
-    # SYMBOL_TABLE = 4
-
-    num_primitives = 22
-    # FIRST_PRIMITIVE = 8
-    # LAST_PRIMITIVE = FIRST_PRIMITIVE + num_primitives
-
     RIB_PROC = "rib_rib"
     FALSE = "rib_false"
     TRUE = "rib_true"
     NIL = "rib_nil"
 
-    # FIXME: probably no return; jump straight to exec_loop?
-    # def call_primitive(lbl):
-    #     rtn_label = asm.next_label("return")
-    #     asm.instr(f"@{rtn_label}")
-    #     asm.instr("D=A")
-    #     asm.instr(f"@{RETURN}")
-    #     asm.instr("M=D")
-    #     asm.instr(f"@{lbl}")
-    #     asm.instr("0;JMP")
-    #     asm.label(rtn_label)
-
-    # def return_from_primitive():
-    #     asm.comment("return")
-    #     asm.instr(f"@{RETURN}")
-    #     asm.instr("A=M")
-    #     asm.instr("0;JMP")
-
-    # def push_d():
-    #     """Push the value in D onto the stack, without over-writing it."""
-    #     asm.instr(f"@{SP}")
-    #     asm.instr("M=M-1")
-    #     asm.instr("A=M+1")  # i.e., point to the previous location
-    #     asm.instr("M=D")
-
-    # def rib(x, y, z):
-    #     asm.comment(f"rib: {x}, {y}, {z}")
-    #     asm.comment("TODO: D = {x}")
-    #     asm.instr("@{NEXT_RIB}")
-    #     asm.instr("A=M")
-    #     asm.instr("M=D")
-    #     asm.comment("TODO: D = {y}")
-    #     asm.instr("@{NEXT_RIB}")
-    #     asm.instr("AM=M+1")
     def rib_append(val="D"):
         """Add a word to the rib currently being constructed.
 
@@ -551,14 +504,6 @@ def interpreter(asm):
         asm.instr("@SP")
         asm.instr("M=D")
 
-
-    # TODO: find end of encoded program; initialize stack pointer below it
-    # decode_stack_start = 16384//2 - 1
-    # asm.comment("SP = below the encoded program")
-    # asm.instr(f"@{decode_stack_start}")
-    # asm.instr("D=A")
-    # asm.instr(f"@{SP}")
-    # asm.instr("M=D")
 
     asm.label("start")
     asm.comment("NEXT_RIB = FIRST_RIB (HEAP_BASE)")
