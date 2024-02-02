@@ -9,7 +9,7 @@ import computer
 # import nand
 from nand.translate import AssemblySource
 from alt import big
-from nand.vector import unsigned
+from nand.vector import extend_sign, unsigned
 
 
 TRACE_NONE = 0
@@ -22,7 +22,7 @@ TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
 
-def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
+def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
 
     encoded = compile(program)
     # print(f"encoded program: {repr(encoded)}")
@@ -110,14 +110,15 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
         def show_obj(val, deep=True):
             # FIXME: check tag
-            if val < big.ROM_BASE:
-                return f"{val}"
+            if -big.ROM_BASE < extend_sign(val) < big.ROM_BASE:
+                return f"{extend_sign(val)}"
             else:
                 x, y, z = peek(val), peek(val+1), peek(val+2)
                 if deep:
-                    return f"({show_obj(x), show_obj(y), show_obj(z)}"
+                    return f"({show_obj(x, False)}, {show_obj(y, False)}, {show_obj(z, False)})"
                 else:
-                    return f"({x, y, z}"
+                    # return f"{x, y, z}"
+                    return f"(@{unsigned(x)}, @{unsigned(y)}, @{unsigned(z)})"
 
         def show_stack(addr):
             def go(addr):
@@ -148,6 +149,13 @@ def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
             print(f"  PC: {show_addr(peek(1))}")
+
+            # HACK?
+            print(f"  symbols (n..0): ({show_addr(peek(4))}) {show_stack(peek(4))}")
+            print(f"  ribs:")
+            for addr in range(big.HEAP_BASE, unsigned(computer.peek(BUILTINS["NEXT_RIB"])), 3):
+                print(f"    @{addr}; {show_obj(addr, deep=False)}")
+
             print(f"  {show_instr(peek(1))}")
         elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr:
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
