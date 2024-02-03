@@ -626,7 +626,9 @@ def interpreter(asm):
     asm.instr("@SP")
     asm.instr("M=D")
 
-    asm.comment("PC = @main")
+    # Note main is a meaningless instruction with its next the actual entry point, so it's actually
+    # skipped on the way into the interpreter loop.
+    asm.comment("PC = @main[2]")
     asm.instr("@main")
     asm.instr("D=A")
     asm.instr("@PC")
@@ -658,9 +660,7 @@ def interpreter(asm):
         asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
         asm.instr("D=M")
 
-    asm.comment("First time: jump to the main loop")
-    asm.instr("@exec_loop")
-    asm.instr("0;JMP")
+    asm.comment("First time: start with the 'next' of main")
 
     asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
     asm.label("continue_next")
