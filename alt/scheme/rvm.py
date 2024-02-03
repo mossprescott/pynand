@@ -74,10 +74,6 @@ def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
     def trace(computer, cycles):
         nonlocal last_traced_exec
 
-        # Only log on one of the half-cycles:
-        if not computer.fetch:
-            return
-
         def peek(addr):
             """Read from RAM or ROM."""
             if big.ROM_BASE <= addr < big.HEAP_BASE:
@@ -122,9 +118,9 @@ def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
 
         def show_stack(addr):
             def go(addr):
-            if addr == symbols["rib_nil"]:
+                if addr == symbols["rib_nil"]:
                     return []
-            elif peek(addr+2) == 0:  # pair
+                elif peek(addr+2) == 0:  # pair
                     return go(peek(addr+1)) + [show_obj(peek(addr))]
             return ", ".join(go(addr))
 
@@ -135,7 +131,8 @@ def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
             else:
                 return f"@{unsigned(addr)}"
 
-        if trace_level >= TRACE_COARSE and computer.pc == symbols["exec_loop"]:
+        if (trace_level >= TRACE_COARSE
+                and (computer.pc == symbols["exec_loop"] or computer.pc == symbols["halt_loop"])):
             if last_traced_exec is None:
                 print(f"{cycles:,d}:")
             else:
@@ -529,11 +526,15 @@ def interpreter(asm):
     symbol_table_loop = "symbol_table_loop"
     asm.label(symbol_table_loop)
 
-    asm.comment("DEBUG: log the pointer to tty")
-    asm.instr("@TEMP_0")
-    asm.instr("D=M")
-    asm.instr("@KEYBOARD")
-    asm.instr("M=D")
+    # asm.comment("DEBUG: log the pointer to tty")
+    # asm.instr("@TEMP_0")
+    # asm.instr("D=M")
+    # asm.instr("@KEYBOARD")
+    # asm.instr("M=D")
+    # asm.instr("A=D")
+    # asm.instr("D=M")
+    # asm.instr("@KEYBOARD")
+    # asm.instr("M=D")
 
     asm.comment("new symbol, with value = false")
     asm.instr("@rib_false")
@@ -573,11 +574,11 @@ def interpreter(asm):
     asm.instr("@SYMBOL_TABLE")
     asm.instr("M=D")
 
-    asm.comment("DEBUG: log NEXT_RIB to tty")
-    asm.instr("@NEXT_RIB")
-    asm.instr("D=M")
-    asm.instr("@KEYBOARD")
-    asm.instr("M=D")
+    # asm.comment("DEBUG: log NEXT_RIB to tty")
+    # asm.instr("@NEXT_RIB")
+    # asm.instr("D=M")
+    # asm.instr("@KEYBOARD")
+    # asm.instr("M=D")
 
     asm.comment("increment R5")
     asm.instr("@TEMP_0")
@@ -590,6 +591,8 @@ def interpreter(asm):
     asm.instr(f"@{symbol_table_loop}")
     asm.instr("D;JLT")
 
+    asm.blank()
+
     asm.comment("HACK: initialize standard symbols (rib, false, true, nil)")
     def inject_symbol_value(idx, val):
         asm.comment(f"global({idx}) = {val}")
@@ -599,7 +602,7 @@ def interpreter(asm):
         asm.instr("D=D-A")
         asm.instr("@TEMP_0")
         asm.instr("M=D")
-        asm.instr("@KEYBOARD"); asm.instr("M=D")  # HACK
+        # asm.instr("@KEYBOARD"); asm.instr("M=D")  # HACK
         asm.instr(val)
         asm.instr("D=A")
         asm.instr("@TEMP_0")

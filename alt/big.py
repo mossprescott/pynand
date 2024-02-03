@@ -281,12 +281,13 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
     kvm = TextKVM(name, 80, 25, 6, 10, "alt/big/Monaco9.png")
 
     # TODO: use computer.py's "run", for many more features
+
     cycles = 0
     halted = False
     while True:
         if not halted and computer.pc == halt_addr:
             halted = True
-            print(f"halted after {cycles} cycles")
+            print(f"\nHalted after {cycles} cycles\n")
             trace(computer, cycles)
 
 
@@ -297,12 +298,15 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
                 cycles_per_call = 10  # has to be a factor of CYCLES_PER_UPDATE
             computer.ticktock(cycles_per_call)
             cycles += cycles_per_call
+
+            if computer.fetch and trace is not None:
+                trace(computer, cycles)
+
         else:
             time.sleep(0.1)
 
 
         if trace is not None:
-            trace(computer, cycles)
             CYCLES_PER_UPDATE = 2  # HACK: to ensure we see all the TTY output
         else:
             CYCLES_PER_UPDATE = 100
