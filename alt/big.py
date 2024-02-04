@@ -102,6 +102,67 @@ def FlatMemory(inputs, outputs):
     outputs.tty_ready = tty.ready
 
 
+# TODO: move this to solved_05 as the standard impl
+@chip
+def DecodeALU(inputs, outputs):
+    """Inspect the bits of an instruction word and determine if it involves the ALU and if so
+    what the control signals should be.
+
+    When `is_alu_instr` is high, the rest of the signals should be wired to the ALU and PC.
+
+    This decoding is intended to be independent of architectural concerns such as cycle timing,
+    memory mapping, etc., so it could be used in a variety of implementations.
+
+    Note: there's almost no logic here, so just a handful of gates, but breaking out the signals
+    and providing clear names for them can make the various CPU implementations easier to follow.
+    """
+
+    instruction = inputs.instruction
+
+    i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, _, _, _ = [instruction[j] for j in reversed(range(16))]
+
+    # If low, then all the other output signals should be ignored:
+    outputs.is_alu_instr = i
+
+    # ALU control:
+    outputs.mem_to_alu = a  # if low, the ALU gets the value of A; if high, the value from memory
+    outputs.zx = c5
+    outputs.nx = c4
+    outputs.zy = c3
+    outputs.ny = c2
+    outputs.f  = c1
+    outputs.no = c0
+
+    # ALU Destinations:
+    # Note: these are all low when the ALU is not in effect, so it's safe to use them directly
+    outputs.alu_to_a = And(a=i, b=da).out
+    outputs.alu_to_d = And(a=i, b=dd).out
+    outputs.alu_to_m = And(a=i, b=dm).out
+
+
+# TODO: move this to solved_05 as the standard impl
+@chip
+def DecodeJump(inputs, outputs):
+    """Inspect the bits of an instruction word and the control signals from the ALU and determine
+    if a branch should be taken.
+
+    Note: if the instruction isn't an ALU instruction, then the output is low.
+    """
+
+    instruction = inputs.instruction
+    ng = inputs.ng
+    zr = inputs.zr
+
+    i, _, _, _,  _,  _,  _,  _,  _,  _,  _,  _,  _, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
+
+    # TODO: this seems like a lot of gates to transform 5 bits of input into one bit of output.
+    # Hmm, is 16 a lot?
+    outputs.jump = And(a=i,
+                       b=Or(a=Or(a=And(a=jlt, b=ng).out,
+                                 b=And(a=jeq, b=zr).out).out,
+                            b=And(a=jgt, b=And(a=Not(in_=ng).out, b=Not(in_=zr).out).out).out).out).out
+
+
 @chip
 def IdlableCPU(inputs, outputs):
     """Same as the standard CPU, plus an 'idle' input that suspends all state updates."""
@@ -114,32 +175,29 @@ def IdlableCPU(inputs, outputs):
     # Extra for fetch/execute cycles:
     idle = inputs.idle               # When set, *don't* update any state
 
-    i, _, _, a, c5, c4, c3, c2, c1, c0, da, dd, dm, jlt, jeq, jgt = [instruction[j] for j in reversed(range(16))]
+    decode = DecodeALU(instruction=instruction)
 
-    not_i = Not(in_=i).out
+    is_imm = Not(in_=decode.is_alu_instr).out
 
     not_idle = Not(in_=idle).out
 
     alu = lazy()
-    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out,
-                     load=And(a=not_idle, b=Or(a=not_i, b=da).out).out)
+    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=decode.is_alu_instr).out,
+                     load=And(a=not_idle, b=Or(a=is_imm, b=decode.alu_to_a).out).out)
     d_reg = Register(in_=alu.out,
-                     load=And(a=not_idle, b=And(a=i, b=dd).out).out)
-    jump_lt = And(a=alu.ng, b=jlt).out
-    jump_eq = And(a=alu.zr, b=jeq).out
-    jump_gt = And(a=And(a=Not(in_=alu.ng).out, b=Not(in_=alu.zr).out).out, b=jgt).out
-    jump = And(a=i,
-               b=Or(a=jump_lt, b=Or(a=jump_eq, b=jump_gt).out).out
-              ).out
+                     load=And(a=not_idle, b=decode.alu_to_d).out)
+
+    jump = DecodeJump(instruction=instruction, ng=alu.ng, zr=alu.zr).jump
+
     pc = PC(in_=a_reg.out, load=And(a=not_idle, b=jump).out, inc=not_idle, reset=reset)
-    alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
-                zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
+    alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=decode.mem_to_alu).out,
+                zx=decode.zx, nx=decode.nx, zy=decode.zy, ny=decode.ny, f=decode.f, no=decode.no))
 
 
-    outputs.outM = alu.out                   # M value output
-    outputs.writeM = And(a=dm, b=i).out      # Write to M?
-    outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
-    outputs.pc = pc.out                      # address of next instruction (latched)
+    outputs.outM = alu.out                # M value output
+    outputs.writeM = decode.alu_to_m      # Write to M?
+    outputs.addressM = a_reg.out          # Address in data memory (of M) (latched)
+    outputs.pc = pc.out                   # address of next instruction (latched)
 
 
 @chip

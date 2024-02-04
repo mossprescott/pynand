@@ -153,8 +153,85 @@ def test_gates_mem():
     assert gate_count(project_05.MemorySystem)['nands'] == 163
 
 
-# def test_cpu(chip=project_05.CPU):
-#     cpu = run(chip)
+def test_decode_alu():
+    decode = nand.run(DecodeALU)
+
+
+    # A typical computation with memory access:
+    decode.instruction = parse_op("M=M-D")
+
+    assert     decode.is_alu_instr
+
+    assert     decode.mem_to_alu
+
+    assert not decode.zx
+    assert not decode.nx
+    assert not decode.zy
+    assert     decode.ny
+    assert     decode.f
+    assert     decode.no
+
+    assert not decode.alu_to_a
+    assert not decode.alu_to_d
+    assert     decode.alu_to_m
+
+
+    # A typical conditional branch:
+    decode.instruction = parse_op("D;JLE")
+
+    assert     decode.is_alu_instr
+
+    # assert     decode.mem_to_alu  # unused
+
+    assert not decode.zx
+    assert not decode.nx
+    assert     decode.zy
+    assert     decode.ny
+    assert not decode.f
+    assert not decode.no
+
+    assert not decode.alu_to_a
+    assert not decode.alu_to_d
+    assert not decode.alu_to_m
+
+
+    decode.instruction = parse_op("@1234")
+
+    assert not decode.is_alu_instr
+
+    assert not decode.alu_to_a
+    assert not decode.alu_to_d
+    assert not decode.alu_to_m
+
+
+def test_gates_decode_alu():
+    assert gate_count(DecodeALU)['nands'] == 6
+
+
+def test_decode_jump():
+    decode = nand.run(DecodeJump)
+
+
+    # A typical computation with memory access:
+    decode.instruction = parse_op("M=M-D")
+
+    assert not decode.jump
+
+
+    # A typical conditional branch:
+    decode.instruction = parse_op("D;JLE")
+    decode.ng = 1
+    decode.zr = 0
+
+    assert decode.jump
+
+
+def test_gates_decode_jump():
+    assert gate_count(DecodeJump)['nands'] == 18
+
+
+# def test_cpu(chip=BigCPU):
+#     cpu = nand.run(chip)
 
 #     cpu.instruction = 0b0011000000111001  # @12345
 #     cpu.ticktock()
@@ -350,7 +427,8 @@ def test_gates_mem():
 def test_gates_cpu():
     """Portion of the extra chip size that's in the CPU's "idle" state."""
 
-    assert gate_count(IdlableCPU)['nands'] == 1106
+    # Note: factoring out instruction decoding seems to have added 2 gates
+    assert gate_count(IdlableCPU)['nands'] == 1108
 
     import project_05
     assert gate_count(project_05.CPU)['nands'] == 1099
@@ -595,7 +673,8 @@ def test_computer_no_program():
 def test_gates_computer():
     """Overall extra chip size."""
 
-    assert gate_count(BigComputer)['nands'] == 1448
+    # Note: factoring out instruction decoding seems to have added 2 gates
+    assert gate_count(BigComputer)['nands'] == 1450
 
     import project_05
     assert gate_count(project_05.Computer)['nands'] == 1262
