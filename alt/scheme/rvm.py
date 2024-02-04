@@ -23,9 +23,13 @@ TRACE_ALL = 3
 
 
 def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
-
     encoded = compile(program)
     # print(f"encoded program: {repr(encoded)}")
+
+    run_compiled(encoded, print_asm, trace_level, verbose_tty)
+
+
+def run_compiled(encoded, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
 
     asm = AssemblySource()
 
