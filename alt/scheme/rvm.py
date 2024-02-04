@@ -123,9 +123,16 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_FINE, verbose_tty=Tr
         def show_stack(addr):
             def go(addr):
                 if addr == symbols["rib_nil"]:
-                    return []
+                    raise Exception("Unexpected nil in stack")
                 elif peek(addr+2) == 0:  # pair
                     return go(peek(addr+1)) + [show_obj(peek(addr))]
+                elif peek(addr) == 0 and peek(addr+1) == 0:
+                    # This must be the primordial continuation rib: (0, 0, halt)
+                    # return ["⊥"]
+                    return []
+                else:
+                    # A continuation: (stack, closure, next instr)
+                    return go(peek(addr)) + [f"cont(@{peek(addr+2)})"]
             return ", ".join(go(addr))
 
         def show_addr(addr):
@@ -319,9 +326,13 @@ def decode(input, asm):
 
     asm.blank()
 
+    emit_rib("rib_outer_cont", "#0", "#0", "@instr_halt", "Bottom of stack: continuation to halt")
+
     # Decode RVM instructions:
 
     asm.comment("Instructions:")
+
+    emit_rib("instr_halt", "#5", "#0", "#0", "halt (secret opcode)")
 
     stack = None
     def pop():
@@ -413,7 +424,8 @@ def decode(input, asm):
                     break
                 else:
                     params_lbl = asm.next_label("params")
-                    emit_rib(params_lbl, n, "#0", body)
+                    print(f"{repr(n)}; {body}")
+                    emit_rib(params_lbl, f"#{n}", "#0", body)
                     # FIXME: is this even close?
                     proc_label = asm.next_label("proc")
                     asm.label(proc_label)
@@ -597,6 +609,7 @@ def interpreter(asm):
 
     asm.blank()
 
+    # TODO: fold this into the table of symbol names; cleaner and smaller
     asm.comment("HACK: initialize standard symbols (rib, false, true, nil)")
     def inject_symbol_value(idx, val):
         asm.comment(f"global({idx}) = {val}")
@@ -624,15 +637,17 @@ def interpreter(asm):
     # Initialize interpreter state:
     #
 
-    asm.comment("SP = '()")
-    asm.instr("@rib_nil")
+    asm.comment("SP = primordial continuation rib")
+    asm.instr("@rib_outer_cont")
     asm.instr("D=A")
     asm.instr("@SP")
     asm.instr("M=D")
 
-    # Note main is a meaningless instruction with its next the actual entry point, so it's actually
+    asm.blank()
+
+    # Note: main is a meaningless instruction with its next the actual entry point, so it's actually
     # skipped on the way into the interpreter loop.
-    asm.comment("PC = @main[2]")
+    asm.comment("PC = @main")
     asm.instr("@main")
     asm.instr("D=A")
     asm.instr("@PC")
@@ -664,7 +679,7 @@ def interpreter(asm):
         asm.instr("A=A+1")  # Cheeky: add two ones instead of using @2 to save a cycle
         asm.instr("D=M")
 
-    asm.comment("First time: start with the 'next' of main")
+    asm.comment("First time: start with the 'next' of main (by falling through to continue_next)")
 
     asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
     asm.label("continue_next")
@@ -680,11 +695,12 @@ def interpreter(asm):
 
     asm.label("exec_loop")
 
-    asm.comment("Sanity check: instruction type between 0 and 4")
+    # TODO: if CHECK:
+    asm.comment("Sanity check: instruction type between 0 and 5")
     x_to_d("PC")
     asm.instr("@halt_loop")
     asm.instr("D;JLT")
-    asm.instr("@4")
+    asm.instr("@5")
     asm.instr("D=D-A")
     asm.instr("@halt_loop")
     asm.instr("D;JGT")
@@ -705,6 +721,7 @@ def interpreter(asm):
     asm.instr("@opcode_2")
     asm.instr("@opcode_3")
     asm.instr("@opcode_4")
+    asm.instr("@opcode_5")
     asm.blank()
 
     asm.label("opcode_0")
@@ -905,6 +922,14 @@ def interpreter(asm):
     asm.label("opcode_4")
     asm.comment("type 4: if")
     asm.comment("TODO")
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    # Note: a safety check would have the same result, but this makes it explicit in case we ever
+    # make those checks optional.
+    asm.label("opcode_5")
+    asm.comment("type 5: halt")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
     asm.blank()
