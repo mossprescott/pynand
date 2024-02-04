@@ -841,6 +841,28 @@ def interpreter(asm):
 
     asm.label("opcode_1")
     asm.comment("type 1: set")
+    y_to_d("PC")
+    asm.instr(f"@MAX_SLOT")
+    asm.instr("D=D-A")
+    asm.instr("@handle_set_slot")
+    asm.instr("D;JLT")
+
+    asm.label("handle_set_global")
+    asm.comment("R5 = address of symbol rib")
+    y_to_d("PC")
+    asm.instr("@TEMP_0")
+    asm.instr("M=D")
+
+    asm.comment("RAM[TEMP_0] = pop()")
+    pop("D")
+    asm.instr("@TEMP_0")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    asm.instr("@continue_next")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("handle_set_slot")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
