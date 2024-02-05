@@ -105,6 +105,8 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_FINE, verbose_tty=Tr
                 return f"const {show_obj(y)} -> {show_addr(z)}"
             elif x == 4:
                 return f"if -> {show_addr(y)} else {show_addr(z)}"
+            elif x == 5:
+                return "halt"
             else:
                 return f"not an instr: {(x, y, z)}"
 
@@ -124,10 +126,13 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_FINE, verbose_tty=Tr
             def go(addr):
                 if addr == symbols["rib_nil"]:
                     raise Exception("Unexpected nil in stack")
+                elif addr == 0:
+                    # This appears only after the outer continuation is invoked:
+                    return ["⊥"]
                 elif peek(addr+2) == 0:  # pair
                     return go(peek(addr+1)) + [show_obj(peek(addr))]
                 elif peek(addr) == 0 and peek(addr+1) == 0:
-                    # This must be the primordial continuation rib: (0, 0, halt)
+                    # This must be the primordial continuation rib: (0, 0, halt), before it is invoked
                     # return ["⊥"]
                     return []
                 else:
