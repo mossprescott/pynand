@@ -451,7 +451,8 @@ def decode(input, asm):
     # emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
     # Note: there is no true no-op, and "id" is not yet initialized. This will leave junk on the
     # stack. What we really want is to put the "main" label on start_instr when it's emitted.
-    emit_rib("main", "#3", "#-42", start_instr)
+    # Using an illegal opcode here just to ensure we never actually try to interpret it.
+    emit_rib("main", "#42", "#0", start_instr)
 
 
 BUILTINS = {
