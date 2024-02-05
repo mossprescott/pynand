@@ -22,14 +22,14 @@ TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
 
-def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
+def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
     encoded = compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
     run_compiled(encoded, print_asm, trace_level, verbose_tty)
 
 
-def run_compiled(encoded, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
+def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
 
     asm = AssemblySource()
 
@@ -1233,7 +1233,7 @@ def interpreter(asm):
     asm.comment("SP.x += y")
     asm.instr("@SP")
     asm.instr("A=M")
-    asm.instr("M=M+D")  # just update SP.x in place,
+    asm.instr("M=M+D")
     asm.instr("@PRIMITIVE_CONT")
     asm.instr("A=M")
     asm.instr("0;JMP")
@@ -1241,8 +1241,17 @@ def interpreter(asm):
 
     asm.label("primitive_-")
     asm.comment("primitive 15; - :: x y -- x - y")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
+    # TODO: if type_checking:
+    asm.comment("D = pop() = y")
+    pop("TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.comment("SP.x -= y")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=M-D")
+    asm.instr("@PRIMITIVE_CONT")
+    asm.instr("A=M")
     asm.instr("0;JMP")
     asm.blank()
 

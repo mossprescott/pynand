@@ -26,6 +26,15 @@ def test_add():
     assert output == []
 
 
+def test_sub():
+    program = "(- 123 234)"
+
+    peek, output = run_to_halt(program, max_cycles=20000)
+
+    assert get_stack(peek) == [-111]
+    assert output == []
+
+
 
 def get_stack(peek):
     def loop(addr):
