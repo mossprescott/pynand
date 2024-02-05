@@ -1133,6 +1133,7 @@ def interpreter(asm):
 
     asm.label("primitive_id")
     asm.comment("primitive 1; id :: x -- x")
+    asm.comment("... and, that's all folks")
     asm.instr("@PRIMITIVE_CONT")
     asm.instr("A=M")
     asm.instr("0;JMP")
@@ -1224,8 +1225,17 @@ def interpreter(asm):
 
     asm.label("primitive_+")
     asm.comment("primitive 14; + :: x y -- x + y")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
+    # TODO: if type_checking:
+    asm.comment("D = pop() = y")
+    pop("TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.comment("SP.x += y")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=M+D")  # just update SP.x in place,
+    asm.instr("@PRIMITIVE_CONT")
+    asm.instr("A=M")
     asm.instr("0;JMP")
     asm.blank()
 

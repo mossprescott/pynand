@@ -17,6 +17,15 @@ def test_trivial():
     assert output == []
 
 
+def test_add():
+    program = "(+ 1 2)"
+
+    peek, output = run_to_halt(program, max_cycles=20000)
+
+    assert get_stack(peek) == [3]
+    assert output == []
+
+
 
 def get_stack(peek):
     def loop(addr):
