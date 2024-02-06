@@ -55,22 +55,22 @@ class Inspector:
             return f"not an instr: {(x, y, z)}"
 
 
-    def show_obj(self, val):
-        """Show an object, which may be an integer, special value, or rib."""
+    def _obj(self, val):
+        """Python representation of an object, which may be an integer, special value, or rib."""
 
         # FIXME: check tag
         if -big.ROM_BASE < extend_sign(val) < big.ROM_BASE:
-            return f"{extend_sign(val)}"
+            return extend_sign(val)
         elif self.symbols_by_addr.get(val) == "rib_nil":
-            return "nil"
+            return []
         elif self.symbols_by_addr.get(val) == "rib_true":
-            return "#t"
+            return True
         elif self.symbols_by_addr.get(val) == "rib_false":
-            return "#f"
+            return False
         else:
             x, y, z = self.peek(val), self.peek(val+1), self.peek(val+2)
             if z == 0:  # pair
-                return f"({self.show_obj(x)} : {self.show_obj(y)}"
+                return [self._obj(x)] + self._obj(y)
             elif z == 1:  # proc
                 MAX_PRIMITIVE = 31
                 if 0 < x < MAX_PRIMITIVE:
@@ -87,9 +87,15 @@ class Inspector:
             else:
                 return f"TODO: ({x}, {y}, {z})"
 
-    def show_stack(self):
-        """Show the contents of the stack, which is a list composed of ordinary pairs and continuation
-        ribs."""
+
+    def show_obj(self, val):
+        """Show an object, which may be an integer, special value, or rib."""
+
+        return str(self._obj(val))
+
+
+    def stack(self):
+        """Contents of the stack, bottom to top."""
 
         def go(addr):
             if self.symbols_by_addr.get(addr) == "rib_nil":
@@ -102,9 +108,17 @@ class Inspector:
                 x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
 
                 if z == 0:  # pair
-                    return go(y) + [self.show_obj(x)]
+                    return go(y) + [self._obj(x)]
                 else:
                     # A continuation: (stack, closure, next instr)
                     return go(x) + [f"cont({self.show_addr(z)})"]
         SP = 0
-        return ", ".join(go(self.peek(SP)))
+        return go(self.peek(SP))
+
+
+    def show_stack(self):
+        """Show the contents of the stack, which is a list composed of ordinary pairs and continuation
+        ribs."""
+
+        return ", ".join(str(o) for o in self.stack())
+

@@ -694,6 +694,14 @@ class NandVectorWrapper:
 
         self._screen.storage[address] = value
 
+    def peek_rom(self, address):
+        """Read a single word from the Computer's ROM."""
+
+        if self._rom is None:
+            raise MissingComponent("No ROM present")
+
+        return self._rom.storage[address]
+
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
 

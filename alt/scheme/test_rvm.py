@@ -4,6 +4,7 @@ import pytest
 
 from alt import big
 from alt.scheme import rvm
+from alt.scheme.inspector import Inspector
 import nand
 from nand.translate import AssemblySource
 from nand.vector import unsigned
@@ -11,46 +12,37 @@ from nand.vector import unsigned
 def test_trivial():
     program = "42"
 
-    peek, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run_to_halt(program, max_cycles=20000)
 
-    assert get_stack(peek) == [42]
+    assert inspect.stack() == [42]
     assert output == []
 
 
 def test_add():
     program = "(+ 1 2)"
 
-    peek, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run_to_halt(program, max_cycles=20000)
 
-    assert get_stack(peek) == [3]
+    assert inspect.stack() == [3]
     assert output == []
 
 
 def test_sub():
     program = "(- 123 234)"
 
-    peek, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run_to_halt(program, max_cycles=20000)
 
-    assert get_stack(peek) == [-111]
+    assert inspect.stack() == [-111]
     assert output == []
 
 
+def test_quote():
+    program = "'()"
 
-def get_stack(peek):
-    def loop(addr):
-        car = peek(addr)
-        cdr = peek(addr+1)
-        type_ = peek(addr+2)
-        if type_ == 5:
-            # It's a "special", so assume it's the nil value
-            return []
-        elif type_ == 0:
-            return loop(cdr) + [car]
-        else:
-            # must be a continuation rib:
-            return loop(car) + [f"cont@{addr}"]
+    inspect, output = run_to_halt(program, max_cycles=20000)
 
-    return loop(peek(0))
+    assert inspect.stack() == [[]]
+    assert output == []
 
 
 def run_to_halt(program, max_cycles=5000):
@@ -104,11 +96,6 @@ def run_to_halt(program, max_cycles=5000):
         if computer.fetch:
             print(f"pc: {show_addr(computer.pc)}; PC: {show_addr(computer.peek(1))}")
 
-    def peek(addr):
-        """Read from RAM or ROM."""
-        if big.ROM_BASE <= addr < big.HEAP_BASE:
-            return computer._rom.storage[addr]
-        else:
-            return computer.peek(addr)
+    inspect = Inspector(computer, symbols)
 
-    return (peek, output)
+    return (inspect, output)
