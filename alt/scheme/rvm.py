@@ -5,11 +5,10 @@
 See http://www.iro.umontreal.ca/~feeley/papers/YvonFeeleyVMIL21.pdf for the general picture.
 """
 
-import computer
-# import nand
 from nand.translate import AssemblySource
 from alt import big
 from nand.vector import extend_sign, unsigned
+from alt.scheme.inspector import Inspector
 
 
 TRACE_NONE = 0
@@ -78,95 +77,7 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=
     def trace(computer, cycles):
         nonlocal last_traced_exec
 
-        def peek(addr):
-            """Read from RAM or ROM."""
-            if big.ROM_BASE <= addr < big.HEAP_BASE:
-                return computer._rom.storage[addr]
-            else:
-                return computer.peek(addr)
-
-        def show_instr(addr):
-            def show_target(val):
-                if val <= BUILTINS["MAX_SLOT"]:
-                    return f"#{val}"
-                else:
-                    return show_addr(val)
-
-            x, y, z = peek(addr), peek(addr+1), peek(addr+2)
-            if x == 0 and z == 0:
-                return f"jump {show_target(y)}"
-            elif x == 0:
-                return f"call {show_target(y)} -> {show_addr(z)}"
-            elif x == 1:
-                return f"set {show_target(y)} -> {show_addr(z)}"
-            elif x == 2:
-                return f"get {show_target(y)} -> {show_addr(z)}"
-            elif x == 3:
-                return f"const {show_obj(y)} -> {show_addr(z)}"
-            elif x == 4:
-                return f"if -> {show_addr(y)} else {show_addr(z)}"
-            elif x == 5:
-                return "halt"
-            else:
-                return f"not an instr: {(x, y, z)}"
-
-        def show_obj(val, deep=True):
-            # FIXME: check tag
-            if -big.ROM_BASE < extend_sign(val) < big.ROM_BASE:
-                return f"{extend_sign(val)}"
-            elif val == symbols["rib_nil"]:
-                return "nil"
-            elif val == symbols["rib_true"]:
-                return "#t"
-            elif val == symbols["rib_false"]:
-                return "#f"
-            else:
-                x, y, z = peek(val), peek(val+1), peek(val+2)
-                if z == 0:  # pair
-                    return f"({show_obj(x)} : {show_obj(y)}"
-                elif z == 1:  # proc
-                    MAX_PRIMITIVE = 31
-                    if 0 < x < MAX_PRIMITIVE:
-                        return f"primitive(#{x})"  # TODO: lookup the primitive's name
-                    else:
-                        num_args, instr = peek(x), peek(x+2)
-                        return f"proc(args={num_args}, env={show_obj(y)}, instr={show_addr(instr)}){show_addr(val)}"
-                # elif z == 2:  # symbol
-                # elif z == 3:  # string
-                # elif z == 4:  # vector
-                elif z == 5:
-                    # Unexpected, but show the contents just in case
-                    return f"special({show_obj(x)}, {show_obj(y)}){show_addr(val)}"
-                else:
-                    return f"TODO: ({x}, {y}, {z})"
-
-                # elif deep:
-                #     return f"({show_obj(x, False)}, {show_obj(y, False)}, {show_obj(z, False)})"
-                # else:
-                #     # return f"{x, y, z}"
-                #     return f"(@{unsigned(x)}, @{unsigned(y)}, @{unsigned(z)})"
-
-        def show_stack(addr):
-            def go(addr):
-                if addr == symbols["rib_nil"]:
-                    # This appears only after the outer continuation is invoked:
-                    return []
-                elif addr == 0:
-                    # sanity check
-                    raise Exception("Unexpected zero pointer in stack")
-                elif peek(addr+2) == 0:  # pair
-                    return go(peek(addr+1)) + [show_obj(peek(addr))]
-                else:
-                    # A continuation: (stack, closure, next instr)
-                    return go(peek(addr)) + [f"cont(@{peek(addr+2)})"]
-            return ", ".join(go(addr))
-
-        def show_addr(addr):
-            """Show an address (with "@"), using the symbol for addresses in ROM."""
-            if addr in symbols_by_addr:
-                return f"@{symbols_by_addr[addr]}"
-            else:
-                return f"@{unsigned(addr)}"
+        inspector = Inspector(computer, symbols)
 
         if (trace_level >= TRACE_COARSE
                 and (computer.pc == symbols["exec_loop"] or computer.pc == symbols["halt_loop"])):
@@ -176,21 +87,21 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=
                 print(f"{cycles:,d} (+{cycles - last_traced_exec:,d}):")
             last_traced_exec = cycles
 
-            print(f"  stack ({show_addr(peek(0))}): {show_stack(peek(0))}")
+            print(f"  stack ({inspector.show_addr(inspector.peek(0))}): {inspector.show_stack()}")
 
-            next_rib = unsigned(peek(2))
+            next_rib = unsigned(inspector.peek(2))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-            print(f"  PC: {show_addr(peek(1))}")
+            print(f"  PC: {inspector.show_addr(inspector.peek(1))}")
 
             # # HACK?
-            # print(f"  symbols (n..0): ({show_addr(peek(4))}) {show_stack(peek(4))}")
+            # print(f"  symbols (n..0): ({inspector.show_addr(inspector.peek(4))}) {inspector.show_stack(inspector.peek(4))}")
             # print(f"  ribs:")
-            # for addr in range(big.HEAP_BASE, unsigned(computer.peek(BUILTINS["NEXT_RIB"])), 3):
-            #     print(f"    @{addr}; {show_obj(addr, deep=False)}")
+            # for addr in range(big.HEAP_BASE, unsigned(inspector.peek(BUILTINS["NEXT_RIB"])), 3):
+            #     print(f"    @{addr}; {inspector.show_obj(addr, deep=False)}")
 
-            print(f"  {show_instr(peek(1))}")
+            print(f"  {inspector.show_instr(inspector.peek(BUILTINS['PC']))}")
         elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr and symbols_by_addr[computer.pc] != "halt_loop":
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
         elif trace_level >= TRACE_ALL:
