@@ -966,6 +966,34 @@ def interpreter(asm):
 
     asm.label("opcode_2")
     asm.comment("type 2: get")
+    y_to_d("PC")
+    d_is_not_slot()
+    asm.instr("@handle_get_slot")
+    asm.instr("D;JEQ")
+
+    asm.label("handle_get_global")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@TEMP_0")
+    asm.instr("M=D")
+    y_to_d("PC")  # D = address of symbol
+    asm.instr("A=D")  # TODO: load directly to A?
+    asm.instr("D=M")  # D = object at symbol.x
+    rib_append("D")
+    asm.instr("@SP")
+    asm.instr("D=M")
+    rib_append("D")
+    rib_append("0")  # pair
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.instr("@SP")
+    asm.instr("M=D")
+
+    asm.instr("@continue_next")
+    asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("handle_get_slot")
     asm.comment("TODO")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
