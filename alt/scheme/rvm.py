@@ -931,7 +931,9 @@ def interpreter(asm):
     asm.comment("- PC = PC.y.z (proc entry point)")
 
 
-    asm.instr("@continue_next")
+    # TODO
+    # asm.instr("@continue_next")
+    asm.instr("@halt_loop")
     asm.instr("0;JMP")
     asm.blank()
 
