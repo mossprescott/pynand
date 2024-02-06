@@ -22,7 +22,7 @@ TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
 
-def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
+def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
     encoded = compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
@@ -114,13 +114,37 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=
             # FIXME: check tag
             if -big.ROM_BASE < extend_sign(val) < big.ROM_BASE:
                 return f"{extend_sign(val)}"
+            elif val == symbols["rib_nil"]:
+                return "nil"
+            elif val == symbols["rib_true"]:
+                return "#t"
+            elif val == symbols["rib_false"]:
+                return "#f"
             else:
                 x, y, z = peek(val), peek(val+1), peek(val+2)
-                if deep:
-                    return f"({show_obj(x, False)}, {show_obj(y, False)}, {show_obj(z, False)})"
+                if z == 0:  # pair
+                    return f"({show_obj(x)} : {show_obj(y)}"
+                elif z == 1:  # proc
+                    MAX_PRIMITIVE = 31
+                    if 0 < x < MAX_PRIMITIVE:
+                        return f"primitive(#{x})"  # TODO: lookup the primitive's name
+                    else:
+                        num_args, instr = peek(x), peek(x+2)
+                        return f"proc(args={num_args}, env={show_obj(y)}, instr={show_addr(instr)}){show_addr(val)}"
+                # elif z == 2:  # symbol
+                # elif z == 3:  # string
+                # elif z == 4:  # vector
+                elif z == 5:
+                    # Unexpected, but show the contents just in case
+                    return f"special({show_obj(x)}, {show_obj(y)}){show_addr(val)}"
                 else:
-                    # return f"{x, y, z}"
-                    return f"(@{unsigned(x)}, @{unsigned(y)}, @{unsigned(z)})"
+                    return f"TODO: ({x}, {y}, {z})"
+
+                # elif deep:
+                #     return f"({show_obj(x, False)}, {show_obj(y, False)}, {show_obj(z, False)})"
+                # else:
+                #     # return f"{x, y, z}"
+                #     return f"(@{unsigned(x)}, @{unsigned(y)}, @{unsigned(z)})"
 
         def show_stack(addr):
             def go(addr):
@@ -318,6 +342,7 @@ def decode(input, asm):
 
     # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
     # block of address space?
+    # TODO: add the initial value for each symbol to this table
     asm.comment("Table of pointers to symbol name ribs in ROM:")
     asm.label("symbol_names_start")
     for lbl, s in reversed(sym_names):
@@ -329,6 +354,8 @@ def decode(input, asm):
     asm.blank()
 
     emit_rib("rib_outer_cont", "@rib_nil", "#0", "@instr_halt", "Bottom of stack: continuation to halt")
+
+    asm.blank()
 
     # Decode RVM instructions:
 
