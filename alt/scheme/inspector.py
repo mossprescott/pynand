@@ -29,7 +29,7 @@ class Inspector:
     def show_instr(self, addr):
         x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
 
-        def show_target():
+        def show_target(with_value):
             """The target of a jump/call, get, or set: either a slot index or global."""
 
             # FIXME: use the rvm's actual/current value
@@ -37,16 +37,16 @@ class Inspector:
             if 0 <= y <= MAX_SLOT:
                 return f"#{y}"
             else:
-                return self.show_symbol(y)
+                return self.show_symbol(y, with_value=with_value)
 
         if x == 0 and z == 0:
-            return f"jump {show_target()}"
+            return f"jump {show_target(True)}"
         elif x == 0:
-            return f"call {show_target()}" # -> {self.show_addr(z)}"
+            return f"call {show_target(True)}" # -> {self.show_addr(z)}"
         elif x == 1:
-            return f"set {show_target()}" # -> {self.show_addr(z)}"
+            return f"set {show_target(False)}" # -> {self.show_addr(z)}"
         elif x == 2:
-            return f"get {show_target()}" # -> {self.show_addr(z)}"
+            return f"get {show_target(False)}" # -> {self.show_addr(z)}"
         elif x == 3:
             return f"const {self.show_obj(y)}" # -> {self.show_addr(z)}"
         elif x == 4:
@@ -57,11 +57,15 @@ class Inspector:
             return f"not an instr: {(x, y, z)}"
 
 
-    def show_symbol(self, addr):
+    def show_symbol(self, addr, with_value=False):
         val, name, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
         assert z == 2
         rib_num = (addr - big.HEAP_BASE)//3
-        return f'"{self._obj(name)}"{self.show_addr(addr)}(_{rib_num}) = {self._obj(val)}'
+        name_and_addr = f'"{self._obj(name)}"{self.show_addr(addr)}(_{rib_num})'
+        if with_value:
+            return f"{name_and_addr} = {self._obj(val)}"
+        else:
+            return name_and_addr
 
 
     def _obj(self, val):
