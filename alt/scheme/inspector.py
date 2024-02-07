@@ -23,6 +23,8 @@ class Inspector:
         else:
             return f"@{unsigned(addr)}"
 
+    def is_labeled(self, addr):
+        return addr in self.symbols_by_addr
 
     def show_instr(self, addr):
         x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
@@ -35,7 +37,7 @@ class Inspector:
             if 0 <= y <= MAX_SLOT:
                 return f"#{y}"
             else:
-                return self.show_addr(y)
+                return self.show_symbol(y)
 
         if x == 0 and z == 0:
             return f"jump {show_target()}"
@@ -55,6 +57,13 @@ class Inspector:
             return f"not an instr: {(x, y, z)}"
 
 
+    def show_symbol(self, addr):
+        val, name, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
+        assert z == 2
+        rib_num = (addr - big.HEAP_BASE)//3
+        return f'"{self._obj(name)}"{self.show_addr(addr)}(_{rib_num}) = {self._obj(val)}'
+
+
     def _obj(self, val):
         """Python representation of an object, which may be an integer, special value, or rib."""
 
@@ -72,15 +81,25 @@ class Inspector:
             if z == 0:  # pair
                 return [self._obj(x)] + self._obj(y)
             elif z == 1:  # proc
-                MAX_PRIMITIVE = 31
-                if 0 < x < MAX_PRIMITIVE:
-                    return f"primitive(#{x})"  # TODO: lookup the primitive's name
+                if 0 <= x < len(PRIMITIVES):
+                    return f"proc({PRIMITIVES[x]})"
                 else:
                     num_args, instr = self.peek(x), self.peek(x+2)
                     return f"proc(args={num_args}, env={self.show_obj(y)}, instr={self.show_addr(instr)}){self.show_addr(val)}"
-            # elif z == 2:  # symbol
-            # elif z == 3:  # string
-            # elif z == 4:  # vector
+            elif z == 2:  # symbol
+                return f"symbol({self._obj(y)} = {self._obj(x)})"
+            elif z == 3:  # string
+                chars = self._obj(x)
+                if len(chars) != y:
+                    raise Exception("bad string")
+                else:
+                    return "".join(chr(c) for c in chars)
+            elif z == 4:  # vector
+                elems = self._obj(x)
+                if len(elems) != y:
+                    raise Exception("bad vector")
+                else:
+                    return elems
             elif z == 5:
                 # Unexpected, but show the contents just in case
                 return f"special({self.show_obj(x)}, {self.show_obj(y)}){self.show_addr(val)}"
@@ -122,3 +141,30 @@ class Inspector:
 
         return ", ".join(str(o) for o in self.stack())
 
+
+PRIMITIVES = {
+    0: "rib",
+    1: "id",
+    2: "arg1",
+    3: "arg2",
+    4: "close",
+    5: "rib?",
+    6: "field0",
+    7: "field1",
+    8: "field2",
+    9: "field0-set!",
+    10: "field1-set!",
+    11: "field2-set!",
+    12: "eqv?",
+    13: "<",
+    14: "+",
+    15: "-",
+    16: "*",
+    17: "quotient (unimp.)",
+    18: "getchar (unimp.)",
+    19: "putchar (unimp.)",
+    # Extra:
+    20: "peek",
+    21: "poke",
+    22: "halt",
+}

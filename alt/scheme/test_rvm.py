@@ -18,6 +18,15 @@ def test_trivial():
     assert output == []
 
 
+def test_string():
+    program = '"abc"'
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == ["abc"]
+    assert output == []
+
+
 def test_add():
     program = "(+ 1 2)"
 
@@ -36,12 +45,34 @@ def test_sub():
     assert output == []
 
 
+
 def test_quote():
     program = "'()"
 
     inspect, output = run_to_halt(program, max_cycles=20000)
 
     assert inspect.stack() == [[]]
+    assert output == []
+
+
+def test_cons():
+    program = "(cons 1 '(2))"
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [1, 2]
+    assert output == []
+
+
+def test_lambda():
+    program = """
+    ((lambda (x y) (+ x y))
+        14 28)
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [42]
     assert output == []
 
 
@@ -61,19 +92,6 @@ def run_to_halt(program, max_cycles=5000):
 
     instrs, symbols, _ = big.assemble(asm.lines, min_static=None, builtins=rvm.BUILTINS)
 
-    symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
-
-    for addr, name in symbols_by_addr.items():
-        print(f"{addr}: {name}")
-
-    def show_addr(addr):
-        # addr = unsigned
-        if addr in symbols_by_addr:
-            return f"{symbols_by_addr[addr]} (@{addr})"
-        else:
-            return f"@{addr}"
-
-
     computer = nand.syntax.run(big.BigComputer, simulator="vector")
 
     computer.init_rom(instrs)
@@ -85,6 +103,8 @@ def run_to_halt(program, max_cycles=5000):
     cycles = 0
     output = []
 
+    inspect = Inspector(computer, symbols)
+
     while (not computer.fetch or computer.pc != symbols["halt_loop"]) and cycles <= max_cycles:
         computer.ticktock()
         cycles += 1
@@ -93,9 +113,13 @@ def run_to_halt(program, max_cycles=5000):
         if tty_char:
             output.append(tty_char)
 
-        if computer.fetch:
-            print(f"pc: {show_addr(computer.pc)}; PC: {show_addr(computer.peek(1))}")
-
-    inspect = Inspector(computer, symbols)
+        if computer.fetch and inspect.is_labeled(computer.pc):
+            cpu_pc = inspect.show_addr(computer.pc)
+            print(f"{cpu_pc}")
+            if cpu_pc == "@exec_loop":
+                stack = ", ".join(str(x) for x in inspect.stack())
+                print(f"  stack: {stack}")
+                pc = inspect.peek(1)
+                print(f"  {inspect.show_addr(pc):<10} {inspect.show_instr(pc)}")
 
     return (inspect, output)
