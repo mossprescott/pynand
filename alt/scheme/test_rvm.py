@@ -55,15 +55,6 @@ def test_quote():
     assert output == []
 
 
-def test_cons():
-    program = "(cons 1 '(2))"
-
-    inspect, output = run_to_halt(program, max_cycles=20000)
-
-    assert inspect.stack() == [1, 2]
-    assert output == []
-
-
 def test_lambda():
     program = """
     ((lambda (x y) (+ x y))
@@ -73,6 +64,19 @@ def test_lambda():
     inspect, output = run_to_halt(program, max_cycles=20000)
 
     assert inspect.stack() == [42]
+    assert output == []
+
+
+def test_define():
+    program = """
+    (define (cons x y) (rib x y 0))
+
+    (cons 1 '(2))
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [[1, 2]]
     assert output == []
 
 
