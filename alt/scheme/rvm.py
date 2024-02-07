@@ -264,6 +264,10 @@ def decode(input, asm):
 
     asm.blank()
 
+    # Primordial continuation:
+    # x (stack) = []
+    # y (proc) = 0
+    # z (instr) = halt
     emit_rib("rib_outer_cont", "@rib_nil", "#0", "@instr_halt", "Bottom of stack: continuation to halt")
 
     asm.blank()
@@ -401,7 +405,7 @@ BUILTINS = {
     # Low-memory "registers":
     "SP": 0,
     "PC": 1,
-    "NEXT_RIB": 2,
+    "NEXT_RIB": 2,   # TODO: "LAST_RIB" is more often useful; you write some values, then you save the address somewhere
 
     "PRIMITIVE_CONT": 3,  # where to go when primitive handler is done
 
@@ -411,7 +415,7 @@ BUILTINS = {
     "TEMP_0": 5,
     "TEMP_1": 6,
     "TEMP_2": 7,
-    "TEMP_3": 7,
+    "TEMP_3": 8,
 
     # Useful values/addresses:
     "FIRST_RIB_MINUS_ONE": big.HEAP_BASE-1,
@@ -644,8 +648,14 @@ def interpreter(asm):
         asm.instr("D=D&A")
 
     def find_cont(dest):
+        """Loop over the stack to find the first continuation (a non-pair.)
+
+        No registers are affected except `dest`.
+        """
+
         cont_loop_test = asm.next_label("cont_loop_test")
         cont_loop_end = asm.next_label("cont_loop_end")
+
         asm.comment("R5 = RAM[SP]")
         asm.instr("@SP")
         asm.instr("D=M")
@@ -664,6 +674,50 @@ def interpreter(asm):
         asm.instr("0;JMP")
 
         asm.label(cont_loop_end)
+
+    def find_slot(dest):
+        """Loop over the stack to find the slot referred to by the current instruction, and placing
+        the location of the object in the supplied destination.
+
+        Overwrites TEMP_0.
+        """
+        assert dest != "TEMP_0"
+
+        test_label = asm.next_label("slot_test")
+        end_label = asm.next_label("slot_end")
+
+        asm.comment("R5 = idx")
+        y_to_d("PC")
+        asm.instr("@TEMP_0")
+        asm.instr("M=D")
+
+        asm.comment(f"{dest} = SP")
+        asm.instr("@SP")
+        asm.instr("D=M")
+        asm.instr(f"@{dest}")
+        asm.instr("M=D")
+
+        asm.label(test_label)
+        asm.instr("@TEMP_0")
+        asm.instr("D=M")
+        asm.instr(f"@{end_label}")
+        asm.instr("D;JLE")
+
+        asm.comment(f"{dest} = cdr({dest})")
+        asm.instr(f"@{dest}")
+        asm.instr("A=M+1")
+        asm.instr("D=M")
+        asm.instr(f"@{dest}")
+        asm.instr("M=D")
+        # asm.instr("@KEYBOARD"); asm.instr("M=D") # DEBUG
+
+        asm.comment("TEMP_0 -= 1")
+        asm.instr("@TEMP_0")
+        asm.instr("M=M-1")
+        asm.instr(f"@{test_label}")
+        asm.instr("0;JMP")
+
+        asm.label(end_label)
 
 
     asm.comment("First time: start with the 'next' of main (by falling through to continue_next)")
@@ -733,16 +787,20 @@ def interpreter(asm):
 
     asm.label("proc_from_slot")
     asm.comment("TEMP_3 = proc rib from stack")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
+    find_slot("TEMP_3")
+    asm.instr("@TEMP_3")  # This has the address of the symbol
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr("@TEMP_3")  # Now update to the value (the proc)
+    asm.instr("M=D")
     asm.blank()
 
     asm.label("handle_proc_start")
-    asm.instr("D=D")  # no-op to make the label tracable
+    asm.instr("D=D")  # no-op to make the label traceable
 
     # TODO: if type_checking:
     asm.label("check_proc_rib")
+    # asm.instr("@TEMP_3"); asm.instr("D=M"); asm.instr("@KEYBOARD"); asm.instr("M=D")  # DEBUG
     z_to_d("TEMP_3")
     asm.instr("D=D-1")
     asm.instr("@halt_loop")
@@ -782,7 +840,6 @@ def interpreter(asm):
     asm.label("after_primitive_for_jump")
 
     asm.comment("find the continuation rib: first rib on stack with non-zero third field")
-
     find_cont("TEMP_0")
 
     asm.comment("overwrite the top stack entry: SP.y = R5.x")
@@ -799,8 +856,95 @@ def interpreter(asm):
     asm.instr("0;JMP")
     asm.blank()
 
+
     asm.label("handle_jump_to_closure")
-    asm.instr("@halt_loop")
+
+    asm.comment("find the continuation rib: first rib on stack with non-zero third field")
+    find_cont("TEMP_0")
+
+    # New continuation rib. Can't update the existing continuation, in case it's the primordial
+    # one, which is stored in ROM.
+    # TODO: move it to RAM, so it can be updated in place?
+    asm.comment("TEMP_1 = new continuation = (old.x, proc, old.z)")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@TEMP_1")
+    asm.instr("M=D")
+
+    asm.comment("New cont. saved stack = old.x")
+    asm.instr("@TEMP_0")
+    asm.instr("A=M")
+    asm.instr("D=M")
+    rib_append()
+    asm.comment("New cont. proc = TEMP_3")
+    asm.instr("@TEMP_3")
+    asm.instr("D=M")
+    rib_append()
+    asm.comment("New cont. next instr = old.z")
+    asm.instr("@TEMP_0")
+    asm.instr("A=M+1")
+    asm.instr("A=A+1")
+    asm.instr("D=M")
+    rib_append()
+
+
+    asm.comment("TEMP_2 = num_args (proc.x.x)")
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr("@TEMP_2")
+    asm.instr("M=D")
+    # asm.instr("@KEYBOARD"); asm.instr("M=D")  # DEBUG
+
+    jump_params_test = asm.next_label("jump_params_test")
+    jump_params_end = asm.next_label("jump_params_end")
+
+    asm.label(jump_params_test)
+    asm.instr("@TEMP_2")
+    asm.instr("D=M")
+    asm.instr(f"@{jump_params_end}")
+    asm.instr("D;JLE")
+
+    asm.comment("pop one object and add it to the new stack")
+    pop("TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    rib_append()
+    asm.instr("@TEMP_1")
+    asm.instr("D=M")
+    rib_append()
+    rib_append(0)
+
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@3")
+    asm.instr("D=D-A")
+    asm.instr("@TEMP_1")
+    asm.instr("M=D")
+
+    asm.instr("@TEMP_2")
+    asm.instr("M=M-1")
+    asm.instr(f"@{jump_params_test}")
+    asm.instr("0;JMP")
+    asm.label(jump_params_end)
+
+    asm.comment("Put new stack in place: SP = TEMP_1")
+    asm.instr("@TEMP_1")
+    asm.instr("D=M")
+    asm.instr("@SP")
+    asm.instr("M=D")
+
+    asm.comment("PC = proc.x.z")
+    # TODO: PC = proc.x and goto continue_next?
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("A=M+1")
+    asm.instr("A=A+1")
+    asm.instr("D=M")
+    asm.instr("@PC")
+    asm.instr("M=D")
+    asm.instr("@exec_loop")
     asm.instr("0;JMP")
     asm.blank()
 

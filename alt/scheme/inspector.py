@@ -134,7 +134,7 @@ class Inspector:
                     return go(y) + [self._obj(x)]
                 else:
                     # A continuation: (stack, closure, next instr)
-                    return go(x) + [f"cont({self.show_addr(z)})"]
+                    return go(x) + [f"cont(saved={self._obj(x)}; {self._obj(y)}; {self.show_addr(z)}){self.show_addr(addr)}"]
         SP = 0
         return go(self.peek(SP))
 
