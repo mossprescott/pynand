@@ -21,7 +21,7 @@ TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
 
-def run(program, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
+def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
     encoded = compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
@@ -1078,8 +1078,32 @@ def interpreter(asm):
     asm.blank()
 
     asm.label("handle_get_slot")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
+    find_slot("TEMP_3")
+    asm.instr("@TEMP_3")  # This has the address of the stack entry
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr("@TEMP_3")  # Now update to the value
+    asm.instr("M=D")
+    asm.blank()
+
+    # TODO: macro for push from TEMP
+    asm.comment("push TEMP3")
+    asm.instr("@TEMP_3")
+    asm.instr("D=M")
+    rib_append()
+    asm.instr("@SP")
+    asm.instr("D=M")
+    rib_append()
+    rib_append(0)
+    asm.comment("SP = NEXT_RIB-3 (the one we just initialized)")
+    asm.instr("@NEXT_RIB")
+    asm.instr("D=M")
+    asm.instr("@3")
+    asm.instr("D=D-A")
+    asm.instr("@SP")
+    asm.instr("M=D")
+
+    asm.instr("@continue_next")
     asm.instr("0;JMP")
     asm.blank()
 
