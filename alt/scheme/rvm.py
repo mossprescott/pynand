@@ -479,6 +479,20 @@ def interpreter(asm):
         asm.instr("@SP")
         asm.instr("M=D")
 
+    def push(val="D"):
+        """"""
+        rib_append()
+        asm.instr("@SP")
+        asm.instr("D=M")
+        rib_append()
+        rib_append(0)  # pair
+        asm.instr("@NEXT_RIB")
+        asm.instr("D=M")
+        asm.instr("@3")
+        asm.instr("D=D-A")
+        asm.instr("@SP")
+        asm.instr("M=D")
+
 
     asm.label("start")
     asm.comment("NEXT_RIB = FIRST_RIB (HEAP_BASE)")
@@ -1250,17 +1264,7 @@ def interpreter(asm):
     asm.instr("D=M")
     asm.instr("@3")
     asm.instr("D=D-A")
-    rib_append()
-    asm.instr("@SP")
-    asm.instr("D=M")
-    rib_append()
-    rib_append("0")  # pair
-    asm.instr("@NEXT_RIB")
-    asm.instr("D=M")
-    asm.instr("@3")
-    asm.instr("D=D-A")
-    asm.instr("@SP")
-    asm.instr("M=D")
+    push("D")
 
     asm.instr("@PRIMITIVE_CONT")
     asm.instr("A=M")
@@ -1407,8 +1411,19 @@ def interpreter(asm):
 
     asm.label("primitive_poke")
     asm.comment("primitive 20; poke :: x y -- y (and write the value y at RAM[x])")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
+    asm.comment("R5 = value")
+    pop("TEMP_0")
+    asm.comment("R6 = addr")
+    pop("TEMP_1")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.instr("@TEMP_1")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    push("D")
+
+    asm.instr("@PRIMITIVE_CONT")
+    asm.instr("A=M")
     asm.instr("0;JMP")
     asm.blank()
 

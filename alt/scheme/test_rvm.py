@@ -80,6 +80,32 @@ def test_define():
     assert output == []
 
 
+def test_draw():
+    program = """
+    (define poke (rib 21 0 1))
+    (define screen 1024)
+    (poke screen 65)
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [65]
+    assert output == []
+
+
+def test_tty():
+    program = """
+    (define poke (rib 21 0 1))
+    (define keyboard 2047)
+    (poke keyboard 48)
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [48]
+    assert output == [ord('0')]
+
+
 def run_to_halt(program, max_cycles=5000):
     """Compile and run a Scheme program, then return a function for inspecting the RAM, and a
     list of words that were written to the TTY port.
