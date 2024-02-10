@@ -1293,8 +1293,12 @@ def interpreter(asm):
     return_from_primitive()
 
     asm.label("primitive_arg1")
-    asm.comment("primitive 2; arg1 :: x y -- x")
-    asm.comment("TODO")
+    asm.comment("primitive 2; arg1 :: x y -- x")  # i.e. "drop"
+    asm.instr("@SP")
+    asm.instr("A=M+1") # addr of top entry.y
+    asm.instr("D=M")  # addr of next entry
+    asm.instr("@SP")
+    asm.instr("M=D")
     return_from_primitive()
 
     asm.label("primitive_arg2")
