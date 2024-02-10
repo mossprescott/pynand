@@ -477,14 +477,18 @@ def interpreter(asm):
         asm.instr(f"M={val}")
 
     def pop(dest):
-        asm.comment("TODO: check SP[2] == 0")
-        asm.comment(f"{dest} = SP[0]")
+        """Remove the top entry from the stack, placing the value in `dest`.
+
+        Updates only SP and `dest`.
+        """
+        asm.comment("TODO: check SP.z == 0")
+        asm.comment(f"{dest} = SP.x")
         asm.instr("@SP")
         asm.instr("A=M")
         asm.instr("D=M")
         asm.instr(f"@{dest}")
         asm.instr("M=D")
-        asm.comment("SP = SP[1]")
+        asm.comment("SP = SP.y")
         asm.instr("@SP")
         asm.instr("A=M+1")
         asm.instr("D=M")
@@ -492,8 +496,11 @@ def interpreter(asm):
         asm.instr("M=D")
 
     def push(val="D"):
-        """"""
-        rib_append()
+        """Add a new entry to the stack with the value from D (or 0 or 1, in case that's ever useful.)
+
+        Updates SP and NEXT_RIB.
+        """
+        rib_append(val)
         asm.instr("@SP")
         asm.instr("D=M")
         rib_append()
@@ -920,47 +927,67 @@ def interpreter(asm):
     asm.instr("D=M")
     rib_append()
 
+    def wrangle_closure_params():
+        """Move num_args objects from the current stack to a new stack on top of a new continuation rib.
 
-    asm.comment("TEMP_2 = num_args (proc.x.x)")
-    asm.instr("@TEMP_3")
-    asm.instr("A=M")
-    asm.instr("A=M")
-    asm.instr("D=M")
-    asm.instr("@TEMP_2")
-    asm.instr("M=D")
-    # asm.instr("@KEYBOARD"); asm.instr("M=D")  # DEBUG
+        The continuation rib is not modified (but the reference to it in TEMP_1 is overwritten.)
 
-    jump_params_test = asm.next_label("jump_params_test")
-    jump_params_end = asm.next_label("jump_params_end")
+        Before:
+        TEMP_3 = addr of proc rib
+        TEMP_1 = addr of new continuation (just allocated)
 
-    asm.label(jump_params_test)
-    asm.instr("@TEMP_2")
-    asm.instr("D=M")
-    asm.instr(f"@{jump_params_end}")
-    asm.instr("D;JLE")
+        During:
+        TEMP_2 = loop var: num args remaining
+        TEMP_1 = loop var: top of new stack
+        TEMP_0 = overwritten
 
-    asm.comment("pop one object and add it to the new stack")
-    pop("TEMP_0")
-    asm.instr("@TEMP_0")
-    asm.instr("D=M")
-    rib_append()
-    asm.instr("@TEMP_1")
-    asm.instr("D=M")
-    rib_append()
-    rib_append(0)
+        After:
+        TEMP_1 = new top of stack
+        """
 
-    asm.instr("@NEXT_RIB")
-    asm.instr("D=M")
-    asm.instr("@3")
-    asm.instr("D=D-A")
-    asm.instr("@TEMP_1")
-    asm.instr("M=D")
+        asm.comment("TEMP_2 = num_args (proc.x.x)")
+        asm.instr("@TEMP_3")
+        asm.instr("A=M")
+        asm.instr("A=M")
+        asm.instr("D=M")
+        asm.instr("@TEMP_2")
+        asm.instr("M=D")
+        # asm.instr("@KEYBOARD"); asm.instr("M=D")  # DEBUG
 
-    asm.instr("@TEMP_2")
-    asm.instr("M=M-1")
-    asm.instr(f"@{jump_params_test}")
-    asm.instr("0;JMP")
-    asm.label(jump_params_end)
+        params_test = asm.next_label("params_test")
+        params_end = asm.next_label("params_end")
+
+        asm.label(params_test)
+        asm.instr("@TEMP_2")
+        asm.instr("D=M")
+        asm.instr(f"@{params_end}")
+        asm.instr("D;JLE")
+
+        # TODO: modify the stack entry in place? And fix up SP, then
+        asm.comment("pop one object and add it to the new stack")
+        pop("TEMP_0")
+        asm.instr("@TEMP_0")
+        asm.instr("D=M")
+        rib_append()
+        asm.instr("@TEMP_1")
+        asm.instr("D=M")
+        rib_append()
+        rib_append(0)
+
+        asm.instr("@NEXT_RIB")
+        asm.instr("D=M")
+        asm.instr("@3")
+        asm.instr("D=D-A")
+        asm.instr("@TEMP_1")
+        asm.instr("M=D")
+
+        asm.instr("@TEMP_2")
+        asm.instr("M=M-1")
+        asm.instr(f"@{params_test}")
+        asm.instr("0;JMP")
+        asm.label(params_end)
+
+    wrangle_closure_params()
 
     asm.comment("Put new stack in place: SP = TEMP_1")
     asm.instr("@TEMP_1")
@@ -969,7 +996,6 @@ def interpreter(asm):
     asm.instr("M=D")
 
     asm.comment("PC = proc.x.z")
-    # TODO: PC = proc.x and goto continue_next?
     asm.instr("@TEMP_3")
     asm.instr("A=M")
     asm.instr("A=M+1")
@@ -977,6 +1003,7 @@ def interpreter(asm):
     asm.instr("D=M")
     asm.instr("@PC")
     asm.instr("M=D")
+
     asm.instr("@exec_loop")
     asm.instr("0;JMP")
     asm.blank()
@@ -1004,53 +1031,53 @@ def interpreter(asm):
     asm.instr("0;JMP")
 
     asm.label("handle_call_closure")
-    asm.comment("R5 = new rib for the continuation")
+
+    asm.comment("R6 = new rib for the continuation")
     asm.instr("@NEXT_RIB")
     asm.instr("D=M")
-    asm.instr("@TEMP_0")
-    rib_append(0)
-    rib_append(0)
-    rib_append(0)
-    asm.blank()
-
-    asm.comment("- pop num_params values from stack, forming list with cont as tail:")  # re-use the ribs?
-    asm.comment("R6 = num_params")
-    y_to_d("PC")  # target proc
     asm.instr("@TEMP_1")
     asm.instr("M=D")
-    asm.comment("R7 = acc")
-    asm.instr("@TEMP_0")
+    rib_append(0)  # cont.x gets filled in later
+    asm.instr("@TEMP_3")
+    asm.instr("D=M")
+    rib_append()  # cont.y = TEMP_3 (the proc rib)
+    z_to_d("PC")
+    rib_append()  # cont.z = pc.z (next instr after the call)
+    asm.blank()
+
+    wrangle_closure_params()
+
+    asm.comment("TEMP_2 = SP (old stack to save)")
+    asm.instr("@SP")
     asm.instr("D=M")
     asm.instr("@TEMP_2")
     asm.instr("M=D")
-
-    asm.label("pop_params_loop")
+    asm.comment("SP = TEMP_1 (top of new stack)")
     asm.instr("@TEMP_1")
     asm.instr("D=M")
-    asm.instr("@pop_params_end")
-    asm.instr("D;JLE")
-
-
-
+    asm.instr("@SP")
+    asm.instr("M=D")
+    asm.comment("cont.x = TEMP_2 (saved stack)")
+    find_cont("TEMP_1")  # Hmm. Searching here just because we ran out of TEMPs to hold onto it
+    asm.instr("@TEMP_2")
+    asm.instr("D=M")
     asm.instr("@TEMP_1")
-    asm.instr("M=M-1")
-    asm.instr("@pop_params_loop")
-    asm.instr("0;JMP")
-    asm.label("pop_params_end")
-    asm.blank()
+    asm.instr("A=M")
+    asm.instr("M=D")
 
-    asm.comment("- cont.x = SP")
-    asm.comment("- cont.y = PC.y (proc)")
-    asm.comment("- cont.z = PC.z")
-    asm.comment("- SP = arg_list")
-    asm.comment("- PC = PC.y.z (proc entry point)")
+    asm.comment("PC = proc.x.z")
+    asm.instr("@TEMP_3")
+    asm.instr("A=M")
+    asm.instr("A=M+1")
+    asm.instr("A=A+1")
+    asm.instr("D=M")
+    asm.instr("@PC")
+    asm.instr("M=D")
 
-
-    # TODO
-    # asm.instr("@continue_next")
-    asm.instr("@halt_loop")
+    asm.instr("@exec_loop")
     asm.instr("0;JMP")
     asm.blank()
+
 
     asm.label("opcode_1")
     asm.comment("type 1: set")
