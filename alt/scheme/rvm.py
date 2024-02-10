@@ -2,6 +2,15 @@
 
 """Ribbit VM implementation.
 
+The interpreter and primitives are all hand-rolled assembly. In hindsight, it would have been
+quicker and easier to adapt the compiler in "register.py", with a minimal library, and implement the
+interpreter in that. The size in ROM of the actual interpreter turns out not to be very critical
+(~1K words), and we're not really going for maximum performance here.
+
+RSC's encoded instruction stream is decoded (in Python) into ribs directly in the ROM, which
+is both relatively efficient in time and space, and more realistic than loading a complex program
+from some kind of I/O.
+
 See http://www.iro.umontreal.ca/~feeley/papers/YvonFeeleyVMIL21.pdf for the general picture.
 """
 
@@ -70,17 +79,10 @@ def run_compiled(encoded, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE
         program_words = len(instrs) - symbols["interpreter_end"]  # Note: includes at least 5 pre-defined ribs
         total_words = len(instrs) - big.ROM_BASE
         rom_capacity = big.HEAP_BASE - big.ROM_BASE
-        # TODO: count ribs in the ROM separate from the fixed runtime
-        # program_words = len(encoded)
-        # reserved_words = 8 + 22  # Interpreter/decoder state, and the primitive vectors
-        # available_ram = 0x4000 - reserved_words
         print(f"Interpreter: {interpreter_words:5,d} ({100*interpreter_words/rom_capacity:2.1f}%)")
         print(f"Program:     {program_words:5,d} ({100*program_words/rom_capacity:2.1f}%)")
         print(f"Total ROM:   {total_words:5,d} ({100*total_words/rom_capacity:2.1f}%)")
         print()
-
-
-
 
 
     last_traced_exec = None
@@ -306,7 +308,6 @@ def decode(input, asm):
         The table is written from the end, and each entry is made of of two ribs, the `symbol`
         and a `pair`.
         """
-        # TODO: fix the inevitable off-by-one error(s) here
         asm.comment(f'symbol_ref({idx}); "{sym_names[idx][1]}"')
         return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx - 1)}"
 
