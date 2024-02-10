@@ -1252,6 +1252,7 @@ def interpreter(asm):
     asm.comment("dummy handlers for 23-31 to simplify range check above:")
     for op in range(23, 32):
         asm.comment(f"{op} (dummy)")
+        asm.instr("@primitive_unimp")
     asm.label("primitive_vectors_end")
 
     asm.blank()
