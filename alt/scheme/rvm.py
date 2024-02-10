@@ -20,15 +20,20 @@ TRACE_FINE = 2
 TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
+DEFAULT_PRINT_ASM = False
+DEFAULT_TRACE_LEVEL = TRACE_FINE
 
-def run(program, print_asm=True, trace_level=TRACE_FINE, verbose_tty=True):
+
+def run(program, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
     encoded = compile(program)
-    # print(f"encoded program: {repr(encoded)}")
+
+    if print_asm:
+        print(f"encoded program: {repr(encoded)}")
 
     run_compiled(encoded, print_asm, trace_level, verbose_tty)
 
 
-def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=True):
+def run_compiled(encoded, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
 
     asm = AssemblySource()
 
@@ -45,17 +50,6 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=
         for l in asm.lines: print(l)
         print()
 
-        runtime_words = len(instrs) - big.ROM_BASE
-        total_rom = big.HEAP_BASE - big.ROM_BASE
-        # TODO: count ribs in the ROM separate from the fixed runtime
-        # program_words = len(encoded)
-        reserved_words = 8 + 22  # Interpreter/decoder state, and the primitive vectors
-        # available_ram = 0x4000 - reserved_words
-        print(f"ROM: {runtime_words:,d} ({100*runtime_words/total_rom:0.2f}%)")
-        # print(f"Encoded program: {program_words} ({100*program_words/available_ram:0.2f}%)")
-        print()
-
-
         def show_map(label, m):
             print("\n".join(
                 [ f"{label}:" ] +
@@ -69,6 +63,24 @@ def run_compiled(encoded, print_asm=True, trace_level=TRACE_COARSE, verbose_tty=
 
         if statics != {}:
             show_map("Statics", statics)
+
+    print_summary = True
+    if print_summary:
+        interpreter_words = symbols["interpreter_end"] - big.ROM_BASE
+        program_words = len(instrs) - symbols["interpreter_end"]  # Note: includes at least 5 pre-defined ribs
+        total_words = len(instrs) - big.ROM_BASE
+        rom_capacity = big.HEAP_BASE - big.ROM_BASE
+        # TODO: count ribs in the ROM separate from the fixed runtime
+        # program_words = len(encoded)
+        # reserved_words = 8 + 22  # Interpreter/decoder state, and the primitive vectors
+        # available_ram = 0x4000 - reserved_words
+        print(f"Interpreter: {interpreter_words:5,d} ({100*interpreter_words/rom_capacity:2.1f}%)")
+        print(f"Program:     {program_words:5,d} ({100*program_words/rom_capacity:2.1f}%)")
+        print(f"Total ROM:   {total_words:5,d} ({100*total_words/rom_capacity:2.1f}%)")
+        print()
+
+
+
 
 
     last_traced_exec = None
@@ -368,7 +380,7 @@ def decode(input, asm):
                     break
                 else:
                     params_lbl = asm.next_label("params")
-                    print(f"{repr(n)}; {body}")
+                    # print(f"{repr(n)}; {body}")
                     emit_rib(params_lbl, f"#{n}", "#0", body)
                     # FIXME: is this even close?
                     proc_label = asm.next_label("proc")
