@@ -13,37 +13,38 @@ was able to afford.
 Writes to ROM addresses are ignored.
 
 A small portion of the RAM is reserved for screen buffer and I/O:
-- 1000 words to hold 80x25 8-bit characters
-- Keyboard and TTY in the same 1024-word "page".
-- 23 other words are available for future expansion.
+- 2000 words to hold 80x25 16-bit characters
+- Keyboard and TTY in the same 2048-word "page".
+- 47 other words are unused.
 
 Layout considerations:
 - ROM is only large enough to fit a scheme/basic/forth interpreter (8K?)
-- Screen buffer and I/O: 1K
+- Screen buffer and I/O: 2K
 - RAM fills as much of the rest of 64K as possible
-- The low-memory page is RAM, for convenient access
+- The low-memory page is RAM, for convenient access.
 - The ROM lives in the 15-bit addressable range, so a code address can always be loaded in one cycle
 - "negative" addresses are a uniform block of RAM, useful for heap
 
-| Address Range | Size (words) | Storage | Contents                       |
-| 0x0000–0x03FF | 1K           | RAM     | Temporaries, "registers", etc. |
-| 0x0400–0x07FF | 1K           | RAM     | Screen buffer and I/O          |
-| 0x0800–0x7FFF | 30K          | ROM     | Code: boot/runtime; data       |
-| 0x8000–0xFFFF | 32K          | RAM     | Heap or other large blocks     |
+| Address Range | Size (words) | Storage | Contents                              |
+| 0x0000–0x07FF | 2K           | RAM     | Temporaries, "registers", stack, etc. |
+| 0x0800–0x0FFF | 2K           | RAM     | Screen buffer and I/O                 |
+| 0x1000–0x7FFF | 28K          | ROM     | Code: boot/runtime; data              |
+| 0x8000–0xFFFF | 32K          | RAM     | Heap or other large blocks            |
 
 Note: it's also possible to treat all negative values as addresses in a continous block of RAM
 starting at 0x8000 = -32768. In fact, this range extends all the way to the bottom of the ROM
-at 0x0800 = 2048.
+at 0x1000 = 4096.
 
 TODO: make the size of the ROM configurable, so you can trade off heap space vs runtime size.
 That means synthesizing the logic to overlay the right address range, so maybe you just select
-one of a few available sizes, e.g. 2K, 6K, 14K, 30K?
+one of a few available sizes, e.g. 4K, 12K, 28K?
 
-"Character-mode" graphics make more efficient use of memory, with only 1k allocated to the screen
-as opposed to 8K for a similar number of pixels (assuming 9-point font.) It also means at least
-8x faster updates,
+"Character-mode" graphics make more efficient use of memory, with only 2k allocated to the screen
+as opposed to 8K for a similar number of pixels (assuming 9-point font.) To keep things simple and
+quick, each 7-bit character is stored in a whole 16-bit word. No shifting or masking is necessary
+to draw a single character on the screen.
 
-For authentic Macintosh fonts, see https://archive.org/details/AppleMacintoshSystem753
+For authentic Macintosh fonts, see https://archive.org/details/AppleMacintoshSystem753.
 """
 
 from nand import chip, lazy, RAM, ROM, Input, Output, DFF
@@ -54,9 +55,9 @@ from project_03 import Mux, Mux16, Register, PC, ALU
 from nand.solutions import solved_06
 from alt.threaded import Eq16
 
-SCREEN_BASE   = 0x0400
-KEYBOARD_ADDR = 0x07FF
-ROM_BASE      = 0x0800
+SCREEN_BASE   = 0x0800
+KEYBOARD_ADDR = 0x0FFF
+ROM_BASE      = 0x1000
 HEAP_BASE     = 0x8000
 HEAP_TOP      = 0xFFFF
 
@@ -78,15 +79,14 @@ def FlatMemory(inputs, outputs):
     load = inputs.load
     address = inputs.address
 
-    # addresses 0x08-- through 0x7F-- are in the ROM:
-    # - high bits 00001–01111   (0000 1000 0000 0000 to 0111 1111 1111 1111)
-    # - or, 0... 1... .... ....
-    # - or, 1 <= (address >> 11) < 16
+    # addresses 0x10-- through 0x7F-- are in the ROM:
+    # - high bits 0001–0111   (0001 0000 0000 0000 to 0111 1111 1111 1111)
+    # - or, 0..1 .... .... ....
+    # - or, 1 <= (address >> 12) < 8
     is_rom = And(a=Not(in_=address[15]).out,
                  b=Or(a=Or(a=address[14],
                            b=address[13]).out,
-                      b=Or(a=address[12],
-                           b=address[11]).out).out).out
+                      b=address[12]).out).out
 
     is_io = Eq16(a=address, b=KEYBOARD_ADDR).out
 
@@ -396,7 +396,7 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
 class TextKVM(computer.KVM):
     """Keyboard and display, displaying characters using a set of baked-in glyphs.
 
-    Each word of the screen buffer stores a pair of 8-bit characters.
+    Each word of the screen buffer stores a single 16-bit character.
     """
 
     def __init__(self, title, char_width, char_height, glyph_width, glyph_height, bitmap_path):
@@ -413,12 +413,10 @@ class TextKVM(computer.KVM):
     def update_display(self, get_chars):
         self.screen.fill(computer.COLORS[0])
 
-        stride = self.char_width//2
         for y in range(0, self.char_height):
-            for x in range(0, self.char_width, 2):
-                pair = get_chars(y*stride + x//2)
-                self.render(  x, y, pair & 0xFF)
-                self.render(x+1, y, pair >> 8)
+            for x in range(0, self.char_width):
+                char = get_chars(y*self.char_width + x)
+                self.render(x, y, char)
 
         pygame.display.flip()
 
