@@ -346,7 +346,8 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
         if not halted and computer.pc == halt_addr:
             halted = True
             print(f"\nHalted after {cycles} cycles\n")
-            trace(computer, cycles)
+            if trace is not None:
+                trace(computer, cycles)
 
 
         if not halted:
