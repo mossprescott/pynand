@@ -746,6 +746,13 @@ def interpreter(asm):
         asm.label(end_label)
 
 
+    def unimp():
+        asm.comment("TODO")
+        asm.instr("@halt_loop")
+        asm.instr("0;JMP")
+        asm.blank()
+
+
     asm.comment("First time: start with the 'next' of main (by falling through to continue_next)")
 
     asm.comment("Typical loop path: get the next instruction to interpret from the third field of the current instruction:")
@@ -1069,10 +1076,7 @@ def interpreter(asm):
     asm.blank()
 
     asm.label("handle_set_slot")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("opcode_2")
     asm.comment("type 2: get")
@@ -1162,10 +1166,7 @@ def interpreter(asm):
 
     asm.label("opcode_4")
     asm.comment("type 4: if")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     # Note: a safety check would have the same result, but this makes it explicit in case we ever
     # make those checks optional.
@@ -1255,6 +1256,12 @@ def interpreter(asm):
 
     asm.blank()
 
+    def return_from_primitive():
+        asm.instr("@PRIMITIVE_CONT")
+        asm.instr("A=M")
+        asm.instr("0;JMP")
+        asm.blank()
+
     asm.label("primitive_rib")
     asm.comment("primitive 0; rib :: x y z -- rib(x, y, z)")
     pop("TEMP_2")
@@ -1277,103 +1284,70 @@ def interpreter(asm):
     asm.instr("@3")
     asm.instr("D=D-A")
     push("D")
-
-    asm.instr("@PRIMITIVE_CONT")
-    asm.instr("A=M")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_id")
     asm.comment("primitive 1; id :: x -- x")
     asm.comment("... and, that's all folks")
-    asm.instr("@PRIMITIVE_CONT")
-    asm.instr("A=M")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_arg1")
     asm.comment("primitive 2; arg1 :: x y -- x")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_arg2")
     asm.comment("primitive 3; arg2 :: x y -- y")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_close")
     asm.comment("primitive 4; close :: x -- rib(x[0], stack, 1)")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_rib?")
     asm.comment("primitive 5; rib? :: x -- bool(x is a rib)")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field0")
     asm.comment("primitive 6; field0 :: rib(x, _, _) -- x")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field1")
     asm.comment("primitive 7; field1 :: rib(_, y, _) -- y")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field2")
     asm.comment("primitive 8; field2 :: rib(_, _, z) -- z")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field0-set!")
     asm.comment("primitive 9; field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field1-set!")
     asm.comment("primitive 10; field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_field2-set!")
     asm.comment("primitive 11; field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))")
     asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_eqv?")
     asm.comment("primitive 12; eqv? :: x y -- bool(x is identical to y)")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_<")
     asm.comment("primitive 13; < :: x y -- bool(x < y)")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_+")
     asm.comment("primitive 14; + :: x y -- x + y")
@@ -1386,10 +1360,7 @@ def interpreter(asm):
     asm.instr("@SP")
     asm.instr("A=M")
     asm.instr("M=M+D")
-    asm.instr("@PRIMITIVE_CONT")
-    asm.instr("A=M")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_-")
     asm.comment("primitive 15; - :: x y -- x - y")
@@ -1402,24 +1373,15 @@ def interpreter(asm):
     asm.instr("@SP")
     asm.instr("A=M")
     asm.instr("M=M-D")
-    asm.instr("@PRIMITIVE_CONT")
-    asm.instr("A=M")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_*")
     asm.comment("primitive 16; - :: x y -- x * y")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_peek")
     asm.comment("primitive 19; peek :: x -- RAM[x]")
-    asm.comment("TODO")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_poke")
     asm.comment("primitive 20; poke :: x y -- y (and write the value y at RAM[x])")
@@ -1433,20 +1395,17 @@ def interpreter(asm):
     asm.instr("A=M")
     asm.instr("M=D")
     push("D")
-
-    asm.instr("@PRIMITIVE_CONT")
-    asm.instr("A=M")
-    asm.instr("0;JMP")
-    asm.blank()
+    return_from_primitive()
 
     asm.label("primitive_halt")
     asm.comment("primitive 21; halt :: -- (no more instructions are executed)")
-    asm.instr("@halt_loop")
-    asm.instr("0;JMP")
-    asm.blank()
+    unimp()
 
     asm.label("primitive_unimp")
     asm.comment("Note: the current instr will be logged if tracing is enabled")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
+    asm.blank()
+
+    asm.label("interpreter_end")
     asm.blank()
