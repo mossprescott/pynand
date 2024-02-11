@@ -1442,3 +1442,19 @@ def interpreter(asm):
 
     asm.label("interpreter_end")
     asm.blank()
+
+
+def main():
+    import sys
+
+    # TODO: command-line args, multiple source files, etc.
+    # --print, --trace
+
+    with open(sys.argv[1]) as f:
+        program = "".join(f.readlines())
+
+    run(program)
+
+
+if __name__ == "__main__":
+    main()
