@@ -83,7 +83,12 @@ class Inspector:
         else:
             x, y, z = self.peek(val), self.peek(val+1), self.peek(val+2)
             if z == 0:  # pair
-                return [self._obj(x)] + self._obj(y)
+                car = self._obj(x)
+                cdr = self._obj(y)
+                if isinstance(cdr, list):
+                    return [car] + cdr
+                else:
+                    return (car, cdr)
             elif z == 1:  # proc
                 if 0 <= x < len(PRIMITIVES):
                     return f"proc({PRIMITIVES[x]})"
