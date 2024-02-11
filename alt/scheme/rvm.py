@@ -1331,47 +1331,38 @@ def interpreter(asm):
 
     asm.label("primitive_arg2")
     asm.comment("primitive 3; arg2 :: x y -- y")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_close")
     asm.comment("primitive 4; close :: x -- rib(x[0], stack, 1)")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_rib?")
     asm.comment("primitive 5; rib? :: x -- bool(x is a rib)")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field0")
     asm.comment("primitive 6; field0 :: rib(x, _, _) -- x")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field1")
     asm.comment("primitive 7; field1 :: rib(_, y, _) -- y")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field2")
     asm.comment("primitive 8; field2 :: rib(_, _, z) -- z")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field0-set!")
     asm.comment("primitive 9; field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field1-set!")
     asm.comment("primitive 10; field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_field2-set!")
     asm.comment("primitive 11; field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))")
-    asm.comment("TODO")
     unimp()
 
     asm.label("primitive_eqv?")
