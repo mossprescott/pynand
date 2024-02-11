@@ -1469,7 +1469,7 @@ def main():
     with open(sys.argv[1]) as f:
         program = "".join(f.readlines())
 
-    run(program)
+    run(program, print_asm=True, trace_level=TRACE_COARSE)
 
 
 if __name__ == "__main__":
