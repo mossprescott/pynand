@@ -28,13 +28,7 @@ def test_string():
 
 
 def test_lt():
-    program = """
-    (define (cons x y) (rib x y 0))
-    (cons (< 1 2)
-    (cons (< 1 1)
-    (cons (< 2 1)
-        '())))
-    """
+    program = several("(< 1 2)", "(< 1 1)", "(< 2 1)")
 
     inspect, output = run_to_halt(program, max_cycles=20000)
 
@@ -119,6 +113,18 @@ def test_tty():
 
     assert inspect.stack() == [48]
     assert output == [ord('0')]
+
+
+
+def several(*exprs):
+    """Make a program that evaluates several expressions and constructs a list with each result."""
+    def go(xs):
+        # print(xs)
+        if xs == []:
+            return "  '()"
+        else:
+            return f"(cons {xs[0]}\n{go(xs[1:])})"
+    return "(define (cons x y) (rib x y 0))\n" + go(list(exprs))
 
 
 def run_to_halt(program, max_cycles=5000):
