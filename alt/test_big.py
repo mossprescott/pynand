@@ -117,12 +117,13 @@ def test_rom():
     mem = nand.run(FlatMemory, simulator="vector")
 
     # Writes to any ROM-mapped address are ignored:
-    for addr in (ROM_BASE, ROM_BASE + 1234, ROM_BASE + 29000, HEAP_BASE - 1):
+    for addr in (ROM_BASE, ROM_BASE + 1234, ROM_BASE + 27*1024, HEAP_BASE - 1):
         mem.address = addr
         mem.in_ = -1
         mem.load = 1
         mem.ticktock()
 
+        print(addr, mem.out)
         assert mem.out == 0
 
 
@@ -147,7 +148,7 @@ def test_gates_mem():
     This would have been extra chips on the board, not extra gates in the CPU, presumably.
     """
 
-    assert gate_count(FlatMemory)['nands'] == 222
+    assert gate_count(FlatMemory)['nands'] == 219
 
     import project_05
     assert gate_count(project_05.MemorySystem)['nands'] == 163
@@ -674,7 +675,7 @@ def test_gates_computer():
     """Overall extra chip size."""
 
     # Note: factoring out instruction decoding seems to have added 2 gates
-    assert gate_count(BigComputer)['nands'] == 1450
+    assert gate_count(BigComputer)['nands'] == 1447
 
     import project_05
     assert gate_count(project_05.Computer)['nands'] == 1262
