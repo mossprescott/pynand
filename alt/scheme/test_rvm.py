@@ -105,7 +105,7 @@ def test_draw():
 def test_tty():
     program = """
     (define poke (rib 21 0 1))
-    (define keyboard 2047)
+    (define keyboard 4095)
     (poke keyboard 48)
     """
 
