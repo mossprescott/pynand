@@ -1380,7 +1380,32 @@ def interpreter(asm):
 
     asm.label("primitive_<")
     asm.comment("primitive 13; < :: x y -- bool(x < y)")
-    unimp()
+    # TODO: if type_checking:
+    asm.comment("TEMP_0 = pop() = y")
+    pop("TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.comment("TEMP_0 -= (SP.x = x)")
+    asm.instr("@SP")
+    asm.instr("A=M")  # A = addr of SP.x
+    asm.instr("D=D-M")  # D = y - x
+    # Note: range of ints is limited, so true overflow doesn't happen?
+    is_less_label = asm.next_label("is_less")
+    asm.instr(f"@{is_less_label}")
+    asm.instr("D;JGT")
+    asm.instr("@rib_false")
+    asm.instr("D=A")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
+    asm.label(is_less_label)
+    asm.instr("@rib_true")
+    asm.instr("D=A")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
 
     asm.label("primitive_+")
     asm.comment("primitive 14; + :: x y -- x + y")

@@ -27,6 +27,21 @@ def test_string():
     assert output == []
 
 
+def test_lt():
+    program = """
+    (define (cons x y) (rib x y 0))
+    (cons (< 1 2)
+    (cons (< 1 1)
+    (cons (< 2 1)
+        '())))
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [[True, False, False]]
+    assert output == []
+
+
 def test_add():
     program = "(+ 1 2)"
 
