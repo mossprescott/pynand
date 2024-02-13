@@ -1549,15 +1549,20 @@ def interpreter(asm):
     push("D")
     return_from_primitive()
 
+
     asm.label("primitive_halt")
     asm.comment("primitive 21; halt :: -- (no more instructions are executed)")
-    unimp()
+    asm.instr("@halt_loop")
+    asm.instr("0;JMP")
+    asm.blank()
+
 
     asm.label("primitive_unimp")
     asm.comment("Note: the current instr will be logged if tracing is enabled")
     asm.instr("@halt_loop")
     asm.instr("0;JMP")
     asm.blank()
+
 
     asm.label("interpreter_end")
     asm.blank()
