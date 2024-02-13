@@ -50,15 +50,15 @@ def run_compiled(encoded, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE
 
     decode(encoded, asm)
 
-    instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
-
-    assert symbols["start"] == big.ROM_BASE
-
-
     if print_asm:
         for l in asm.lines: print(l)
         print()
 
+    instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
+
+    assert symbols["start"] == big.ROM_BASE
+
+    if print_asm:
         def show_map(label, m):
             print("\n".join(
                 [ f"{label}:" ] +
