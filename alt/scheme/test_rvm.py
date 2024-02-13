@@ -54,6 +54,24 @@ def test_sub():
     assert output == []
 
 
+def test_mul():
+    program = "(* 6 7)"
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [42]
+    assert output == []
+
+
+def test_mul_mixed_signs():
+    program = several("(* 6 -7)", "(* -14 -3)", "(* 2 -21)")
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [[-42, 42, -42]]
+    assert output == []
+
+
 def test_if():
     program = "(if #t 42 '())"
 
