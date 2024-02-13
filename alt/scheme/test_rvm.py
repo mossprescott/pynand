@@ -89,6 +89,18 @@ def test_define():
     assert output == []
 
 
+def test_capture():
+    program = """
+    (define (add x) (lambda (y) (+ x y)))
+    ((add 1) 2)
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [3]
+    assert output == []
+
+
 def test_draw():
     program = """
     (define poke (rib 21 0 1))
