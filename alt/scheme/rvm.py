@@ -1194,7 +1194,21 @@ def interpreter(asm):
 
     asm.label("opcode_4")
     asm.comment("type 4: if")
-    unimp()
+    pop("TEMP_0")
+    asm.comment("TOS is #f; no branch")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.instr("@rib_false")
+    asm.instr("D=D-A")
+    asm.instr("@continue_next")
+    asm.instr("D;JEQ")
+    asm.comment("PC = PC.y")
+    y_to_d("PC")
+    asm.instr("@PC")
+    asm.instr("M=D")
+    asm.instr("@exec_loop")
+    asm.instr("0;JMP")
+    asm.blank()
 
     # Note: a safety check would have the same result, but this makes it explicit in case we ever
     # make those checks optional.

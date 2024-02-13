@@ -54,6 +54,14 @@ def test_sub():
     assert output == []
 
 
+def test_if():
+    program = "(if #t 42 '())"
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [42]
+    assert output == []
+
 
 def test_quote():
     program = "'()"
