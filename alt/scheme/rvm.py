@@ -393,8 +393,6 @@ def decode(input, asm):
                     asm.instr(f"@{params_lbl}")
                     asm.instr("@rib_nil")
                     asm.instr("#1")
-                    # n = [[n, 0, m], "@rib_nil", 1]
-                    # asm.comment(f"proc: {n}, ...")
                     n = f"@{proc_label}"
                     op = 4
 
