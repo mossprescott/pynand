@@ -399,8 +399,8 @@ def decode(input, asm):
             if isinstance(n, int):
                 n = f"#{n}"
 
-            instr_lbl = emit_instr(op-1, n, pop())
-            push(f"@{instr_lbl}")
+        instr_lbl = emit_instr(op-1, n, pop())
+        push(f"@{instr_lbl}")
 
     # This will be the body of the outer proc, so just "jump" straight to it:
     start_instr = n
