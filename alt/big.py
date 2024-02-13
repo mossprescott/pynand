@@ -69,10 +69,6 @@ HEAP_TOP      = 0xFFFF
 @chip
 def FlatMemory(inputs, outputs):
     """The same interface as MemorySystem, but also maps the ROM and extends address to the full 16 bits.
-
-    FIXME: this will need some additional support in the "codegen" simulator, which otherwise implements
-    the standard MemorySystem directly. But that support will be useful to any Computer with different
-    memory layout.
     """
 
     in_ = inputs.in_
@@ -317,7 +313,7 @@ import pygame.image
 import time
 
 
-def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True):
+def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True):
     """Run with keyboard and text-mode graphics."""
 
     # TODO: font
@@ -328,7 +324,7 @@ def run(program, chip=BigComputer, name="Flat!", font="monaco-9", halt_addr=None
     elif any(b != 0 for b in program[:ROM_BASE]):
         print("WARNING: non-zero words found in the program image below ROM_BASE; this memory is hidden by low RAM")
 
-    computer = nand.syntax.run(chip, simulator="vector")
+    computer = nand.syntax.run(chip, simulator=simulator)
 
     computer.init_rom(program)
 
@@ -437,7 +433,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run assembly source with text-mode display and keyboard")
     parser.add_argument("path", help="Path to source (<file>.asm)")
-    # parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
+    parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
     # parser.add_argument("--trace", action="store_true", help="(VM/Jack-only) print cycle counts during initialization. Note: runs almost 3x slower.")
     # parser.add_argument("--print", action="store_true", help="(VM/Jack-only) print translated assembly.")
     # TODO: "--debug" showing opcode-level trace. Breakpoints, stepping, peek/poke?
@@ -458,7 +454,7 @@ def main():
     print(f"symbols: {symbols}")
     print(f"statics: {statics}")
 
-    run(program=prg, halt_addr=symbols["halt"])
+    run(program=prg, simulator=args.simulator, halt_addr=symbols["halt"])
 
 
 if __name__ == "__main__":

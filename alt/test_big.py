@@ -1,13 +1,23 @@
 #! /usr/bin/env pytest
 
+import pytest
+
 from nand import run, gate_count
 import nand.component
 from alt.big import *
 
 
-def test_memory_system():
-    # FIXME: not handled by "codegen" yet
-    mem = nand.run(FlatMemory, simulator="vector")
+# TODO: put this somewhere common:
+def parameterize_simulators(f):
+    def vector(chip, **args):
+        return nand.run(chip, simulator="vector", **args)
+    def codegen(chip, **args):
+        return nand.run(chip, simulator="codegen", **args)
+    return pytest.mark.parametrize("run", [vector, codegen])(f)
+
+@parameterize_simulators
+def test_memory_system(run):
+    mem = run(FlatMemory)
 
     # set RAM[0] = -1
     mem.in_ = -1
@@ -113,8 +123,9 @@ def test_memory_system():
     assert mem.out == -1
 
 
-def test_rom():
-    mem = nand.run(FlatMemory, simulator="vector")
+@parameterize_simulators
+def test_rom(run):
+    mem = run(FlatMemory)
 
     # Writes to any ROM-mapped address are ignored:
     for addr in (ROM_BASE, ROM_BASE + 1234, ROM_BASE + 27*1024, HEAP_BASE - 1):
@@ -154,9 +165,9 @@ def test_gates_mem():
     assert gate_count(project_05.MemorySystem)['nands'] == 163
 
 
-def test_decode_alu():
-    decode = nand.run(DecodeALU)
-
+@parameterize_simulators
+def test_decode_alu(run):
+    decode = run(DecodeALU)
 
     # A typical computation with memory access:
     decode.instruction = parse_op("M=M-D")
@@ -209,8 +220,9 @@ def test_gates_decode_alu():
     assert gate_count(DecodeALU)['nands'] == 6
 
 
-def test_decode_jump():
-    decode = nand.run(DecodeJump)
+@parameterize_simulators
+def test_decode_jump(run):
+    decode = run(DecodeJump)
 
 
     # A typical computation with memory access:
@@ -435,8 +447,9 @@ def test_gates_cpu():
     assert gate_count(project_05.CPU)['nands'] == 1099
 
 
-def test_computer_no_program():
-    computer = nand.run(BigComputer)
+@parameterize_simulators
+def test_computer_no_program(run):
+    computer = run(BigComputer)
 
     for _ in range(100):
         computer.ticktock()

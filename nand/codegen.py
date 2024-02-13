@@ -13,13 +13,15 @@ directly in Python:
 - ROM: there should no more than one ROM present
 - MemorySystem: there should be no more than one MemorySystem present
 
+If the conventional MemorySystem is not used, then these components can be used discretely:
+- RAM, Input, Output: not more than one of each
+
 A few more are implemented so that this simulator can also be used (and tested) with smaller
 chips:
 - DFF
 - DMux
 - DMux8Way
 - Mux8Way16
-- TODO: RAM, separately from MemorySystem
 
 Any other ICs that appear are flattened to combinations of these. The downside is that a
 moderate amount of flattening will have a significant impact on simulation speed. For example,
@@ -36,7 +38,7 @@ into a flat address space) is all implemented with fixed logic. The rationale is
 the memory layout also entails constructing a new UI harness, which is beside the point.
 """
 
-from nand.component import Nand, Const, DFF, ROM
+from nand.component import Nand, Const, DFF, ROM, RAM, Input, Output
 from nand.integration import IC, Connection, root, clock
 from nand.optimize import simplify
 from nand.vector import extend_sign
@@ -131,10 +133,13 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
     if any(conn == clock for conn in ic.wires.values()):
         raise NotImplementedError("This simulator cannot handle chips that refer to 'clock' directly.")
 
-    if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps):
+    # if any(isinstance(c, IC) and c.label == 'MemorySystem' for c in all_comps):
+    if any(isinstance(c, ROM) for c in all_comps):
         supr = "SOC"
+        supr_args = ["15", "16"]  # HACK: works for Big; doesn't break the standard CPU
     else:
         supr = "Chip"
+        supr_args = []
 
     lines = []
     def l(indent, str):
@@ -237,6 +242,10 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         return template.format(a=src_many(comp, 'a'), b=src_many(comp, 'b'))
 
     def component_expr(comp):
+        """Expression producing the value for a component's single output, or None if it can't be
+        represented that way.
+        """
+
         if isinstance(comp, Nand):
             return binary1(comp, "not ({a} and {b})")
         elif isinstance(comp, Const):
@@ -300,6 +309,14 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             # the RAM?
             address = src_many(comp, 'address', 14)
             return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
+        elif isinstance(comp, RAM):
+            address = src_many(comp, 'address', comp.address_bits)
+            return f"self._ram[{address}]"
+        elif isinstance(comp, Input):
+            return "self.input"
+        elif isinstance(comp, Output):
+            # FIXME: bogus?
+            return "self._tty == 0"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
 
@@ -310,7 +327,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
 
     l(0, f"class {class_name}({supr}):")
     l(1,   f"def __init__(self):")
-    l(2,     f"{supr}.__init__(self)")
+    l(2,     f"{supr}.__init__({','.join(['self'] + supr_args)})")
     for name in ic.inputs():
         l(2, f"self._{name} = 0  # input")
     for name in ic.outputs():
@@ -437,8 +454,21 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             l(6,     f"self._tty = {in_name}")
             l(6,     f"self._tty_ready = {in_name} != 0")
             any_state = True
-        elif isinstance(comp, (Const, ROM)):
+        elif isinstance(comp, (Const, ROM, Input)):
             pass
+        elif isinstance(comp, RAM):
+            address_expr = src_many(comp, 'address', 14)
+            in_name = f"_{all_comps.index(comp)}_in"
+            l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"{in_name} = {src_many(comp, 'in_')}")
+            l(5,   f"self._ram[{address_expr}] = {in_name}")
+            any_state = True
+        elif isinstance(comp, Output):
+            in_name = f"_{all_comps.index(comp)}_in"
+            l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"self._tty = {in_name}")
+            l(5,   f"self._tty_ready = {in_name} != 0")
+            any_state = True
         elif comp.label in PRIMITIVES:
             # All combinational components: nothing to do here
             pass
@@ -499,10 +529,11 @@ class Chip:
 class SOC(Chip):
     """Super for chips that include a full computer with ROM, RAM, keyboard input, and "TTY" output."""
 
-    def __init__(self):
-        self._rom = []
-        self._ram = [0]*(1 << 14)
-        self._screen = [0]*(1 << 13)
+    def __init__(self, rom_address_bits=15, ram_address_bits=14, screen_address_bits=13):
+        self._rom = [0]*(1 << rom_address_bits)
+        self._ram = [0]*(1 << ram_address_bits)
+        if screen_address_bits is not None:
+            self._screen = [0]*(1 << screen_address_bits)
         self._keyboard = 0
         self._tty = 0
 
@@ -519,8 +550,8 @@ class SOC(Chip):
         size = len(instructions)
 
         # Assuming a 15-bit ROM, as we do here, we can't address more than 32K of instructions:
-        if size >= 2**15:
-            raise Exception(f"Too many instructions: {size:0,d} >= {2**15:0,d}")
+        if size >= len(self._rom):
+            raise Exception(f"Too many instructions: {size:0,d} >= {len(self._rom):,d}")
 
         contents = instructions + [
             size,  # @size (which is the address of this instruction)
