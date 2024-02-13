@@ -115,6 +115,21 @@ def test_define():
     assert output == []
 
 
+def test_fact():
+    program = """
+    (define (fact n)
+        (if (< n 2) 1
+            (* n (fact (- n 1)))))
+
+    (fact 5)
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [120]
+    assert output == []
+
+
 def test_capture():
     program = """
     (define (add x) (lambda (y) (+ x y)))
