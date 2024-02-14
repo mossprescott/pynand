@@ -293,6 +293,40 @@ def test_field2_set(run):
     assert output == []
 
 
+@parameterize_simulators
+def test_eqv_simple(run):
+    program = """
+    (define eqv? (rib 12 0 1))
+
+    (define x 42)
+    (define y 42)  ;; same value means same object
+    (define z 11)
+
+    """ + several("(eqv? x x)", "(eqv? x y)", "(eqv? x z)")
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [[True, True, False]]
+    assert output == []
+
+
+@parameterize_simulators
+def test_eqv_ribs(run):
+    program = """
+    (define eqv? (rib 12 0 1))
+
+    (define x '(1 2 3))
+    (define y '(1 2 3))  ;; not the same object, despite same contents
+    (define z '(3 4 5))
+
+    """ + several("(eqv? x x)", "(eqv? x y)", "(eqv? x z)")
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [[True, False, False]]
+    assert output == []
+
+
 #
 # Helpers
 #
@@ -305,7 +339,7 @@ def several(*exprs):
             return "  '()"
         else:
             return f"(cons {xs[0]}\n{go(xs[1:])})"
-    return "(define (cons x y) (rib x y 0))\n" + go(list(exprs))
+    return "(define (cons $$x $$y) (rib $$x $$y 0))\n" + go(list(exprs))
 
 
 def run_to_halt(program, max_cycles=20000, simulator="codegen"):

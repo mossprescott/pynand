@@ -1467,6 +1467,7 @@ def interpreter(asm):
     asm.instr("A=M+1")
     asm.instr("A=A+1")
     asm.instr("M=D")
+    # FIXME: jump to shared copy of this common sequence
     asm.comment("Update the top stack entry in place")
     asm.instr("@SP")
     asm.instr("A=M")
@@ -1476,7 +1477,34 @@ def interpreter(asm):
 
     asm.label("primitive_eqv?")
     asm.comment("primitive 12; eqv? :: x y -- bool(x is identical to y)")
-    unimp()
+    asm.comment("TEMP_0 = pop() = y")
+    pop("TEMP_0")
+    asm.instr("@TEMP_0")
+    asm.instr("D=M")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("D=D-M")
+    eqv_true_label = asm.next_label("eqv_true")
+    asm.instr(f"@{eqv_true_label}")
+    asm.instr("D;JEQ")
+    asm.instr("@rib_false")
+    asm.instr("D=A")
+    # FIXME: jump to shared copy of this common sequence
+    asm.comment("Update the top stack entry in place")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
+    asm.label(eqv_true_label)
+    asm.instr("@rib_true")
+    asm.instr("D=A")
+    # FIXME: jump to shared copy of this common sequence
+    asm.comment("Update the top stack entry in place")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
+
 
     asm.label("primitive_<")
     asm.comment("primitive 13; < :: x y -- bool(x < y)")
