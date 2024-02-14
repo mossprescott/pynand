@@ -238,6 +238,60 @@ def test_field2(run):
     assert output == []
 
 
+@parameterize_simulators
+def test_field0_set(run):
+    program = """
+    (define field0-set! (rib 9 0 1))
+    (define (pair x y) (rib x y 0))
+
+    (define foo '(7 8 9))
+
+    ;; Leave both the modified-in-place cons cell and the value on the stack for inspection:
+    (pair foo (field0-set! foo 10))
+    """
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [([10, 8, 9], 10)]
+    assert output == []
+
+
+@parameterize_simulators
+def test_field1_set(run):
+    program = """
+    (define field1-set! (rib 10 0 1))
+    (define (pair x y) (rib x y 0))
+
+    (define foo '(7 8 9))
+
+    ;; Leave both the modified-in-place cons cell and the value on the stack for inspection:
+    (pair foo (field1-set! foo '(10 11)))
+    """
+
+    inspect, output = run(program)
+
+    # Note: here the cdr is acually a list, so it gets interpreted that way
+    assert inspect.stack() == [[[7, 10, 11], 10, 11]]
+    assert output == []
+
+
+@parameterize_simulators
+def test_field2_set(run):
+    program = """
+    (define field2-set! (rib 11 0 1))
+    (define (pair x y) (rib x y 0))
+
+    (define foo '(7 8 9))
+
+    ;; Hard to make a legit value by changing the type, so just update it and then pull it back out
+    (pair (field2-set! foo 11) (field2 foo))
+    """
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [(11, 11)]
+    assert output == []
+
 
 #
 # Helpers
