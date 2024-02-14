@@ -13,7 +13,22 @@ def main():
         min_library_src_lines = f.readlines()
 
     # TODO: need to reference the library functions we want to be able available
-    program = "".join(min_library_src_lines) + "\n\n(repl)"
+    program = "".join(min_library_src_lines) + """
+
+    (define poke (rib 21 0 1))
+
+    (define screen 2048)
+    (define (drawchar x y c) (poke (+ screen (+ x (* 80 y))) c))
+
+    (define cursorx 0)
+    (define cursory 0)
+    (define (putchar c)
+        (begin
+            (drawchar cursorx cursory c)
+            (set! cursorx (+ 1 cursorx))))
+
+    (repl)
+    """
 
     # Note: actually running the compiler in the Ribbit Python interpreter is pretty slow.
     # Probably want to cache the encoded result somewhere (or just go back to hard-coding it here.)
