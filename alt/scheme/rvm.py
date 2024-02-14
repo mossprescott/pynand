@@ -1283,8 +1283,8 @@ def interpreter(asm):
     asm.instr("@primitive_*")
     asm.comment("17 (quotient: not implemented)")
     asm.instr("@primitive_unimp")
-    asm.comment("18 (getchar: not implemented)")
-    asm.instr("@primitive_unimp")
+    asm.comment("18")
+    asm.instr("@primitive_getchar")
     asm.comment("19 (putchar: not implemented)")
     asm.instr("@primitive_unimp")
     asm.comment("20")
@@ -1631,9 +1631,30 @@ def interpreter(asm):
     return_from_primitive()
 
 
+    asm.label("primitive_getchar")
+    asm.comment("primitive 18: getchar :: -- <char from keyboard> (blocks until a key is pressed)")
+    # Note: this will only catch keypresses that occur after the instruction is executed. For
+    # a responsive shell, the check will have to incorporated into the interpreter loop.
+    # It might even need to be be checked more often than once per instruction, since instructions
+    # can take as long as hundreds of cycles.
+    asm.comment("Loop until @KEYBOARD contains anything other than zero.")
+
+    getchar_loop_label = asm.next_label("getchar_loop")
+
+    asm.label(getchar_loop_label)
+    asm.instr("@KEYBOARD")
+    asm.instr("D=M")
+    asm.instr(f"@{getchar_loop_label}")
+    asm.instr("D;JEQ")
+
+    push("D")
+    return_from_primitive()
+
+
     asm.label("primitive_peek")
     asm.comment("primitive 19; peek :: x -- RAM[x]")
     unimp()
+
 
     asm.label("primitive_poke")
     asm.comment("primitive 20; poke :: x y -- y (and write the value y at RAM[x])")
