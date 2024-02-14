@@ -157,13 +157,9 @@ def test_gates_mem():
     """Portion of the extra chip size that's in the memory system.
 
     This would have been extra chips on the board, not extra gates in the CPU, presumably.
-
-    A surprising amount of this space (~50 gates) is just to avoid applying a out-of-range
-    address to the ROM, which the codegen simulator doesn't like. If that seems unfair,
-    the simulator could be modified to do the range-check.
     """
 
-    assert gate_count(FlatMemory)['nands'] == 268
+    assert gate_count(FlatMemory)['nands'] == 219
 
     import project_05
     assert gate_count(project_05.MemorySystem)['nands'] == 163
@@ -692,7 +688,7 @@ def test_gates_computer():
     """Overall extra chip size."""
 
     # Note: factoring out instruction decoding seems to have added 2 gates
-    assert gate_count(BigComputer)['nands'] == 1496
+    assert gate_count(BigComputer)['nands'] == 1447
 
     import project_05
     assert gate_count(project_05.Computer)['nands'] == 1262
