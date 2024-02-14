@@ -87,7 +87,7 @@ def FlatMemory(inputs, outputs):
     is_io = Eq16(a=address, b=KEYBOARD_ADDR).out
 
     ram = RAM(16)(in_=in_, load=load, address=address)  # Fully 64K; partially hidden by the ROM
-    rom = ROM(15)(address=Mux16(a=0, b=address, sel=is_rom).out)  # Based at 0 and sized to 32K, but partially hidden by RAM
+    rom = ROM(15)(address=address)  # Based at 0 and sized to 32K, but partially hidden by RAM
     # screen = RAM(10) # Separate RAM would make life easier for the harness?
     keyboard = Input()
     tty = Output(in_=in_, load=And(a=load, b=is_io).out)

@@ -57,7 +57,7 @@ def translate(ic):
     class_name, lines = generate_python(ic)
 
     # print(ic)
-    # print_lines(lines)
+    print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
@@ -362,7 +362,12 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             pass
         elif isinstance(comp, ROM):
             # TODO: trap index errors with try/except
-            l(3, f"{output_name(comp)} = self._rom[{src_many(comp, 'address', comp.address_bits)}]")
+            address_name = f"_{all_comps.index(comp)}_address"
+            l(3, f"{address_name} = {src_many(comp, 'address', comp.address_bits)}")
+            l(3, f"if 0 <= {address_name} < len(self._rom):")
+            l(4,   f"{output_name(comp)} = self._rom[{address_name}]")
+            l(3, "else:")
+            l(4,   f"{output_name(comp)} = 0")
         elif comp.label == "DMux":
             in_name = f"_{all_comps.index(comp)}_in"
             sel_name = f"_{all_comps.index(comp)}_sel"
@@ -594,6 +599,9 @@ class SOC(Chip):
     def poke_screen(self, address, value):
         """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
         self._screen[address] = extend_sign(value)
+
+    def peek_rom(self, address):
+        return self._rom[address]
 
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
