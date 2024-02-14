@@ -313,7 +313,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             address = src_many(comp, 'address', comp.address_bits)
             return f"self._ram[{address}]"
         elif isinstance(comp, Input):
-            return "self.input"
+            return "self._keyboard"
         elif isinstance(comp, Output):
             # FIXME: bogus?
             return "self._tty == 0"
@@ -471,6 +471,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         elif isinstance(comp, Output):
             in_name = f"_{all_comps.index(comp)}_in"
             l(4, f"if {src_one(comp, 'load')}:")
+            l(5,   f"{in_name} = {src_many(comp, 'in_')}")
             l(5,   f"self._tty = {in_name}")
             l(5,   f"self._tty_ready = {in_name} != 0")
             any_state = True
