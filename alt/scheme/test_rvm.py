@@ -169,6 +169,54 @@ def test_tty():
 
 
 
+#
+# Tests for specific primitives:
+#
+
+def test_field0():
+    program = """
+    (define field0 (rib 6 0 1))
+
+    (field0 '(7 8 9))
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [7]  # car
+    assert output == []
+
+
+def test_field1():
+    program = """
+    (define field1 (rib 7 0 1))
+
+    (field1 '(7 8 9))
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [[8, 9]]  # cdr
+    assert output == []
+
+
+def test_field2():
+    program = """
+    (define field2 (rib 8 0 1))
+
+    (field2 '(7 8 9))
+    """
+
+    inspect, output = run_to_halt(program, max_cycles=20000)
+
+    assert inspect.stack() == [0]  # pair-type
+    assert output == []
+
+
+
+#
+# Helpers
+#
+
 def several(*exprs):
     """Make a program that evaluates several expressions and constructs a list with each result."""
     def go(xs):
