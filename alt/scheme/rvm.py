@@ -1390,9 +1390,46 @@ def interpreter(asm):
     asm.instr("M=D")
     return_from_primitive()
 
+
     asm.label("primitive_rib?")
     asm.comment("primitive 5; rib? :: x -- bool(x is a rib)")
-    unimp()
+    # FIXME: this test is super bogus. Need to implement tagged ints, and test the correct bit here.
+    # For now, any value large enough to be a potential address
+
+    is_rib_nonneg_label = asm.next_label("is_rib_nonneg")
+    is_rib_true_label = asm.next_label("is_rib_true")
+
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("D=M")
+    asm.instr(f"@{is_rib_nonneg_label}")
+    asm.instr("D;JGE")
+    asm.instr("D=-D")
+    asm.label(is_rib_nonneg_label)
+    asm.comment("If the (absolute) value is larger than the base address of the ROM, assume it's a rib address")
+    asm.instr("@ROM")
+    asm.instr("D=D-A")
+    asm.instr(f"@{is_rib_true_label}")
+    asm.instr("D;JGT")
+
+    asm.instr("@rib_false")
+    asm.instr("D=A")
+    # FIXME: jump to shared copy of this common sequence
+    asm.comment("Update the top stack entry in place")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
+    asm.label(is_rib_true_label)
+    asm.instr("@rib_true")
+    asm.instr("D=A")
+    # FIXME: jump to shared copy of this common sequence
+    asm.comment("Update the top stack entry in place")
+    asm.instr("@SP")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    return_from_primitive()
+
 
     asm.label("primitive_field0")
     asm.comment("primitive 6; field0 :: rib(x, _, _) -- x")

@@ -327,6 +327,19 @@ def test_eqv_ribs(run):
     assert output == []
 
 
+@parameterize_simulators
+def test_ribq(run):
+    program = """
+    (define rib? (rib 5 0 1))
+
+    """ + several("(rib? 123)", "(rib? -345)", "(rib? #t)", '(rib? "abc")')
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [[False, False, True, True]]
+    assert output == []
+
+
 #
 # Helpers
 #
@@ -377,6 +390,7 @@ def run_to_halt(program, max_cycles=20000, simulator="codegen"):
 
         tty_char = computer.get_tty()
         if tty_char:
+            print(f"tty: {tty_char}")
             output.append(tty_char)
 
         if computer.fetch and inspect.is_labeled(computer.pc):
