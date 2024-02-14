@@ -1332,23 +1332,38 @@ def interpreter(asm):
     push("D")
     return_from_primitive()
 
+
     asm.label("primitive_id")
     asm.comment("primitive 1; id :: x -- x")
     asm.comment("... and, that's all folks")
     return_from_primitive()
 
+
     asm.label("primitive_arg1")
     asm.comment("primitive 2; arg1 :: x y -- x")  # i.e. "drop"
+    asm.comment("Simply discard the top entry on the stack by updating SP")
     asm.instr("@SP")
-    asm.instr("A=M+1") # addr of top entry.y
-    asm.instr("D=M")  # addr of next entry
+    asm.instr("A=M+1")
+    asm.instr("D=M")
     asm.instr("@SP")
     asm.instr("M=D")
     return_from_primitive()
 
+
     asm.label("primitive_arg2")
     asm.comment("primitive 3; arg2 :: x y -- y")
-    unimp()
+    asm.comment("Discard the second entry on the stack by updating the top entry")
+    asm.comment("D = the addr of the third entry from the top of the stack")
+    asm.instr("@SP")
+    asm.instr("A=M+1")
+    asm.instr("A=M+1")
+    asm.instr("D=M")
+    asm.comment("SP.x = D")
+    asm.instr("@SP")
+    asm.instr("A=M+1")
+    asm.instr("M=D")
+    return_from_primitive()
+
 
     asm.label("primitive_close")
     asm.comment("primitive 4; close :: x -- rib(x[0], stack, 1)")
