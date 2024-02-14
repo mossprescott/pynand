@@ -33,16 +33,16 @@ DEFAULT_PRINT_ASM = False
 DEFAULT_TRACE_LEVEL = TRACE_FINE
 
 
-def run(program, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run(program, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
     encoded = compile(program)
 
     if print_asm:
         print(f"encoded program: {repr(encoded)}")
 
-    run_compiled(encoded, print_asm, trace_level, verbose_tty)
+    run_compiled(encoded, simulator, print_asm, trace_level, verbose_tty)
 
 
-def run_compiled(encoded, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run_compiled(encoded, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
 
     asm = AssemblySource()
 
@@ -122,6 +122,7 @@ def run_compiled(encoded, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE
             print(f"{cycles:3,d}: {computer.pc}")
 
     big.run(program=instrs,
+            simulator=simulator,
             name="Scheme",
             halt_addr=symbols["halt_loop"],
             trace=trace if trace_level > TRACE_NONE else None,
@@ -1600,12 +1601,12 @@ def main():
     import sys
 
     # TODO: command-line args, multiple source files, etc.
-    # --print, --trace
+    # --print, --trace, --simulator
 
     with open(sys.argv[1]) as f:
         program = "".join(f.readlines())
 
-    run(program, print_asm=True, trace_level=TRACE_COARSE)
+    run(program, simulator="codegen", print_asm=False, trace_level=TRACE_NONE)
 
 
 if __name__ == "__main__":

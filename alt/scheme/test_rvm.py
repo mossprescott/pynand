@@ -9,113 +9,134 @@ import nand
 from nand.translate import AssemblySource
 from nand.vector import unsigned
 
-def test_trivial():
+# TODO: put this somewhere common:
+def parameterize_simulators(f):
+    def vector(chip, **args):
+        return run_to_halt(chip, simulator="vector", **args)
+    def codegen(chip, **args):
+        return run_to_halt(chip, simulator="codegen", **args)
+    return pytest.mark.parametrize("run", [vector, codegen])(f)
+
+
+@parameterize_simulators
+def test_trivial(run):
     program = "42"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [42]
     assert output == []
 
 
-def test_string():
+@parameterize_simulators
+def test_string(run):
     program = '"abc"'
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == ["abc"]
     assert output == []
 
 
-def test_lt():
+@parameterize_simulators
+def test_lt(run):
     program = several("(< 1 2)", "(< 1 1)", "(< 2 1)")
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [[True, False, False]]
     assert output == []
 
 
-def test_add():
+@parameterize_simulators
+def test_add(run):
     program = "(+ 1 2)"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [3]
     assert output == []
 
 
-def test_sub():
+@parameterize_simulators
+def test_sub(run):
     program = "(- 123 234)"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [-111]
     assert output == []
 
 
-def test_mul():
+@parameterize_simulators
+def test_mul(run):
     program = "(* 6 7)"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [42]
     assert output == []
 
 
-def test_mul_mixed_signs():
+@parameterize_simulators
+def test_mul_mixed_signs(run):
     program = several("(* 6 -7)", "(* -14 -3)", "(* 2 -21)")
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [[-42, 42, -42]]
     assert output == []
 
 
-def test_if():
+@parameterize_simulators
+def test_if(run):
     program = "(if #t 42 '())"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [42]
     assert output == []
 
 
-def test_quote():
+@parameterize_simulators
+def test_quote(run):
     program = "'()"
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [[]]
     assert output == []
 
 
-def test_lambda():
+@parameterize_simulators
+def test_lambda(run):
     program = """
     ((lambda (x y) (+ x y))
         14 28)
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [42]
     assert output == []
 
 
-def test_define():
+@parameterize_simulators
+def test_define(run):
     program = """
     (define (cons x y) (rib x y 0))
 
     (cons 1 '(2))
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [[1, 2]]
     assert output == []
 
 
-def test_fact():
+@parameterize_simulators
+def test_fact(run):
     program = """
     (define (fact n)
         (if (< n 2) 1
@@ -124,45 +145,48 @@ def test_fact():
     (fact 5)
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [120]
     assert output == []
 
 
-def test_capture():
+@parameterize_simulators
+def test_capture(run):
     program = """
     (define (add x) (lambda (y) (+ x y)))
     ((add 1) 2)
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [3]
     assert output == []
 
 
-def test_draw():
+@parameterize_simulators
+def test_draw(run):
     program = """
     (define poke (rib 21 0 1))
     (define screen 1024)
     (poke screen 65)
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [65]
     assert output == []
 
 
-def test_tty():
+@parameterize_simulators
+def test_tty(run):
     program = """
     (define poke (rib 21 0 1))
     (define keyboard 4095)
     (poke keyboard 48)
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [48]
     assert output == [ord('0')]
@@ -173,40 +197,42 @@ def test_tty():
 # Tests for specific primitives:
 #
 
-def test_field0():
+@parameterize_simulators
+def test_field0(run):
     program = """
     (define field0 (rib 6 0 1))
 
     (field0 '(7 8 9))
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [7]  # car
     assert output == []
 
 
-def test_field1():
+@parameterize_simulators
+def test_field1(run):
     program = """
     (define field1 (rib 7 0 1))
 
     (field1 '(7 8 9))
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [[8, 9]]  # cdr
     assert output == []
 
-
-def test_field2():
+@parameterize_simulators
+def test_field2(run):
     program = """
     (define field2 (rib 8 0 1))
 
     (field2 '(7 8 9))
     """
 
-    inspect, output = run_to_halt(program, max_cycles=20000)
+    inspect, output = run(program)
 
     assert inspect.stack() == [0]  # pair-type
     assert output == []
@@ -228,7 +254,7 @@ def several(*exprs):
     return "(define (cons x y) (rib x y 0))\n" + go(list(exprs))
 
 
-def run_to_halt(program, max_cycles=5000):
+def run_to_halt(program, max_cycles=20000, simulator="codegen"):
     """Compile and run a Scheme program, then return a function for inspecting the RAM, and a
     list of words that were written to the TTY port.
     """
@@ -244,7 +270,7 @@ def run_to_halt(program, max_cycles=5000):
 
     instrs, symbols, _ = big.assemble(asm.lines, min_static=None, builtins=rvm.BUILTINS)
 
-    computer = nand.syntax.run(big.BigComputer, simulator="vector")
+    computer = nand.syntax.run(big.BigComputer, simulator=simulator)
 
     computer.init_rom(instrs)
 
