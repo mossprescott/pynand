@@ -362,7 +362,7 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
 
 
         if trace is not None:
-            CYCLES_PER_UPDATE = 2  # HACK: to ensure we see all the TTY output
+            CYCLES_PER_UPDATE = 20  # HACK: to ensure we see all the TTY output
         else:
             CYCLES_PER_UPDATE = 100
 
