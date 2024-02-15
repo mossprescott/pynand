@@ -1742,15 +1742,24 @@ def interpreter(asm):
 
 
 def main():
-    import sys
+    import argparse
+    parser = argparse.ArgumentParser(description="Run Scheme source with text-mode display and keyboard")
+    parser.add_argument("path", nargs=argparse.ONE_OR_MORE, help="Path to source (<file>.scm)")
+    parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
+    parser.add_argument("--trace", action="store_true", help="Print each Ribbit instruction as it is interpreted. Note: runs almost 3x slower.")
+    parser.add_argument("--print", action="store_true", help="Print interpreter assembly and compiled instructions.")
 
-    # TODO: command-line args, multiple source files, etc.
-    # --print, --trace, --simulator
+    args = parser.parse_args()
 
-    with open(sys.argv[1]) as f:
-        program = "".join(f.readlines())
+    src_lines = []
+    for p in args.path:
+        with open(p) as f:
+            src_lines += [] + f.readlines()
 
-    run(program, simulator="codegen", print_asm=False, trace_level=TRACE_NONE)
+    run("".join(src_lines),
+        simulator=args.simulator,
+        print_asm=args.print,
+        trace_level=TRACE_COARSE if args.trace else TRACE_NONE)
 
 
 if __name__ == "__main__":
