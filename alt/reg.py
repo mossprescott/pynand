@@ -1000,8 +1000,8 @@ RETURN_ADDRESS = "R4"  # Note: have to avoid using the "temp" registers if this 
 RESULT = "R12" # for now, just use one of the registers also used for local variables.
 
 class Translator(solved_07.Translator):
-    def __init__(self):
-        self.asm = AssemblySource()
+    def __init__(self, asm=None):
+        self.asm = asm if asm else AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
 
         # self.preamble()  # called by the loader, apparently
