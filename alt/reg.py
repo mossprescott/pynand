@@ -1150,12 +1150,13 @@ class Translator(solved_07.Translator):
 
         kind, index = ast.location.kind, ast.location.idx
         if kind == "static":
+            symbol_name = f"{self.class_namespace}.static_{ast.name}"
             if imm is not None:
-                self.asm.instr(f"@{self.class_namespace}.static{index}")
+                self.asm.instr(f"@{symbol_name}")
                 self.asm.instr(f"M={imm}")
             else:
                 self._handle(ast.value)
-                self.asm.instr(f"@{self.class_namespace}.static{index}")
+                self.asm.instr(f"@{symbol_name}")
                 self.asm.instr("M=D")
 
         elif kind == "field":
@@ -1386,7 +1387,8 @@ class Translator(solved_07.Translator):
     def handle_Location(self, ast: Location):
         kind, index = ast.kind, ast.idx
         if ast.kind == "static":
-            self.asm.instr(f"@{self.class_namespace}.static{ast.idx}")
+            symbol_name = f"{self.class_namespace}.static_{ast.name}"
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr("D=M")
         elif ast.kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
