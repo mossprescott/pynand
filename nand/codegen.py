@@ -44,6 +44,10 @@ from nand.optimize import simplify
 from nand.vector import extend_sign
 
 
+# For debugging:
+PRINT_FLATTENED = False
+PRINT_GENERATED = False
+
 def run(ic):
     """Prepare an IC for simulation, returning an object which exposes the inputs and outputs
     as attributes. If the IC is Computer, it also provides access to the ROM, RAM, etc.
@@ -57,7 +61,8 @@ def translate(ic):
     class_name, lines = generate_python(ic)
 
     # print(ic)
-    # print_lines(lines)
+    if PRINT_GENERATED:
+        print_lines(lines)
 
     eval(compile('\n'.join(lines),
             filename="<generated>",
@@ -126,7 +131,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
     ic = ic.flatten(primitives=PRIMITIVES)
     # ic = simplify(ic.flatten(primitives=PRIMITIVES))  # TODO: don't flatten everything in simplify
 
-    # print(ic)
+    if PRINT_FLATTENED:
+        print(ic)
 
     all_comps = ic.sorted_components()
 
