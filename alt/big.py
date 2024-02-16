@@ -58,8 +58,8 @@ from alt.threaded import Eq16
 SCREEN_BASE   = 0x0800
 KEYBOARD_ADDR = 0x0FFF
 ROM_BASE      = 0x1000
-HEAP_BASE     = 0x8000
-HEAP_TOP      = 0xFFFF
+HEAP_BASE     = 0x8000  # Note: too big for "@-" instruction
+HEAP_TOP      = 0xFFFF  # Note: too big for "@-" instruction
 
 
 #
