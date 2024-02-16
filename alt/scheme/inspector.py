@@ -170,7 +170,7 @@ PRIMITIVES = {
     15: "-",
     16: "*",
     17: "quotient (unimp.)",
-    18: "getchar (unimp.)",
+    18: "getchar",
     19: "putchar (unimp.)",
     # Extra:
     20: "peek",
