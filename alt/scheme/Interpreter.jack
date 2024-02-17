@@ -17,6 +17,11 @@ class Interpreter {
     static Rib ribTrue;
     static Rib ribNil;
 
+    // Used only during intialization:
+    static Array symbolNameTableStart;
+    static Array symbolNameTableEnd;
+
+    static Array tty;  // DEBUG
 
     /*
     When we arrive here, some initialization has already occurred.
@@ -28,10 +33,12 @@ class Interpreter {
 
         // Initialize some more state:
 
+        let tty = 4095;  // DEBUG
+
         // Bottom of the "heap" area:
         let nextRib = 32767 + 1;  // Note: will overflow to -32768
 
-        // TODO: initialize the symbol table
+        do Interpreter.initSymbolTable();
 
         // Skip the bogus "main" instr:
         let pc = pc[2];
@@ -81,10 +88,34 @@ class Interpreter {
         return;
     }
 
+    /**
+    Allocate symbols (which must be in RAM so their values can be updated in place) and the
+    pairs that form the list that is the symbol table.
+    The decoded instructions in ROM refer to the addresses where these symbols are expected to
+    located in memory.
+    */
+    function void initSymbolTable() {
+        var Array ptr;
+        var Rib symbol;
+        var Rib entry;
+
+        let entry = ribNil;
+        let ptr = symbolNameTableStart;
+        while (ptr < symbolNameTableEnd) {
+            let tty[0] = ptr; // DEBUG
+            let symbol = Interpreter.alloc(ptr[1], ptr[0], 2);  // symbol type
+            let entry = Interpreter.alloc(symbol, entry, 0);  // pair type
+            let ptr = ptr + 2;
+        }
+
+        return;
+    }
+
     /** Allocate a rib on the heap, filling in the three fields. */
     function Rib alloc(int x, int y, int z) {
         var Rib r;
         let r = nextRib;
+        let tty[0] = r; // DEBUG
         let r[0] = x;
         let r[1] = y;
         let r[2] = z;
