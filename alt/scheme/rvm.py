@@ -33,28 +33,47 @@ DEFAULT_PRINT_ASM = False
 DEFAULT_TRACE_LEVEL = TRACE_FINE
 
 
-def run(program, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run(program, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
     encoded = compile(program)
 
     if print_asm:
         print(f"encoded program: {repr(encoded)}")
 
-    run_compiled(encoded, simulator, print_asm, trace_level, verbose_tty)
+    run_compiled(encoded, interpreter, simulator, print_asm, trace_level, verbose_tty)
 
 
-def run_compiled(encoded, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
 
-    asm = AssemblySource()
-
-    interpreter(asm)
+    if interpreter == "assembly":
+        asm = asm_interpreter()
+    elif interpreter == "jack":
+        asm = jack_interpreter()
+    else:
+        raise Exception(f"Unknown interpreter: {interpreter}")
 
     decode(encoded, asm)
 
+    # TODO: print with addresses
     if print_asm:
         for l in asm.lines: print(l)
         print()
 
-    instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
+    if interpreter == "assembly":
+        instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
+        stack_loc =    BUILTINS["SP"]
+        pc_loc =       BUILTINS["PC"]
+        next_rib_loc = BUILTINS["NEXT_RIB"]
+        interp_loop_addr = symbols.get("exec_loop")
+        halt_loop_addr =   symbols.get("halt_loop")
+    elif interpreter == "jack":
+        from nand.solutions import solved_06
+        instrs, symbols, statics = big.assemble(asm.lines, builtins=solved_06.BUILTIN_SYMBOLS)
+        stack_loc =    statics["interpreter.static_stack"]
+        pc_loc =       statics["interpreter.static_pc"]
+        next_rib_loc = statics["interpreter.static_nextRib"]
+        interp_loop_addr = first_loop_in_function(symbols, "Interpreter", "main")
+        halt_loop_addr =   first_loop_in_function(symbols, "Interpreter", "halt")
+        print(interp_loop_addr, halt_loop_addr)
 
     assert symbols["start"] == big.ROM_BASE
 
@@ -91,32 +110,32 @@ def run_compiled(encoded, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DE
     def trace(computer, cycles):
         nonlocal last_traced_exec
 
-        inspector = Inspector(computer, symbols)
+        inspector = Inspector(computer, symbols, stack_loc)
 
         if (trace_level >= TRACE_COARSE
-                and (computer.pc == symbols["exec_loop"] or computer.pc == symbols["halt_loop"])):
+                and (computer.pc == interp_loop_addr or computer.pc == halt_loop_addr)):
             if last_traced_exec is None:
                 print(f"{cycles:,d}:")
             else:
                 print(f"{cycles:,d} (+{cycles - last_traced_exec:,d}):")
             last_traced_exec = cycles
 
-            print(f"  stack ({inspector.show_addr(inspector.peek(0))}): {inspector.show_stack()}")
+            print(f"  stack ({inspector.show_addr(inspector.peek(stack_loc))}): {inspector.show_stack()}")
 
-            next_rib = unsigned(inspector.peek(2))
+            next_rib = unsigned(inspector.peek(next_rib_loc))
             current_ribs = (next_rib - big.HEAP_BASE)//3
             max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-            print(f"  PC: {inspector.show_addr(inspector.peek(1))}")
+            print(f"  PC: {inspector.show_addr(inspector.peek(pc_loc))}")
 
             # # HACK?
-            # print(f"  symbols (n..0): ({inspector.show_addr(inspector.peek(4))}) {inspector.show_stack(inspector.peek(4))}")
+            # print(f"  symbols (n..0): ({inspector.show_addr(inspector.peek(symbol_table_loc))}) {inspector.show_stack(inspector.peek(symbol_table_loc))}")
             # print(f"  ribs:")
-            # for addr in range(big.HEAP_BASE, unsigned(inspector.peek(BUILTINS["NEXT_RIB"])), 3):
+            # for addr in range(big.HEAP_BASE, unsigned(inspector.peek(next_rib_loc)), 3):
             #     print(f"    @{addr}; {inspector.show_obj(addr, deep=False)}")
 
-            print(f"  {inspector.show_instr(inspector.peek(BUILTINS['PC']))}")
-        elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr and symbols_by_addr[computer.pc] != "halt_loop":
+            print(f"  {inspector.show_instr(inspector.peek(pc_loc))}")
+        elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr and computer.pc != halt_loop_addr:
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
         elif trace_level >= TRACE_ALL:
             print(f"{cycles:3,d}: {computer.pc}")
@@ -124,7 +143,7 @@ def run_compiled(encoded, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DE
     big.run(program=instrs,
             simulator=simulator,
             name="Scheme",
-            halt_addr=symbols["halt_loop"],
+            halt_addr=halt_loop_addr,
             trace=trace if trace_level > TRACE_NONE else None,
             verbose_tty=verbose_tty)
 
@@ -457,11 +476,13 @@ FIRST_RIB = BUILTINS["FIRST_RIB_MINUS_ONE"] + 1
 assert BUILTINS["MAX_SLOT"] < tag_rib_pointer(FIRST_RIB)
 
 
-def interpreter(asm):
+def asm_interpreter():
     """ROM program implementing the RVM runtime, which interprets a program stored as "ribs" in ROM and RAM.
 
     This part of the ROM is the same, independent of the Scheme program that's being interpreted.
     """
+
+    asm = AssemblySource()
 
     RIB_PROC = "rib_rib"
     FALSE = "rib_false"
@@ -680,7 +701,8 @@ def interpreter(asm):
 
     def d_is_not_slot():
         """Test if the value in D is a slot index, leaving 0 in D if so."""
-        asm.instr("@1023")
+        # FIXME: choose the correct boundary when tagged ints and pointers are implemented
+        asm.instr("@0x03FF")  # Mask for bits that can be set in a number less than 2^10 = 1024
         asm.instr("A=!A")
         asm.instr("D=D&A")
 
@@ -1740,6 +1762,78 @@ def interpreter(asm):
     asm.label("interpreter_end")
     asm.blank()
 
+    return asm
+
+
+def jack_interpreter():
+    from nand.solutions import solved_10
+    from alt import reg
+
+    asm = AssemblySource()
+
+    def init_global(comment, addr, value):
+        asm.comment(comment)
+        if isinstance(value, int) and -1 <= value <= 1:
+            asm.instr(f"@{addr}")
+            asm.instr(f"M={value}")
+        else:
+            asm.instr(f"@{value}")
+            asm.instr("D=A")
+            asm.instr(f"@{addr}")
+            asm.instr("M=D")
+
+    # Because the base of the ROM isn't at address 0, we make it explicit for the assembler:
+    asm.label("start")
+
+    init_global("Jack stack pointer", "SP", 256)
+    # Note: these two probably don't actually need to be initialized, but might contain garbage
+    # and confuse debugging
+    init_global("Jack frame pointer", "LCL", 0)
+    init_global("Jack arg pointer", "ARG", 0)
+    # THIS and THAT definitely don't need to be set up before the first function call
+    asm.blank()
+
+    asm.comment("Initialize interpreter state that needs to point to data in ROM")
+
+    init_global("Interpreter stack", "interpreter.static_stack", "rib_outer_cont")
+    init_global("Interpreter pc", "interpreter.static_pc", "main")
+    # TODO: stash pointers somewhere for the interpreter to find:
+    # rib_nil, _true, _false
+    # symbol_name_table_start/end
+    asm.blank()
+
+    translator = reg.Translator(asm)
+
+    def load_class(path):
+        with open(path) as f:
+            src_lines = f.readlines()
+        ast = solved_10.parse_class("".join(src_lines))
+
+        ir = reg.compile_class(ast)
+
+        translator.translate_class(ir)
+
+    for cl in "Interpreter", "Rib":
+        load_class(f"alt/scheme/{cl}.jack")
+
+    asm.label("interpreter_end")
+    asm.blank()
+
+    return asm
+
+def first_loop_in_function(symbols, class_name, function_name):
+    """Address of the first instruction labeled "loop_... found (probably) within the given function."""
+
+    function_label = f"{class_name}.{function_name}".lower()
+    symbols_by_addr = sorted((addr, name) for name, addr in symbols.items())
+    ptr = 0
+    while symbols_by_addr[ptr][1] != function_label:
+        ptr += 1
+    ptr += 1
+    while not symbols_by_addr[ptr][1].startswith("loop_"):
+        ptr += 1
+    return symbols_by_addr[ptr][0]
+
 
 def main():
     import argparse
@@ -1748,6 +1842,8 @@ def main():
     parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
     parser.add_argument("--trace", action="store_true", help="Print each Ribbit instruction as it is interpreted. Note: runs almost 3x slower.")
     parser.add_argument("--print", action="store_true", help="Print interpreter assembly and compiled instructions.")
+    # TEMP: experimental for now
+    parser.add_argument("--jack", action="store_true", help="Use the Jack interpreter.")
 
     args = parser.parse_args()
 
@@ -1757,6 +1853,7 @@ def main():
             src_lines += [] + f.readlines()
 
     run("".join(src_lines),
+        interpreter="jack" if args.jack else "assembly",
         simulator=args.simulator,
         print_asm=args.print,
         trace_level=TRACE_COARSE if args.trace else TRACE_NONE)

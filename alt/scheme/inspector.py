@@ -5,7 +5,9 @@ from alt import big
 
 
 class Inspector:
-    def __init__(self, computer, symbols={}, rom_base=big.ROM_BASE, rom_limit=big.HEAP_BASE):
+    def __init__(self, computer, symbols, stack_loc, rom_base=big.ROM_BASE, rom_limit=big.HEAP_BASE):
+        self.stack_loc = stack_loc
+
         def peek(addr):
             if rom_base <= addr < rom_limit:
                 return computer.peek_rom(addr)
@@ -105,8 +107,10 @@ class Inspector:
                     return "".join(chr(c) for c in chars)
             elif z == 4:  # vector
                 elems = self._obj(x)
-                if len(elems) != y:
-                    raise Exception("bad vector")
+                if not isinstance(elems, list) or len(elems) != y:
+                    raw = (elems, self._obj(y), z)
+                    print(f"bad vector: {raw}")
+                    return raw
                 else:
                     return elems
             elif z == 5:
@@ -140,8 +144,7 @@ class Inspector:
                 else:
                     # A continuation: (stack, closure, next instr)
                     return go(x) + [f"cont(saved={self._obj(x)}; {self._obj(y)}; {self.show_addr(z)}){self.show_addr(addr)}"]
-        SP = 0
-        return go(self.peek(SP))
+        return go(self.peek(self.stack_loc))
 
 
     def show_stack(self):
