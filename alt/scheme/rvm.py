@@ -41,9 +41,7 @@ def run(program, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_leve
 
     run_compiled(encoded, interpreter, simulator, print_asm, trace_level, verbose_tty)
 
-
-def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
-
+def assemble(encoded, interpreter, print_asm):
     if interpreter == "assembly":
         asm = asm_interpreter()
     elif interpreter == "jack":
@@ -103,6 +101,13 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
         print(f"Total ROM:   {total_words:5,d} ({100*total_words/rom_capacity:2.1f}%)")
         print()
 
+    return instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr
+
+
+def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+
+    # FIXME: Ug
+    instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, interpreter, print_asm)
 
     last_traced_exec = None
     symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
