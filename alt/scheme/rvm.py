@@ -292,13 +292,16 @@ def decode(input, asm):
 
     # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
     # block of address space?
-    # TODO: add the initial value for each symbol to this table
-    asm.comment("Table of pointers to symbol name ribs in ROM:")
+    asm.comment("Table of pointers to symbol name and initial value ribs in ROM:")
     asm.label("symbol_names_start")
-    for lbl, s in reversed(sym_names):
-        if s != "":
-            asm.comment(f'"{s}"')
+    sym_names_and_values = list(zip(
+        sym_names,
+        ["rib_rib", "rib_false", "rib_true", "rib_nil"] + ["rib_false"]*(len(sym_names)-4)))
+    for i in reversed(range(len(sym_names_and_values))):
+        (lbl, s), val = sym_names_and_values[i]
+        asm.comment(f'{i}: "{s}"')
         asm.instr(f"@{lbl}")
+        asm.instr(f"@{val}")
     asm.label("symbol_names_end")
 
     asm.blank()
@@ -577,9 +580,10 @@ def asm_interpreter():
     # asm.instr("@KEYBOARD")
     # asm.instr("M=D")
 
-    asm.comment("new symbol, with value = false")
-    asm.instr("@rib_false")
-    asm.instr("D=A")
+    asm.comment("new symbol, with value = MEM(R5+1) and name = MEM(R5)")
+    asm.instr("@TEMP_0")
+    asm.instr("A=M+1")
+    asm.instr("D=M")
     rib_append()
     asm.instr("@TEMP_0")
     asm.instr("A=M")
@@ -621,9 +625,11 @@ def asm_interpreter():
     # asm.instr("@KEYBOARD")
     # asm.instr("M=D")
 
-    asm.comment("increment R5")
+    asm.comment("increment R5 (by 2)")
+    asm.instr("@2")
+    asm.instr("D=A")
     asm.instr("@TEMP_0")
-    asm.instr("M=M+1")
+    asm.instr("M=M+D")
 
     asm.comment("D = compare(R5, symbol_names_end)")
     asm.instr("D=M")
@@ -631,29 +637,6 @@ def asm_interpreter():
     asm.instr("D=D-A")
     asm.instr(f"@{symbol_table_loop}")
     asm.instr("D;JLT")
-
-    asm.blank()
-
-    # TODO: fold this into the table of symbol names; cleaner and smaller
-    asm.comment("HACK: initialize standard symbols (rib, false, true, nil)")
-    def inject_symbol_value(idx, val):
-        asm.comment(f"global({idx}) = {val}")
-        asm.instr("@NEXT_RIB")
-        asm.instr("D=M")
-        asm.instr(f"@{(idx+1)*6}")
-        asm.instr("D=D-A")
-        asm.instr("@TEMP_0")
-        asm.instr("M=D")
-        # asm.instr("@KEYBOARD"); asm.instr("M=D")  # HACK
-        asm.instr(val)
-        asm.instr("D=A")
-        asm.instr("@TEMP_0")
-        asm.instr("A=M")
-        asm.instr("M=D")
-    inject_symbol_value(0, "@rib_rib")
-    inject_symbol_value(1, "@rib_false")
-    inject_symbol_value(2, "@rib_true")
-    inject_symbol_value(3, "@rib_nil")
 
     asm.blank()
 
