@@ -1150,7 +1150,7 @@ class Translator(solved_07.Translator):
 
         kind, index = ast.location.kind, ast.location.idx
         if kind == "static":
-            symbol_name = f"{self.class_namespace}.static_{ast.name}"
+            symbol_name = f"{self.class_namespace}.static_{ast.location.name}"
             if imm is not None:
                 self.asm.instr(f"@{symbol_name}")
                 self.asm.instr(f"M={imm}")
