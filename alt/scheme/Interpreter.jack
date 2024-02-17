@@ -1,0 +1,107 @@
+class Interpreter {
+    // For any kind of efficiency, the compiler wants to allocate these pointers as statics in the
+    // usual range (starting at addr 16). And ordinarily its own stack state is stored in
+    // locations 0-3 or so.
+    // For that matter, its stack grows up from 256 (which is fine as long as it doesn't collide
+    // with the screen buffer at 2048.)
+    static Rib stack;
+    static Rib pc;
+    static Rib nextRib;
+
+    // Pre-allocated "proc" containing the "rib" primitive, which will be used to construct every
+    // other primitive.
+    static Rib ribRib;
+
+    // Pre-allocated special values:
+    static Rib ribFalse;
+    static Rib ribTrue;
+    static Rib ribNil;
+
+
+    /*
+    When we arrive here, some initialization has already occurred.
+    TODO: how does that actually work?
+     */
+    function void main() {
+        var Array instr;
+        var int opcode;
+
+        // Initialize some more state:
+
+        // Bottom of the "heap" area:
+        let nextRib = 32767 + 1;  // Note: will overflow to -32768
+
+        // TODO: initialize the symbol table
+
+        // Skip the bogus "main" instr:
+        let pc = pc[2];
+
+        while (1) {
+            let opcode = pc[0];
+
+            if (opcode = 0) {
+                if (instr[2] = 0) {
+                    // jump
+                    do Interpreter.halt();  // TODO
+                }
+                else {
+                    // call
+                    do Interpreter.halt();  // TODO
+                }
+            }
+            else {
+            if (opcode = 1) {
+                // set
+                do Interpreter.halt();  // TODO
+            }
+            else {
+            if (opcode = 2) {
+                // get
+                do Interpreter.halt();  // TODO
+            }
+            else {
+            if (opcode = 3) {
+                // const
+                do Interpreter.push(pc[1]);
+                let pc = pc[2];
+            }
+            else {
+            if (opcode = 4) {
+                // if
+                do Interpreter.halt();  // TODO
+            }
+            else {
+            // if (opcode = 5) {
+            // halt
+                do Interpreter.halt();
+            // }
+            }}}}}
+        }
+
+        return;
+    }
+
+    /** Allocate a rib on the heap, filling in the three fields. */
+    function Rib alloc(int x, int y, int z) {
+        var Rib r;
+        let r = nextRib;
+        let r[0] = x;
+        let r[1] = y;
+        let r[2] = z;
+        let nextRib = nextRib + 3;
+        return r;
+    }
+
+    function void push(int obj) {
+        var Rib entry;
+
+        let stack = Interpreter.alloc(obj, stack, 0); // pair-type
+
+        return;
+    }
+
+    function void halt() {
+        while (1) {
+        }
+    }
+}
