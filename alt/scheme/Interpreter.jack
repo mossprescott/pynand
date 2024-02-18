@@ -24,12 +24,14 @@ class Interpreter {
     static Array tty;  // DEBUG
 
     /*
-    When we arrive here, some initialization has already occurred.
-    TODO: how does that actually work?
+     When we arrive here, the assembly prelude has already initialized many of the statics with the
+     starting values.
      */
     function void main() {
-        var Array instr;
         var int opcode;
+        var Rib symbol;
+        var Rib proc;
+        var Rib cont;
 
         // Initialize some more state:
 
@@ -47,19 +49,74 @@ class Interpreter {
             let opcode = pc[0];
 
             if (opcode = 0) {
-                if (instr[2] = 0) {
+                if (pc[2] = 0) {
                     // jump
-                    do Interpreter.halt();  // TODO
+                    if ((pc[1] > -1) & (pc[1] < 1000)) {
+                        // y is slot # of target
+                        // TODO: let proc = findSlot();
+                        do Interpreter.halt();  // TODO
+                    }
+                    else {
+                        // y is addr of target symbol
+                        let symbol = pc[1];
+                        let proc = symbol[0];
+                        if (proc[0] & (~31)) {  // not between 0 and 31
+                            // closure
+
+                            do Interpreter.halt();  // TODO
+                        }
+                        else {
+                            // primitive
+
+                            do Interpreter.handlePrimitive(proc[0]);
+
+                            let cont = Interpreter.findContinuation();
+
+                            // Overwrite top stack entry so the stack consists of the just-pushed
+                            // result on top of the saved stack from the continuation.
+                            let stack[1] = cont[0];
+
+                            // PC = next instruction from the continuation
+                            let pc = cont[2];
+                        }
+                    }
                 }
                 else {
                     // call
-                    do Interpreter.halt();  // TODO
+                    if ((pc[1] > -1) & (pc[1] < 1000)) {
+                        // y is slot # of target
+                        // TODO: let proc = findSlot();
+                        do Interpreter.halt();  // TODO
+                    }
+                    else {
+                        // y is addr of target symbol
+                        let symbol = pc[1];
+                        let proc = symbol[0];
+                        if (proc[0] & (~31)) {  // not between 0 and 31
+                            // closure
+                            do Interpreter.halt();  // TODO
+                        }
+                        else {
+                            // primitive
+                            do Interpreter.handlePrimitive(proc[0]);
+                        }
+                    }
+                    let pc = pc[2];
                 }
             }
             else {
             if (opcode = 1) {
                 // set
-                do Interpreter.halt();  // TODO
+                if ((pc[1] > -1) & (pc[1] < 1000)) {
+                    // y is slot # of target
+                    do Interpreter.halt();  // TODO
+                }
+                else {
+                    // y is addr of target symbol
+                    let symbol = pc[1];
+                    let symbol[0] = Interpreter.pop();
+                }
+                let pc = pc[2];
             }
             else {
             if (opcode = 2) {
@@ -102,7 +159,7 @@ class Interpreter {
         let entry = ribNil;
         let ptr = symbolNameTableStart;
         while (ptr < symbolNameTableEnd) {
-            let tty[0] = ptr; // DEBUG
+            // let tty[0] = ptr; // DEBUG
             let symbol = Interpreter.alloc(ptr[1], ptr[0], 2);  // symbol type
             let entry = Interpreter.alloc(symbol, entry, 0);  // pair type
             let ptr = ptr + 2;
@@ -111,11 +168,171 @@ class Interpreter {
         return;
     }
 
+    function void handlePrimitive(int opcode) {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: What you really want here is a computed jump (i.e. a switch construct.)
+        // Failing that, we make do with a binary search, effectively, with 5 branches
+        // to examine the 5 bits of the opcode.
+
+        if (opcode < 16) {
+            if (opcode < 8) {
+                if (opcode < 4) {
+                    if (opcode < 2) {
+                        if (opcode < 1) {
+                            // 0
+                            // rib: x y z -- rib(x, y, z)
+                            // Note: one rib becomes garbage (top entry of stack)
+
+                            let z = stack[0];
+
+                            let tmp = stack[1];
+                            let y = tmp[0];
+
+                            // The entry holding x will be the new top of stack:
+                            let stack = tmp[1];
+                            let x = stack[0];
+
+                            // Now re-use the second entry's rib as the newly-constructed rib:
+                            let tmp[0] = x;
+                            let tmp[1] = y;
+                            let tmp[2] = z;
+                            let stack[0] = tmp;
+                        }
+                        else {
+                            // 1
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                    else { // opcode >= 2
+                        if (opcode < 3) {
+                            // 2
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 3
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                }
+                else { // opcode >= 4
+                    if (opcode < 6) {
+                        if (opcode < 5) {
+                            // 4
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 5
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                    else { // opcode >= 6
+                        if (opcode < 7) {
+                            // 6
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 7
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                }
+            }
+            else {  // opcode >= 8
+                if (opcode < 12) {
+                    if (opcode < 10) {
+                        if (opcode < 9) {
+                            // 8
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 9
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                    else { // opcode >= 10
+                        if (opcode < 11) {
+                            // 10
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 11
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                }
+                else { // opcode >= 12
+                    if (opcode < 14) {
+                        if (opcode < 13) {
+                            // 12
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 13
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                    else { // opcode >= 14
+                        if (opcode < 15) {
+                            // 14
+                            // +: x y -- (x + y)
+
+                            // Note: one rib becomes garbage:
+                            let y = Interpreter.pop();
+                            let x = stack[0];
+                            // Update second stack entry in place:
+                            let stack[0] = x + y;
+                        }
+                        else {
+                            // 15
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            let tty[0] = opcode; // DEBUG
+            do Intepreter.halt();
+        }
+        return;
+    }
+
+
     /** Allocate a rib on the heap, filling in the three fields. */
     function Rib alloc(int x, int y, int z) {
         var Rib r;
         let r = nextRib;
-        let tty[0] = r; // DEBUG
+        // let tty[0] = r; // DEBUG
         let r[0] = x;
         let r[1] = y;
         let r[2] = z;
@@ -124,15 +341,35 @@ class Interpreter {
     }
 
     function void push(int obj) {
-        var Rib entry;
-
         let stack = Interpreter.alloc(obj, stack, 0); // pair-type
-
         return;
+    }
+
+    /** Discard the top entry from the stack, return its CAR. */
+    function int pop() {
+        var int r;
+        let r = stack[0];
+        let stack = stack[1];
+        return r;
+    }
+
+    /**
+     Address of the continuation rib in the current stack frame: the first entry in the
+     stack with z != 0.
+     */
+    function Rib findContinuation() {
+        var Rib ptr;
+
+        let ptr = stack;
+        while (ptr[2] = 0) {
+            let ptr = ptr[1];
+        }
+        return ptr;
     }
 
     function void halt() {
         while (1) {
+            // let tty[0] = -1; // DEBUG
         }
     }
 }

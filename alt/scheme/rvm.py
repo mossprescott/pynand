@@ -1785,9 +1785,16 @@ def jack_interpreter():
 
     init_global("Interpreter stack", "interpreter.static_stack", "rib_outer_cont")
     init_global("Interpreter pc", "interpreter.static_pc", "main")
-    # TODO: stash pointers somewhere for the interpreter to find:
-    # rib_nil, _true, _false
-    # symbol_name_table_start/end
+
+    init_global("Primitive proc: 'rib'", "interpreter.static_ribRib", "rib_rib")
+
+    init_global("Constant: #f",  "interpreter.static_ribFalse", "rib_false")
+    init_global("Constant: #t",  "interpreter.static_ribTrue",  "rib_true")
+    init_global("Constant: '()", "interpreter.static_ribNil",   "rib_nil")
+
+    init_global("Symbol Names (start)", "interpreter.static_symbolNameTableStart", "symbol_names_start")
+    init_global("Symbol Names (end)",   "interpreter.static_symbolNameTableEnd",   "symbol_names_end")
+
     asm.blank()
 
     translator = reg.Translator(asm)
