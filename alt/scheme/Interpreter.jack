@@ -297,9 +297,12 @@ class Interpreter {
                     if (opcode < 6) {
                         if (opcode < 5) {
                             // 4
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Intepreter.halt();
+                            // close :: x -- rib(x[0], stack, 1)
+
+                            // Note: modifyinging the top entry on the stack in place,
+                            // but allocating a new rib for the closure.
+                            let tmp = stack[0];
+                            let stack[0] = Interpreter.alloc(tmp[0], stack[1], 1);
                         }
                         else {
                             // 5
