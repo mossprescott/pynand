@@ -312,9 +312,13 @@ class Interpreter {
                             // 5
                             // rib? :: x -- bool(x is a rib)
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            let tmp = stack[0];
+                            if (Rib.isRib(tmp)) {
+                                let stack[0] = ribTrue;
+                            }
+                            else {
+                                let stack[0] = ribFalse;
+                            }
                         }
                     }
                     else { // opcode >= 6
