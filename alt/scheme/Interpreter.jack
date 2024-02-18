@@ -202,9 +202,9 @@ class Interpreter {
                         }
                         else {
                             // 1
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Intepreter.halt();
+                            // id: --
+
+                            // Literally nothing to see here
                         }
                     }
                     else { // opcode >= 2
