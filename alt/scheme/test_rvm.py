@@ -101,11 +101,11 @@ def test_if(run):
 
 @parameterize
 def test_quote(run):
-    program = "'()"
+    program = "'(1 2 3)"
 
     inspect, output = run(program)
 
-    assert inspect.stack() == [[]]
+    assert inspect.stack() == [[1, 2, 3]]
     assert output == []
 
 
