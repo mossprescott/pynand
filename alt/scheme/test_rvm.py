@@ -20,7 +20,7 @@ def parameterize(f):
     return pytest.mark.parametrize("run", [vector, codegen, jack])(f)
 
 @parameterize
-def test_trivial(run, interpreter):
+def test_trivial(run):
     program = "42"
 
     inspect, output = run(program)
