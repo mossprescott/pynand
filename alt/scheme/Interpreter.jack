@@ -354,9 +354,18 @@ class Interpreter {
                         }
                         else {
                             // 13
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Intepreter.halt();
+                            // <: x y -- bool(x < y)
+
+                            // Note: one rib becomes garbage:
+                            let y = Interpreter.pop();
+                            let x = stack[0];
+                            // Update second stack entry in place:
+                            if (x < y) {
+                                let stack[0] = ribTrue;
+                            }
+                            else {
+                                let stack[0] = ribFalse;
+                            }
                         }
                     }
                     else { // opcode >= 14
