@@ -283,9 +283,7 @@ class Interpreter {
                             // 2
                             // arg1 :: x y -- x (i.e. "drop")
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            let stack = stack[1];
                         }
                         else {
                             // 3
