@@ -435,9 +435,11 @@ class Interpreter {
                             // 16
                             // * :: x y -- (x * y)
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Intepreter.halt();
+                            // Note: one rib becomes garbage:
+                            let y = Interpreter.pop();
+                            let x = stack[0];
+                            // Update second stack entry in place:
+                            let stack[0] = Interpreter.multiply(x, y);
                         }
                         else {
                             // 17
@@ -502,6 +504,48 @@ class Interpreter {
         return;
     }
 
+    /**
+     This was lifted verbatim from Math.jack in the solutions for project 12 from the book, except
+     for inlining abs().
+     Does that mean it's good? Maybe, but it probably works.
+     */
+    function int multiply(int x, int y) {
+        var boolean neg;
+        var int tmp;
+        var int sum, shiftedX, shiftedBit;
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
+        if (y < 0) { let y = -y; }
+        if (x < 0) { let x = -x; }
+
+        // Put the smaller (abs.) value in y (because this is O(log y)):
+        if (x < y) {
+            let tmp = y;
+            let y = x;
+            let x = tmp;
+        }
+
+        let sum = 0;
+        let shiftedX = x;
+        let shiftedBit = 1;
+
+        while ((shiftedBit > 0) & ~(shiftedBit > y)) {
+            if (y & shiftedBit) {
+                let sum = sum + shiftedX;
+            }
+            let shiftedX = shiftedX + shiftedX;
+            let shiftedBit = shiftedBit + shiftedBit;
+        }
+
+        // Check the original signs and adjust the result:
+        if (neg) {
+            return -sum;
+        }
+        else {
+            return sum;
+        }
+    }
 
     /** Allocate a rib on the heap, filling in the three fields. */
     function Rib alloc(int x, int y, int z) {
