@@ -394,9 +394,16 @@ class Interpreter {
                             // 12
                             // eqv? :: x y -- bool(x is identical to y)
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // Note: one rib becomes garbage (top entry of stack)
+
+                            let y = Interpreter.pop();
+                            let x = stack[0];
+                            if (x = y) {
+                                let stack[0] = ribTrue;
+                            }
+                            else {
+                                let stack[0] = ribFalse;
+                            }
                         }
                         else {
                             // 13
