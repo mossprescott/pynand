@@ -30,8 +30,9 @@ class Interpreter {
     function void main() {
         var int opcode;
         var Rib symbol;
-        var Rib proc;
-        var Rib cont;
+        var Rib proc, code, cont, newStack;
+        var int slot;
+        var Rib ptr;
 
         // Initialize some more state:
 
@@ -94,14 +95,27 @@ class Interpreter {
                         let proc = symbol[0];
                         if (proc[0] & (~31)) {  // not between 0 and 31
                             // closure
-                            do Interpreter.halt();  // TODO
+
+                            // New continuation:
+                            //   x = saved stack (after popping args)
+                            //   y = proc rib
+                            //   z = next instruction
+                            let cont = Interpreter.alloc(-1, proc, pc[2]);
+                            let newStack = Interpreter.wrangleClosureParams(proc, cont);
+                            let cont[0] = stack;
+                            let stack = newStack;
+
+                            // Now jump to the entry point of the proc:
+                            let code = proc[0];
+                            let pc = code[2];
                         }
                         else {
                             // primitive
                             do Interpreter.handlePrimitive(proc[0]);
+
+                            let pc = pc[2];
                         }
                     }
-                    let pc = pc[2];
                 }
             }
             else {
@@ -121,9 +135,15 @@ class Interpreter {
             else {
             if (opcode = 2) {
                 // get
-                if ((pc[1] > -1) & (pc[1] < 1000)) {
+                let slot = pc[1];
+                if ((slot > -1) & (slot < 1000)) {
                     // y is slot # of target
-                    do Interpreter.halt();  // TODO
+                    let ptr = stack;
+                    while (slot > 0) {
+                        let ptr = ptr[1];
+                        let slot = slot - 1;
+                    }
+                    do Interpreter.push(ptr[0]);
                 }
                 else {
                     // y is addr of target symbol
@@ -154,6 +174,8 @@ class Interpreter {
         return;
     }
 
+
+
     /**
     Allocate symbols (which must be in RAM so their values can be updated in place) and the
     pairs that form the list that is the symbol table.
@@ -175,6 +197,26 @@ class Interpreter {
         }
 
         return;
+    }
+
+    /**
+     Pop numArgs objects from the stack, assembling them into a new stack (in reverse order),
+     on top of the just-allocated continuation rib.
+     */
+    function Rib wrangleClosureParams(Rib proc, Rib cont) {
+        var Rib code;
+        var int numArgs, i;
+        var Rib newStack;
+
+        let code = proc[0];
+        let numArgs = code[0];
+        let i = 0;
+        let newStack = cont;
+        while (i < numArgs) {
+            let newStack = Interpreter.alloc(Interpreter.pop(), newStack, 0);
+            let i = i + 1;
+        }
+        return newStack;
     }
 
     function void handlePrimitive(int opcode) {
