@@ -121,7 +121,16 @@ class Interpreter {
             else {
             if (opcode = 2) {
                 // get
-                do Interpreter.halt();  // TODO
+                if ((pc[1] > -1) & (pc[1] < 1000)) {
+                    // y is slot # of target
+                    do Interpreter.halt();  // TODO
+                }
+                else {
+                    // y is addr of target symbol
+                    let symbol = pc[1];
+                    do Interpreter.push(symbol[0]);
+                }
+                let pc = pc[2];
             }
             else {
             if (opcode = 3) {
