@@ -253,7 +253,7 @@ class Interpreter {
                     if (opcode < 2) {
                         if (opcode < 1) {
                             // 0
-                            // rib: x y z -- rib(x, y, z)
+                            // rib :: x y z -- rib(x, y, z)
                             // Note: one rib becomes garbage (top entry of stack)
 
                             let z = stack[0];
@@ -273,7 +273,7 @@ class Interpreter {
                         }
                         else {
                             // 1
-                            // id: --
+                            // id :: x -- x
 
                             // Literally nothing to see here
                         }
@@ -281,12 +281,16 @@ class Interpreter {
                     else { // opcode >= 2
                         if (opcode < 3) {
                             // 2
+                            // arg1 :: x y -- x (i.e. "drop")
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
                         }
                         else {
                             // 3
+                            // arg2 :: x y -- y
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -306,6 +310,8 @@ class Interpreter {
                         }
                         else {
                             // 5
+                            // rib? :: x -- bool(x is a rib)
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -314,12 +320,16 @@ class Interpreter {
                     else { // opcode >= 6
                         if (opcode < 7) {
                             // 6
+                            // field0 :: rib(x, _, _) -- x
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
                         }
                         else {
                             // 7
+                            // field1 :: rib(_, y, _) -- y
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -332,12 +342,16 @@ class Interpreter {
                     if (opcode < 10) {
                         if (opcode < 9) {
                             // 8
+                            // field2 :: rib(_, _, z) -- z
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
                         }
                         else {
                             // 9
+                            // field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -346,12 +360,16 @@ class Interpreter {
                     else { // opcode >= 10
                         if (opcode < 11) {
                             // 10
+                            // field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
                         }
                         else {
                             // 11
+                            // field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -362,6 +380,8 @@ class Interpreter {
                     if (opcode < 14) {
                         if (opcode < 13) {
                             // 12
+                            // eqv? :: x y -- bool(x is identical to y)
+
                             // TODO
                             let tty[0] = opcode; // DEBUG
                             do Intepreter.halt();
@@ -407,9 +427,77 @@ class Interpreter {
                 }
             }
         }
-        else {
-            let tty[0] = opcode; // DEBUG
-            do Intepreter.halt();
+        else { // opcode >= 16
+            if (opcode < 24) {
+                if (opcode < 20) {
+                    if (opcode < 18) {
+                        if (opcode < 17) {
+                            // 16
+                            // * :: x y -- (x * y)
+
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 17
+                            // quotient :: not implemented
+
+                            do Intepreter.halt();
+                        }
+                    }
+                    else { // opcode >= 18
+                        if (opcode < 19) {
+                            // 18
+                            // getchar :: -- <char from keyboard> (blocks until a key is pressed)
+
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 19
+                            // putchar :: not implemented
+
+                            do Intepreter.halt();
+                        }
+                    }
+                }
+                else { // opcode >= 20
+                    if (opcode < 22) {
+                        if (opcode < 21) {
+                            // 20
+                            // peek :: x -- RAM[x]
+
+                            // TODO
+                            let tty[0] = opcode; // DEBUG
+                            do Intepreter.halt();
+                        }
+                        else {
+                            // 21
+                            // poke :: x y -- y (and write the value y at RAM[x])
+
+                            // Note: one rib becomes garbage:
+                            let y = Interpreter.pop();
+
+                            let x = stack[0];
+                            let tmp = 0;
+                            let tmp[x] = y;
+                            // Update the second stack entry in place
+                            let stack[0] = y;
+                        }
+                    }
+                    else { // opcode >= 22
+                        // 22
+                        // halt
+
+                        do Intepreter.halt();
+                    }
+                }
+            }
+            else { // opcode >= 24
+                do Intepreter.halt();
+            }
         }
         return;
     }
