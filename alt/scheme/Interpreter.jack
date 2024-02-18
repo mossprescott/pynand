@@ -322,17 +322,17 @@ class Interpreter {
                             // 6
                             // field0 :: rib(x, _, _) -- x
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // No allocation: the top entry on the stack is updated in place
+                            let tmp = stack[0];
+                            let stack[0] = tmp[0];
                         }
                         else {
                             // 7
                             // field1 :: rib(_, y, _) -- y
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // No allocation: the top entry on the stack is updated in place
+                            let tmp = stack[0];
+                            let stack[0] = tmp[1];
                         }
                     }
                 }
@@ -344,17 +344,21 @@ class Interpreter {
                             // 8
                             // field2 :: rib(_, _, z) -- z
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // No allocation: the top entry on the stack is updated in place
+                            let tmp = stack[0];
+                            let stack[0] = tmp[2];
                         }
                         else {
                             // 9
                             // field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // Note: one rib becomes garbage (top entry of stack)
+
+                            let x = Interpreter.pop();
+                            let tmp = stack[0];
+                            let tmp[0] = x;
+                            // Update the second entry on the stack in place:
+                            let stack[0] = x;
                         }
                     }
                     else { // opcode >= 10
@@ -362,17 +366,25 @@ class Interpreter {
                             // 10
                             // field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // Note: one rib becomes garbage (top entry of stack)
+
+                            let y = Interpreter.pop();
+                            let tmp = stack[0];
+                            let tmp[1] = y;
+                            // Update the second entry on the stack in place:
+                            let stack[0] = y;
                         }
                         else {
                             // 11
                             // field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))
 
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
+                            // Note: one rib becomes garbage (top entry of stack)
+
+                            let z = Interpreter.pop();
+                            let tmp = stack[0];
+                            let tmp[2] = z;
+                            // Update the second entry on the stack in place:
+                            let stack[0] = z;
                         }
                     }
                 }
