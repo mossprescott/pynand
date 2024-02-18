@@ -52,104 +52,86 @@ class Interpreter {
             if (opcode = 0) {
                 if (pc[2] = 0) {
                     // jump
-                    if ((pc[1] > -1) & (pc[1] < 1000)) {
-                        // y is slot # of target
-                        // TODO: let proc = findSlot();
-                        do Interpreter.halt();  // TODO
+
+                    let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                    let proc = symbol[0];
+
+                    if (proc[0] & (~31)) {  // not between 0 and 31
+                        // closure
+
+                        let cont = Interpreter.findContinuation();
+
+                        // Note: can't overwrite the old continuation because it may be in ROM
+                        let cont = Interpreter.alloc(cont[0], proc, cont[2]);
+
+                        let stack = Interpreter.wrangleClosureParams(proc, cont);
+
+                        let code = proc[0];
+                        let pc = code[2];
                     }
                     else {
-                        // y is addr of target symbol
-                        let symbol = pc[1];
-                        let proc = symbol[0];
-                        if (proc[0] & (~31)) {  // not between 0 and 31
-                            // closure
+                        // primitive
 
-                            do Interpreter.halt();  // TODO
-                        }
-                        else {
-                            // primitive
+                        do Interpreter.handlePrimitive(proc[0]);
 
-                            do Interpreter.handlePrimitive(proc[0]);
+                        let cont = Interpreter.findContinuation();
 
-                            let cont = Interpreter.findContinuation();
+                        // Overwrite top stack entry so the stack consists of the just-pushed
+                        // result on top of the saved stack from the continuation.
+                        let stack[1] = cont[0];
 
-                            // Overwrite top stack entry so the stack consists of the just-pushed
-                            // result on top of the saved stack from the continuation.
-                            let stack[1] = cont[0];
-
-                            // PC = next instruction from the continuation
-                            let pc = cont[2];
-                        }
+                        // PC = next instruction from the continuation
+                        let pc = cont[2];
                     }
                 }
                 else {
                     // call
-                    if ((pc[1] > -1) & (pc[1] < 1000)) {
-                        // y is slot # of target
-                        // TODO: let proc = findSlot();
-                        do Interpreter.halt();  // TODO
+
+                    let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                    let proc = symbol[0];
+
+                    if (proc[0] & (~31)) {  // not between 0 and 31
+                        // closure
+
+                        // New continuation:
+                        //   x = saved stack (after popping args)
+                        //   y = proc rib
+                        //   z = next instruction
+                        let cont = Interpreter.alloc(-1, proc, pc[2]);
+                        let newStack = Interpreter.wrangleClosureParams(proc, cont);
+                        let cont[0] = stack;
+                        let stack = newStack;
+
+                        // Now jump to the entry point of the proc:
+                        let code = proc[0];
+                        let pc = code[2];
                     }
                     else {
-                        // y is addr of target symbol
-                        let symbol = pc[1];
-                        let proc = symbol[0];
-                        if (proc[0] & (~31)) {  // not between 0 and 31
-                            // closure
+                        // primitive
+                        do Interpreter.handlePrimitive(proc[0]);
 
-                            // New continuation:
-                            //   x = saved stack (after popping args)
-                            //   y = proc rib
-                            //   z = next instruction
-                            let cont = Interpreter.alloc(-1, proc, pc[2]);
-                            let newStack = Interpreter.wrangleClosureParams(proc, cont);
-                            let cont[0] = stack;
-                            let stack = newStack;
-
-                            // Now jump to the entry point of the proc:
-                            let code = proc[0];
-                            let pc = code[2];
-                        }
-                        else {
-                            // primitive
-                            do Interpreter.handlePrimitive(proc[0]);
-
-                            let pc = pc[2];
-                        }
+                        let pc = pc[2];
                     }
                 }
             }
             else {
             if (opcode = 1) {
                 // set
-                if ((pc[1] > -1) & (pc[1] < 1000)) {
-                    // y is slot # of target
-                    do Interpreter.halt();  // TODO
-                }
-                else {
-                    // y is addr of target symbol
-                    let symbol = pc[1];
-                    let symbol[0] = Interpreter.pop();
-                }
+
+                let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+
+                let symbol[0] = Interpreter.pop();
+
                 let pc = pc[2];
             }
             else {
             if (opcode = 2) {
                 // get
-                let slot = pc[1];
-                if ((slot > -1) & (slot < 1000)) {
-                    // y is slot # of target
-                    let ptr = stack;
-                    while (slot > 0) {
-                        let ptr = ptr[1];
-                        let slot = slot - 1;
-                    }
-                    do Interpreter.push(ptr[0]);
-                }
-                else {
-                    // y is addr of target symbol
-                    let symbol = pc[1];
-                    do Interpreter.push(symbol[0]);
-                }
+
+                let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+
+                do Interpreter.push(symbol[0]);
+
                 let pc = pc[2];
             }
             else {
@@ -197,6 +179,33 @@ class Interpreter {
         }
 
         return;
+    }
+
+    /**
+     Decode the "y" value from a jump/.call, set, or get instruction, and return the rib that
+     contains the target, which might be a stack entry or a symbol. In either case, the actual
+     target is found in the "x" field of the result.
+     */
+    function Rib getTarget(int slotOrGlobal) {
+        var int i;
+        var Rib ptr;
+        var Rib symbol;
+
+        if ((slotOrGlobal > -1) & (slotOrGlobal < 1000)) {
+            let i = slotOrGlobal;
+            // y is slot # of target
+            let ptr = stack;
+            while (i > 0) {
+                let ptr = ptr[1];
+                let i = i - 1;
+            }
+            return ptr;
+        }
+        else {
+            // y is addr of target symbol
+            let symbol = pc[1];
+            return symbol;
+        }
     }
 
     /**
