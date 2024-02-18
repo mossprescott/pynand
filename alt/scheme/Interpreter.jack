@@ -381,9 +381,13 @@ class Interpreter {
                         }
                         else {
                             // 15
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Intepreter.halt();
+                            // -: x y -- (x - y)
+
+                            // Note: one rib becomes garbage:
+                            let y = Interpreter.pop();
+                            let x = stack[0];
+                            // Update second stack entry in place:
+                            let stack[0] = x - y;
                         }
                     }
                 }
