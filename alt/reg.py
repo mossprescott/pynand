@@ -30,7 +30,7 @@ implementations.
 
 Other differences:
 
-- Subroutine results are stored in r0 (aka @5)
+- Subroutine results are stored in @12 (aka r7)
 - Return addresses are stored at @4 (aka THAT)
 - Each call site just pushes arguments, stashes the return address and then jumps to the "function"
     address. It's up to each function to do any saving of registers and adjustment of the stack
@@ -50,6 +50,15 @@ from nand.platform import Platform, BUNDLED_PLATFORM
 from nand.translate import AssemblySource
 from nand.solutions import solved_07, solved_11
 from nand.solutions.solved_11 import SymbolTable, VarKind
+
+
+OPTIMIZE_LEAF_FUNCTIONS = True
+"""If True, a simpler call/return sequence is used for functions that do not need to manipulate the
+stack (because they don't call any subroutines).
+Saves ~30 instructions per leaf function in ROM, plus another ~30 at runtime. For small functions like
+Math.min/max/abs, this might save ~50% of the space and ~70% of the time.
+Possibly makes tracing/debugging confusing or useless in these functions.
+"""
 
 
 # IR
@@ -1004,6 +1013,11 @@ class Translator(solved_07.Translator):
         self.asm = asm if asm else AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
 
+        # HACK: stash the leaf-ishness of the current subroutine statefully, so we don't have to
+        # thread it through the traversal. When we're dealing with a leaf, this is the number of
+        # args. Otherwise, None.
+        self.leaf_sub_args = None
+
         # self.preamble()  # called by the loader, apparently
 
     def handle(self, op):
@@ -1032,48 +1046,93 @@ class Translator(solved_07.Translator):
         self.asm.start(f"function {class_name}.{subroutine_ast.name} {subroutine_ast.num_vars}")
         self.asm.label(f"{self.function_namespace}")
 
-        # Note: this could be done with a common sequence in the preamble, but jumping there and
-        # back would cost at least 6 cycles or so, and the goal here is to get small by generating
-        # tighter code, not save space in ROM by adding runtime overhead.
-        # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
-        # at all.
-        self.asm.comment("push the return address, then LCL and ARG")
-        self.asm.instr(f"@{RETURN_ADDRESS}")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@LCL")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@ARG")
-        self.asm.instr("D=M")
-        self._push_d()
+        def uses_stack(stmt: Stmt):
+            if isinstance(stmt, Eval):
+                return isinstance(stmt.expr, CallSub)
+            elif isinstance(stmt, IndirectWrite):
+                return False
+            elif isinstance(stmt, Store):
+                return False
+            elif isinstance(stmt, If):
+                return any(uses_stack(s) for s in stmt.when_true + (stmt.when_false or []))
+            elif isinstance(stmt, While):
+                return any(uses_stack(s) for s in stmt.test + stmt.body)
+            elif isinstance(stmt, Return):
+                return isinstance(stmt.expr, CallSub)  # FIXME: does this happen?
+            elif isinstance(stmt, Push):
+                return True
+            elif isinstance(stmt, Discard):
+                return isinstance(stmt.expr, CallSub)
+            else:
+                raise Exception(f"Unknown Stmt: {stmt}")
 
-        self.asm.comment("LCL = SP")
-        self.asm.instr("@SP")
-        self.asm.instr("D=M")
-        self.asm.instr("@LCL")
-        self.asm.instr("M=D")
+        is_leaf = OPTIMIZE_LEAF_FUNCTIONS and not any(uses_stack(s) for s in subroutine_ast.body)
 
-        self.asm.comment("ARG = SP - (num_args + 3)")
-        self.asm.instr(f"@{subroutine_ast.num_args + 3}")
-        self.asm.instr("D=A")
-        self.asm.instr("@SP")
-        self.asm.instr("D=M-D")
-        self.asm.instr("@ARG")
-        self.asm.instr("M=D")
+        if is_leaf:
+            # TODO: if solved_07.INITIALIZE_LOCALS?
+            if subroutine_ast.num_vars > 0:
+                # Note: this is probably pretty rare. You need to have a leaf function with more
+                # live variables than there are registers (typically 8).
+                self.asm.comment(f"initialize locals ({subroutine_ast.num_vars})")
+                self.asm.instr("@SP")
+                self.asm.instr("M=0")
+                for _ in range(subroutine_ast.num_vars-1):
+                    self.asm.instr("A=A+1")
+                    self.asm.instr("M=0")
+            else:
+                self.asm.comment("no locals to initialize (leaf function), so no-op")
+                # Bogus: so the function label and the first stmt don't end up at the same address
+                self.asm.instr("D=D")
 
-        if subroutine_ast.num_vars > 0:
-            self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
-            self.reserve_local_space(subroutine_ast.num_vars)
+        else:
+            # Note: this could be done with a common sequence in the preamble, but jumping there and
+            # back would cost at least 6 cycles or so, and the goal here is to get small by generating
+            # tighter code, not save space in ROM by adding runtime overhead.
+            # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
+            # at all.
+            self.asm.comment("push the return address, then LCL and ARG")
+            self.asm.instr(f"@{RETURN_ADDRESS}")
+            self.asm.instr("D=M")
+            self._push_d()
+            self.asm.instr("@LCL")
+            self.asm.instr("D=M")
+            self._push_d()
+            self.asm.instr("@ARG")
+            self.asm.instr("D=M")
+            self._push_d()
+
+            self.asm.comment("LCL = SP")
+            self.asm.instr("@SP")
+            self.asm.instr("D=M")
+            self.asm.instr("@LCL")
+            self.asm.instr("M=D")
+
+            self.asm.comment("ARG = SP - (num_args + 3)")
+            self.asm.instr(f"@{subroutine_ast.num_args + 3}")
+            self.asm.instr("D=A")
+            self.asm.instr("@SP")
+            self.asm.instr("D=M-D")
+            self.asm.instr("@ARG")
+            self.asm.instr("M=D")
+
+            if subroutine_ast.num_vars > 0:
+                self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
+                self.reserve_local_space(subroutine_ast.num_vars)
 
         # Now the body:
+        if is_leaf:
+            self.leaf_sub_args = subroutine_ast.num_args
+        else:
+            self.leaf_sub_args = None
+
         for s in subroutine_ast.body:
             self._handle(s)
+
         self.asm.blank()
 
         instr_count_after = self.asm.instruction_count
 
-        # print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}")
+        # print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}\n")  # DEBUG
 
 
     # Statements:
@@ -1163,12 +1222,22 @@ class Translator(solved_07.Translator):
             raise Exception(f"should have been rewritten: {ast}")
 
         else:
-            if kind == "argument":
-                segment_ptr = "ARG"
-            elif kind == "local":
-                segment_ptr = "LCL"
+            if self.leaf_sub_args is not None:
+                # LCL and ARG are not used; just index off of SP (below for args, above for locals)
+                segment_ptr = "SP"
+                if kind == "argument":
+                    index = -self.leaf_sub_args + ast.location.idx
+                elif kind == "local":
+                    index = ast.location.idx
+                else:
+                    raise Exception(f"Unknown location: {ast}")
             else:
-                raise Exception(f"Unknown location: {ast}")
+                if kind == "argument":
+                    segment_ptr = "ARG"
+                elif kind == "local":
+                    segment_ptr = "LCL"
+                else:
+                    raise Exception(f"Unknown location: {ast}")
 
             # Super common case: initialize a var to 0 or 1 (or -1):
             if imm is not None:
@@ -1180,15 +1249,25 @@ class Translator(solved_07.Translator):
                     self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M+1")
                     self.asm.instr(f"M={imm}")
-                else:
+                elif index > 0:
                     self.asm.instr(f"@{index}")
                     self.asm.instr("D=A")
                     self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M+D")
                     self.asm.instr(f"M={imm}")
+                elif index == -1:
+                    self.asm.instr(f"@{segment_ptr}")
+                    self.asm.instr("A=M-1")
+                    self.asm.instr(f"M={imm}")
+                else:
+                    self.asm.instr(f"@{-index}")
+                    self.asm.instr("D=A")
+                    self.asm.instr(f"@{segment_ptr}")
+                    self.asm.instr("A=M-D")
+                    self.asm.instr(f"M={imm}")
 
             else:
-                if index <= 6:
+                if 0 <= index <= 6:
                     self._handle(ast.value)
                     self.asm.instr(f"@{segment_ptr}")
                     if index == 0:
@@ -1200,8 +1279,12 @@ class Translator(solved_07.Translator):
                     self.asm.instr("M=D")
 
                 else:
-                    self.asm.instr(f"@{index}")
-                    self.asm.instr("D=A")
+                    if index > 0:
+                        self.asm.instr(f"@{index}")
+                        self.asm.instr("D=A")
+                    else:
+                        self.asm.instr(f"@{-index}")
+                        self.asm.instr("D=-A")
                     self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("D=M+D")
                     self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
@@ -1295,7 +1378,21 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
 
-        self.return_op()
+        if self.leaf_sub_args is not None:
+            self.asm.start("return (from leaf)")
+            if self.leaf_sub_args > 0:
+                # TODO: special-case 1 and 2 arguments to save 2/1 instructions
+                self.asm.comment("pop arguments")
+                self.asm.instr(f"@{self.leaf_sub_args}")
+                self.asm.instr("D=A")
+                self.asm.instr("@SP")
+                self.asm.instr("M=M-D")
+            self.asm.instr(f"@{RETURN_ADDRESS}")
+            self.asm.instr("A=M")
+            self.asm.instr("0;JMP")
+
+        else:
+            self.return_op()
 
     def handle_Push(self, ast):
         if not isinstance(ast.expr, CallSub):
@@ -1393,12 +1490,22 @@ class Translator(solved_07.Translator):
         elif ast.kind == "field":
             raise Exception(f"should have been rewritten: {ast}")
         else:
-            if ast.kind == "argument":
-               segment_ptr = "ARG"
-            elif ast.kind == "local":
-                segment_ptr = "LCL"
+            if self.leaf_sub_args is not None:
+                # LCL and ARG are not used; just index off of SP (below for args, above for locals)
+                segment_ptr = "SP"
+                if ast.kind == "argument":
+                    index = -self.leaf_sub_args + ast.idx
+                elif ast.kind == "local":
+                    index = ast.index
+                else:
+                    raise Exception(f"Unknown location: {ast}")
             else:
-                raise Exception(f"Unknown location: {ast}")
+                if ast.kind == "argument":
+                    segment_ptr = "ARG"
+                elif ast.kind == "local":
+                    segment_ptr = "LCL"
+                else:
+                    raise Exception(f"Unknown location: {ast}")
 
             if index == 0:
                 self.asm.instr(f"@{segment_ptr}")
@@ -1410,12 +1517,25 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{segment_ptr}")
                 self.asm.instr("A=M+1")
                 self.asm.instr("A=A+1")
-            else:
+            elif index > 0:
                 self.asm.instr(f"@{index}")
                 self.asm.instr("D=A")
                 self.asm.instr(f"@{segment_ptr}")
-                self.asm.instr("A=D+M")
+                self.asm.instr("A=M+D")
+            elif index == -1:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-1")
+            elif index == -2:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-1")
+                self.asm.instr("A=A-1")
+            else:
+                self.asm.instr(f"@{-index}")
+                self.asm.instr("D=A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-D")
             self.asm.instr("D=M")
+
 
     def handle_Reg(self, ast: Reg):
         self.asm.instr(f"@R{5+ast.idx}")
@@ -1600,7 +1720,6 @@ class Translator(solved_07.Translator):
 
     def _return(self):
         "Override the normal sequence; much less stack adjustment required."
-        # TODO: use this only for non-leaf subroutines
 
         label = self.asm.next_label("return_common")
 
@@ -1642,6 +1761,8 @@ class Translator(solved_07.Translator):
         self.asm.instr("@R14")
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
+
+        self.asm.blank()
 
         return label
 
