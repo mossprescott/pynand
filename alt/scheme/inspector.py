@@ -3,6 +3,8 @@
 from nand.vector import extend_sign, unsigned
 from alt import big
 
+# Seems like overkill
+SHOW_SAVED_STACKS = False
 
 class Inspector:
     def __init__(self, computer, symbols, stack_loc, rom_base=big.ROM_BASE, rom_limit=big.HEAP_BASE):
@@ -96,7 +98,7 @@ class Inspector:
                     return f"proc({PRIMITIVES[x]})"
                 else:
                     num_args, instr = self.peek(x), self.peek(x+2)
-                    return f"proc(args={num_args}, env={self.show_obj(y)}, instr={self.show_addr(instr)}){self.show_addr(val)}"
+                    return f"proc(args={num_args}, env={list_str(self.stack(y))}, instr={self.show_addr(instr)}){self.show_addr(val)}"
             elif z == 2:  # symbol
                 return f"symbol({self._obj(y)} = {self._obj(x)})"
             elif z == 3:  # string
@@ -126,25 +128,38 @@ class Inspector:
         return str(self._obj(val))
 
 
-    def stack(self):
+    def stack(self, addr=None):
         """Contents of the stack, bottom to top."""
+        if addr is None:
+            addr = self.peek(self.stack_loc)
 
-        def go(addr):
-            if self.symbols_by_addr.get(addr) == "rib_nil":
-                # This appears only after the outer continuation is invoked:
-                return []
-            elif addr == 0:
-                # sanity check
-                raise Exception("Unexpected zero pointer in stack")
+        if self.symbols_by_addr.get(addr) == "rib_nil":
+            # This appears only after the outer continuation is invoked:
+            return []
+        elif addr == 0:
+            # sanity check
+            return ["<0>!"]
+        else:
+            x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
+
+            if z == 0:  # pair
+                return self.stack(y) + [self._obj(x)]
             else:
-                x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
-
-                if z == 0:  # pair
-                    return go(y) + [self._obj(x)]
+                if SHOW_SAVED_STACKS:
+                    saved_str = list_str(self.stack(x))
+                    cont = f"cont(saved={saved_str}; {self.show_addr(z)}){self.show_addr(addr)}"
                 else:
-                    # A continuation: (stack, closure, next instr)
-                    return go(x) + [f"cont(saved={self._obj(x)}; {self._obj(y)}; {self.show_addr(z)}){self.show_addr(addr)}"]
-        return go(self.peek(self.stack_loc))
+                    cont = f"cont({self.show_addr(z)}){self.show_addr(addr)}"
+
+                if y == 0:
+                    # outer continuation: there is no proc, and no further stack
+                    return [cont]
+                else:
+                    # Note: no instruction ever actually looks at this entry. It's just holding `env`,
+                    # which we're about to traverse. But need to show something so slot numbers make
+                    # sense.
+                    closure = "<closure>"
+                    return self.stack(self.peek(y+1)) + [closure, cont]
 
 
     def show_stack(self):
@@ -152,6 +167,14 @@ class Inspector:
         ribs."""
 
         return ", ".join(str(o) for o in self.stack())
+
+
+def list_str(lst):
+    """Looks like a list's repr(), but use str() on the elements to avoid quoting everything.
+
+    Why do I have to write this? Or do I?
+    """
+    return "[" + ", ".join(str(x) for x in lst) + "]"
 
 
 PRIMITIVES = {
