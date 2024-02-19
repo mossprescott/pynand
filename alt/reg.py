@@ -94,9 +94,18 @@ class IndirectWrite(NamedTuple):
     value: "Value"
 
 class Store(NamedTuple):
-    """Store a value to a location identified by segment and index."""
+    """Store a value to a location identified by segment and index.
+
+    Restrictions on the RHS expr:
+    - if location is not "static", then expr is always a Value, because the destination address
+      may need to be computed.
+    - if location is "static", then expr can be any flattened expression
+
+    And yes, this does imply that storing to a static and storing to argument/local are
+    actually different operations worthy of their own Stmt types.
+    """
     location: "Location"
-    value: "Value"
+    expr: "Expr"
 
 Cmp = str  # requires 3.8: Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
 
@@ -144,9 +153,10 @@ class Local(NamedTuple):
 
 class Location(NamedTuple):
     """A location identified by segment and index."""
+    # TODO: break this out into StackVar and Static
     kind: VarKind
-    idx: int
-    name: str  # include for debugging purposes
+    idx: int   # Used for argument/local
+    name: str  # Used for static
 
 class Reg(NamedTuple):
     """A variable which is local the the subroutine scope, does not need to persist
@@ -235,6 +245,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 if isinstance(loc, Local):
                     expr_stmts, expr = flatten_expression(stmt.expr, force=False)
                     let_stmt = Eval(dest=loc, expr=expr)
+                    return expr_stmts + [let_stmt]
+                elif loc.kind == "static":
+                    # Note: writing to a static is simple (no need to generate target address), so the
+                    # RHS doesn't need to be in a register.
+                    expr_stmts, expr = flatten_expression(stmt.expr, force=False)
+                    let_stmt = Store(loc, expr)
                     return expr_stmts + [let_stmt]
                 elif loc.kind == "this":
                     if isinstance(this_expr, Local):
@@ -574,7 +590,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
             read.update(refs(stmt.address))
             read.update(refs(stmt.value))
         elif isinstance(stmt, Store):
-            read.update(refs(stmt.value))
+            read.update(refs(stmt.expr))
         elif isinstance(stmt, If):
             # Note: overwriting stmt (and live_set) here:
             stmt, live_set = analyze_if(stmt, live_set)
@@ -703,8 +719,8 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             value_stmts, value_value = rewrite_value(stmt.value)
             return address_stmts + value_stmts + [IndirectWrite(address_value, value_value)]
         elif isinstance(stmt, Store):
-            value_stmts, value = rewrite_expr(stmt.value)
-            return value_stmts + [Store(stmt.location, value)]
+            expr_stmts, expr = rewrite_expr(stmt.expr)
+            return expr_stmts + [Store(stmt.location, expr)]
         elif isinstance(stmt, If):
             value_stmts, value = rewrite_expr(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
@@ -888,9 +904,8 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             value = rewrite_value(stmt.value)
             return IndirectWrite(address, value)
         elif isinstance(stmt, Store):
-            # print(f"rewrite Store: {stmt}")
-            value = rewrite_value(stmt.value)
-            return Store(stmt.location, value)
+            expr = rewrite_expr(stmt.expr)
+            return Store(stmt.location, expr)
         elif isinstance(stmt, If):
             value = rewrite_value(stmt.value)
             when_true = rewrite_statements(stmt.when_true)
@@ -1052,7 +1067,7 @@ class Translator(solved_07.Translator):
             elif isinstance(stmt, IndirectWrite):
                 return False
             elif isinstance(stmt, Store):
-                return False
+                return isinstance(stmt.expr, CallSub)
             elif isinstance(stmt, If):
                 return any(uses_stack(s) for s in stmt.when_true + (stmt.when_false or []))
             elif isinstance(stmt, While):
@@ -1203,9 +1218,10 @@ class Translator(solved_07.Translator):
             self.asm.instr("M=D")
 
     def handle_Store(self, ast: Store):
-        self.asm.start(f"store {_Stmt_str(ast)}")
+        if not isinstance(ast.expr, CallSub):
+            self.asm.start(f"store-{self.describe_expr(ast.expr)} {_Stmt_str(ast)}")
 
-        imm = self.immediate(ast.value)
+        imm = self.immediate(ast.expr)
 
         kind, index = ast.location.kind, ast.location.idx
         if kind == "static":
@@ -1214,7 +1230,11 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{symbol_name}")
                 self.asm.instr(f"M={imm}")
             else:
-                self._handle(ast.value)
+                self._handle(ast.expr)
+
+                if isinstance(ast.expr, CallSub):
+                    self.asm.start(f"store-result {_Expr_str(ast.location)} = <result>")
+
                 self.asm.instr(f"@{symbol_name}")
                 self.asm.instr("M=D")
 
@@ -1249,15 +1269,15 @@ class Translator(solved_07.Translator):
                     self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M+1")
                     self.asm.instr(f"M={imm}")
+                elif index == -1:
+                    self.asm.instr(f"@{segment_ptr}")
+                    self.asm.instr("A=M-1")
+                    self.asm.instr(f"M={imm}")
                 elif index > 0:
                     self.asm.instr(f"@{index}")
                     self.asm.instr("D=A")
                     self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M+D")
-                    self.asm.instr(f"M={imm}")
-                elif index == -1:
-                    self.asm.instr(f"@{segment_ptr}")
-                    self.asm.instr("A=M-1")
                     self.asm.instr(f"M={imm}")
                 else:
                     self.asm.instr(f"@{-index}")
@@ -1267,8 +1287,14 @@ class Translator(solved_07.Translator):
                     self.asm.instr(f"M={imm}")
 
             else:
+                # For small index, compute the destination address without clobbering D:
+                # Note: not optimizing negative indexes because we rarely see store to argument
                 if 0 <= index <= 6:
-                    self._handle(ast.value)
+                    self._handle(ast.expr)
+
+                    if isinstance(ast.expr, CallSub):
+                        self.asm.start(f"store-result {_Expr_str(ast.location)} = <result>")
+
                     self.asm.instr(f"@{segment_ptr}")
                     if index == 0:
                         self.asm.instr("A=M")
@@ -1289,7 +1315,11 @@ class Translator(solved_07.Translator):
                     self.asm.instr("D=M+D")
                     self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
                     self.asm.instr("M=D")
-                    self._handle(ast.value)
+                    self._handle(ast.expr)
+
+                    if isinstance(ast.expr, CallSub):
+                        self.asm.start(f"store-result {_Expr_str(ast.location)} = <result>")
+
                     self.asm.instr("@R15")
                     self.asm.instr("A=M")
                     self.asm.instr("M=D")
@@ -1785,7 +1815,7 @@ def _Stmt_str(stmt: Stmt) -> str:
     elif isinstance(stmt, IndirectWrite):
         return f"mem[{_Expr_str(stmt.address)}] = {_Expr_str(stmt.value)}"
     elif isinstance(stmt, Store):
-        return f"{_Expr_str(stmt.location)} = {_Expr_str(stmt.value)}"
+        return f"{_Expr_str(stmt.location)} = {_Expr_str(stmt.expr)}"
     elif isinstance(stmt, If):
         return "\n".join([
             f"if ({_Expr_str(stmt.value)} {stmt.cmp} zero)",
