@@ -85,7 +85,7 @@ Possibly makes tracing/debugging confusing or useless in these functions.
 
 class Eval(NamedTuple):
     """Evaluate an expression and store the result somewhere."""
-    dest: "Local"
+    dest: "Local"  # Actually Reg (or Static?) after rewriting
     expr: "Expr"
 
 class IndirectWrite(NamedTuple):
@@ -97,14 +97,14 @@ class Store(NamedTuple):
     """Store a value to a location identified by segment and index.
 
     Restrictions on the RHS expr:
-    - if location is not "static", then expr is always a Value, because the destination address
+    - if location is not Static, then expr is always a Value, because the destination address
       may need to be computed.
-    - if location is "static", then expr can be any flattened expression
+    - if location is Static, then expr can be any flattened expression
 
     And yes, this does imply that storing to a static and storing to argument/local are
     actually different operations worthy of their own Stmt types.
     """
-    location: "Location"
+    location: Union["Location", "Static"]
     expr: "Expr"
 
 Cmp = str  # requires 3.8: Literal["!="]  # Meaning "non-zero"; TODO: the rest of the codes
@@ -152,11 +152,10 @@ class Local(NamedTuple):
     name: str  # TODO: parameterize, so we can annotate, etc.?
 
 class Location(NamedTuple):
-    """A location identified by segment and index."""
-    # TODO: break this out into StackVar and Static
+    """A location identified by segment (argument/local) and index."""
     kind: VarKind
-    idx: int   # Used for argument/local
-    name: str  # Used for static
+    idx: int
+    name: str  # For debugging
 
 class Reg(NamedTuple):
     """A variable which is local the the subroutine scope, does not need to persist
@@ -164,7 +163,11 @@ class Reg(NamedTuple):
     idx: int
     name: str  # include for debugging purposes
 
-Value = Union[Const, Local, Reg]
+class Static(NamedTuple):
+    """A static variable; just as efficient to access as Reg."""
+    name: str
+
+Value = Union[Const, Local, Reg, Static]
 """A value that's eligible to be referenced in any statement or expression."""
 
 class Binary(NamedTuple):
@@ -228,12 +231,14 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     elif ast.kind == "constructor":
         this_expr = next_var("this")
 
-    def resolve_name(name: str) -> Union[Local, Location]:
+    def resolve_name(name: str) -> Union[Local, Location, Static]:
         # TODO: this makes sense for locals, arguments, and statics, but "this" needs to get flattened.
         # How to deal with that?
         kind = symbol_table.kind_of(name)
         if kind == "local":
             return Local(name)
+        elif kind == "static":
+            return Static(name)
         else:
             index = symbol_table.index_of(name)
             return Location(kind, index, name)
@@ -246,9 +251,10 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                     expr_stmts, expr = flatten_expression(stmt.expr, force=False)
                     let_stmt = Eval(dest=loc, expr=expr)
                     return expr_stmts + [let_stmt]
-                elif loc.kind == "static":
+                elif isinstance(loc, Static):
                     # Note: writing to a static is simple (no need to generate target address), so the
                     # RHS doesn't need to be in a register.
+                    # TODO: so, this isn't really a Store, is it?
                     expr_stmts, expr = flatten_expression(stmt.expr, force=False)
                     let_stmt = Store(loc, expr)
                     return expr_stmts + [let_stmt]
@@ -370,7 +376,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
 
         elif isinstance(expr, jack_ast.VarRef):
             loc = resolve_name(expr.name)
-            if isinstance(loc, Local):
+            if isinstance(loc, (Local, Static)):
                 return [], loc  # Never wrapped
             elif loc.kind == "this":
                 if isinstance(this_expr, Local):
@@ -683,7 +689,7 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             return [], value
 
     def rewrite_expr(expr: Expr) -> Tuple[List[Stmt], Expr]:
-        if isinstance(expr, (CallSub, Const, Location)):
+        if isinstance(expr, (CallSub, Const, Location, Static)):
             return [], expr
         elif isinstance(expr, Local):
             if expr in map:
@@ -876,7 +882,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             return value
 
     def rewrite_expr(expr: Expr) -> Expr:
-        if isinstance(expr, (CallSub, Const, Location)):
+        if isinstance(expr, (CallSub, Const, Location, Static)):
             return expr
         elif isinstance(expr, Local):
             # TODO: a more informative error
@@ -1223,8 +1229,7 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.expr)
 
-        kind, index = ast.location.kind, ast.location.idx
-        if kind == "static":
+        if isinstance(ast.location, Static):
             symbol_name = f"{self.class_namespace}.static_{ast.location.name}"
             if imm is not None:
                 self.asm.instr(f"@{symbol_name}")
@@ -1238,10 +1243,8 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{symbol_name}")
                 self.asm.instr("M=D")
 
-        elif kind == "field":
-            raise Exception(f"should have been rewritten: {ast}")
-
         else:
+            kind = ast.location.kind
             if self.leaf_sub_args is not None:
                 # LCL and ARG are not used; just index off of SP (below for args, above for locals)
                 segment_ptr = "SP"
@@ -1258,6 +1261,7 @@ class Translator(solved_07.Translator):
                     segment_ptr = "LCL"
                 else:
                     raise Exception(f"Unknown location: {ast}")
+                index = ast.location.idx
 
             # Super common case: initialize a var to 0 or 1 (or -1):
             if imm is not None:
@@ -1513,11 +1517,7 @@ class Translator(solved_07.Translator):
 
     def handle_Location(self, ast: Location):
         kind, index = ast.kind, ast.idx
-        if ast.kind == "static":
-            symbol_name = f"{self.class_namespace}.static_{ast.name}"
-            self.asm.instr(f"@{symbol_name}")
-            self.asm.instr("D=M")
-        elif ast.kind == "field":
+        if ast.kind in ("field", "static"):
             raise Exception(f"should have been rewritten: {ast}")
         else:
             if self.leaf_sub_args is not None:
@@ -1571,6 +1571,13 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"@R{5+ast.idx}")
         self.asm.instr("D=M")
 
+
+    def handle_Static(self, ast: Static):
+        symbol_name = f"{self.class_namespace}.static_{ast.name}"
+        self.asm.instr(f"@{symbol_name}")
+        self.asm.instr("D=M")
+
+
     def handle_Binary(self, ast: Binary):
         left_imm = self.immediate(ast.left)
         alu_op = self.binary_op_alu(ast.op)
@@ -1597,7 +1604,7 @@ class Translator(solved_07.Translator):
             # Massive savings here for this compiler; by pushing the comparison all the way into
             # the ALU, this is one branch, with a specific condition code, to pick the right result.
             # But having to leave the result in D kind of spoils the party; for one thing, have to
-            # branch again to skip the no-taken branch, which would have written the other result.
+            # branch again to skip the not-taken branch, which would have written the other result.
 
             # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
             #    -30,000 > 30,000
@@ -1687,6 +1694,8 @@ class Translator(solved_07.Translator):
             return "load"
         elif isinstance(expr, Reg):
             return "copy"
+        elif isinstance(expr, Static):
+            return "copy"  # Confusing? These "loads" are as efficient as reg-reg copies
         elif isinstance(expr, Binary):
             return "binary"
         elif isinstance(expr, Unary):
@@ -1699,12 +1708,20 @@ class Translator(solved_07.Translator):
 
     # Helpers:
 
-    def value_to_a(self, ast: Union[Reg, Const]):
-        """Load a register or constant value into A, without overwriting D, and in one less cycle,
-        in some cases."""
+    def value_to_a(self, ast: Union[Reg, Static, Const]):
+        """Load a register, static or constant value into A, without overwriting D, and in one less cycle,
+        in some cases.
+
+        Note: these values are essentially the types in Value, except Locals have been eliminated
+        at this point.
+        """
 
         if isinstance(ast, Reg):
             self.asm.instr(f"@R{5+ast.idx}")
+            self.asm.instr("A=M")
+        elif isinstance(ast, Static):
+            symbol_name = f"{self.class_namespace}.static_{ast.name}"
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr("A=M")
         elif isinstance(ast, Const):
             if -1 <= ast.value <= 1:
@@ -1854,6 +1871,8 @@ def _Expr_str(expr: Expr) -> str:
         return f"{expr.name} ({expr.kind} {expr.idx})"
     elif isinstance(expr, Reg):
         return f"{expr.name} (r{expr.idx})"
+    elif isinstance(expr, Static):
+        return f"{expr.name} (static)"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
