@@ -20,7 +20,7 @@ def parameterize(f):
     def codegen(chip, **args):
         return run_to_halt(chip, simulator="codegen", interpreter="assembly", **args)
     def jack(chip, **args):
-        return run_to_halt(chip, simulator="codegen", interpreter="jack", **args)
+        return run_to_halt(chip, simulator="codegen", interpreter="jack", max_cycles=100000, **args)
     return pytest.mark.parametrize("run", [vector, codegen, jack])(f)
 
 @parameterize
@@ -397,7 +397,10 @@ def run_to_halt(program, interpreter, max_cycles=20000, simulator="codegen"):
 
     inspect = Inspector(computer, symbols, stack_loc)
 
-    while (not computer.fetch or computer.pc != halt_loop_addr) and cycles <= max_cycles:
+    while not (computer.fetch and computer.pc == halt_loop_addr):
+        if cycles > max_cycles:
+            raise Exception(f"exceeded max_cycles: {max_cycles:,d}")
+
         computer.ticktock()
         cycles += 1
 
