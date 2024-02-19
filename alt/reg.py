@@ -183,7 +183,7 @@ class IndirectRead(NamedTuple):
     """Get the value given an address, aka peek()."""
     address: "Value"
 
-Expr = Union[CallSub, Const, Local, Location, Reg, Binary, Unary, IndirectRead]
+Expr = Union[CallSub, Const, Local, Location, Reg, Static, Binary, Unary, IndirectRead]
 
 
 class Subroutine(NamedTuple):
@@ -1579,18 +1579,18 @@ class Translator(solved_07.Translator):
 
 
     def handle_Binary(self, ast: Binary):
-        left_imm = self.immediate(ast.left)
+        left_symbol = self.symbol(ast.left)
         alu_op = self.binary_op_alu(ast.op)
         right_imm = self.immediate(ast.right)
 
-        if alu_op == "+" and isinstance(ast.left, Reg) and right_imm is not None:
+        if alu_op == "+" and left_symbol is not None and right_imm is not None:
             # e.g. r0 + 1  ->  @R5; D=M+1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            self.asm.instr(f"@{left_symbol}")
             self.asm.instr(f"D=M{right_imm:+}")
             return
-        elif alu_op == "-" and isinstance(ast.left, Reg) and right_imm is not None:
+        elif alu_op == "-" and left_symbol is not None and right_imm is not None:
             # e.g. r0 - 1  ->  @R5; D=M-1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            self.asm.instr(f"@{left_symbol}")
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
@@ -1678,6 +1678,18 @@ class Translator(solved_07.Translator):
             return ast.value
         else:
             return None
+
+    def symbol(self, ast: Expr) -> Optional[str]:
+        """If the expression is a reference to a Reg or Static which has a known (symbolic) address,
+        then construct it.
+        """
+        if isinstance(ast, Reg):
+            return f"R{5+ast.idx}"
+        elif isinstance(ast, Static):
+            return f"{self.class_namespace}.static_{ast.name}"
+        else:
+            return None
+
 
     def describe_expr(self, expr) -> str:
         """A short suffix categorizing the type of expression, for example 'const'.
