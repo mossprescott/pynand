@@ -9,6 +9,10 @@ import nand
 from nand.translate import AssemblySource
 from nand.vector import unsigned
 
+
+SHOW_ALL_LABELS = False
+
+
 # TODO: put this somewhere common:
 def parameterize(f):
     def vector(chip, **args):
@@ -403,12 +407,14 @@ def run_to_halt(program, interpreter, max_cycles=20000, simulator="codegen"):
             output.append(tty_char)
 
         if computer.fetch and inspect.is_labeled(computer.pc):
-            cpu_pc = inspect.show_addr(computer.pc)
-            print(f"{cpu_pc}")
+            if SHOW_ALL_LABELS:
+                print(f"{inspect.show_addr(computer.pc)}")
             if computer.pc == interp_loop_addr:
+                print(f"{cycles:,d}")
                 stack = ", ".join(str(x) for x in inspect.stack())
                 print(f"  stack: {stack}")
                 pc = inspect.peek(pc_loc)
-                print(f"  {inspect.show_addr(pc):<10} {inspect.show_instr(pc)}")
+                print(f"  pc: {inspect.show_addr(pc)}")
+                print(f"  {inspect.show_instr(pc)}")
 
     return (inspect, output)
