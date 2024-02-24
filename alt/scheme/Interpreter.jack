@@ -34,10 +34,11 @@ class Interpreter {
         var Rib code;      // temp used to extract proc's entry point
         var Rib newStack;  // temp used when assembling callee's stack
         var Rib cont;      // existing continuation
+        var Rib proc;      // used only for dispatch
 
         // Stack-allocated:
-        var Rib proc;      // saved to construct cont
-        var Rib newCont;   // saved to update after constructing stack
+        var Rib savedProc;      // saved to construct cont
+        var Rib newCont;        // saved to update after constructing stack
         var Rib symbolToUpdate; // need the location to update after .pop()
 
         // Initialize some more state:
@@ -65,14 +66,16 @@ class Interpreter {
                     if (proc[0] & (~31)) {  // not between 0 and 31
                         // closure
 
+                        let savedProc = proc;
+
                         let cont = Interpreter.findContinuation();
 
                         // Note: can't overwrite the old continuation because it may be in ROM
-                        let newCont = Interpreter.alloc(cont[0], proc, cont[2]);
+                        let newCont = Interpreter.alloc(cont[0], savedProc, cont[2]);
 
-                        let stack = Interpreter.wrangleClosureParams(proc, newCont);
+                        let stack = Interpreter.wrangleClosureParams(savedProc, newCont);
 
-                        let code = proc[0];
+                        let code = savedProc[0];
                         let pc = code[2];
                     }
                     else {
@@ -99,17 +102,19 @@ class Interpreter {
                     if (proc[0] & (~31)) {  // not between 0 and 31
                         // closure
 
+                        let savedProc = proc;
+
                         // New continuation:
                         //   x = saved stack (after popping args)
                         //   y = proc rib
                         //   z = next instruction
-                        let newCont = Interpreter.alloc(-1, proc, pc[2]);
-                        let newStack = Interpreter.wrangleClosureParams(proc, newCont);
+                        let newCont = Interpreter.alloc(-1, proc, pc[2]);  // tricky: faster to use proc from register in first call
+                        let newStack = Interpreter.wrangleClosureParams(savedProc, newCont);
                         let newCont[0] = stack;
                         let stack = newStack;
 
                         // Now jump to the entry point of the proc:
-                        let code = proc[0];
+                        let code = savedProc[0];
                         let pc = code[2];
                     }
                     else {
