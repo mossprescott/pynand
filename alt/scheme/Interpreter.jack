@@ -54,7 +54,7 @@ class Interpreter {
                 if (pc[2] = 0) {
                     // jump
 
-                    let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
                     let proc = symbol[0];
 
                     if (proc[0] & (~31)) {  // not between 0 and 31
@@ -88,7 +88,7 @@ class Interpreter {
                 else {
                     // call
 
-                    let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
                     let proc = symbol[0];
 
                     if (proc[0] & (~31)) {  // not between 0 and 31
@@ -120,7 +120,7 @@ class Interpreter {
             if (opcode = 1) {
                 // set
 
-                let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                let symbol = Interpreter.getTarget();  // actually an entry or symbol
 
                 let symbol[0] = Interpreter.pop();
 
@@ -130,7 +130,7 @@ class Interpreter {
             if (opcode = 2) {
                 // get
 
-                let symbol = Interpreter.getTarget(pc[1]);  // actually an entry or symbol
+                let symbol = Interpreter.getTarget();  // actually an entry or symbol
 
                 do Interpreter.push(symbol[0]);
 
@@ -193,18 +193,19 @@ class Interpreter {
     }
 
     /**
-     Decode the "y" value from a jump/.call, set, or get instruction, and return the rib that
+     Decode the "y" value from a jump/call, set, or get instruction, and return the rib that
      contains the target, which might be a stack entry or a symbol. In either case, the actual
      target is found in the "x" field of the result.
      */
-    function Rib getTarget(int slotOrGlobal) {
+    function Rib getTarget() {
+        var int slotOrGlobal;
         var int i;
         var Rib ptr;
-        var Rib symbol;
 
+        let slotOrGlobal = pc[1];
         if ((slotOrGlobal > -1) & (slotOrGlobal < 1000)) {
-            let i = slotOrGlobal;
             // y is slot # of target
+            let i = slotOrGlobal;
             let ptr = stack;
             while (i > 0) {
                 let ptr = ptr[1];
@@ -214,8 +215,7 @@ class Interpreter {
         }
         else {
             // y is addr of target symbol
-            let symbol = pc[1];
-            return symbol;
+            return slotOrGlobal;
         }
     }
 
@@ -239,9 +239,14 @@ class Interpreter {
         return newStack;
     }
 
-    function void handlePrimitive(int opcode) {
+    function void handlePrimitive(int opcode_arg) {
+        var int opcode;
         var int x, y, z;
         var Rib tmp;
+
+        // Make a local copy, which will end up in a register, avoiding
+        // 4/5 loads from the stack every time:
+        let opcode = opcode_arg;
 
         // Note: What you really want here is a computed jump (i.e. a switch construct.)
         // Failing that, we make do with a binary search, effectively, with 5 branches
