@@ -28,12 +28,17 @@ class Interpreter {
      starting values.
      */
     function void main() {
-        var int opcode;
-        var Rib symbol;
-        var Rib proc, code, cont, newStack;
-        var int slot;
-        var Rib ptr;
-        var int obj;
+        // Register-allocated:
+        var int opcode;    // only used to dispatch before any handling
+        var Rib symbol;    // only used to find the value of a symbol
+        var Rib code;      // temp used to extract proc's entry point
+        var Rib newStack;  // temp used when assembling callee's stack
+        var Rib cont;      // existing continuation
+
+        // Stack-allocated:
+        var Rib proc;      // saved to construct cont
+        var Rib newCont;   // saved to update after constructing stack
+        var Rib symbolToUpdate; // need the location to update after .pop()
 
         // Initialize some more state:
 
@@ -63,9 +68,9 @@ class Interpreter {
                         let cont = Interpreter.findContinuation();
 
                         // Note: can't overwrite the old continuation because it may be in ROM
-                        let cont = Interpreter.alloc(cont[0], proc, cont[2]);
+                        let newCont = Interpreter.alloc(cont[0], proc, cont[2]);
 
-                        let stack = Interpreter.wrangleClosureParams(proc, cont);
+                        let stack = Interpreter.wrangleClosureParams(proc, newCont);
 
                         let code = proc[0];
                         let pc = code[2];
@@ -98,9 +103,9 @@ class Interpreter {
                         //   x = saved stack (after popping args)
                         //   y = proc rib
                         //   z = next instruction
-                        let cont = Interpreter.alloc(-1, proc, pc[2]);
-                        let newStack = Interpreter.wrangleClosureParams(proc, cont);
-                        let cont[0] = stack;
+                        let newCont = Interpreter.alloc(-1, proc, pc[2]);
+                        let newStack = Interpreter.wrangleClosureParams(proc, newCont);
+                        let newCont[0] = stack;
                         let stack = newStack;
 
                         // Now jump to the entry point of the proc:
@@ -120,9 +125,9 @@ class Interpreter {
             if (opcode = 1) {
                 // set
 
-                let symbol = Interpreter.getTarget();  // actually an entry or symbol
+                let symbolToUpdate = Interpreter.getTarget();  // actually an entry or symbol
 
-                let symbol[0] = Interpreter.pop();
+                let symbolToUpdate[0] = Interpreter.pop();
 
                 let pc = pc[2];
             }
