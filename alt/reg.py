@@ -309,23 +309,14 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         preparing a value to be compared with zero.
         """
 
-        # Collapse simple negated conditions:
-        if isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
-            if isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "<":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op(">="), expr.expr.right)
-            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == ">":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("<="), expr.expr.right)
-            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "=":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("!="), expr.expr.right)
+        # First apply AST-level simplification, which reduces the number of possible shapes:
+        expr = simplify_expression(expr)
 
         # Collapse anything that's become a comparison between two values:
         if isinstance(expr, jack_ast.BinaryExpression) and expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
             if expr.right == jack_ast.IntegerConstant(0):
                 left_stmts, left_value = flatten_expression(expr.left)
                 return left_stmts, left_value, expr.op.symbol
-            elif expr.left == jack_ast.IntegerConstant(0):
-                right_stmts, right_value = flatten_expression(expr.right)
-                return right_stmts, right_value, negate_cmp(expr.op.symbol)
             else:
                 left_stmts, left_value = flatten_expression(expr.left)
                 right_stmts, right_value = flatten_expression(expr.right)
@@ -336,8 +327,13 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             expr_stmts, expr_value = flatten_expression(expr)
             return expr_stmts, expr_value, "!="
 
+
     def negate_cmp(cmp: Cmp) -> Cmp:
+        """Negate the value."""
         return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
+    def invert_cmp(cmp: Cmp) -> Cmp:
+        """Reverse the operand order."""
+        return {"<": ">", ">": "<", "=": "=", "<=": ">=", ">=": "<=", "!=": "!="}[cmp]
 
     def flatten_expression(expr: jack_ast.Expression, force=True) -> Tuple[List[Stmt], Expr]:
         """Reduce an expression to something that's definitely trivial, possibly preceded
@@ -347,6 +343,8 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         or a local.) If not, it may be an expression which can only appear as the right-hand side
         of Eval or Push.
         """
+
+        expr = simplify_expression(expr)
 
         if isinstance(expr, jack_ast.IntegerConstant):
             return [], Const(expr.value)
@@ -431,16 +429,10 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
 
         elif isinstance(expr, jack_ast.BinaryExpression):
-            # TODO: this transformation is the same as the standard compiler; share that code?
-            if expr.op.symbol == "*":
-                return flatten_expression(jack_ast.SubroutineCall("Math", None, "multiply", [expr.left, expr.right]), force=force)
-            elif expr.op.symbol == "/":
-                return flatten_expression(jack_ast.SubroutineCall("Math", None, "divide", [expr.left, expr.right]), force=force)
-            else:
-                left_stmts, left_expr = flatten_expression(expr.left)
-                right_stmts, right_expr = flatten_expression(expr.right)
-                stmts = left_stmts + right_stmts
-                flat_expr = Binary(left_expr, expr.op, right_expr)
+            left_stmts, left_expr = flatten_expression(expr.left)
+            right_stmts, right_expr = flatten_expression(expr.right)
+            stmts = left_stmts + right_stmts
+            flat_expr = Binary(left_expr, expr.op, right_expr)
 
         elif isinstance(expr, jack_ast.UnaryExpression):
             stmts, child_expr = flatten_expression(expr.expr)
@@ -482,6 +474,72 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     num_args = symbol_table.count("argument")
     num_vars = None  # bogus, but this isn't meaningful until the next phase anyway
     return Subroutine(ast.name, num_args, num_vars, statements)
+
+
+def simplify_expression(expr: jack_ast.Expression) -> jack_ast.BinaryExpression:
+    """Reduce/canonicalize conditions to a more regular form:
+
+    Replace * and / expressions with calls to multiply/divide.
+
+    For comparison expressions:
+    - if there's a constant, it's on the right
+    - if the constant can be re-written to 0, it is
+    - flatten negated conditions and negative integer constants
+    """
+
+    if isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
+        if isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "<":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op(">="), expr.expr.right)
+        elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == ">":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("<="), expr.expr.right)
+        elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "=":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("!="), expr.expr.right)
+
+    def simplify_constant(x: jack_ast.Expression) -> Optional[int]:
+        """If possible, reduce the expression to a (possibly negative) constant."""
+        if isinstance(x, jack_ast.UnaryExpression) and x.op.symbol == "-" and isinstance(x.expr, jack_ast.IntegerConstant):
+            return -x.expr.value
+        elif isinstance(x, jack_ast.IntegerConstant):
+            return x.value
+        else:
+            return None
+
+    if isinstance(expr, jack_ast.BinaryExpression):
+        # TODO: this transformation is the same as the standard compiler; share that code?
+        if expr.op.symbol == "*":
+            return jack_ast.SubroutineCall("Math", None, "multiply", [expr.left, expr.right])
+        elif expr.op.symbol == "/":
+            return jack_ast.SubroutineCall("Math", None, "divide", [expr.left, expr.right])
+        elif expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
+            def invert_cmp(cmp: Cmp) -> Cmp:
+                """Reverse the operand order."""
+                return {"<": ">", ">": "<", "=": "=", "<=": ">=", ">=": "<=", "!=": "!="}[cmp]
+
+            simple_left = simplify_constant(expr.left)
+            simple_right = simplify_constant(expr.right)
+
+            if simple_left is not None and simple_right is None:
+                # Constant on the left; reverse the order:
+                return simplify_expression(jack_ast.BinaryExpression(expr.right,
+                                                                    jack_ast.Op(invert_cmp(expr.op.symbol)),
+                                                                    expr.left))
+            elif simple_right is not None:
+                # Constant on the right; match some common cases:
+                zero = jack_ast.IntegerConstant(0)
+                if expr.op.symbol == "<" and simple_right == 1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op("<="), zero)
+                elif expr.op.symbol == ">=" and simple_right == 1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op(">"), zero)
+                elif expr.op.symbol == ">" and simple_right == -1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op(">="), zero)
+                elif expr.op.symbol == "<=" and simple_right == -1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op("<"), zero)
+                else:
+                    return jack_ast.BinaryExpression(expr.left,
+                                                    expr.op,
+                                                    jack_ast.IntegerConstant(simple_right))
+
+    return expr
 
 
 class LiveStmt(NamedTuple):
@@ -1620,6 +1678,9 @@ class Translator(solved_07.Translator):
             "<": "LT",
             ">": "GT",
             "=": "EQ",
+            "<=": "LE",
+            ">=": "GE",
+            "!=": "NE",
         }.get(op.symbol)
 
     def handle_Unary(self, ast: Unary):
