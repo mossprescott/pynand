@@ -148,8 +148,7 @@ class Interpreter {
             if (opcode = 4) {
                 // if
 
-                let obj = Interpreter.pop();
-                if (obj = ribFalse) {
+                if (Interpreter.pop() = ribFalse) {
                     let pc = pc[2];
                 }
                 else {
@@ -577,7 +576,6 @@ class Interpreter {
     function Rib alloc(int x, int y, int z) {
         var Rib r;
         let r = nextRib;
-        // let tty[0] = r; // DEBUG
         let r[0] = x;
         let r[1] = y;
         let r[2] = z;
@@ -586,7 +584,17 @@ class Interpreter {
     }
 
     function void push(int obj) {
-        let stack = Interpreter.alloc(obj, stack, 0); // pair-type
+        // let stack = Interpreter.alloc(obj, stack, 0); // pair-type
+
+        // Avoid function call overhead by doing the allocation directly here:
+        var Rib r;
+        let r = nextRib;
+        let r[0] = obj;
+        let r[1] = stack;
+        let r[2] = 0;  // pair type
+        let nextRib = nextRib + 3;
+        let stack = r;
+
         return;
     }
 
