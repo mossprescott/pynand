@@ -609,12 +609,26 @@ class Interpreter {
     }
 
     /** Discard the top entry from the stack, return its CAR. */
+    // TODO: get the compiler to inline this
     function int pop() {
         var int r;
         let r = stack[0];
         let stack = stack[1];
         return r;
     }
+
+    // /** Get the object on the top of the stack, without removing it. */
+    // // TODO: get the compiler to inline this
+    // function int peek() {
+    //     return stack[0];
+    // }
+
+    // /** Overwrite the object on the top of the stack, avoiding allocation. */
+    // // TODO: get the compiler to inline this
+    // function void replace(int obj) {
+    //     let stack[0] = obj;
+    //     return;
+    // }
 
     /**
      Address of the continuation rib in the current stack frame: the first entry in the
