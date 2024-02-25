@@ -41,6 +41,7 @@ These changes mean that the debug/trace logging done by some test cases doesn't 
 correct arguments, locals, return addresses, and result values.
 """
 
+from collections import Counter
 import itertools
 from os import name
 from typing import Dict, Generic, List, NamedTuple, Optional, Sequence, Set, Tuple, TypeVar, Union
@@ -58,6 +59,18 @@ stack (because they don't call any subroutines).
 Saves ~30 instructions per leaf function in ROM, plus another ~30 at runtime. For small functions like
 Math.min/max/abs, this might save ~50% of the space and ~70% of the time.
 Possibly makes tracing/debugging confusing or useless in these functions.
+"""
+
+PRINT_LIVENESS = True
+"""Print each function before assigning variables to registers.
+Each statement is anootated with the set of variables which are 'live' at the beginning of
+that statement. A live variable contains a value that will be used later; it must nt be overwritten
+at that point."""
+
+PRINT_IR = True
+"""Print each function immediately before emitting code.
+Variables have been assigned to concrete locations, and each statement represents a unit
+of work for which code can be generated directly.
 """
 
 
@@ -113,7 +126,7 @@ class While(NamedTuple):
     body: Sequence["Stmt"]
 
 class Return(NamedTuple):
-    """Evaluate expr, store the value (if present) in the "RESULT" register, and return to the caller."""
+    """Evaluate expr (if present), store the value in the "RESULT" register, and return to the caller."""
     expr: Optional["Expr"]
 
 class Push(NamedTuple):
@@ -157,6 +170,12 @@ class Reg(NamedTuple):
 class Static(NamedTuple):
     """A static variable; just as efficient to access as Reg."""
     name: str
+
+class Temp(NamedTuple):
+    """Pseudo-register location used when we know a variable is live only between adjacent
+    instructions, and it's safe to simply store it in D."""
+    name: str  # for debugging
+
 
 Value = Union[Const, Local, Reg, Static]
 """A value that's eligible to be referenced in any statement or expression."""
@@ -920,15 +939,16 @@ def color_locals(liveness: Sequence[LiveStmt]) -> List[Set[Local]]:
     return color_sets
 
 
-def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]:
+def resolve_locals(stmts: Sequence[Stmt], map: Dict[Local, V], fail_on_unmapped=True) -> List[Stmt]:
     """Rewrite statements and expressions, updating references to locals to refer to the given
-    registers. If any local is not accounted for, fail.
+    registers. If fail_on_unmapped and any local is not accounted for, fail.
     """
 
     def rewrite_value(value: Value) -> Value:
-        if isinstance(value, Local):
-            # TODO: a more informative error
+        if value in map:
             return map[value]
+        elif fail_on_unmapped and isinstance(value, Local):
+            raise Exception(f"No assignment for local: {value}")
         else:
             return value
 
@@ -936,8 +956,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
         if isinstance(expr, (CallSub, Const, Location, Static)):
             return expr
         elif isinstance(expr, Local):
-            # TODO: a more informative error
-            return map[expr]
+            return rewrite_value(expr)
         elif isinstance(expr, Binary):
             left_value = rewrite_value(expr.left)
             right_value = rewrite_value(expr.right)
@@ -993,6 +1012,89 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
     return rewrite_statements(stmts)
 
 
+def find_transients(stmts: Sequence[LiveStmt]) -> Set[str]:
+    """Identify Locals that exist only to carry a result between a pair of adjacent statements,
+    where the code generator is able to keep the value in D:
+    - live only in one statement (i.e. assigned in one, then used in the next)
+    - the statement that uses it doesn't need to overwrite D
+    """
+
+    counts = Counter()
+
+    def count_stmt(s: LiveStmt):
+        for l in s.before: counts[l] += 1
+        if isinstance(s.statement, If):
+            for cs in s.statement.when_true: count_stmt(cs)
+            for cs in s.statement.when_false or []: count_stmt(cs)
+        elif isinstance(s.statement, While):
+            for cs in s.statement.test: count_stmt(cs)
+            for cs in s.statement.body: count_stmt(cs)
+            # Tricky: the value's refs aren't represented in LiveStmt
+            for l in refs(s.statement.value):
+                counts[l] += 1
+
+    for s in stmts: count_stmt(s)
+
+    # Candidate locals: live only in a single statement, the one where they're used
+    one_time = { l for (l, x) in counts.items() if x == 1 }
+
+    # Try re-writing the statement where the var is used:
+    def visit_stmts(l: Local, stmts: Sequence[LiveStmt]) -> bool:
+        return any (visit_stmt(l, s) for s in stmts)
+
+    def visit_stmt(l: Local, stmt: LiveStmt) -> bool:
+        if isinstance(stmt.statement, If):
+            if any(is_translatable(s) for s in stmt.statement.when_true): return True
+            elif (stmt.statement.when_false is not None
+                    and any(is_translatable(s) for s in stmt.statement.when_false)): return True
+        elif isinstance(stmt.statement, While):
+            if l in refs(stmt.statement.value): return True
+            elif any(is_translatable(s) for s in stmt.statement.test): return True
+            elif any(is_translatable(s) for s in stmt.statement.body): return True
+
+        if l in stmt.before:
+            # TODO: rewrite the expression
+            return is_translatable(stmt.statement)
+            # if isinstance(stmt.statement, Eval):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+            # elif isinstance(stmt.statement, IndirectWrite):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+            # elif isinstance(stmt.statement, Store):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+            # elif isinstance(stmt.statement, Return):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+            # elif isinstance(stmt.statement, Push):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+            # elif isinstance(stmt.statement, Discard):
+            #     # TODO: rewrite the expression
+            #     return is_translatable(stmt.statement)
+        else:
+            return False
+
+    # FIXME: this is patently O(n^2). Fix that by constructing a map of one-time locals to the
+    # statements that use them, and then only inspect those.
+    return { l for l in one_time if visit_stmts(l, stmts) }
+
+
+def is_translatable(stmt: Stmt):
+    """True if the statement can be translated to assembly without disturbing Temp values stored in D.
+    The statement may contain unresolved Locals; they are assumed to represent Reg locations that
+    will be assigned later.
+    """
+
+    if isinstance(stmt, If):  # and isinstance(stmt.value, Temp):
+        # Actually, probably the value is only ever a Temp if we're asking the question
+        return True
+    # TODO: what else?
+    else:
+        return False
+
+
 def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
     """The input is IR with all locals represented by Local.
 
@@ -1002,6 +1104,11 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
     # TODO: treat THIS and THAT as additional locations for "saved" vars.
     # TODO: color vars needing saving as well? probably not worth it for stack-allocated.
+
+    #
+    # Identify locals that need to be stored on the stack (because their values
+    # need to persist across subroutine calls):
+    #
 
     promoted_count = 0
     def next_location(var: Local) -> Location:
@@ -1014,45 +1121,63 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
     need_promotion = need_saving(liveness)
 
-    # for s in liveness:
-    #     print(_Stmt_str(s))
-    # print(f"need saving: {need_promotion}")
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness))
+        print(f"need saving: [{', '.join(str(n) for n in need_promotion)}]")
+        print()
 
     body = promote_locals(ast.body, { Local(l): next_location(Local(l)) for l in need_promotion }, "p_")
 
-    while True:
-        liveness2 = analyze_liveness(body)
-        need_promotion2 = need_saving(liveness2)
+    liveness2 = analyze_liveness(body)
+    need_promotion2 = need_saving(liveness2)
 
-        # Sanity check: additional promotion
-        if len(need_promotion2) > 0:
-            # for s in liveness2:
-            #     print(_Stmt_str(s))
-            # print(f"need saving after one round: {need_promotion2}")
-            raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness2))
 
-        local_sets = color_locals(liveness2)
+    # Sanity check: additional promotion needed
+    if len(need_promotion2) > 0:
+        raise Exception(f"One-pass promotion inadequate Need promotion: {need_promotion2}; in {ast.name}()")
 
-        if len(local_sets) > reg_count:
-            unallocatable_sets = local_sets[reg_count:]
 
-            print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
+    #
+    # Identify temps that can be passed in D for zero overhead:
+    #
 
-            body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
+    transients = find_transients(liveness2)
+    body = resolve_locals(body, {Local(l): Temp(l) for l in transients}, fail_on_unmapped=False)
+    liveness3 = analyze_liveness(body)  # TODO: is it safe to re-analyze?
 
-        else:
-            reg_map = {
-                l: Reg(idx=i, name=l.name)
-                for i, ls in enumerate(local_sets)
-                for l in ls
-            }
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness3))
+        print()
 
-            reg_pressure = 0 if reg_map == {} else max(r.idx+1 for r in reg_map.values())
-            # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+    #
+    # Anything left now can be stored in a register, and they better all fit:
+    #
 
-            reg_body = lock_down_locals(body, reg_map)
+    local_sets = color_locals(liveness3)
 
-            return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
+    if len(local_sets) > reg_count:
+        unallocatable_sets = local_sets[reg_count:]
+
+        print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
+
+        raise Exception("One-pass promotion failed!?")
+        # body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
+
+    else:
+        reg_map = {
+            l: Reg(idx=i, name=l.name)
+            for i, ls in enumerate(local_sets)
+            for l in ls
+        }
+
+        reg_pressure = 0 if reg_map == {} else max(r.idx+1 for r in reg_map.values())
+        # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+
+        reg_body = resolve_locals(body, reg_map, fail_on_unmapped=True)
+
+        return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
 
 
 def compile_class(ast: jack_ast.Class) -> Class:
@@ -1101,7 +1226,8 @@ class Translator(solved_07.Translator):
             self.translate_subroutine(s, class_ast.name)
 
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
-        # print(subroutine_ast)
+        if PRINT_IR:
+            print(subroutine_ast); print()
 
         # if self.last_function_start is not None:
         #     instrs = self.asm.instruction_count - self.last_function_start
@@ -1210,10 +1336,15 @@ class Translator(solved_07.Translator):
     # Statements:
 
     def handle_Eval(self, ast: Eval):
-        assert isinstance(ast.dest, (Reg, Static))
+        assert isinstance(ast.dest, (Reg, Static, Temp))
 
         if not isinstance(ast.expr, CallSub):
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Stmt_str(ast)}")
+
+        # Easy case: leave the result in D for the next statement to pick up
+        if isinstance(ast.dest, Temp):
+            self._handle(ast.expr)
+            return
 
         symbol_name = self.symbol(ast.dest)
 
@@ -1441,8 +1572,8 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
 
+        self.asm.start("return (from leaf)")
         if self.leaf_sub_args is not None:
-            self.asm.start("return (from leaf)")
             if self.leaf_sub_args > 0:
                 if self.leaf_sub_args == 1:
                     self.asm.comment("pop 1 argument")
@@ -1615,6 +1746,11 @@ class Translator(solved_07.Translator):
         self.asm.instr(f"@{symbol_name}")
         self.asm.instr("D=M")
 
+    def handle_Temp(self, ast: Temp):
+        """Yesssss. The contract is to load the value into D, and Temp means the value is
+        already in D when we get here.
+        """
+        pass
 
     def handle_Binary(self, ast: Binary):
         left_symbol = self.symbol(ast.left)
@@ -1929,6 +2065,8 @@ def _Expr_str(expr: Expr) -> str:
         return f"{expr.name} (r{expr.idx})"
     elif isinstance(expr, Static):
         return f"{expr.name} (static)"
+    elif isinstance(expr, Temp):
+        return f"{expr.name} (D)"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
