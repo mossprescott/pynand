@@ -113,8 +113,8 @@ class While(NamedTuple):
     body: Sequence["Stmt"]
 
 class Return(NamedTuple):
-    """Evaluate expr, store the value in the "RESULT" register, and return to the caller."""
-    expr: "Expr"
+    """Evaluate expr, store the value (if present) in the "RESULT" register, and return to the caller."""
+    expr: Optional["Expr"]
 
 class Push(NamedTuple):
     """Used only with Subroutine calls. Acts like Eval, but the destination is the stack."""
@@ -299,7 +299,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 stmts, expr = flatten_expression(stmt.expr, force=False)
                 return stmts + [Return(expr)]
             else:
-                return [Return(Const(0))]
+                return [Return(None)]
 
         else:
             raise Exception(f"Unknown statement: {stmt}")
@@ -786,8 +786,11 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             body = rewrite_statements(stmt.body)
             return [While(test + value_stmts, value, stmt.cmp, body)]
         elif isinstance(stmt, Return):
-            value_stmts, value = rewrite_expr(stmt.expr)
-            return value_stmts + [Return(value)]
+            if stmt.expr is not None:
+                value_stmts, value = rewrite_expr(stmt.expr)
+                return value_stmts + [Return(value)]
+            else:
+                return [Return(None)]
         elif isinstance(stmt, Push):
             expr_stmts, expr = rewrite_expr(stmt.expr)
             return expr_stmts + [Push(expr)]
@@ -971,7 +974,7 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             body = rewrite_statements(stmt.body)
             return While(test, value, stmt.cmp, body)
         elif isinstance(stmt, Return):
-            value = rewrite_expr(stmt.expr)
+            value = rewrite_expr(stmt.expr) if stmt.expr is not None else None
             return Return(value)
         elif isinstance(stmt, Push):
             expr = rewrite_expr(stmt.expr)
@@ -1425,7 +1428,7 @@ class Translator(solved_07.Translator):
             self.handle_CallSub(ast.expr)
             self.asm.comment(f"leave the result in {RESULT}")
 
-        else:
+        elif ast.expr is not None:
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)} (for return)")
 
             # Save a cycle for "return 0":
@@ -1441,12 +1444,21 @@ class Translator(solved_07.Translator):
         if self.leaf_sub_args is not None:
             self.asm.start("return (from leaf)")
             if self.leaf_sub_args > 0:
-                # TODO: special-case 1 and 2 arguments to save 2/1 instructions
-                self.asm.comment("pop arguments")
-                self.asm.instr(f"@{self.leaf_sub_args}")
-                self.asm.instr("D=A")
-                self.asm.instr("@SP")
-                self.asm.instr("M=M-D")
+                if self.leaf_sub_args == 1:
+                    self.asm.comment("pop 1 argument")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-1")
+                elif self.leaf_sub_args == 2:
+                    self.asm.comment("pop 2 arguments")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-1")
+                    self.asm.instr("M=M-1")
+                else:
+                    self.asm.comment("pop arguments")
+                    self.asm.instr(f"@{self.leaf_sub_args}")
+                    self.asm.instr("D=A")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-D")
             self.asm.instr(f"@{RETURN_ADDRESS}")
             self.asm.instr("A=M")
             self.asm.instr("0;JMP")
@@ -1886,7 +1898,10 @@ def _Stmt_str(stmt: Stmt) -> str:
     elif isinstance(stmt, While):
         return f"while ({'; '.join(_Stmt_str(s) for s in stmt.test)}; {_Expr_str(stmt.value)} {stmt.cmp} zero)\n" + jack_ast._indent("\n".join(_Stmt_str(s) for s in stmt.body))
     elif isinstance(stmt, Return):
-        return f"return {_Expr_str(stmt.expr)}"
+        if stmt.expr is not None:
+            return f"return {_Expr_str(stmt.expr)}"
+        else:
+            return "return"
     elif isinstance(stmt, Push):
         return f"push {_Expr_str(stmt.expr)}"
     elif isinstance(stmt, Discard):
