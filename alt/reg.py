@@ -638,7 +638,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         if len(test_liveness) > 0:
             live_at_test_start = test_liveness[0].before
         else:
-            live_at_test_start = live_at_body_start
+            live_at_test_start = live_at_test_end
 
         stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
         live = live_at_test_start
