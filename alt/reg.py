@@ -458,13 +458,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
 
         elif isinstance(expr, jack_ast.UnaryExpression):
             stmts, child_expr = flatten_expression(expr.expr)
-            if isinstance(child_expr, Const) and expr.op.symbol == "-":
-                # This is ok because this VM handles negative constant values
-                flat_expr = Const(-child_expr.value)
-            # elif isinstance(child_expr, Const) and expr.op.symbol == "~":
-                # TODO: figure out how to evaluate logical negation at compile time, accounting for word size...
-            else:
-                flat_expr = Unary(expr.op, child_expr)
+            flat_expr = Unary(expr.op, child_expr)
         else:
             raise Exception(f"Unknown expression: {expr}")
 
@@ -956,7 +950,7 @@ def resolve_locals(stmts: Sequence[Stmt], map: Dict[Local, V], fail_on_unmapped=
             return value
 
     def rewrite_expr(expr: Expr) -> Expr:
-        if isinstance(expr, (CallSub, Const, Location, Static)):
+        if isinstance(expr, (CallSub, Const, Location, Static, Temp)):
             return expr
         elif isinstance(expr, Local):
             return rewrite_value(expr)
@@ -1047,35 +1041,19 @@ def find_transients(stmts: Sequence[LiveStmt]) -> Set[str]:
 
     def visit_stmt(l: Local, stmt: LiveStmt) -> bool:
         if isinstance(stmt.statement, If):
-            if any(is_translatable(s) for s in stmt.statement.when_true): return True
+            if l in refs(stmt.statement.value): return True
+            elif any(visit_stmt(l, s) for s in stmt.statement.when_true): return True
             elif (stmt.statement.when_false is not None
-                    and any(is_translatable(s) for s in stmt.statement.when_false)): return True
+                    and any(visit_stmt(l, s) for s in stmt.statement.when_false)): return True
         elif isinstance(stmt.statement, While):
             if l in refs(stmt.statement.value): return True
-            elif any(is_translatable(s) for s in stmt.statement.test): return True
-            elif any(is_translatable(s) for s in stmt.statement.body): return True
-
-        if l in stmt.before:
-            # TODO: rewrite the expression
-            return is_translatable(stmt.statement)
-            # if isinstance(stmt.statement, Eval):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
-            # elif isinstance(stmt.statement, IndirectWrite):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
-            # elif isinstance(stmt.statement, Store):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
-            # elif isinstance(stmt.statement, Return):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
-            # elif isinstance(stmt.statement, Push):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
-            # elif isinstance(stmt.statement, Discard):
-            #     # TODO: rewrite the expression
-            #     return is_translatable(stmt.statement)
+            elif any(visit_stmt(l, s) for s in stmt.statement.test): return True
+            elif any(visit_stmt(l, s) for s in stmt.statement.body): return True
+        elif l in stmt.before:
+            # Tricky: this little hack fails if the stmt is nested, so we just don't do this path
+            # if it's If/While
+            rewritten, = resolve_locals([stmt.statement], { Local(l): Temp(l) }, fail_on_unmapped=False)
+            return is_translatable(rewritten)
         else:
             return False
 
@@ -1084,18 +1062,75 @@ def find_transients(stmts: Sequence[LiveStmt]) -> Set[str]:
     return { l for l in one_time if visit_stmts(l, stmts) }
 
 
-def is_translatable(stmt: Stmt):
+def is_translatable(stmt: Stmt) -> bool:
     """True if the statement can be translated to assembly without disturbing Temp values stored in D.
     The statement may contain unresolved Locals; they are assumed to represent Reg locations that
     will be assigned later.
+
+    Note: If/While aren't handled here, because a) their test values are always transient
     """
 
-    if isinstance(stmt, If):  # and isinstance(stmt.value, Temp):
-        # Actually, probably the value is only ever a Temp if we're asking the question
-        return True
-    # TODO: what else?
-    else:
+    def translatable_expr(expr: Expr) -> bool:
+        if isinstance(expr, CallSub):
+            raise Exception("silly question: a CallSub can't refer to a one-time (or any) local")
+        elif isinstance(expr, Const):
+            # A constant should never in and of itself require D to be overwritten.
+            return True
+        elif isinstance(expr, (Local, Reg, Static)):
+            # These are all places values can be accessed from without touching D
+            return True
+        elif isinstance(expr, Temp):
+            # The temp location itself is trivially ok
+            return True
+        elif isinstance(expr, Location):
+            # Accessing a stack-allocated variable may involve overwriting D
+            return False
+        elif isinstance(expr, Binary):
+            # Tricky: a binary expression can take one of its arguments from D, in some cases.
+            # TODO: how far does this get us?
+            # return translatable_expr(expr.left) and translatable_expr(expr.right)
+            # FIXME: temporarily disable, until the code generator knows how to handle it
+            return False
+        elif isinstance(expr, Unary):
+            # *Not* and *negate* can be done in place
+            return translatable_expr(expr.value)
+        elif isinstance(expr, IndirectRead):
+            # The *read* isn't a problem
+            return translatable_expr(expr.address)
+        else:
+            raise Exception(f"Unexpected expr: {expr}")
+
+    def a_only(expr: Expr) -> bool:
+        """True if the value of the expression can be constructed directly in A (see value_to_a)."""
+        return isinstance(expr, (Const, Reg, Local, Static))
+
+    if isinstance(stmt, Eval):
+        return translatable_expr(stmt.expr)
+    elif isinstance(stmt, IndirectWrite):
+        # The *value* can come from D, if the *address* doesn't need to touch it:
+        if a_only(stmt.address) and translatable_expr(stmt.value):
+            return True
+        # Or, the *address* can come from D, if the value can be constructed by the ALU:
+        elif translatable_expr(stmt.address) and isinstance(stmt.value, Const) and (-1 <= stmt.value.value <= 1):
+            return True
+        else:
+            return False
+    elif isinstance(stmt, Store):
+        # TODO: this could be ok if the code generator can construct the address without D,
+        # which it can, if the index is 0 or 1 (or even -1), or even some larger values
+        # with some additional cycles if it's till cheaper than copying to a Register and
+        # back (which is 4 instructions).
         return False
+    elif isinstance(stmt, (If, While)):
+        raise Exception("Not handled here")
+    elif isinstance(stmt, Return):
+        return stmt.expr is None or translatable_expr(stmt.expr)
+    elif isinstance(stmt, Push):
+        return translatable_expr(stmt.expr)
+    elif isinstance(stmt, Discard):
+        raise Exception("silly question: a CallSub can't refer to a one-time (or any) local")
+    else:
+        raise Exception(f"Unexpected stmt: {stmt}")
 
 
 def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
@@ -1403,7 +1438,12 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.value)
         if imm is not None:
-            self.value_to_a(ast.address)
+            if isinstance(ast.address, Temp):
+                # TODO: this is a little silly; the previous instruction could probably just
+                # load the value into A if we knew that's where it would be useful
+                self.asm.instr("A=D")
+            else:
+                self.value_to_a(ast.address)
             self.asm.instr(f"M={imm}")
         else:
             self._handle(ast.value)
@@ -1847,7 +1887,12 @@ class Translator(solved_07.Translator):
         return {"-": "-", "~": "!"}[op.symbol]
 
     def handle_IndirectRead(self, ast: IndirectRead):
-        self.value_to_a(ast.address)
+        if isinstance(ast.address, Temp):
+            # TODO: this is a little silly; the previous instruction could probably just
+            # load the value into A if we knew that's where it would be useful
+            self.asm.instr("A=D")
+        else:
+            self.value_to_a(ast.address)
         self.asm.instr("D=M")
 
     def immediate(self, ast: Expr) -> Optional[int]:
@@ -1888,6 +1933,8 @@ class Translator(solved_07.Translator):
             return "copy"
         elif isinstance(expr, Static):
             return "copy"  # Confusing? These "loads" are as efficient as reg-reg copies
+        elif isinstance(expr, Temp):
+            return "direct"
         elif isinstance(expr, Binary):
             return "binary"
         elif isinstance(expr, Unary):
@@ -1924,7 +1971,7 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{-ast.value}")
                 self.asm.instr("A=-A")
         else:
-            raise Exception(f"Unknown Value: {ast}")
+            raise Exception(f"Unexpected Value: {ast}")
 
     def _handle(self, ast):
         self.__getattribute__(f"handle_{ast.__class__.__name__}")(ast)
