@@ -342,6 +342,9 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 diff_var = next_var()
                 diff_stmt = Eval(diff_var, Binary(left_value, jack_ast.Op("-"), right_value))
                 return left_stmts + right_stmts + [diff_stmt], diff_var, expr.op.symbol
+        elif isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
+            expr_stmts, expr_value = flatten_expression(expr.expr)
+            return expr_stmts, expr_value, "="
         else:
             expr_stmts, expr_value = flatten_expression(expr)
             return expr_stmts, expr_value, "!="
