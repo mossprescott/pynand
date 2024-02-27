@@ -61,9 +61,9 @@ Math.min/max/abs, this might save ~50% of the space and ~70% of the time.
 Possibly makes tracing/debugging confusing or useless in these functions.
 """
 
-PRINT_LIVENESS = True
+PRINT_LIVENESS = False
 """Print each function before assigning variables to registers.
-Each statement is anootated with the set of variables which are 'live' at the beginning of
+Each statement is annotated with the set of variables which are 'live' at the beginning of
 that statement. A live variable contains a value that will be used later; it must nt be overwritten
 at that point."""
 
