@@ -1406,7 +1406,16 @@ class Translator(solved_07.Translator):
         symbol_name = self.symbol(ast.dest)
 
         # Do the update in-place if possible:
-        if isinstance(ast.expr, Binary) and symbol_name == self.symbol(ast.expr.left):
+        if (isinstance(ast.expr, Binary)
+            and symbol_name == self.symbol(ast.expr.left) and symbol_name == self.symbol(ast.expr.right)):
+            # This pretty much only handles x = x + x, but that occurs the in hot loop in multiply
+            op = self.binary_op_alu(ast.expr.op)
+            if op is not None:
+                self.asm.instr(f"@{symbol_name}")
+                self.asm.instr(f"D=M")
+                self.asm.instr(f"M=M{op}D")
+                return
+        elif isinstance(ast.expr, Binary) and symbol_name == self.symbol(ast.expr.left):
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
                 right_imm = self.immediate(ast.expr.right)
