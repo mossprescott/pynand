@@ -18,6 +18,12 @@ def test_simplify_expression():
     const = jack_ast.IntegerConstant
     def neg(exp): return jack_ast.UnaryExpression(jack_ast.Op("-"), exp)
 
+    assert (simplify_expression(neg(const(1)))
+                             == const(-1))
+
+    assert (simplify_expression(binary(x, op("+"), neg(const(1))))
+                             == binary(x, op("+"), const(-1)))
+
     assert (simplify_expression(binary(x, op("<"), const(0)))
                              == binary(x, op("<"), const(0)))
 

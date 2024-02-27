@@ -521,11 +521,14 @@ def simplify_expression(expr: jack_ast.Expression) -> jack_ast.BinaryExpression:
             return None
 
     if isinstance(expr, jack_ast.BinaryExpression):
+        left = simplify_expression(expr.left)
+        right = simplify_expression(expr.right)
+
         # TODO: this transformation is the same as the standard compiler; share that code?
         if expr.op.symbol == "*":
-            return jack_ast.SubroutineCall("Math", None, "multiply", [expr.left, expr.right])
+            return jack_ast.SubroutineCall("Math", None, "multiply", [left, right])
         elif expr.op.symbol == "/":
-            return jack_ast.SubroutineCall("Math", None, "divide", [expr.left, expr.right])
+            return jack_ast.SubroutineCall("Math", None, "divide", [left, right])
         elif expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
             def invert_cmp(cmp: Cmp) -> Cmp:
                 """Reverse the operand order."""
@@ -541,6 +544,8 @@ def simplify_expression(expr: jack_ast.Expression) -> jack_ast.BinaryExpression:
                                                                     expr.left))
             elif simple_right is not None:
                 # Constant on the right; match some common cases:
+                # The idea is to compare with 0 whenever possible, because that's what the chip
+                # actually provides directly.
                 zero = jack_ast.IntegerConstant(0)
                 if expr.op.symbol == "<" and simple_right == 1:
                     return jack_ast.BinaryExpression(expr.left, jack_ast.Op("<="), zero)
@@ -554,7 +559,15 @@ def simplify_expression(expr: jack_ast.Expression) -> jack_ast.BinaryExpression:
                     return jack_ast.BinaryExpression(expr.left,
                                                     expr.op,
                                                     jack_ast.IntegerConstant(simple_right))
+        else:
+            return jack_ast.BinaryExpression(left, expr.op, right)
 
+    elif (isinstance(expr, jack_ast.UnaryExpression)
+          and expr.op.symbol == "-"
+          and isinstance(expr.expr, jack_ast.IntegerConstant)):
+        return jack_ast.IntegerConstant(-expr.expr.value)
+
+    # Nothing matched:
     return expr
 
 
