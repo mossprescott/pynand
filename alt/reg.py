@@ -1086,11 +1086,17 @@ def is_translatable(stmt: Stmt) -> bool:
             # Accessing a stack-allocated variable may involve overwriting D
             return False
         elif isinstance(expr, Binary):
-            # Tricky: a binary expression can take one of its arguments from D, in some cases.
-            # TODO: how far does this get us?
-            # return translatable_expr(expr.left) and translatable_expr(expr.right)
-            # FIXME: temporarily disable, until the code generator knows how to handle it
-            return False
+            # Tricky: a binary expression can take one or both of its arguments from D, in some cases.
+            if isinstance(expr.left, Temp) and isinstance(expr.right, Temp):
+                return True
+            elif isinstance(expr.left, Temp) and a_only(expr.right):
+                return True
+            elif a_only(expr.left) and isinstance(expr.right, Temp):
+                return True
+            else:
+                # print(f"unsafe: {_Expr_str(expr)}")
+                # return False
+                raise Exception("Doesn't happen?!")
         elif isinstance(expr, Unary):
             # *Not* and *negate* can be done in place
             return translatable_expr(expr.value)
@@ -1404,14 +1410,16 @@ class Translator(solved_07.Translator):
                         self.asm.instr(f"@{symbol_name}")
                         self.asm.instr(f"M=M{-right_imm:+}")
                 else:
-                    self._handle(ast.expr.right)  # D = right
+                    if not isinstance(ast.expr.right, Temp):
+                        self._handle(ast.expr.right)  # D = right
                     self.asm.instr(f"@{symbol_name}")
                     self.asm.instr(f"M=M{op}D")
                 return
         elif isinstance(ast.expr, Binary) and symbol_name == self.symbol(ast.expr.right):
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
-                self._handle(ast.expr.left)  # D = left
+                if not isinstance(ast.expr.left, Temp):
+                    self._handle(ast.expr.left)  # D = left
                 self.asm.instr(f"@{symbol_name}")
                 self.asm.instr(f"M=D{op}M")
                 return
@@ -1818,14 +1826,20 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
-            if isinstance(ast.left, Temp):
+            left_in_d = isinstance(ast.left, Temp)
+            right_in_d = isinstance(ast.right, Temp)
+            if left_in_d and right_in_d:
+                # e.g. x = x + x
+                self.asm.instr("A=D")
+                self.asm.instr(f"D=D{alu_op}A")
+            elif left_in_d:
                                            # D = left (from previous instr)
                 self.value_to_a(ast.right) # A = right
                 self.asm.instr(f"D=D{alu_op}A")
-            elif isinstance(ast.right, Temp):
+            elif right_in_d:
                 self.value_to_a(ast.left) # A = left
                                           # D = right (from previous instr)
-                self.asm.instr(f"D=A{alu_op}D")
+                self.asm.instr(f"D=A{alu_op}D")  # Note reversed operands (for -)
             else:
                 self._handle(ast.left)     # D = left
                 self.value_to_a(ast.right) # A = right
@@ -1849,17 +1863,34 @@ class Translator(solved_07.Translator):
             # Note: if the right operand is -1,0,1, we shave a few cycles. An earlier phase should
             # take care of rewriting conditions into that form where possible.
 
-            if isinstance(ast.left, Temp):
-                pass                        # D = left (from previous instr)
-            else:
-                self._handle(ast.left)      # D = left
-            if right_imm == 0:
-                pass                        # comparing with zero, so D already has left - 0, effectively
-            elif right_imm is not None and -1 <= right_imm <= 1:
-                self.asm.instr(f"D=D{-right_imm:+d}")     # D = left - right (so, positive if left > right)
-            else:
+            # Now it breaks down into 6 possible cases, depending on whether there's an immediate
+            # on the right, and whether either operand is in D:
+            if right_imm is not None:
+                if isinstance(ast.left, Temp):
+                    pass                               # D = left (from previous instr)
+                else:
+                    self._handle(ast.left)             # D = left
+
+                if right_imm == 0:
+                    pass                               # D = left - 0 (with no additional work)
+                else:
+                    self.asm.instr(f"D=D{-right_imm:+d}")  # D = left - right (so, positive if left > right)
+
+            elif isinstance(ast.left, Temp):
+                                            # D = left (from previous instr)
                 self.value_to_a(ast.right)  # A = right
                 self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+
+            elif isinstance(ast.right, Temp):
+                                            # D = right (from previous instr)
+                self.value_to_a(ast.left)   # A = left
+                self.asm.instr("D=A-D")     # D = left - right (so, positive if left > right)
+
+            else:
+                self._handle(ast.left)      # D = left
+                self.value_to_a(ast.right)  # A = right
+                self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+
 
             self.asm.instr(f"@{true_label}")
             self.asm.instr(f"D;J{cmp_op}")
@@ -1873,7 +1904,7 @@ class Translator(solved_07.Translator):
             self.asm.label(end_label)
             return
 
-        raise Exception(f"TODO: {ast}")
+        raise Exception(f"Unexpected expr: {_Expr_str(ast)}")
 
     def binary_op_alu(self, op: jack_ast.Op) -> Optional[str]:
         return {

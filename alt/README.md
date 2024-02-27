@@ -54,7 +54,7 @@ replaces certain function calls with lower-overhead "reduced" alternatives.
 | [alt/eight.py](eight.py)         | 1,032 (-18%) |        _same_  |            +100% |              +100% |
 | [alt/big.py](big.py)             | 1,448 (+14%) |              ? |                ? |                  ? |
 | [alt/lazy.py](lazy.py)           | _same_       |   23,650 (-8%) |    37,300 (-10%) |     111,000 (-14%) |
-| [alt/reg.py](reg.py)             | _same_       |  19,450 (-24%) |    14,450 (-65%) |      56,600 (-56%) |
+| [alt/reg.py](reg.py)             | _same_       |  18,200 (-29%) |    12,450 (-70%) |      55,250 (-57%) |
 | [alt/reduce.py](reduce.py)       | _same_       | 27,350 (+6.5%) |    20,300 (-51%) |             _same_ |
 
 
