@@ -231,19 +231,34 @@ class Interpreter {
     /**
      Pop numArgs objects from the stack, assembling them into a new stack (in reverse order),
      on top of the just-allocated continuation rib.
+
+     Note aggressive manual inlining here to reduce call overhead because this
+     is part of the most expensive code path.
      */
     function Rib wrangleClosureParams(Rib proc, Rib cont) {
         var Rib code;
-        var int numArgs, i;
+        var int numArgs;
+        var int x;
         var Rib newStack;
 
         let code = proc[0];
         let numArgs = code[0];
-        let i = 0;
         let newStack = cont;
-        while (i < numArgs) {
-            let newStack = Interpreter.alloc(Interpreter.pop(), newStack, 0);
-            let i = i + 1;
+        while (numArgs > 0) {
+            // let x = Interpreter.pop();
+            let x = stack[0];
+            let stack = stack[1];
+
+            // Note: can't re-use the stack entries, because they seem to be shared
+            // with captured environment in some cases:
+            // let newStack = Interpreter.alloc(x, newStack, 0);
+            let nextRib[0] = x;
+            let nextRib[1] = newStack;
+            let nextRib[2] = 0;
+            let newStack = nextRib;
+            let nextRib = nextRib + 3;
+
+            let numArgs = numArgs - 1;
         }
         return newStack;
     }
