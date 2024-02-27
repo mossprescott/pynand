@@ -251,7 +251,7 @@ class Interpreter {
     function void handlePrimitive(int opcode_arg) {
         var int opcode;
         var int x, y, z;
-        var Rib tmp;
+        var Rib tmp, tmp21;
 
         // Make a local copy, which will end up in a register, avoiding
         // 4/5 loads from the stack every time:
@@ -412,7 +412,10 @@ class Interpreter {
 
                             // Note: one rib becomes garbage (top entry of stack)
 
-                            let y = Interpreter.pop();
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
+
                             let x = stack[0];
                             if (x = y) {
                                 let stack[0] = ribTrue;
@@ -426,7 +429,10 @@ class Interpreter {
                             // <: x y -- bool(x < y)
 
                             // Note: one rib becomes garbage:
-                            let y = Interpreter.pop();
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
+
                             let x = stack[0];
                             // Update second stack entry in place:
                             if (x < y) {
@@ -443,7 +449,10 @@ class Interpreter {
                             // +: x y -- (x + y)
 
                             // Note: one rib becomes garbage:
-                            let y = Interpreter.pop();
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
+
                             let x = stack[0];
                             // Update second stack entry in place:
                             let stack[0] = x + y;
@@ -453,7 +462,10 @@ class Interpreter {
                             // -: x y -- (x - y)
 
                             // Note: one rib becomes garbage:
-                            let y = Interpreter.pop();
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
+
                             let x = stack[0];
                             // Update second stack entry in place:
                             let stack[0] = x - y;
@@ -471,8 +483,12 @@ class Interpreter {
                             // * :: x y -- (x * y)
 
                             // Note: one rib becomes garbage:
-                            let y = Interpreter.pop();
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
+
                             let x = stack[0];
+
                             // Update second stack entry in place:
                             let stack[0] = Interpreter.multiply(x, y);
                         }
@@ -515,11 +531,14 @@ class Interpreter {
                             // poke :: x y -- y (and write the value y at RAM[x])
 
                             // Note: one rib becomes garbage:
-                            let y = Interpreter.pop();
+                            // TODO: inline it
+                            // let y = Interpreter.pop();
+                            let y = stack[0];
+                            let stack = stack[1];
 
-                            let x = stack[0];
-                            let tmp = 0;
-                            let tmp[x] = y;
+                            let tmp21 = stack[0];
+                            let tmp21[0] = y;
+
                             // Update the second stack entry in place
                             let stack[0] = y;
                         }
