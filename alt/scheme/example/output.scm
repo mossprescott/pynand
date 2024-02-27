@@ -1,7 +1,10 @@
 (define poke (rib 21 0 1))
 
-(define screen 2048)
-(define (drawchar x y c) (poke (+ screen (+ x (* 80 y))) c))
+;; (define screen 2048)
+;; (define (drawchar x y c) (poke (+ screen (+ x (* 80 y))) c))
+
+(define screenAddr (rib 23 0 1))
+(define (drawchar x y c) (poke (screenAddr x y) c))
 
 ;; First, ABCD in the corners of the screen:
 (drawchar  0  0 65)
@@ -56,4 +59,17 @@
                 (+ y 4)
                 (+ h x)))))))
 
-;; 1.1M cycles and 40% of the heap to complete
+;; 1.1M cycles and 40% of the heap to complete (assembly interpreter)
+
+;; 5.3M cycles and 38.4% of the heap (Jack interpreter)
+;; 3.6M cycles after optimizing leaf functions in reg.py
+;; 3.5M cycles after collapsing stores with simple expressions
+;; 3.3M cycles after unifying codegen for registers and statics
+;; [2.9M cycles after totally overhauling flattening (and probably introducing lots of bugs)]
+;; 3.1M cycles after reducing use of arguments/locals in getTarget and handlePrimitive
+;; 3.0M cycles after splitting locals in main() so most are in registers
+;; 2.9M cycles after splitting savedProc from proc for dispatch
+;; 2.8M cycles after assigning test values for if/while to D
+;; 2.5M cycles after assigning memory read addresses to D
+;; 2.4M cycles after assigning sources for binary/comp exprs to D
+;; 2.1M cycles and 36% of the heap after adding a "screenAddress" primitive

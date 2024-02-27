@@ -525,10 +525,18 @@ class Interpreter {
                         }
                     }
                     else { // opcode >= 22
-                        // 22
-                        // halt
+                        if (opcode < 23) {
+                            // 22
+                            // halt
 
-                        do Interpreter.halt();
+                            do Interpreter.halt();
+                        }
+                        else {
+                            // 23
+                            // screenAddr :: x y -- address of character at column x, line y
+
+                            do Interpreter.screenAddress();
+                        }
                     }
                 }
             }
@@ -592,6 +600,40 @@ class Interpreter {
         else {
             return sum;
         }
+    }
+
+    /*
+     Cheat: calculate the address of a character in the screen buffer, using
+     hand-coded "shift" and adds to multiply by 80, and without any allocation.
+
+     Doing its own (interpreter) stack manipulation to keep variables local and avoid arguments
+     on the (Jack) stack, and doing it by hand so this can be a leaf function.
+
+     TODO: implement function inlining and just use pop/peek/replace
+     */
+    function Array screenAddress() {
+        var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
+
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+        // let x = Interpreter.pop();
+        let x = stack[0];  // i.e. peek()
+
+        // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
+        let acc0 = y + y;       //  2y
+        let acc1 = acc0 + acc0; //  4y
+        let acc2 = acc1 + y;    //  5y
+        let acc3 = acc2 + acc2; // 10y
+        let acc4 = acc3 + acc3; // 20y
+        let acc5 = acc4 + acc4; // 40y
+        let acc6 = acc5 + acc5; // 80y
+
+        let addr = 2048 + acc6 + x;
+        // do Interpreter.push(addr);
+        let stack[0] = addr;  // replace();
+
+        return;
     }
 
     /** Allocate a rib on the heap, filling in the three fields. */

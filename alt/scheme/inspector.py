@@ -202,4 +202,5 @@ PRIMITIVES = {
     20: "peek",
     21: "poke",
     22: "halt",
+    23: "screenAddr",
 }
