@@ -545,28 +545,40 @@ class Interpreter {
      Does that mean it's good? Maybe, but it probably works.
      */
     function int multiply(int x, int y) {
+        var int localX, localY;
         var boolean neg;
         var int tmp;
         var int sum, shiftedX, shiftedBit;
 
+        // local copies for quick access
+        let localX = x;
+        let localY = y;
+
         // Get sign, then take absolute values (inline to save fn calls):
-        if ((x < 0) = (y < 0)) { let neg = false; } else { let neg = true; }
-        if (y < 0) { let y = -y; }
-        if (x < 0) { let x = -x; }
+        // Note: testing each operand only once to minimize branching.
+        let neg = false;
+        if (localY < 0) {
+            let localY = -localY;
+            let neg = ~neg;
+        }
+        if (localX < 0) {
+            let localX = -localX;
+            let neg = ~neg;
+        }
 
         // Put the smaller (abs.) value in y (because this is O(log y)):
-        if (x < y) {
-            let tmp = y;
-            let y = x;
-            let x = tmp;
+        if (localX < localY) {
+            let tmp = localY;
+            let localY = localX;
+            let localX = tmp;
         }
 
         let sum = 0;
-        let shiftedX = x;
+        let shiftedX = localX;
         let shiftedBit = 1;
 
-        while ((shiftedBit > 0) & ~(shiftedBit > y)) {
-            if (y & shiftedBit) {
+        while ((shiftedBit > 0) & ~(shiftedBit > localY)) {
+            if (localY & shiftedBit) {
                 let sum = sum + shiftedX;
             }
             let shiftedX = shiftedX + shiftedX;
@@ -597,13 +609,11 @@ class Interpreter {
         // let stack = Interpreter.alloc(obj, stack, 0); // pair-type
 
         // Avoid function call overhead by doing the allocation directly here:
-        var Rib r;
-        let r = nextRib;
-        let r[0] = obj;
-        let r[1] = stack;
-        let r[2] = 0;  // pair type
-        let nextRib = nextRib + 3;
-        let stack = r;
+        let nextRib[0] = obj;
+        let nextRib[1] = stack;
+        let nextRib[2] = 0;  // pair type
+        let stack = nextRib;
+        let nextRib = nextRib+3;
 
         return;
     }
