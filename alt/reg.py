@@ -1445,6 +1445,9 @@ class Translator(solved_07.Translator):
             else:
                 self.value_to_a(ast.address)
             self.asm.instr(f"M={imm}")
+        elif isinstance(ast.value, Temp):
+            self.value_to_a(ast.address)
+            self.asm.instr("M=D")
         else:
             self._handle(ast.value)
             self.value_to_a(ast.address)
@@ -1542,7 +1545,8 @@ class Translator(solved_07.Translator):
             end_label = self.asm.next_label("end")
 
             self.asm.start(f"if {_Expr_str(ast.value)} {ast.cmp} 0?")
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"@{end_label}")
             self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
@@ -1556,7 +1560,8 @@ class Translator(solved_07.Translator):
             false_label = self.asm.next_label("false")
 
             self.asm.start(f"if/else {_Expr_str(ast.value)} {ast.cmp} 0?")
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"@{false_label}")
             self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
@@ -1593,7 +1598,8 @@ class Translator(solved_07.Translator):
             self._handle(s)
 
         self.asm.start(f"while-test {_Expr_str(ast.value)} {ast.cmp} 0?")
-        self._handle(ast.value)
+        if not isinstance(ast.value, Temp):
+            self._handle(ast.value)
         self.asm.instr(f"@{body_label}")
         self.asm.instr(f"D;J{self.compare_op_pos(ast.cmp)}")
 
@@ -1652,7 +1658,8 @@ class Translator(solved_07.Translator):
             self.asm.instr("A=M-1")
             self.asm.instr(f"M={imm}")
         else:
-            self._handle(ast.expr)
+            if not isinstance(ast.expr, Temp):
+                self._handle(ast.expr)
 
             if isinstance(ast.expr, CallSub):
                 self.asm.start(f"push-result {_Expr_str(ast.expr)}")
@@ -1790,12 +1797,12 @@ class Translator(solved_07.Translator):
         self.asm.instr("D=M")
 
     def handle_Temp(self, ast: Temp):
-        """Yesssss. The contract is to load the value into D, and Temp means the value is
-        already in D when we get here.
-        """
-        pass
+        raise Exception("Unsafe! Callers should explicitly handle Temp when they can do so safely.")
 
     def handle_Binary(self, ast: Binary):
+        # TODO: identify cases where (one of) the operands can safely come from Temp (which is to say, D),
+        # handle them, and fix the earlier pass to make that happen
+
         left_symbol = self.symbol(ast.left)
         alu_op = self.binary_op_alu(ast.op)
         right_imm = self.immediate(ast.right)
@@ -1811,9 +1818,18 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
-            self._handle(ast.left)     # D = left
-            self.value_to_a(ast.right) # A = right
-            self.asm.instr(f"D=D{alu_op}A")
+            if isinstance(ast.left, Temp):
+                                           # D = left (from previous instr)
+                self.value_to_a(ast.right) # A = right
+                self.asm.instr(f"D=D{alu_op}A")
+            elif isinstance(ast.right, Temp):
+                self.value_to_a(ast.left) # A = left
+                                          # D = right (from previous instr)
+                self.asm.instr(f"D=A{alu_op}D")
+            else:
+                self._handle(ast.left)     # D = left
+                self.value_to_a(ast.right) # A = right
+                self.asm.instr(f"D=D{alu_op}A")
             return
 
         cmp_op = self.binary_op_cmp(ast.op)
@@ -1833,7 +1849,10 @@ class Translator(solved_07.Translator):
             # Note: if the right operand is -1,0,1, we shave a few cycles. An earlier phase should
             # take care of rewriting conditions into that form where possible.
 
-            self._handle(ast.left)          # D = left
+            if isinstance(ast.left, Temp):
+                pass                        # D = left (from previous instr)
+            else:
+                self._handle(ast.left)      # D = left
             if right_imm == 0:
                 pass                        # comparing with zero, so D already has left - 0, effectively
             elif right_imm is not None and -1 <= right_imm <= 1:
@@ -1880,7 +1899,8 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"D={self.unary_op(ast.op)}M")
         else:
             # Note: ~(Const) isn't being evaluated in the compiler yet, but should be.
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"D={self.unary_op(ast.op)}D")
 
     def unary_op(self, op: jack_ast.Op) -> str:
