@@ -494,13 +494,26 @@ class Interpreter {
         return;
     }
 
-    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed) */
-    function void handleGetchar() {
-        var int x, y, z;
-        var Rib tmp;
+    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed)
 
-        // TODO
-        do Interpreter.halt();
+     Note: this will only catch keypresses that occur after the instruction is executed. For
+     a responsive shell, the check will have to incorporated into the interpreter loop.
+     It might even need to be be checked more often than once per instruction, since instructions
+     can take as long as hundreds of cycles.
+     */
+    function void handleGetchar() {
+        var Array keyboard;
+        var int c;
+
+        let keyboard = Jack.symbol("KEYBOARD");
+        let c = 0;
+        while (c = 0) {
+            let c = keyboard[0];
+        }
+
+        do Interpreter.push(c);
+
+        return;
     }
 
     /*  peek :: x -- RAM[x] */

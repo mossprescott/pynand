@@ -66,7 +66,7 @@ def assemble(encoded, interpreter, print_asm):
         from nand.solutions import solved_06
         builtins = {
             **solved_06.BUILTIN_SYMBOLS,
-            "SCREEN": big.SCREEN_BASE,
+            **big.BUILTIN_SYMBOLS,
         }
         instrs, symbols, statics = big.assemble(asm.lines, builtins=builtins)
         stack_loc =    statics["interpreter.static_stack"]
