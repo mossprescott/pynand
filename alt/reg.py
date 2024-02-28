@@ -39,7 +39,31 @@ Other differences:
 
 These changes mean that the debug/trace logging done by some test cases doesn't always show the
 correct arguments, locals, return addresses, and result values.
+
+Extensions:
+
+Two additional primitives are provided, to support dynamic dispatch (that is, storing the address
+of a function or method and invoking it later):
+
+- Jack.symbol(<string>): address of the given label.
+- Jack.invoke(ptr, ...): call the function/method referred to by the pointer.
+
+For example, this code sequence:
+
+```
+var int fptr;  // the type doesn't matter
+let fooPtr = Jack.symbol("main.foo");
+...
+do Jack.invoke(fooPtr, "bar");
+```
+
+has the same effect as this simple call:
+
+```
+do Main.foo("bar");
+```
 """
+
 
 from collections import Counter
 import itertools
@@ -135,7 +159,7 @@ class Push(NamedTuple):
 
 class Discard(NamedTuple):
     """Call a subroutine, then pop the stack, discarding the result."""
-    expr: "CallSub"
+    expr: Union["CallSub", "Invoke"]
 
 Stmt = Union[Eval, IndirectWrite, Store, If, While, Push, Discard]
 
@@ -193,7 +217,18 @@ class IndirectRead(NamedTuple):
     """Get the value given an address, aka peek()."""
     address: "Value"
 
-Expr = Union[CallSub, Const, Local, Location, Reg, Static, Binary, Unary, IndirectRead]
+# Extensions:
+
+class Symbol(NamedTuple):
+    """Address of an arbitrary symbol."""
+    name: str
+
+class Invoke(NamedTuple):
+    """Call a subroutine given the address of its entry point."""
+    ptr: "Value"
+    # numArgs?
+
+Expr = Union[CallSub, Const, Local, Location, Reg, Static, Binary, Unary, IndirectRead, Symbol, Invoke]
 
 
 class Subroutine(NamedTuple):
@@ -435,20 +470,33 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             flat_expr = IndirectRead(address_expr)
 
         elif isinstance(expr, jack_ast.SubroutineCall):
-            pairs = [flatten_expression(a, force=False) for a in expr.args]
-            arg_stmts = [s for ss, x in pairs for s in ss + [Push(x)]]
-            if expr.class_name is not None:
-                stmts = arg_stmts
-                flat_expr = CallSub(expr.class_name, expr.sub_name, len(expr.args))
-            elif expr.var_name is not None:
-                instance_stmts, instance_expr = flatten_expression(jack_ast.VarRef(expr.var_name), force=False)
-                stmts = instance_stmts + [Push(instance_expr)] + arg_stmts
-                target_class = symbol_table.type_of(expr.var_name)
-                flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+            if expr.class_name == "Jack" and expr.sub_name == "symbol":
+                assert len(expr.args) == 1 and isinstance(expr.args[0], jack_ast.StringConstant)
+                stmts = []
+                flat_expr = Symbol(expr.args[0].value)
+
+            elif expr.class_name == "Jack" and expr.sub_name == "invoke":
+                # TODO: handle arguments, when someone needsw them
+                assert len(expr.args) == 1
+                target_stmts, target_expr = flatten_expression(expr.args[0])
+                stmts = target_stmts
+                flat_expr = Invoke(target_expr)
+
             else:
-                stmts = [Push(this_expr)] + arg_stmts
-                target_class = symbol_table.class_name
-                flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+                pairs = [flatten_expression(a, force=False) for a in expr.args]
+                arg_stmts = [s for ss, x in pairs for s in ss + [Push(x)]]
+                if expr.class_name is not None:
+                    stmts = arg_stmts
+                    flat_expr = CallSub(expr.class_name, expr.sub_name, len(expr.args))
+                elif expr.var_name is not None:
+                    instance_stmts, instance_expr = flatten_expression(jack_ast.VarRef(expr.var_name), force=False)
+                    stmts = instance_stmts + [Push(instance_expr)] + arg_stmts
+                    target_class = symbol_table.type_of(expr.var_name)
+                    flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+                else:
+                    stmts = [Push(this_expr)] + arg_stmts
+                    target_class = symbol_table.class_name
+                    flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
 
         elif isinstance(expr, jack_ast.BinaryExpression):
             left_stmts, left_expr = flatten_expression(expr.left)
@@ -692,7 +740,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         elif isinstance(stmt, Push):
             read.update(refs(stmt.expr))
         elif isinstance(stmt, Discard):
-            pass
+            read.update(refs(stmt.expr))
         else:
             raise Exception(f"Unknown statement: {stmt}")
 
@@ -715,6 +763,8 @@ def refs(expr: Expr) -> Set[str]:
         return refs(expr.value)
     elif isinstance(expr, IndirectRead):
         return refs(expr.address)
+    elif isinstance(expr, Invoke):
+        return refs(expr.ptr)
     else:
         return set()
 
@@ -728,8 +778,8 @@ def need_saving(liveness: Sequence[LiveStmt]) -> Set[str]:
 
     result = set()
     for l in liveness:
-        if isinstance(l.statement, (Eval, Push, Discard)) and isinstance(l.statement.expr, CallSub):
-            result.update(l.before)
+        if isinstance(l.statement, (Eval, Push, Discard)) and isinstance(l.statement.expr, (CallSub, Invoke)):
+            result.update(l.during)
         elif isinstance(l.statement, If):
             result.update(need_saving(l.statement.when_true))
             if l.statement.when_false is not None:
@@ -783,6 +833,11 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         elif isinstance(expr, IndirectRead):
             stmts, address = rewrite_value(expr.address)
             return stmts, IndirectRead(address)
+        elif isinstance(expr, Symbol):
+            return [], expr
+        elif isinstance(expr, Invoke):
+            stmts, ptr = rewrite_value(expr.ptr)
+            return stmts, Invoke(ptr)
         else:
             raise Exception(f"Unknown Expr: {expr}")
 
@@ -824,7 +879,8 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             expr_stmts, expr = rewrite_expr(stmt.expr)
             return expr_stmts + [Push(expr)]
         elif isinstance(stmt, Discard):
-            return [stmt]
+            expr_stmts, expr = rewrite_expr(stmt.expr)
+            return expr_stmts + [Discard(expr)]
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
@@ -977,6 +1033,11 @@ def resolve_locals(stmts: Sequence[Stmt], map: Dict[Local, V], fail_on_unmapped=
         elif isinstance(expr, IndirectRead):
             address = rewrite_value(expr.address)
             return IndirectRead(address)
+        elif isinstance(expr, Symbol):
+            return expr
+        elif isinstance(expr, Invoke):
+            ptr = rewrite_value(expr.ptr)
+            return Invoke(ptr)
         else:
             raise Exception(f"Unknown Expr: {expr}")
 
@@ -1009,7 +1070,8 @@ def resolve_locals(stmts: Sequence[Stmt], map: Dict[Local, V], fail_on_unmapped=
             expr = rewrite_expr(stmt.expr)
             return Push(expr)
         elif isinstance(stmt, Discard):
-            return stmt
+            expr = rewrite_expr(stmt.expr)
+            return Discard(expr)
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
@@ -1116,6 +1178,11 @@ def is_translatable(stmt: Stmt) -> bool:
         elif isinstance(expr, IndirectRead):
             # The *read* isn't a problem
             return translatable_expr(expr.address)
+        elif isinstance(expr, Symbol):
+            return True
+        elif isinstance(expr, Invoke):
+            # Need D to set up the return address
+            return False
         else:
             raise Exception(f"Unexpected expr: {expr}")
 
@@ -1147,7 +1214,7 @@ def is_translatable(stmt: Stmt) -> bool:
     elif isinstance(stmt, Push):
         return translatable_expr(stmt.expr)
     elif isinstance(stmt, Discard):
-        raise Exception("silly question: a CallSub can't refer to a one-time (or any) local")
+        return translatable_expr(stmt.expr)
     else:
         raise Exception(f"Unexpected stmt: {stmt}")
 
@@ -1303,7 +1370,7 @@ class Translator(solved_07.Translator):
 
         def uses_stack(stmt: Stmt):
             if isinstance(stmt, Eval):
-                return isinstance(stmt.expr, CallSub)
+                return isinstance(stmt.expr, (CallSub, Invoke))
             elif isinstance(stmt, IndirectWrite):
                 return False
             elif isinstance(stmt, Store):
@@ -1313,11 +1380,11 @@ class Translator(solved_07.Translator):
             elif isinstance(stmt, While):
                 return any(uses_stack(s) for s in stmt.test + stmt.body)
             elif isinstance(stmt, Return):
-                return isinstance(stmt.expr, CallSub)  # FIXME: does this happen?
+                return isinstance(stmt.expr, (CallSub, Invoke))  # FIXME: does this happen?
             elif isinstance(stmt, Push):
                 return True
             elif isinstance(stmt, Discard):
-                return isinstance(stmt.expr, CallSub)
+                return isinstance(stmt.expr, (CallSub, Invoke))
             else:
                 raise Exception(f"Unknown Stmt: {stmt}")
 
@@ -1702,9 +1769,16 @@ class Translator(solved_07.Translator):
     def handle_Discard(self, ast: Discard):
         # Note: now that results are passed in a register, there's no cleanup to do when
         # the result is not used.
-        self.call(ast.expr)
+
+        if isinstance(ast.expr, CallSub):
+            self.call(ast.expr)
+        elif isinstance(ast.expr, Invoke):
+            self.invoke(ast.expr)
+        else:
+            raise Exception(f"Unexpected expr; {_Stmt_str(ast)}")
 
         self.asm.comment(f"ignore the result")
+
 
     def compare_op_neg(self, cmp: Cmp):
         return {
@@ -1752,6 +1826,22 @@ class Translator(solved_07.Translator):
         self.asm.instr("0;JMP")
 
         self.asm.label(return_label)
+
+    def invoke(self, ast: Invoke):
+        return_label = self.asm.next_label("return_address")
+
+        self.asm.start(f"call (* {_Expr_str(ast.ptr)})")
+
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{RETURN_ADDRESS}")
+        self.asm.instr("M=D")
+
+        self.value_to_a(ast.ptr)
+        self.asm.instr("0;JMP")
+
+        self.asm.label(return_label)
+
 
 
     def handle_Const(self, ast: Const):
@@ -1830,9 +1920,6 @@ class Translator(solved_07.Translator):
         raise Exception("Unsafe! Callers should explicitly handle Temp when they can do so safely.")
 
     def handle_Binary(self, ast: Binary):
-        # TODO: identify cases where (one of) the operands can safely come from Temp (which is to say, D),
-        # handle them, and fix the earlier pass to make that happen
-
         left_symbol = self.symbol(ast.left)
         alu_op = self.binary_op_alu(ast.op)
         right_imm = self.immediate(ast.right)
@@ -1968,6 +2055,10 @@ class Translator(solved_07.Translator):
             self.value_to_a(ast.address)
         self.asm.instr("D=M")
 
+    def handle_Symbol(self, ast: Symbol):
+        self.asm.instr(f"@{ast.name}")
+        self.asm.instr("D=A")
+
     def immediate(self, ast: Expr) -> Optional[int]:
         """If the expression is a constant which the ALU can take as an "immediate" operand
         (i.e. -1, 0, or 1), then unpack it.
@@ -2014,6 +2105,10 @@ class Translator(solved_07.Translator):
             return "unary"
         elif isinstance(expr, IndirectRead):
             return "read"
+        elif isinstance(expr, Symbol):
+            return "symbol"
+        elif isinstance(expr, Invoke):
+            return "invoke"
         else:
             raise Exception(f"Unknown expr: {expr}")
 
@@ -2196,6 +2291,10 @@ def _Expr_str(expr: Expr) -> str:
         return f"{expr.op.symbol} {_Expr_str(expr.value)}"
     elif isinstance(expr, IndirectRead):
         return f"mem[{_Expr_str(expr.address)}]"
+    elif isinstance(expr, Symbol):
+        return f"&{expr.name}"
+    elif isinstance(expr, Invoke):
+        return f"call (* {_Expr_str(expr.ptr)})"
     else:
         raise Exception(f"Unknown Expr: {expr}")
 
