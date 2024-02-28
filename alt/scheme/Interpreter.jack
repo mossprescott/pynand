@@ -8,6 +8,9 @@ class Interpreter {
     static Rib pc;
     static Rib nextRib;
 
+    // Pointers to the functions that handle each primitive:
+    static Array handlers;
+
     // Pre-allocated "proc" containing the "rib" primitive, which will be used to construct every
     // other primitive.
     static Rib ribRib;
@@ -50,6 +53,8 @@ class Interpreter {
 
         do Interpreter.initSymbolTable();
 
+        do Interpreter.initPrimitiveVectors();
+
         // Skip the bogus "main" instr:
         let pc = pc[2];
 
@@ -81,7 +86,7 @@ class Interpreter {
                     else {
                         // primitive
 
-                        do Interpreter.handlePrimitive(proc[0]);
+                        do Jack.invoke(handlers[proc[0]]);
 
                         let cont = Interpreter.findContinuation();
 
@@ -120,7 +125,7 @@ class Interpreter {
                     else {
                         // primitive
 
-                        do Interpreter.handlePrimitive(proc[0]);
+                        do Jack.invoke(handlers[proc[0]]);
 
                         let pc = pc[2];
                     }
@@ -201,6 +206,387 @@ class Interpreter {
         return;
     }
 
+
+    function void initPrimitiveVectors() {
+        // Just below the screen buffer
+        let handlers = 2048 - 32;
+
+        let handlers[ 0] = Jack.symbol("interpreter.handleRib");
+        let handlers[ 1] = Jack.symbol("interpreter.handleId");
+        let handlers[ 2] = Jack.symbol("interpreter.handleArg1");
+        let handlers[ 3] = Jack.symbol("interpreter.handleArg2");
+        let handlers[ 4] = Jack.symbol("interpreter.handleClose");
+        let handlers[ 5] = Jack.symbol("interpreter.handleRibQ");
+        let handlers[ 6] = Jack.symbol("interpreter.handleField0");
+        let handlers[ 7] = Jack.symbol("interpreter.handleField1");
+        let handlers[ 8] = Jack.symbol("interpreter.handleField2");
+        let handlers[ 9] = Jack.symbol("interpreter.handleField0_set");
+        let handlers[10] = Jack.symbol("interpreter.handleField1_set");
+        let handlers[11] = Jack.symbol("interpreter.handleField2_set");
+        let handlers[12] = Jack.symbol("interpreter.handleEqvQ");
+        let handlers[13] = Jack.symbol("interpreter.handleLt");
+        let handlers[14] = Jack.symbol("interpreter.handlePlus");
+        let handlers[15] = Jack.symbol("interpreter.handleMinus");
+        let handlers[16] = Jack.symbol("interpreter.handleTimes");
+        let handlers[17] = Jack.symbol("interpreter.handleUnimp"); // quotient
+        let handlers[18] = Jack.symbol("interpreter.handleGetchar");
+        let handlers[19] = Jack.symbol("interpreter.handleUnimp"); // putchar
+        let handlers[20] = Jack.symbol("interpreter.handlePeek");
+        let handlers[21] = Jack.symbol("interpreter.handlePoke");
+        let handlers[22] = Jack.symbol("interpreter.handleHalt");
+        let handlers[23] = Jack.symbol("interpreter.handleScreenAddr");
+
+        // Extra, just to simplify the dispatching logic:
+        let handlers[24] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[25] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[26] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[27] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[28] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[29] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[30] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[31] = Jack.symbol("interpreter.handleUnimp");
+
+        return;
+    }
+
+    /* rib :: x y z -- rib(x, y, z) */
+    function void handleRib() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let z = stack[0];
+
+        let tmp = stack[1];
+        let y = tmp[0];
+
+        // The entry holding x will be the new top of stack:
+        let stack = tmp[1];
+        let x = stack[0];
+
+        // Now re-use the second entry's rib as the newly-constructed rib:
+        let tmp[0] = x;
+        let tmp[1] = y;
+        let tmp[2] = z;
+        let stack[0] = tmp;
+
+        return;
+    }
+
+    /* id :: x -- x */
+    function void handleId() {
+        return;
+    }
+
+    /* arg1 :: x y -- x")  # i.e. "drop" */
+    function void handleArg1() {
+        let stack = stack[1];
+
+        return;
+    }
+
+    /* arg2 :: x y -- y */
+    function void handleArg2() {
+        // TODO
+        do Interpreter.halt();
+
+        return;
+    }
+
+    /* close :: x -- rib(x[0], stack, 1) */
+    function void handleClose() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: modifyinging the top entry on the stack in place,
+        // but allocating a new rib for the closure.
+        let tmp = stack[0];
+        let stack[0] = Interpreter.alloc(tmp[0], stack[1], 1);
+
+        return;
+    }
+
+    /* rib? :: x -- bool(x is a rib) */
+    function void handleRibQ() {
+        var int x, y, z;
+        var Rib tmp;
+
+        let tmp = stack[0];
+        if (Rib.isRib(tmp)) {
+            let stack[0] = ribTrue;
+        }
+        else {
+            let stack[0] = ribFalse;
+        }
+
+        return;
+    }
+
+    /* field0 :: rib(x, _, _) -- x */
+    function void handleField0() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[0];
+
+        return;
+    }
+
+    /* field1 :: rib(_, y, _) -- y */
+    function void handleField1() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[1];
+
+        return;
+    }
+
+    /* field2 :: rib(_, _, z) -- z */
+    function void handleField2() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[2];
+
+        return;
+    }
+
+    /* field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z)) */
+    function void handleField0_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let x = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[0] = x;
+        // Update the second entry on the stack in place:
+        let stack[0] = x;
+
+        return;
+    }
+
+    /*  field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z)) */
+    function void handleField1_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let y = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[1] = y;
+        // Update the second entry on the stack in place:
+        let stack[0] = y;
+
+        return;
+    }
+
+    /*  field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z)) */
+    function void handleField2_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let z = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[2] = z;
+        // Update the second entry on the stack in place:
+        let stack[0] = z;
+
+        return;
+    }
+
+    /*  eqv? :: x y -- bool(x is identical to y) */
+    function void handleEqvQ() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        if (x = y) {
+            let stack[0] = ribTrue;
+        }
+        else {
+            let stack[0] = ribFalse;
+        }
+
+        return;
+    }
+
+    /*  < :: x y -- bool(x < y) */
+    function void handleLt() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        if (x < y) {
+            let stack[0] = ribTrue;
+        }
+        else {
+            let stack[0] = ribFalse;
+        }
+
+        return;
+    }
+
+    /*  + :: x y -- x + y */
+    function void handlePlus() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        let stack[0] = x + y;
+
+        return;
+    }
+
+    /*  - :: x y -- x - y */
+    function void handleMinus() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        let stack[0] = x - y;
+
+        return;
+    }
+
+    /*  * :: x y -- x * y */
+    function void handleTimes() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+
+        // Update second stack entry in place:
+        let stack[0] = Interpreter.multiply(x, y);
+
+        return;
+    }
+
+    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed) */
+    function void handleGetchar() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // TODO
+        do Interpreter.halt();
+    }
+
+    /*  peek :: x -- RAM[x] */
+    function void handlePeek() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // TODO
+        do Interpreter.halt();
+    }
+
+    /*  poke :: x y -- y (and write the value y at RAM[x]) */
+    function void handlePoke() {
+        var int y;
+        var Array tmp;
+
+        // Note: one rib becomes garbage:
+        // TODO: inline it
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let tmp = stack[0];
+        let tmp[0] = y;
+
+        // Update the second stack entry in place
+        let stack[0] = y;
+
+        return;
+    }
+
+    /*  halt :: -- (no more instructions are executed) */
+    function void handleHalt() {
+        do Interpreter.halt();
+    }
+
+    /* screenAddr :: x y -- address of character at column x, line y
+
+     Cheat: calculate the address of a character in the screen buffer, using
+     hand-coded "shift" and adds to multiply by 80, and without any allocation.
+
+     Doing its own (interpreter) stack manipulation to keep variables local and avoid arguments
+     on the (Jack) stack, and doing it by hand so this can be a leaf function.
+
+     TODO: implement function inlining and just use pop/peek/replace
+    */
+    function void handleScreenAddr() {
+        var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
+
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+        // let x = Interpreter.pop();
+        let x = stack[0];  // i.e. peek()
+
+        // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
+        let acc0 = y + y;       //  2y
+        let acc1 = acc0 + acc0; //  4y
+        let acc2 = acc1 + y;    //  5y
+        let acc3 = acc2 + acc2; // 10y
+        let acc4 = acc3 + acc3; // 20y
+        let acc5 = acc4 + acc4; // 40y
+        let acc6 = acc5 + acc5; // 80y
+
+        let addr = 2048 + acc6 + x;
+        // do Interpreter.push(addr);
+        let stack[0] = addr;  // replace();
+
+        return;
+    }
+
+    /* Handler for any unused primitive code. */
+    function void handleUnimp() {
+        // TODO
+        do Interpreter.halt();
+    }
+
     /**
      Decode the "y" value from a jump/call, set, or get instruction, and return the rib that
      contains the target, which might be a stack entry or a symbol. In either case, the actual
@@ -263,324 +649,6 @@ class Interpreter {
         return newStack;
     }
 
-    function void handlePrimitive(int opcode_arg) {
-        var int opcode;
-        var int x, y, z;
-        var Rib tmp, tmp21;
-
-        // Make a local copy, which will end up in a register, avoiding
-        // 4/5 loads from the stack every time:
-        let opcode = opcode_arg;
-
-        // Note: What you really want here is a computed jump (i.e. a switch construct.)
-        // Failing that, we make do with a binary search, effectively, with 5 branches
-        // to examine the 5 bits of the opcode.
-
-        if (opcode < 16) {
-            if (opcode < 8) {
-                if (opcode < 4) {
-                    if (opcode < 2) {
-                        if (opcode < 1) {
-                            // 0
-                            // rib :: x y z -- rib(x, y, z)
-                            // Note: one rib becomes garbage (top entry of stack)
-
-                            let z = stack[0];
-
-                            let tmp = stack[1];
-                            let y = tmp[0];
-
-                            // The entry holding x will be the new top of stack:
-                            let stack = tmp[1];
-                            let x = stack[0];
-
-                            // Now re-use the second entry's rib as the newly-constructed rib:
-                            let tmp[0] = x;
-                            let tmp[1] = y;
-                            let tmp[2] = z;
-                            let stack[0] = tmp;
-                        }
-                        else {
-                            // 1
-                            // id :: x -- x
-
-                            // Literally nothing to see here
-                        }
-                    }
-                    else { // opcode >= 2
-                        if (opcode < 3) {
-                            // 2
-                            // arg1 :: x y -- x (i.e. "drop")
-
-                            let stack = stack[1];
-                        }
-                        else {
-                            // 3
-                            // arg2 :: x y -- y
-
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
-                        }
-                    }
-                }
-                else { // opcode >= 4
-                    if (opcode < 6) {
-                        if (opcode < 5) {
-                            // 4
-                            // close :: x -- rib(x[0], stack, 1)
-
-                            // Note: modifyinging the top entry on the stack in place,
-                            // but allocating a new rib for the closure.
-                            let tmp = stack[0];
-                            let stack[0] = Interpreter.alloc(tmp[0], stack[1], 1);
-                        }
-                        else {
-                            // 5
-                            // rib? :: x -- bool(x is a rib)
-
-                            let tmp = stack[0];
-                            if (Rib.isRib(tmp)) {
-                                let stack[0] = ribTrue;
-                            }
-                            else {
-                                let stack[0] = ribFalse;
-                            }
-                        }
-                    }
-                    else { // opcode >= 6
-                        if (opcode < 7) {
-                            // 6
-                            // field0 :: rib(x, _, _) -- x
-
-                            // No allocation: the top entry on the stack is updated in place
-                            let tmp = stack[0];
-                            let stack[0] = tmp[0];
-                        }
-                        else {
-                            // 7
-                            // field1 :: rib(_, y, _) -- y
-
-                            // No allocation: the top entry on the stack is updated in place
-                            let tmp = stack[0];
-                            let stack[0] = tmp[1];
-                        }
-                    }
-                }
-            }
-            else {  // opcode >= 8
-                if (opcode < 12) {
-                    if (opcode < 10) {
-                        if (opcode < 9) {
-                            // 8
-                            // field2 :: rib(_, _, z) -- z
-
-                            // No allocation: the top entry on the stack is updated in place
-                            let tmp = stack[0];
-                            let stack[0] = tmp[2];
-                        }
-                        else {
-                            // 9
-                            // field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z))
-
-                            // Note: one rib becomes garbage (top entry of stack)
-
-                            let x = Interpreter.pop();
-                            let tmp = stack[0];
-                            let tmp[0] = x;
-                            // Update the second entry on the stack in place:
-                            let stack[0] = x;
-                        }
-                    }
-                    else { // opcode >= 10
-                        if (opcode < 11) {
-                            // 10
-                            // field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z))
-
-                            // Note: one rib becomes garbage (top entry of stack)
-
-                            let y = Interpreter.pop();
-                            let tmp = stack[0];
-                            let tmp[1] = y;
-                            // Update the second entry on the stack in place:
-                            let stack[0] = y;
-                        }
-                        else {
-                            // 11
-                            // field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z))
-
-                            // Note: one rib becomes garbage (top entry of stack)
-
-                            let z = Interpreter.pop();
-                            let tmp = stack[0];
-                            let tmp[2] = z;
-                            // Update the second entry on the stack in place:
-                            let stack[0] = z;
-                        }
-                    }
-                }
-                else { // opcode >= 12
-                    if (opcode < 14) {
-                        if (opcode < 13) {
-                            // 12
-                            // eqv? :: x y -- bool(x is identical to y)
-
-                            // Note: one rib becomes garbage (top entry of stack)
-
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let x = stack[0];
-                            if (x = y) {
-                                let stack[0] = ribTrue;
-                            }
-                            else {
-                                let stack[0] = ribFalse;
-                            }
-                        }
-                        else {
-                            // 13
-                            // <: x y -- bool(x < y)
-
-                            // Note: one rib becomes garbage:
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let x = stack[0];
-                            // Update second stack entry in place:
-                            if (x < y) {
-                                let stack[0] = ribTrue;
-                            }
-                            else {
-                                let stack[0] = ribFalse;
-                            }
-                        }
-                    }
-                    else { // opcode >= 14
-                        if (opcode < 15) {
-                            // 14
-                            // +: x y -- (x + y)
-
-                            // Note: one rib becomes garbage:
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let x = stack[0];
-                            // Update second stack entry in place:
-                            let stack[0] = x + y;
-                        }
-                        else {
-                            // 15
-                            // -: x y -- (x - y)
-
-                            // Note: one rib becomes garbage:
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let x = stack[0];
-                            // Update second stack entry in place:
-                            let stack[0] = x - y;
-                        }
-                    }
-                }
-            }
-        }
-        else { // opcode >= 16
-            if (opcode < 24) {
-                if (opcode < 20) {
-                    if (opcode < 18) {
-                        if (opcode < 17) {
-                            // 16
-                            // * :: x y -- (x * y)
-
-                            // Note: one rib becomes garbage:
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let x = stack[0];
-
-                            // Update second stack entry in place:
-                            let stack[0] = Interpreter.multiply(x, y);
-                        }
-                        else {
-                            // 17
-                            // quotient :: not implemented
-
-                            do Interpreter.halt();
-                        }
-                    }
-                    else { // opcode >= 18
-                        if (opcode < 19) {
-                            // 18
-                            // getchar :: -- <char from keyboard> (blocks until a key is pressed)
-
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
-                        }
-                        else {
-                            // 19
-                            // putchar :: not implemented
-
-                            do Interpreter.halt();
-                        }
-                    }
-                }
-                else { // opcode >= 20
-                    if (opcode < 22) {
-                        if (opcode < 21) {
-                            // 20
-                            // peek :: x -- RAM[x]
-
-                            // TODO
-                            let tty[0] = opcode; // DEBUG
-                            do Interpreter.halt();
-                        }
-                        else {
-                            // 21
-                            // poke :: x y -- y (and write the value y at RAM[x])
-
-                            // Note: one rib becomes garbage:
-                            // TODO: inline it
-                            // let y = Interpreter.pop();
-                            let y = stack[0];
-                            let stack = stack[1];
-
-                            let tmp21 = stack[0];
-                            let tmp21[0] = y;
-
-                            // Update the second stack entry in place
-                            let stack[0] = y;
-                        }
-                    }
-                    else { // opcode >= 22
-                        if (opcode < 23) {
-                            // 22
-                            // halt
-
-                            do Interpreter.halt();
-                        }
-                        else {
-                            // 23
-                            // screenAddr :: x y -- address of character at column x, line y
-
-                            do Interpreter.screenAddress();
-                        }
-                    }
-                }
-            }
-            else { // opcode >= 24
-                do Interpreter.halt();
-            }
-        }
-        return;
-    }
-
     /**
      This was lifted verbatim from Math.jack in the solutions for project 12 from the book, except
      for inlining abs().
@@ -634,40 +702,6 @@ class Interpreter {
         else {
             return sum;
         }
-    }
-
-    /*
-     Cheat: calculate the address of a character in the screen buffer, using
-     hand-coded "shift" and adds to multiply by 80, and without any allocation.
-
-     Doing its own (interpreter) stack manipulation to keep variables local and avoid arguments
-     on the (Jack) stack, and doing it by hand so this can be a leaf function.
-
-     TODO: implement function inlining and just use pop/peek/replace
-     */
-    function Array screenAddress() {
-        var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
-
-        // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
-        // let x = Interpreter.pop();
-        let x = stack[0];  // i.e. peek()
-
-        // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
-        let acc0 = y + y;       //  2y
-        let acc1 = acc0 + acc0; //  4y
-        let acc2 = acc1 + y;    //  5y
-        let acc3 = acc2 + acc2; // 10y
-        let acc4 = acc3 + acc3; // 20y
-        let acc5 = acc4 + acc4; // 40y
-        let acc6 = acc5 + acc5; // 80y
-
-        let addr = 2048 + acc6 + x;
-        // do Interpreter.push(addr);
-        let stack[0] = addr;  // replace();
-
-        return;
     }
 
     /** Allocate a rib on the heap, filling in the three fields. */
