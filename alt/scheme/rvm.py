@@ -51,9 +51,8 @@ def assemble(encoded, interpreter, print_asm):
 
     decode(encoded, asm)
 
-    # TODO: print with addresses
     if print_asm:
-        for l in asm.lines: print(l)
+        for l in asm.pretty(big.ROM_BASE): print(l)
         print()
 
     if interpreter == "assembly":
@@ -65,13 +64,19 @@ def assemble(encoded, interpreter, print_asm):
         halt_loop_addr =   symbols.get("halt_loop")
     elif interpreter == "jack":
         from nand.solutions import solved_06
-        instrs, symbols, statics = big.assemble(asm.lines, builtins=solved_06.BUILTIN_SYMBOLS)
+        builtins = {
+            **solved_06.BUILTIN_SYMBOLS,
+            "SCREEN": big.SCREEN_BASE,
+        }
+        instrs, symbols, statics = big.assemble(asm.lines, builtins=builtins)
         stack_loc =    statics["interpreter.static_stack"]
         pc_loc =       statics["interpreter.static_pc"]
         next_rib_loc = statics["interpreter.static_nextRib"]
         interp_loop_addr = first_loop_in_function(symbols, "Interpreter", "main")
         halt_loop_addr =   first_loop_in_function(symbols, "Interpreter", "halt")
-        print(interp_loop_addr, halt_loop_addr)
+        unexpected_statics = [s for s in statics if (".static_" not in s)]
+        if unexpected_statics != []:
+            raise Exception(f"unexpected statics: {unexpected_statics}")
 
     assert symbols["start"] == big.ROM_BASE
 
@@ -79,13 +84,13 @@ def assemble(encoded, interpreter, print_asm):
         def show_map(label, m):
             print("\n".join(
                 [ f"{label}:" ] +
-                [ f"  {addr:5d}: {name}"
+                [ f"{addr:5d}:   {name}"
                   for name, addr in sorted(m.items(), key=lambda t: t[1])
                 ] +
                 [""]
             ))
 
-        show_map("Symbols", symbols)
+        # show_map("Symbols", symbols)
 
         if statics != {}:
             show_map("Statics", statics)
@@ -178,20 +183,6 @@ def decode(input, asm):
     See https://github.com/udem-dlteam/ribbit/blob/dev/src/host/py/rvm.py#L126
     """
 
-    # base_addr = len(big.assemble(asm.lines)[0])
-
-    # next_rib = 0
-
-    # def emit_rib(x, y, z):
-    #     nonlocal next_rib
-    #     name = f"rib{next_rib}"
-    #     asm.label(name)
-    #     asm.instr(x)
-    #     asm.instr(y)
-    #     asm.instr(z)
-    #     next_rib += 1
-    #     return f"@{name}"
-
     asm.comment("===  Data  ===")
 
     # Exactly one primitive proc rib is pre-defined: `rib`
@@ -241,19 +232,14 @@ def decode(input, asm):
         asm.instr(y)
         asm.instr(z)
 
-    def emit_pair(lbl, car, cdr):             emit_rib(lbl, car, cdr, "#0")
-    def emit_proc(lbl, code, env):            emit_rib(lbl, code, env, "#1")
-    def emit_symbol(lbl, value, name):        emit_rib(lbl, value, name, "#2")
-    def emit_string(lbl, chars, count: int):  emit_rib(lbl, chars, f"#{count}", "#3")
-    def emit_vector(lbl, elems, count: int):  emit_rib(lbl, elems, f"#{count}", "#4")
-
-
+    def emit_pair(lbl, car, cdr, comment):             emit_rib(lbl, car, cdr, "#0", comment)
+    def emit_string(lbl, chars, count: int, comment):  emit_rib(lbl, chars, f"#{count}", "#3", comment)
 
 
     # Strings for the symbol table, as constant ribs directly in the ROM:
 
     # One empty string that can be shared:
-    emit_string("rib_string_empty", "@rib_nil", 0)
+    emit_string("rib_string_empty", "@rib_nil", 0, '""')
 
     # First byte(s): number of symbols without names
     n = get_int(0)
@@ -270,9 +256,8 @@ def decode(input, asm):
             if acc_str == "":
                 lbl = "rib_string_empty"
             else:
-                asm.comment(f'"{acc_str}"')
                 lbl = f"rib_string_{idx}"
-                emit_string(lbl, accum, len(acc_str))
+                emit_string(lbl, accum, len(acc_str), f'"{acc_str}"')
                 idx += 1
             sym_names.insert(0, (lbl, acc_str))
 
@@ -282,9 +267,8 @@ def decode(input, asm):
             if c == ord(";"):
                 break
         else:
-            asm.comment(f"'{chr(c)}'")
             lbl = asm.next_label("char")
-            emit_pair(lbl, f"#{hex(c)}", accum)
+            emit_pair(lbl, f"#{hex(c)}", accum, f"'{chr(c)}'")
             accum = f"@{lbl}"
             acc_str = chr(c) + acc_str
 
@@ -336,24 +320,30 @@ def decode(input, asm):
         The table is written from the end, and each entry is made of of two ribs, the `symbol`
         and a `pair`.
         """
-        asm.comment(f'symbol_ref({idx}); "{sym_names[idx][1]}"')
-        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx - 1)}"
+        name = sym_names[idx][1]
+        description = f'"{name}"({idx})'
+        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx - 1)}", description
 
-    def emit_instr(op, arg, next):
+    def emit_instr(op, arg, next, sym):
         lbl = asm.next_label("instr")
 
         asm.label(lbl)
 
+        if sym is not None:
+            target = sym
+        else:
+            target = arg
+
         if op == 0 and next == "#0":
-            asm.comment(f"jump {arg} ")
+            asm.comment(f"jump {target} ")
         elif op == 0:
-            asm.comment(f"call {arg} -> {next}")
+            asm.comment(f"call {target} -> {next}")
         elif op == 1:
-            asm.comment(f"set {arg} -> {next}")
+            asm.comment(f"set {target} -> {next}")
         elif op == 2:
-            asm.comment(f"get {arg} -> {next}")
+            asm.comment(f"get {target} -> {next}")
         elif op == 3:
-            asm.comment(f"const {arg} -> {next}")
+            asm.comment(f"const {target} -> {next}")
         elif op == 4:
             asm.comment(f"if -> {arg} else {next}")
         else:
@@ -381,6 +371,8 @@ def decode(input, asm):
         d = 0
         op = 0
 
+        sym = None
+
         while True:
             d = [20, 30, 0, 10, 11, 4][op]
             if n <= 2+d: break
@@ -397,9 +389,9 @@ def decode(input, asm):
                 n = f"#{get_int(0)}"
             elif n >= d:
                 idx = get_int(n-d-1)
-                n = symbol_ref(idx)
+                n, sym = symbol_ref(idx)
             elif op < 3:
-                n = symbol_ref(n)
+                n, sym = symbol_ref(n)
 
             if op > 4:
                 # This is either a lambda, or the outer proc that wraps the whole program.
@@ -429,8 +421,10 @@ def decode(input, asm):
             if isinstance(n, int):
                 n = f"#{n}"
 
-        instr_lbl = emit_instr(op-1, n, pop())
+        instr_lbl = emit_instr(op-1, n, pop(), sym)
         push(f"@{instr_lbl}")
+
+        sym = None
 
     # This will be the body of the outer proc, so just "jump" straight to it:
     start_instr = n
@@ -1625,7 +1619,7 @@ def asm_interpreter():
 
 
     asm.label("primitive_*")
-    asm.comment("primitive 16; - :: x y -- x * y")
+    asm.comment("primitive 16; * :: x y -- x * y")
     asm.comment("TEMP_0 = pop() = y")
     pop("TEMP_0")
     asm.comment("TEMP_1 = SP.x = x")
@@ -1781,22 +1775,6 @@ def jack_interpreter():
     # THIS and THAT definitely don't need to be set up before the first function call
     asm.blank()
 
-    asm.comment("Initialize interpreter state that needs to point to data in ROM")
-
-    init_global("Interpreter stack", "interpreter.static_stack", "rib_outer_cont")
-    init_global("Interpreter pc", "interpreter.static_pc", "main")
-
-    init_global("Primitive proc: 'rib'", "interpreter.static_ribRib", "rib_rib")
-
-    init_global("Constant: #f",  "interpreter.static_ribFalse", "rib_false")
-    init_global("Constant: #t",  "interpreter.static_ribTrue",  "rib_true")
-    init_global("Constant: '()", "interpreter.static_ribNil",   "rib_nil")
-
-    init_global("Symbol Names (start)", "interpreter.static_symbolNameTableStart", "symbol_names_start")
-    init_global("Symbol Names (end)",   "interpreter.static_symbolNameTableEnd",   "symbol_names_end")
-
-    asm.blank()
-
     translator = reg.Translator(asm)
 
     def load_class(path):
@@ -1815,6 +1793,7 @@ def jack_interpreter():
     asm.blank()
 
     return asm
+
 
 def first_loop_in_function(symbols, class_name, function_name):
     """Address of the first instruction labeled "loop_... found (probably) within the given function."""

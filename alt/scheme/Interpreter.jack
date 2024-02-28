@@ -11,19 +11,6 @@ class Interpreter {
     // Pointers to the functions that handle each primitive:
     static Array handlers;
 
-    // Pre-allocated "proc" containing the "rib" primitive, which will be used to construct every
-    // other primitive.
-    static Rib ribRib;
-
-    // Pre-allocated special values:
-    static Rib ribFalse;
-    static Rib ribTrue;
-    static Rib ribNil;
-
-    // Used only during intialization:
-    static Array symbolNameTableStart;
-    static Array symbolNameTableEnd;
-
     static Array tty;  // DEBUG
 
     /*
@@ -44,7 +31,7 @@ class Interpreter {
         var Rib newCont;        // saved to update after constructing stack
         var Rib symbolToUpdate; // need the location to update after .pop()
 
-        // Initialize some more state:
+        // Initialize state:
 
         let tty = 4095;  // DEBUG
 
@@ -55,7 +42,11 @@ class Interpreter {
 
         do Interpreter.initPrimitiveVectors();
 
+        // Bottom of the stack: "primordial continuation" in ROM
+        let stack = Jack.symbol("rib_outer_cont");
+
         // Skip the bogus "main" instr:
+        let pc = Jack.symbol("main");
         let pc = pc[2];
 
         while (1) {
@@ -163,7 +154,7 @@ class Interpreter {
             if (opcode = 4) {
                 // if
 
-                if (Interpreter.pop() = ribFalse) {
+                if (Interpreter.pop() = Jack.symbol("rib_false")) {
                     let pc = pc[2];
                 }
                 else {
@@ -194,9 +185,9 @@ class Interpreter {
         var Rib symbol;
         var Rib entry;
 
-        let entry = ribNil;
-        let ptr = symbolNameTableStart;
-        while (ptr < symbolNameTableEnd) {
+        let entry = Jack.symbol("rib_nil");
+        let ptr = Jack.symbol("symbol_names_start");
+        while (ptr < Jack.symbol("symbol_names_end")) {
             // let tty[0] = ptr; // DEBUG
             let symbol = Interpreter.alloc(ptr[1], ptr[0], 2);  // symbol type
             let entry = Interpreter.alloc(symbol, entry, 0);  // pair type
@@ -209,7 +200,7 @@ class Interpreter {
 
     function void initPrimitiveVectors() {
         // Just below the screen buffer
-        let handlers = 2048 - 32;
+        let handlers = Jack.symbol("SCREEN") - 32;
 
         let handlers[ 0] = Jack.symbol("interpreter.handleRib");
         let handlers[ 1] = Jack.symbol("interpreter.handleId");
@@ -314,10 +305,10 @@ class Interpreter {
 
         let tmp = stack[0];
         if (Rib.isRib(tmp)) {
-            let stack[0] = ribTrue;
+            let stack[0] = Jack.symbol("rib_true");
         }
         else {
-            let stack[0] = ribFalse;
+            let stack[0] = Jack.symbol("rib_false");
         }
 
         return;
@@ -420,10 +411,10 @@ class Interpreter {
 
         let x = stack[0];
         if (x = y) {
-            let stack[0] = ribTrue;
+            let stack[0] = Jack.symbol("rib_true");
         }
         else {
-            let stack[0] = ribFalse;
+            let stack[0] = Jack.symbol("rib_false");
         }
 
         return;
@@ -442,10 +433,10 @@ class Interpreter {
         let x = stack[0];
         // Update second stack entry in place:
         if (x < y) {
-            let stack[0] = ribTrue;
+            let stack[0] = Jack.symbol("rib_true");
         }
         else {
-            let stack[0] = ribFalse;
+            let stack[0] = Jack.symbol("rib_false");
         }
 
         return;
