@@ -313,6 +313,13 @@ import pygame.image
 import time
 
 
+EVENT_INTERVAL = 1/10
+DISPLAY_INTERVAL = 1/20  # Note: screen update is pretty slow at this point, so no point in trying for a higher frame rate.
+CYCLE_INTERVAL = 1/1.0  # How often to update the cycle and frame counters; a bit longer so they doesn't bounce around too much
+
+CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
+
+
 def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True):
     """Run with keyboard and text-mode graphics."""
 
@@ -336,39 +343,46 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
 
     # TODO: use computer.py's "run", for many more features
 
-    cycles = 0
+    last_cycle_time = last_event_time = last_display_time = last_frame_time = now = time.monotonic()
     halted = False
+
+    last_cycle_count = cycles = 0
     while True:
         if not halted and computer.pc == halt_addr:
             halted = True
-            print(f"\nHalted after {cycles} cycles\n")
+            print(f"\nHalted after {cycles:,d} cycles\n")
             if trace is not None:
                 trace(computer, cycles)
 
 
-        if not halted:
-            if trace is not None:
-                cycles_per_call = 1
-            else:
-                cycles_per_call = 10  # has to be a factor of CYCLES_PER_UPDATE
-            computer.ticktock(cycles_per_call)
-            cycles += cycles_per_call
+        if halted:
+            time.sleep(EVENT_INTERVAL)
+
+        elif trace is None:
+            computer.ticktock(CYCLES_PER_CALL)
+            cycles += CYCLES_PER_CALL
+
+        else:
+            computer.ticktock()
+            cycles += 1
 
             if computer.fetch and trace is not None:
                 trace(computer, cycles)
 
-        else:
-            time.sleep(0.1)
 
+        if cycles % CYCLES_PER_CALL == 0 or halted:
+            now = time.monotonic()
 
-        if trace is not None:
-            CYCLES_PER_UPDATE = 20  # HACK: to ensure we see all the TTY output
-        else:
-            CYCLES_PER_UPDATE = 100
+            # A few times per second, process events and update the display:
+            if now >= last_event_time + EVENT_INTERVAL:
+                last_event_time = now
+                key = kvm.process_events()
+                computer.set_keydown(key or 0)
 
-        if cycles % CYCLES_PER_UPDATE == 0 or halted:
-            key = kvm.process_events()
-            computer.set_keydown(key or 0)
+            if now >= last_display_time + DISPLAY_INTERVAL:
+                last_display_time = now
+                kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
+
 
             tty_char = computer.get_tty()
             if tty_char:
@@ -380,13 +394,17 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
                 else:
                     print(f"TTY:     ({tty_char:6d}; 0x{unsigned(tty_char):04x})")
 
-            kvm.update_display(lambda x: computer.peek(SCREEN_BASE + x))
 
-            msgs = [
-                f"{cycles/1000:0.1f}k cycles",
-                f"@{computer.pc}",
-            ]
+            msgs = []
+            msgs.append(f"{cycles/1000:0.1f}k cycles")
+            cps = (cycles - last_cycle_count)/(now - last_cycle_time)
+            msgs.append(f"{cps/1000:0,.1f}k/s")
+            msgs.append(f"@{computer.pc}")
+            # TODO: let the caller add meters (e.g. Ribbit heap consumption)
             pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
+
+            last_cycle_time = now
+            last_cycle_count = cycles
 
 
 class TextKVM(computer.KVM):
