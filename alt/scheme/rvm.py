@@ -114,21 +114,23 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
     # FIXME: Ug
     instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, interpreter, print_asm)
 
-    last_traced_exec = None
     symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
+    last_traced_exec = None
+    ribs = 0
 
     def trace(computer, cycles):
-        nonlocal last_traced_exec
+        nonlocal last_traced_exec, ribs
 
         inspector = Inspector(computer, symbols, stack_loc)
 
         if (trace_level >= TRACE_COARSE
                 and (computer.pc == interp_loop_addr or computer.pc == halt_loop_addr)):
             if last_traced_exec is None:
-                print(f"{cycles:,d}:")
+                print(f"{ribs:,d}; cycle {cycles:,d}:")
             else:
-                print(f"{cycles:,d} (+{cycles - last_traced_exec:,d}):")
+                print(f"{ribs:,d}; cycle {cycles:,d} (+{cycles - last_traced_exec:,d}):")
             last_traced_exec = cycles
+            ribs += 1
 
             print(f"  stack ({inspector.show_addr(inspector.peek(stack_loc))}): {inspector.show_stack()}")
 
