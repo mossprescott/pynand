@@ -279,8 +279,14 @@ class Interpreter {
 
     /* arg2 :: x y -- y */
     function void handleArg2() {
-        // TODO
-        do Interpreter.halt();
+        var int y;
+
+        // y = pop()
+        let y = stack[0];
+        let stack = stack[1];
+
+        // replace(y)
+        let stack[0] = y;
 
         return;
     }
