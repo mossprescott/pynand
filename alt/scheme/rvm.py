@@ -187,24 +187,6 @@ def decode(input, asm):
 
     asm.comment("===  Data  ===")
 
-    # Exactly one primitive proc rib is pre-defined: `rib`
-    asm.label("rib_rib")
-    asm.instr("#0")
-    asm.instr("#0")
-    asm.instr("#1")
-
-    # Three constants the runtime can refer to by name:
-    def special(name):
-        asm.label(name)
-        asm.instr("#0")
-        asm.instr("#0")
-        asm.instr("#5")
-    special("rib_false")
-    special("rib_true")
-    special("rib_nil")
-
-    asm.blank()
-
     # for comprehension:
     pos = -1
     def get_byte():
@@ -274,6 +256,29 @@ def decode(input, asm):
             accum = f"@{lbl}"
             acc_str = chr(c) + acc_str
 
+    asm.blank()
+
+    # Exactly one primitive proc rib is pre-defined: `rib`
+    # As a completely over-the-top hack, the location of the symbol table in RAM is stashed in
+    # the otherwise-unused second field.
+    # Note: can't emit this rib until the size of the symbol_table is known, hence the odd sequence.
+    asm.label("rib_rib")
+    asm.instr("#0")
+    asm.comment("Location of symtbl:")
+    # asm.instr(symbol_ref(0)[0])
+    asm.instr(f"#{big.HEAP_BASE + 6*(len(sym_names)) - 3}")
+    asm.instr("#1")
+    asm.blank()
+
+    # Three constants the runtime can refer to by name:
+    def special(name):
+        asm.label(name)
+        asm.instr("#0")
+        asm.instr("#0")
+        asm.instr("#5")
+    special("rib_false")
+    special("rib_true")
+    special("rib_nil")
     asm.blank()
 
     # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
