@@ -310,6 +310,7 @@ def assemble(f, min_static=16, max_static=1023, builtins=BUILTIN_SYMBOLS):
 
 import computer
 import pygame.image
+import sys
 import time
 
 
@@ -339,6 +340,13 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
     computer.poke(0, ROM_BASE)
     computer.poke(1, parse_op("0;JMP"))
 
+    def run_trace():
+        try:
+            trace(computer, cycles)
+        except:
+            print(f"exception in trace: {sys.exc_info()[1]}")
+
+
     kvm = TextKVM(name, 80, 25, 6, 10, "alt/big/Monaco9.png")
 
     # TODO: use computer.py's "run", for many more features
@@ -352,7 +360,7 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
             halted = True
             print(f"\nHalted after {cycles:,d} cycles\n")
             if trace is not None:
-                trace(computer, cycles)
+                run_trace()
 
 
         if halted:
@@ -367,8 +375,7 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
             cycles += 1
 
             if computer.fetch and trace is not None:
-                trace(computer, cycles)
-
+                run_trace()
 
         if cycles % CYCLES_PER_CALL == 0 or halted:
             now = time.monotonic()
