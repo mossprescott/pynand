@@ -11,6 +11,9 @@ class Interpreter {
     // Pointers to the functions that handle each primitive:
     static Array handlers;
 
+    // Code of the key that was returned by getchar on the most recent call.
+    static int lastKeyPressed;
+
     static Array tty;  // DEBUG
 
     /*
@@ -37,6 +40,8 @@ class Interpreter {
 
         // Bottom of the "heap" area:
         let nextRib = 32767 + 1;  // Note: will overflow to -32768
+
+        let lastKeyPressed = 0;
 
         do Interpreter.initSymbolTable();
 
@@ -504,7 +509,7 @@ class Interpreter {
 
      Note: this will only catch keypresses that occur after the instruction is executed. For
      a responsive shell, the check will have to incorporated into the interpreter loop.
-     It might even need to be be checked more often than once per instruction, since instructions
+     It might even need to be be checked more often than once per rib, since ribs
      can take as long as hundreds of cycles.
      */
     function void handleGetchar() {
@@ -512,10 +517,19 @@ class Interpreter {
         var int c;
 
         let keyboard = Jack.symbol("KEYBOARD");
-        let c = 0;
+
+        // First wait for the key to be different than the last call:
+        let c = keyboard[0];
+        while (c = lastKeyPressed) {
+            let c = keyboard[0];
+        }
+
+        // Now wait for any key to be pressed:
         while (c = 0) {
             let c = keyboard[0];
         }
+
+        let lastKeyPressed = c;
 
         do Interpreter.push(c);
 
