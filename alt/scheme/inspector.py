@@ -65,14 +65,14 @@ class Inspector:
         val, name, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
         assert z == 2
         rib_num = (addr - big.HEAP_BASE)//3
-        name_and_addr = f'"{self._obj(name)}"{self.show_addr(addr)}(_{rib_num})'
+        name_and_addr = f"{self._obj(name)}{self.show_addr(addr)}(_{rib_num})"
         if with_value:
             return f"{name_and_addr} = {self._obj(val)}"
         else:
             return name_and_addr
 
 
-    def _obj(self, val):
+    def _obj(self, val, max_depth=10):
         """Python representation of an object, which may be an integer, special value, or rib."""
 
         # FIXME: check tag
@@ -88,11 +88,15 @@ class Inspector:
             x, y, z = self.peek(val), self.peek(val+1), self.peek(val+2)
             if z == 0:  # pair
                 car = self._obj(x)
-                cdr = self._obj(y)
+                if max_depth > 0:
+                    cdr = self._obj(y, max_depth=max_depth-1)
+                else:
+                    cdr = ["..."]
                 if isinstance(cdr, list):
                     return [car] + cdr
                 else:
-                    return (car, cdr)
+                    # In at least one case, this is a "jump" instruction during compilation
+                    return f"({car}, {cdr}, {x})"
             elif z == 1:  # proc
                 if 0 <= x < len(PRIMITIVES):
                     return f"proc({PRIMITIVES[x]})"
@@ -102,11 +106,10 @@ class Inspector:
             elif z == 2:  # symbol
                 return f"symbol({self._obj(y)} = {self._obj(x)})"
             elif z == 3:  # string
-                chars = self._obj(x)
+                chars = self._obj(x, max_depth=y)
                 if len(chars) != y:
-                    raise Exception("bad string")
-                else:
-                    return "".join(chr(c) for c in chars)
+                    print(f"bad string: {chars, y, z}")
+                return repr("".join(chr(c) for c in chars))
             elif z == 4:  # vector
                 elems = self._obj(x)
                 if not isinstance(elems, list) or len(elems) != y:
@@ -166,7 +169,7 @@ class Inspector:
         """Show the contents of the stack, which is a list composed of ordinary pairs and continuation
         ribs."""
 
-        return ", ".join(str(o) for o in self.stack())
+        return ", ".join(str(o) for o in reversed(self.stack()))
 
 
 def list_str(lst):
