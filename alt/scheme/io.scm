@@ -16,29 +16,29 @@
 (define screenAddr (rib 23 0 1))
 (define (drawchar x y c) (poke (screenAddr x y) c))
 
-(define cursorx 0)
-(define cursory 0)
-(define (putchar c)
-    (if (eqv? c 10)
-        (begin
-            (set! cursorx 0)
-            (set! cursory (+ 1 cursory)))
-        (begin
-            (drawchar cursorx cursory c)
-            (set! cursorx (+ 1 cursorx)))))
+;; (define cursorx 0)
+;; (define cursory 0)
+;; (define (putchar c)
+;;     (if (eqv? c 10)
+;;         (begin
+;;             (set! cursorx 0)
+;;             (set! cursory (+ 1 cursory)))
+;;         (begin
+;;             (drawchar cursorx cursory c)
+;;             (set! cursorx (+ 1 cursorx)))))
 
 ;; The getchar primitive just blocks and then returns a non-zero char. The repl seems to
 ;; expect getchar to handle echo, etc.
 ;; TODO: use a (let ...) here to hide this definition
-(define getchar-primitive (rib 18 0 1))
-(define (getchar)
-    (let ((c (getchar-primitive)))
-        (if (eqv? c 128)  ;; newline, according to the strange key mapping
-            (begin
-                (set! cursorx 0)
-                (set! cursory (+ 1 cursory))
-                10)  ;; regular ASCII newline
-            (begin
-                (putchar c)
-                c))))
+;; (define getchar-primitive (rib 18 0 1))
+;; (define (getchar)
+;;     (let ((c (getchar-primitive)))
+;;         (if (eqv? c 128)  ;; newline, according to the strange key mapping
+;;             (begin
+;;                 (set! cursorx 0)
+;;                 (set! cursory (+ 1 cursory))
+;;                 10)  ;; regular ASCII newline
+;;             (begin
+;;                 (putchar c)
+;;                 c))))
 

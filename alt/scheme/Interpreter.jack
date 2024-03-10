@@ -11,10 +11,18 @@ class Interpreter {
     // Pointers to the functions that handle each primitive:
     static Array handlers;
 
+    //
+    // IO
+    //
+
+    static int cursorX;
+    static int cursorY;
+
     // Code of the key that was returned by getchar on the most recent call.
     static int lastKeyPressed;
 
     static Array tty;  // DEBUG
+
 
     /*
      When we arrive here, the assembly prelude has already initialized many of the statics with the
@@ -41,6 +49,9 @@ class Interpreter {
         // Bottom of the "heap" area:
         let nextRib = 32767 + 1;  // Note: will overflow to -32768
 
+        // IO:
+        let cursorX = 0;
+        let cursorY = 0;
         let lastKeyPressed = 0;
 
         do Interpreter.initSymbolTable();
@@ -226,7 +237,7 @@ class Interpreter {
         let handlers[16] = Jack.symbol("interpreter.handleTimes");
         let handlers[17] = Jack.symbol("interpreter.handleUnimp"); // quotient
         let handlers[18] = Jack.symbol("interpreter.handleGetchar");
-        let handlers[19] = Jack.symbol("interpreter.handleUnimp"); // putchar
+        let handlers[19] = Jack.symbol("interpreter.handlePutchar");
         let handlers[20] = Jack.symbol("interpreter.handlePeek");
         let handlers[21] = Jack.symbol("interpreter.handlePoke");
         let handlers[22] = Jack.symbol("interpreter.handleHalt");
@@ -505,7 +516,7 @@ class Interpreter {
         return;
     }
 
-    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed)
+    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed, and echos the character)
 
      Note: this will only catch keypresses that occur after the instruction is executed. For
      a responsive shell, the check will have to incorporated into the interpreter loop.
@@ -515,23 +526,65 @@ class Interpreter {
     function void handleGetchar() {
         var Array keyboard;
         var int c;
+        var Array cursorAddr;
 
         let keyboard = Jack.symbol("KEYBOARD");
+        let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+
+        let cursorAddr[0] = 0;
 
         // First wait for the key to be different than the last call:
         let c = keyboard[0];
         while (c = lastKeyPressed) {
             let c = keyboard[0];
+            let cursorAddr[0] = 95 - cursorAddr[0];
         }
 
         // Now wait for any key to be pressed:
         while (c = 0) {
             let c = keyboard[0];
+            let cursorAddr[0] = 95 - cursorAddr[0];
         }
 
         let lastKeyPressed = c;
+        let cursorAddr[0] = c;
+
+        if (c = 128) {
+            // newline, in the weird HACK keymap
+            let cursorX = 0;
+            let cursorY = cursorY + 1;
+            let c = 10;
+        }
+        else {
+            let cursorX = cursorX + 1;
+        }
+        // TODO: backspace?
+        // TODO: if we're at the bottom of the screen, scroll everything up
 
         do Interpreter.push(c);
+
+        return;
+    }
+
+    /*  putchar :: c -- c (and draw the character at the current position) */
+    function void handlePutchar() {
+        var int c;
+        var Array cursorAddr;
+
+        // let c = Interpreter.peek();
+        let c = stack[0];
+
+        if (c = 10) {
+            let cursorX = 0;
+            let cursorY = cursorY + 1;
+            // TODO: if we're at the bottom of the screen, scroll everything up
+        }
+        else {
+            let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+            let cursorAddr[0] = c;
+
+            let cursorX = cursorX + 1;
+        }
 
         return;
     }
@@ -581,13 +634,38 @@ class Interpreter {
      TODO: implement function inlining and just use pop/peek/replace
     */
     function void handleScreenAddr() {
-        var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
+        var int x, y, addr;
+        // var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
+
+        // let tty[0] = -42;
 
         // let y = Interpreter.pop();
         let y = stack[0];
         let stack = stack[1];
         // let x = Interpreter.pop();
         let x = stack[0];  // i.e. peek()
+
+        // // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
+        // let acc0 = y + y;       //  2y
+        // let acc1 = acc0 + acc0; //  4y
+        // let acc2 = acc1 + y;    //  5y
+        // let acc3 = acc2 + acc2; // 10y
+        // let acc4 = acc3 + acc3; // 20y
+        // let acc5 = acc4 + acc4; // 40y
+        // let acc6 = acc5 + acc5; // 80y
+
+        // let addr = 2048 + acc6 + x;
+
+        let addr = Interpreter.screenAddr(x, y);
+
+        // do Interpreter.push(addr);
+        let stack[0] = addr;  // replace();
+
+        return;
+    }
+
+    function Array screenAddr(int x, int y) {
+        var int acc0, acc1, acc2, acc3, acc4, acc5, acc6;
 
         // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
         let acc0 = y + y;       //  2y
@@ -598,11 +676,7 @@ class Interpreter {
         let acc5 = acc4 + acc4; // 40y
         let acc6 = acc5 + acc5; // 80y
 
-        let addr = 2048 + acc6 + x;
-        // do Interpreter.push(addr);
-        let stack[0] = addr;  // replace();
-
-        return;
+        return 2048 + acc6 + x;
     }
 
     /* Handler for any unused primitive code. */
