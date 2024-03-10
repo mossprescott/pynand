@@ -1824,7 +1824,7 @@ def main():
     parser.add_argument("--trace", action="store_true", help="Print each Ribbit instruction as it is interpreted. Note: runs almost 3x slower.")
     parser.add_argument("--print", action="store_true", help="Print interpreter assembly and compiled instructions.")
     # TEMP: experimental for now
-    parser.add_argument("--jack", action="store_true", help="Use the Jack interpreter.")
+    parser.add_argument("--asm", action="store_true", help="Use the (partially-implemented) assembly interpreter.")
 
     args = parser.parse_args()
 
@@ -1834,10 +1834,11 @@ def main():
             src_lines += [] + f.readlines()
 
     run("".join(src_lines),
-        interpreter="jack" if args.jack else "assembly",
+        interpreter="jack" if not args.asm else "assembly",
         simulator=args.simulator,
         print_asm=args.print,
         trace_level=TRACE_COARSE if args.trace else TRACE_NONE)
+        # trace_level=TRACE_FINE if args.trace else TRACE_NONE)
 
 
 if __name__ == "__main__":
