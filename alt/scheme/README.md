@@ -17,36 +17,39 @@ A source program is compiled by the Ribbit AOT compiler to an instruction graph 
 [A Small Scheme VM, Compiler, and REPL in 4K](http://www.iro.umontreal.ca/~feeley/papers/YvonFeeleyVMIL21.pdf),
 with a few modifications.
 
-Unimplemented primitives:
-- `*`, `quotient`: the Hack CPU does not provide these; they can be implemented as ordinary
-  functions (*TBD* probably need at least `*` as a primitive for speed).
-- `getchar` and `putchar`: there is no OS to provide these, they will be implemented as ordinary
-    functions when needed (i.e. for the REPL)
-
 Additional primitives:
 - `peek`; code: `20`; `x ← pop(); r ← RAM[x]`
 - `poke`; code: `21`; `y ← pop(); x ← pop(); RAM[x] ← y; r <- y`
-- `halt`; code: `22`; stop the machine, probably by going into a tight loop
+- `halt`; code: `22`; stop the machine, by going into a tight loop recognized by the simulator
+- `screenAddr`; code: `23`; `y <- pop(); x <- pop(); r <- address of character at (x, y)`
 
 `peek` and `poke` can be used to read and write to any address, but most usefully the screen buffer
 (which is at 0x0400–0x0x07E7) and the location mapped to the keyboard (0x07FF).
 
 `halt` can be used to signal normal completion of a program.
 
+`screenAddr` provides a fast implementation of the very common calculation mapping coordinates
+to the screen buffer in memory.
+
+
 ## Memory Layout
 
-| Address | Contents | Description |
-| 0       | SP       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry. |
-| 1       | PC       | Address of the rib currently being interpreted. |
-| 2       | NEXT_RIB | Address where the next allocation will occur. |
+| Address | Label                     | Contents | Description |
+| 0       | `interpreter.stack`       | SP       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry. |
+| 1       | `interpreter.pc`          | PC       | Address of the rib currently being interpreted. |
+| 2       | `interpreter.nextRib`     | NEXT_RIB | Address where the next allocation will occur. |
 | ...     |          | TBD: values used by the garbage collector to keep track of free space. |
+
+*Note: when the Jack interpreter is used, these locations are determined by the assembler,
+addresses 0-15 and are used by the interpreter's own stack pointers and temporary storage, and the
+interpreter's own stack grows up from address 256.*
 
 
 ## Rib Representation
 
 For simplicity, ribs are stored as described in the paper, three words each.
 
-The high bit of each word is used as a tag to identify whether the word points to a rib.
+**TODO**: The high bit of each word is used as a tag to identify whether the word points to a rib.
 - A word with the high bit set is a 15-bit signed integer value. To recover an ordinary 16-bit value when
     needed, bit 14 is copied to bit 15. For many operations, it's sufficient to treat values as unsigned
     and just make sure to set the high bit if it might have been cleared (e.g. due to overflow.)
@@ -79,17 +82,37 @@ implementations. That means to initialize we need something like 6K of heap plus
 some for stack.
 
 Actual size in the implementation:
-- Instruction ribs in the ROM for the REPL: 1643 (4.8K words)
-- Initial ribs in RAM for the symbol table: 212 (0.6K words)
-- Note: this does not account for additional Scheme code that will eventually be needed to make it
-    work (e.g. getchar/putchar).
+- Instruction ribs in the ROM for the REPL: 1,340 (4.0K words)
+- String/char ribs in R0M for the symbol table: 1,170 (3.5K words)
+- Initial ribs in RAM for the symbol table: 89 (267 words)
+- Actual total ROM, including interpreter and tables: at least 11K.
 
-[A comment in the Ribbit source]((https://github.com/udem-dlteam/ribbit/blob/dev/src/host/c/rvm.c#L207))
+
+[A comment in the Ribbit source](https://github.com/udem-dlteam/ribbit/blob/dev/src/host/c/rvm.c#L207)
 suggests that space for 48,000 ribs is needed to bootstrap. Presumably that refers to running the
 *compiler*, which is out of scope.
+
 
 ## GC
 
 The program runs until memory is exhausted.
 
-TODO: collect garbage.
+**TODO**: collect garbage.
+
+See https://github.com/udem-dlteam/ribbit/issues/26.
+
+
+## Performance
+
+With the current Jack compiler and the `compiled` simulator, performance of the interpreter is good
+enough to call interactive. However, if and when we decide to improve it, there are a couple of
+obvious bottlenecks:
+
+- Symbol table lookup: the REPL's symbol table is at least 89 deep, and linear search in interpreted
+  Scheme is currently consuming a large portion of the total time. Could experiment with a simple tree
+  structure, which would be roughly log(90) = 6 levels deep.
+
+- Dispatching on instruction and primitive codes is relatively expensive. Could embed handler pointers
+  directly in the ribs? Or just use more codes to flatten the amount of dispatching that's currently
+  needed (e.g. separate codes for call slot, call symbol, jump to slot, jump to symbol). Either would
+  require modifying the Scheme compiler to account for the new representation.
