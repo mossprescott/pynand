@@ -22,8 +22,6 @@ def main():
 ;; TEMP: this should be good enough to convert single-digit numbers to strings for display
 (define (quotient x y) 0)
 
-;; TEMP: until I get exports to work
-(define + (rib 14 0 1))
 
 (repl)
 
