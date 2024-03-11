@@ -2,10 +2,12 @@
 
 """Ribbit VM implementation.
 
-The interpreter and primitives are all hand-rolled assembly. In hindsight, it would have been
-quicker and easier to adapt the compiler in "register.py", with a minimal library, and implement the
-interpreter in that. The size in ROM of the actual interpreter turns out not to be very critical
-(~1K words), and we're not really going for maximum performance here.
+Two interpreters are currently implemented:
+- a faster, more compact, but incomplete interpreter, in hand-rolled assembly
+- a slightly slower, larger, but almost completely functional version in Jack using the compiler
+  in reg.py, which has been significantly enhanced for this purpose.
+
+Neither interpreter provides garbage-collection yet.
 
 RSC's encoded instruction stream is decoded (in Python) into ribs directly in the ROM, which
 is both relatively efficient in time and space, and more realistic than loading a complex program
