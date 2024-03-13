@@ -722,8 +722,10 @@
 (define const-op     3)
 (define if-op        4)
 
+(define feature-arity-check #f)  ;; HACK
+
 (define (add-nb-args nb tail)
-  (if ##feature-arity-check
+  (if feature-arity-check  ;; HACK
     (rib const-op
          nb
          tail)
@@ -927,7 +929,7 @@
           (let ((v (lookup var cte 0)))
             (add-nb-args
               nb-args
-              (gen-call (if (and (not (rib? v)) ##feature-arity-check) (+ v 1) v) cont)))))))
+              (gen-call (if (and (not (rib? v)) feature-arity-check) (+ v 1) v) cont)))))))  ;; HACK
 
 (define (lookup var cte i)
   (if (pair? cte)
