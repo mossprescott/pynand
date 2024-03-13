@@ -96,7 +96,7 @@ class Inspector:
                     return [car] + cdr
                 else:
                     # In at least one case, this is a "jump" instruction during compilation
-                    return f"({car}, {cdr}, {x})"
+                    return f"({car}, {cdr}, {z})"
             elif z == 1:  # proc
                 if 0 <= x < len(PRIMITIVES):
                     return f"proc({PRIMITIVES[x]})"
