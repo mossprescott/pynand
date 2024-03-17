@@ -198,9 +198,9 @@ PRIMITIVES = {
     14: "+",
     15: "-",
     16: "*",
-    17: "quotient (unimp.)",
+    17: "quotient",
     18: "getchar",
-    19: "putchar (unimp.)",
+    19: "putchar",
     # Extra:
     20: "peek",
     21: "poke",

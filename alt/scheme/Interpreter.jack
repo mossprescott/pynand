@@ -235,7 +235,7 @@ class Interpreter {
         let handlers[14] = Jack.symbol("interpreter.handlePlus");
         let handlers[15] = Jack.symbol("interpreter.handleMinus");
         let handlers[16] = Jack.symbol("interpreter.handleTimes");
-        let handlers[17] = Jack.symbol("interpreter.handleUnimp"); // quotient
+        let handlers[17] = Jack.symbol("interpreter.handleQuotient");
         let handlers[18] = Jack.symbol("interpreter.handleGetchar");
         let handlers[19] = Jack.symbol("interpreter.handlePutchar");
         let handlers[20] = Jack.symbol("interpreter.handlePeek");
@@ -527,6 +527,26 @@ class Interpreter {
 
         return;
     }
+
+
+    /*  quotient :: x y -- x / y */
+    function void handleQuotient() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+
+        // Update second stack entry in place:
+        let stack[0] = Interpreter.divide(x, y);
+
+        return;
+    }
+
 
     /*  getchar :: -- <char from keyboard> (blocks an entire line is entered, while echoing characters)
 
@@ -854,6 +874,58 @@ class Interpreter {
         }
         else {
             return sum;
+        }
+    }
+
+    /**
+     This was lifted verbatim from Math.jack in the solutions for project 12 from the book, except
+     for inlining abs().
+     Does that mean it's good? Maybe, but it probably works.
+     */
+     function int divide(int x, int y) {
+        var int localX, localY;
+        var boolean neg;
+        var int q, r;
+
+        if (y = 0) {
+            do Interpreter.halt();
+        }
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        // Note: testing each operand only once to minimize branching.
+        let neg = false;
+        if (localY < 0) {
+            let localY = -localY;
+            let neg = ~neg;
+        }
+        if (localX < 0) {
+            let localX = -localX;
+            let neg = ~neg;
+        }
+
+        // No more bits to look at:
+        if (y > x) {
+            return 0;
+        }
+
+        // Try dividing by 2y:
+        if ((y+y) < 0) {
+            // If 2*y overflows, it's definitely > x.
+            let q = 0;
+        }
+        else {
+            let q = Interpreter.divide(x, y+y);
+        }
+        let r = q+q;
+        if (~((x - Interpreter.multiply(r, y)) < y)) {
+            let r = r + 1;
+        }
+
+        if (neg) {
+            return -r;
+        }
+        else {
+            return r;
         }
     }
 

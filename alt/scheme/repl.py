@@ -19,23 +19,19 @@ def main():
 
     program = "".join(min_library_src_lines + io_src_lines) + """
 
-;; TEMP: this should be good enough to convert single-digit numbers to strings for display
-(define (quotient x y) 0)
-
-
 (repl)
 
 ;; Exported symbols.
 
 (export
-
-*
-+
--
-<
-=
-cons
-)
+  +
+  -
+  *
+  quotient
+  <
+  =
+  cons
+  )
 """
 
     # Note: actually running the compiler in the Ribbit Python interpreter is pretty slow.
