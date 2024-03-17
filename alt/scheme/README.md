@@ -31,14 +31,31 @@ Additional primitives:
 `screenAddr` provides a fast implementation of the very common calculation mapping coordinates
 to the screen buffer in memory.
 
+Note: `getchar` reads characters one at a time from a buffer which contains up to an entire line.
+No characters are returned until `newline` (HACK: 128; Scheme: 10) is entered. As long as a line
+hasn't been completed, the backspace key can be used to edit the line by removing the last-entered
+character (if any).
+However, at present, characters can only be entered after `getchar` has been invoked. While in the
+loop receiving keypresses, a "blinking" underscore indicates the cursor position.
+This makes `getchar`/`putchar` unsuitable for non-terminal-oriented uses (i.e. games.) Instead, you
+can implement your own "keyDown" and "drawChar" operations (see [io.scm](io.scm)) using
+`(peek 4095)` and `(poke (screenAddr x y) c)`.
+
 
 ## Memory Layout
 
-| Address | Label                     | Contents | Description |
-| 0       | `interpreter.stack`       | SP       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry. |
-| 1       | `interpreter.pc`          | PC       | Address of the rib currently being interpreted. |
-| 2       | `interpreter.nextRib`     | NEXT_RIB | Address where the next allocation will occur. |
-| ...     |          | TBD: values used by the garbage collector to keep track of free space. |
+| Address | Label                            | Contents | Description |
+| 0       | `interpreter.static_stack`       | SP       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry.                   |
+| 1       | `interpreter.static_pc`          | PC       | Address of the rib currently being interpreted.   |
+| 2       | `interpreter.static_nextRib`     | NEXT_RIB | Address where the next allocation will occur.     |
+| ...     |                                  |          | TBD: values used by the garbage collector to keep track of free space. |
+| 256–    |                                  |          | Jack stack.                                       |
+| 1936–2015 | `interpreter.static_bufferStart`/`End` |  | Space to store a line of input from the keyboard. |
+| 2016–2047 | `interpreter.static_handlers`  |          | Function pointer for each primitive handler.      |
+| 2048-4048 |                                |          | Screen buffer: 80x25 characters.                  |
+| 4095      |                                | KEYBOARD | Mapped to the keyboard for input and "tty" for output. |
+| 4096–32767 |                               |          | ROM: interpreter, symbol names, instructions.     |
+| 32768–65536 |                              |          | Heap.                                             |
 
 *Note: when the Jack interpreter is used, these locations are determined by the assembler,
 addresses 0-15 and are used by the interpreter's own stack pointers and temporary storage, and the
