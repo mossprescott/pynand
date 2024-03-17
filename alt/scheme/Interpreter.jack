@@ -18,6 +18,9 @@ class Interpreter {
     static int cursorX;
     static int cursorY;
 
+    static Array bufferStart;
+    static Array bufferEnd;
+
     // Code of the key that was returned by getchar on the most recent call.
     static int lastKeyPressed;
 
@@ -49,14 +52,11 @@ class Interpreter {
         // Bottom of the "heap" area:
         let nextRib = 32767 + 1;  // Note: will overflow to -32768
 
-        // IO:
-        let cursorX = 0;
-        let cursorY = 0;
-        let lastKeyPressed = 0;
-
         do Interpreter.initSymbolTable();
 
         do Interpreter.initPrimitiveVectors();
+
+        do Interpreter.initIO();
 
         // Bottom of the stack: "primordial continuation" in ROM
         let stack = Jack.symbol("rib_outer_cont");
@@ -252,6 +252,18 @@ class Interpreter {
         let handlers[29] = Jack.symbol("interpreter.handleUnimp");
         let handlers[30] = Jack.symbol("interpreter.handleUnimp");
         let handlers[31] = Jack.symbol("interpreter.handleUnimp");
+
+        return;
+    }
+
+    function void initIO() {
+        // Allocate space for one full line of characters, just below where the primitive vectors are stored
+        let bufferStart = handlers - 80;   // a constant
+        let bufferEnd = bufferStart;  // ptr to the word *after* the last word containing a character
+
+        let cursorX = 0;
+        let cursorY = 0;
+        let lastKeyPressed = 0;
 
         return;
     }
@@ -516,54 +528,97 @@ class Interpreter {
         return;
     }
 
-    /*  getchar :: -- <char from keyboard> (blocks until a key is pressed, and echos the character)
+    /*  getchar :: -- <char from keyboard> (blocks an entire line is entered, while echoing characters)
 
-     Note: this will only catch keypresses that occur after the instruction is executed. For
-     a responsive shell, the check will have to incorporated into the interpreter loop.
-     It might even need to be be checked more often than once per rib, since ribs
-     can take as long as hundreds of cycles.
+     Once a line is captured, multiple calls will return successive characters until all are
+     consumed. Then the next call will block again.
+
+     Note: this will only catch keypresses that occur after the instruction is executed.
      */
     function void handleGetchar() {
         var Array keyboard;
-        var int c;
+        var int c, underscore;
         var Array cursorAddr;
 
-        let keyboard = Jack.symbol("KEYBOARD");
-        let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+        if (~(bufferEnd > bufferStart)) {
+            let keyboard = Jack.symbol("KEYBOARD");
+            let underscore = 95;
 
-        let cursorAddr[0] = 0;
+            while ((bufferEnd = bufferStart) | ~(c = 10)) {
 
-        // First wait for the key to be different than the last call:
-        let c = keyboard[0];
-        while (c = lastKeyPressed) {
-            let c = keyboard[0];
-            let cursorAddr[0] = 95 - cursorAddr[0];
-        }
+                let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+                let cursorAddr[0] = 0;
 
-        // Now wait for any key to be pressed:
-        while (c = 0) {
-            let c = keyboard[0];
-            let cursorAddr[0] = 95 - cursorAddr[0];
-        }
+                // First wait for the key to be different than the last call/iteration:
+                let c = keyboard[0];
+                while (c = lastKeyPressed) {
+                    let cursorAddr[0] = underscore - cursorAddr[0];  // blink
+                    let c = keyboard[0];
+                }
 
-        let lastKeyPressed = c;
-        let cursorAddr[0] = c;
+                // Now wait for any key to be pressed:
+                while (c = 0) {
+                    let cursorAddr[0] = underscore - cursorAddr[0];  // blink
+                    let c = keyboard[0];
+                }
 
-        if (c = 128) {
-            // newline, in the weird HACK keymap
-            let cursorX = 0;
-            let cursorY = cursorY + 1;
-            let c = 10;
+                let lastKeyPressed = c;
+
+                if (c = 128) {
+                    // newline, in the weird HACK keymap
+
+                    // Clear the blicking cursor:
+                    let cursorAddr[0] = 0;
+
+                    //move the cursor to the next line:
+                    let cursorX = 0;
+                    let cursorY = cursorY + 1;
+
+                    // Map to regular newline
+                    let c = 10;
+
+                    // Add the
+                    let bufferEnd[0] = c;
+                    let bufferEnd = bufferEnd + 1;
+                }
+                else { if (c = 129) {
+                    // backspace
+                    if (bufferEnd > bufferStart) {
+                        // Clear the blinking cursor:
+                        let cursorAddr[0] = 0;
+
+                        // Move left and delete the last character from the buffer:
+                        let cursorX = cursorX - 1;
+                        let bufferEnd = bufferEnd - 1;
+                    }
+                }
+                else { if (cursorX < 80) {
+                    let cursorAddr[0] = c;
+                    let cursorX = cursorX + 1;
+                    let bufferEnd[0] = c;
+                    let bufferEnd = bufferEnd + 1;
+                }}}
+                // TODO: if we're at the bottom of the screen, scroll everything up
+            }
+
+            // An entire line has been captured; yield the first character and return:
+            do Interpreter.push(bufferStart[0]);
+            let bufferStart = bufferStart + 1;
+
+            return;
         }
         else {
-            let cursorX = cursorX + 1;
+            // Some characters were captured previously, so return the next in the sequence:
+            let c = bufferStart[0];
+            let bufferStart = bufferStart+1;
+            if (~(bufferStart < bufferEnd)) {
+                // No more characters after this; reset the buffer
+                let bufferStart = handlers - 80;
+                let bufferEnd = bufferStart;
+            }
+            do Interpreter.push(c);
+            return;
         }
-        // TODO: backspace?
-        // TODO: if we're at the bottom of the screen, scroll everything up
-
-        do Interpreter.push(c);
-
-        return;
     }
 
     /*  putchar :: c -- c (and draw the character at the current position) */
