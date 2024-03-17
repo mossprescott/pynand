@@ -1632,8 +1632,6 @@ class Translator(solved_07.Translator):
                 self.asm.instr("M=D")
 
     def handle_If(self, ast: If):
-        self.asm.comment("if...")
-
         if ast.when_false is None:
             # Awesome: when there's no else, and the condition is simple, it turns into a single branch.
             # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
@@ -1719,8 +1717,8 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
 
-        self.asm.start("return (from leaf)")
         if self.leaf_sub_args is not None:
+            self.asm.start("return (from leaf)")
             if self.leaf_sub_args > 0:
                 if self.leaf_sub_args == 1:
                     self.asm.comment("pop 1 argument")
