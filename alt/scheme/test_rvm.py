@@ -94,6 +94,26 @@ def test_mul_mixed_signs(run):
 
 
 @parameterize
+def test_quotient(run):
+    program = "(quotient 123 10)"
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [12]
+    assert output == []
+
+
+@parameterize
+def test_quotient_mixed_signs(run):
+    program = several("(quotient 6 -3)", "(quotient -14 -3)", "(* 21 -2)")
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [[-2, 4, -10]]
+    assert output == []
+
+
+@parameterize
 def test_if(run):
     program = "(if #t 42 '())"
 
@@ -368,7 +388,7 @@ def run_to_halt(program, interpreter, max_cycles=20000, simulator="codegen"):
     encoded = rvm.compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
-    instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, False)
+    instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, True)
 
     # asm = AssemblySource()
 
@@ -419,5 +439,7 @@ def run_to_halt(program, interpreter, max_cycles=20000, simulator="codegen"):
                 pc = inspect.peek(pc_loc)
                 print(f"  pc: {inspect.show_addr(pc)}")
                 print(f"  {inspect.show_instr(pc)}")
+
+    print(f"cycles: {cycles}")
 
     return (inspect, output)

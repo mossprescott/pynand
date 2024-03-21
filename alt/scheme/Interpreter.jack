@@ -883,7 +883,6 @@ class Interpreter {
      Does that mean it's good? Maybe, but it probably works.
      */
      function int divide(int x, int y) {
-        var int localX, localY;
         var boolean neg;
         var int q, r;
 
@@ -894,12 +893,12 @@ class Interpreter {
         // Get sign, then take absolute values (inline to save fn calls):
         // Note: testing each operand only once to minimize branching.
         let neg = false;
-        if (localY < 0) {
-            let localY = -localY;
+        if (y < 0) {
+            let y = -y;
             let neg = ~neg;
         }
-        if (localX < 0) {
-            let localX = -localX;
+        if (x < 0) {
+            let x = -x;
             let neg = ~neg;
         }
 
@@ -914,7 +913,7 @@ class Interpreter {
             let q = 0;
         }
         else {
-            let q = Interpreter.divide(x, y+y);
+            let q = Interpreter.dividePos(x, y+y);
         }
         let r = q+q;
         if (~((x - Interpreter.multiply(r, y)) < y)) {
@@ -927,6 +926,31 @@ class Interpreter {
         else {
             return r;
         }
+    }
+
+    /** Divide x by y, assuming both a positive. */
+    function int dividePos(int x, int y) {
+        var int q, r;
+
+        // No more bits to look at:
+        if (y > x) {
+            return 0;
+        }
+
+        // Try dividing by 2y:
+        if ((y+y) < 0) {
+            // If 2*y overflows, it's definitely > x.
+            let q = 0;
+        }
+        else {
+            let q = Interpreter.dividePos(x, y+y);
+        }
+        let r = q+q;
+        if (~((x - Interpreter.multiply(r, y)) < y)) {
+            let r = r + 1;
+        }
+
+        return r;
     }
 
     /** Allocate a rib on the heap, filling in the three fields. */
