@@ -154,12 +154,23 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
         elif trace_level >= TRACE_ALL:
             print(f"{cycles:3,d}: {computer.pc}")
 
+    def meters(computer, cycles):
+        inspector = Inspector(computer, symbols, stack_loc)
+        next_rib = unsigned(inspector.peek(next_rib_loc))
+        current_ribs = (next_rib - big.HEAP_BASE)//3
+        max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
+        return {
+            f"mem: {100*current_ribs/max_ribs:0.1f}%"
+        }
+
+
     big.run(program=instrs,
             simulator=simulator,
             name="Scheme",
             halt_addr=halt_loop_addr,
             trace=trace if trace_level > TRACE_NONE else None,
-            verbose_tty=verbose_tty)
+            verbose_tty=verbose_tty,
+            meters=meters)
 
 
 def compile(src):

@@ -321,7 +321,7 @@ CYCLE_INTERVAL = 1/1.0  # How often to update the cycle and frame counters; a bi
 CYCLES_PER_CALL = 100  # Number of cycles to run in the tight loop (when not tracing)
 
 
-def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True):
+def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="monaco-9", halt_addr=None, trace=None, verbose_tty=True, meters=None):
     """Run with keyboard and text-mode graphics."""
 
     # TODO: font
@@ -407,7 +407,8 @@ def run(program, chip=BigComputer, simulator="codegen", name="Flat!", font="mona
             cps = (cycles - last_cycle_count)/(now - last_cycle_time)
             msgs.append(f"{cps/1000:0,.1f}k/s")
             msgs.append(f"@{computer.pc}")
-            # TODO: let the caller add meters (e.g. Ribbit heap consumption)
+            if meters:
+                msgs.extend(meters(computer, cycles))
             pygame.display.set_caption(f"{name}: {'; '.join(msgs)}")
 
             last_cycle_time = now
