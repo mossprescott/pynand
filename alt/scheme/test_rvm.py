@@ -406,20 +406,6 @@ def run_to_halt(program, interpreter, max_cycles=200000, simulator="codegen"):
 
     instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, True)
 
-    # asm = AssemblySource()
-
-    # if interpreter == "assembly":
-    #     asm = rvm.asm_interpreter()
-    # elif interpreter == "jack":
-    #     asm = rvm.jack_interpreter()
-
-    # rvm.decode(encoded, asm)
-
-    # instrs, symbols, _ = big.assemble(asm.lines, min_static=None, builtins=rvm.BUILTINS)
-
-    # for k, v in symbols.items():
-    #     print(k, v)
-
     computer = nand.syntax.run(big.BigComputer, simulator=simulator)
 
     computer.init_rom(instrs)
