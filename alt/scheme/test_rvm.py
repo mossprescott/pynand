@@ -20,7 +20,7 @@ def parameterize(f):
     def codegen(chip, **args):
         return run_to_halt(chip, simulator="codegen", interpreter="assembly", **args)
     def jack(chip, **args):
-        return run_to_halt(chip, simulator="codegen", interpreter="jack", max_cycles=100000, **args)
+        return run_to_halt(chip, simulator="codegen", interpreter="jack", **args)
     return pytest.mark.parametrize("run", [vector, codegen, jack])(f)
 
 @parameterize
@@ -217,6 +217,18 @@ def test_tty(run):
     assert output == [ord('0')]
 
 
+@parameterize
+def test_eval(run):
+    with open("alt/scheme/ribbit/min.scm") as f:
+        lib = f.readlines()
+
+    program = "\n".join(lib + ["""(eval '(+ 1 2))"""])
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [3]
+    assert output == []
+
 
 #
 # Tests for specific primitives:
@@ -380,7 +392,7 @@ def several(*exprs):
     return "(define (cons $$x $$y) (rib $$x $$y 0))\n" + go(list(exprs))
 
 
-def run_to_halt(program, interpreter, max_cycles=20000, simulator="codegen"):
+def run_to_halt(program, interpreter, max_cycles=200000, simulator="codegen"):
     """Compile and run a Scheme program, then return a function for inspecting the RAM, and a
     list of words that were written to the TTY port.
     """
