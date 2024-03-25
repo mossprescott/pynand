@@ -109,7 +109,7 @@ class Inspector:
                 chars = self._obj(x, max_depth=y)
                 if len(chars) != y:
                     print(f"bad string: {chars, y, z}")
-                return repr("".join(chr(c) for c in chars))
+                return "".join(chr(c) for c in chars)
             elif z == 4:  # vector
                 elems = self._obj(x)
                 if not isinstance(elems, list) or len(elems) != y:
