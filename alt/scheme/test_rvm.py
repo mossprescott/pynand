@@ -13,15 +13,19 @@ from nand.vector import unsigned
 SHOW_ALL_LABELS = False
 
 
-# TODO: put this somewhere common:
 def parameterize(f):
-    def vector(chip, **args):
-        return run_to_halt(chip, simulator="vector", interpreter="assembly", **args)
-    def codegen(chip, **args):
-        return run_to_halt(chip, simulator="codegen", interpreter="assembly", **args)
-    def jack(chip, **args):
-        return run_to_halt(chip, simulator="codegen", interpreter="jack", **args)
-    return pytest.mark.parametrize("run", [vector, codegen, jack])(f)
+    def vector(program, **args):
+        return run_to_halt(program, simulator="vector", interpreter="jack", **args)
+    def codegen(program, **args):
+        return run_to_halt(program, simulator="codegen", interpreter="jack", **args)
+    def assembly(program, **args):
+        return run_to_halt(program, simulator="codegen", interpreter="assembly", **args)
+    return pytest.mark.parametrize("run", [vector, codegen, assembly])(f)
+
+
+def run_jack(program):
+    return run_to_halt(program=program, simulator="codegen", interpreter="jack")
+
 
 @parameterize
 def test_trivial(run):
@@ -93,21 +97,21 @@ def test_mul_mixed_signs(run):
     assert output == []
 
 
-@parameterize
-def test_quotient(run):
+# Note: not implemented in assembly
+def test_quotient():
     program = "(quotient 123 10)"
 
-    inspect, output = run(program)
+    inspect, output = run_jack(program)
 
     assert inspect.stack() == [12]
     assert output == []
 
 
-@parameterize
-def test_quotient_mixed_signs(run):
-    program = several("(quotient 6 -3)", "(quotient -14 -3)", "(* 21 -2)")
+# Note: not implemented in assembly
+def test_quotient_mixed_signs():
+    program = several("(quotient 6 -3)", "(quotient -14 -3)", "(quotient 21 -2)")
 
-    inspect, output = run(program)
+    inspect, output = run_jack(program)
 
     assert inspect.stack() == [[-2, 4, -10]]
     assert output == []
