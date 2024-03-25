@@ -43,6 +43,12 @@ local variables and expression evaluation, reserving the stack only for subrouti
 [alt/reduce.py](reduce.py) adds an optimization phase after parsing and before the normal compiler runs, which
 replaces certain function calls with lower-overhead "reduced" alternatives.
 
+
+## Alternative languages
+
+[alt/scheme](scheme/) provides a compiler and REPL for the Scheme language (circa R4RS), using the "big" architecture.
+
+
 ## Results
 
 | Location                         | Nands        | ROM size       | Cycles per frame | Cycles for init    |
