@@ -569,7 +569,7 @@ class SOC(Chip):
             size,  # @size (which is the address of this instruction)
             0b111_0_000000_000_111,  # JMP
         ]
-        self._rom = contents
+        self._rom[:len(contents)] = contents
         # TODO: surprisingly, this is not faster (no apparent effect):
         # self._rom = array.array('H', contents)
 
