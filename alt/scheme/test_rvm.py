@@ -293,7 +293,7 @@ def test_field0_set(run):
 
     inspect, output = run(program)
 
-    assert inspect.stack() == [([10, 8, 9], 10)]
+    assert inspect.stack() == [([10, 8, 9], 10, 0)]
     assert output == []
 
 
@@ -330,7 +330,7 @@ def test_field2_set(run):
 
     inspect, output = run(program)
 
-    assert inspect.stack() == [(11, 11)]
+    assert inspect.stack() == [(11, 11, 0)]
     assert output == []
 
 
