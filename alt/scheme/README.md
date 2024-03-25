@@ -7,8 +7,10 @@ Goals:
 - provide a REPL that can compile and run simple functions like `fib` or `fact` written at the
   keyboard
 - run something graphical (even if in character-mode)
-- implement as little as possible in assembly; just the bare interpreter and Ribbit primitives,
+- implement as little as possible in assembly/Jack; just the bare interpreter and Ribbit primitives,
   plus a few additions for accessing the hardware.
+
+![evaluating (+ 1 2)](capture.mov)
 
 
 ## Virtual Machine
@@ -38,8 +40,8 @@ character (if any).
 However, at present, characters can only be entered after `getchar` has been invoked. While in the
 loop receiving keypresses, a "blinking" underscore indicates the cursor position.
 This makes `getchar`/`putchar` unsuitable for non-terminal-oriented uses (i.e. games.) Instead, you
-can implement your own "keyDown" and "drawChar" operations (see [io.scm](io.scm)) using
-`(peek 4095)` and `(poke (screenAddr x y) c)`.
+can implement your own "keyDown" and "drawChar" operations using `(peek 4095)` and
+`(poke (screenAddr x y) c)` (see [io.scm](io.scm)).
 
 
 ## Memory Layout
