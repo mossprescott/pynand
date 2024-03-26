@@ -3,16 +3,20 @@ class Rib {
 
     /**
     TEMP: for now every rib pointer is definitely above ROM_BASE (4096), so any value smaller
-    than that is considered an un-boxed int. We'll also treat negative values in teh same range
+    than that is considered an un-boxed int. We'll also treat negative values in the same range
     as raw ints.
     This is all bogus. Need to implement a proper tagging scheme so we can use larger int values
     (i.e. 15 bits.)
     */
+    // TODO: get the compiler to inline this
     function boolean isRib(int obj) {
         return (obj < -4095) | (obj > 4095);
     }
 
-    method int x() {
-        return x;
-    }
+    // TODO: get the compiler to inline this, so we can actually afford to use it
+    // method int x() {
+    //     return x;
+    // }
+
+    // TODO: y(), z(), setX/Y/Z()?
 }

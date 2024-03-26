@@ -956,12 +956,30 @@ class Interpreter {
     /** Allocate a rib on the heap, filling in the three fields. */
     function Rib alloc(int x, int y, int z) {
         var Rib r;
+
+        // Note: makes this not a leaf function, but most callers have already inlined it anyway
+        do Interpreter.checkHeap();
+
         let r = nextRib;
         let r[0] = x;
         let r[1] = y;
         let r[2] = z;
         let nextRib = nextRib + 3;
         return r;
+    }
+
+    /**
+     Make sure there's space to allocate a rib, otherwise halt.
+
+     TODO: make space by collecting garbage.
+     */
+    function void checkHeap() {
+        if (~Rib.isRib(nextRib)) {
+            do Interpreter.halt();
+        }
+        else {
+            return;
+        }
     }
 
     function void push(int obj) {
