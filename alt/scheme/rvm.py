@@ -32,7 +32,7 @@ TRACE_ALL = 3
 """Log every CPU instruction (in addition to COARSE and FINE logging.)"""
 
 DEFAULT_PRINT_ASM = False
-DEFAULT_TRACE_LEVEL = TRACE_FINE
+DEFAULT_TRACE_LEVEL = TRACE_COARSE
 
 
 def run(program, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
