@@ -45,6 +45,7 @@ parser.add_argument("--no-waiting", action="store_true", help="(VM/Jack-only) su
 parser.add_argument("--max-fps", action="store", type=int, help="Experimental! (VM/Jack-only) pin the game loop to a fixed rate, approximately (in games that use Sys.wait).\nMay or may not work, depending on the translator.")
 # TODO: "--max-cps"; limit the clock speed directly. That will allow different chips to be compared (in a way).
 # TODO: "--headless" with no UI, with Keyboard and TTY connected to stdin/stdout
+parser.add_argument("--scale", action="store_true", help="Scale the display by a whole number multiplier to approximately fill the screen.")
 
 def main(platform=USER_PLATFORM):
     args = parser.parse_args()
@@ -62,7 +63,8 @@ def main(platform=USER_PLATFORM):
         src_map=src_map if args.trace else None,
         is_in_wait=in_function_pred(None if args.no_waiting else wait_addresses),
         max_fps=args.max_fps,
-        is_in_halt=in_function_pred(halt_addresses))
+        is_in_halt=in_function_pred(halt_addresses),
+        scale=args.scale)
 
 
 def load(platform, path, print_asm=False, no_waiting=False):
@@ -166,16 +168,17 @@ Not sure
 """
 
 class KVM:
-    def __init__(self, title, width, height):
+    def __init__(self, title, width, height, scale=False):
         self.width = width
         self.height = height
 
         pygame.init()
 
         flags = 0
-        # flags = pygame.FULLSCREEN
-        # pygame.SCALED requires 2.0.0
-        flags |= pygame.SCALED
+        # flags |= pygame.FULLSCREEN
+        if scale:
+            # pygame.SCALED requires 2.0.0
+            flags |= pygame.SCALED
         self.screen = pygame.display.set_mode((width, height), flags=flags)
         pygame.display.set_caption(title)
 
@@ -224,11 +227,11 @@ class KVM:
         pygame.display.flip()
 
 
-def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wait=(lambda _: False), max_fps=None, is_in_halt=(lambda _: False)):
+def run(program, chip, name="Nand!", simulator="codegen", src_map=None, is_in_wait=(lambda _: False), max_fps=None, is_in_halt=(lambda _: False), scale=False):
     computer = nand.syntax.run(chip, simulator=simulator)
     computer.init_rom(program)
 
-    kvm = KVM(name, 512, 256)
+    kvm = KVM(name, 512, 256, scale=scale)
 
     last_cycle_time = last_event_time = last_display_time = last_frame_time = now = time.monotonic()
     was_in_sys_wait = False
