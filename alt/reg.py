@@ -46,7 +46,7 @@ Two additional primitives are provided, to support dynamic dispatch (that is, st
 of a function or method and invoking it later):
 
 - Jack.symbol(<string>): address of the given label.
-- Jack.invoke(ptr, ...): call the function/method referred to by the pointer.
+- Jack.invoke(ptr): call the function/method referred to by the pointer.
 
 For example, this code sequence:
 
@@ -54,13 +54,13 @@ For example, this code sequence:
 var int fptr;  // the type doesn't matter
 let fooPtr = Jack.symbol("main.foo");
 ...
-do Jack.invoke(fooPtr, "bar");
+do Jack.invoke(fooPtr);
 ```
 
 has the same effect as this simple call:
 
 ```
-do Main.foo("bar");
+do Main.foo();
 ```
 """
 
@@ -88,7 +88,7 @@ Possibly makes tracing/debugging confusing or useless in these functions.
 PRINT_LIVENESS = False
 """Print each function before assigning variables to registers.
 Each statement is annotated with the set of variables which are 'live' at the beginning of
-that statement. A live variable contains a value that will be used later; it must nt be overwritten
+that statement. A live variable contains a value that will be used later; it must not be overwritten
 at that point."""
 
 PRINT_IR = True
@@ -101,7 +101,7 @@ of work for which code can be generated directly.
 # IR
 #
 # A simplified AST for statements and expressions:
-# - no expressions; each statement does a single calculation
+# - no nested expressions; each statement does a single calculation
 # - if and while are still here, to simplify control-flow analysis
 # - separate representations for local variables, which are not at first assigned to a specific
 #     location, and other variables, for which the location is fixed in the symbol table.
