@@ -91,7 +91,7 @@ Each statement is annotated with the set of variables which are 'live' at the be
 that statement. A live variable contains a value that will be used later; it must not be overwritten
 at that point."""
 
-PRINT_IR = True
+PRINT_IR = False
 """Print each function immediately before emitting code.
 Variables have been assigned to concrete locations, and each statement represents a unit
 of work for which code can be generated directly.
