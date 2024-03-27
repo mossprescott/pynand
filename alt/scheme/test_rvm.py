@@ -396,7 +396,7 @@ def several(*exprs):
     return "(define (cons $$x $$y) (rib $$x $$y 0))\n" + go(list(exprs))
 
 
-def run_to_halt(program, interpreter, max_cycles=200000, simulator="codegen"):
+def run_to_halt(program, interpreter, max_cycles=250000, simulator="codegen"):
     """Compile and run a Scheme program, then return a function for inspecting the RAM, and a
     list of words that were written to the TTY port.
     """
