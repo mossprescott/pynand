@@ -8,6 +8,7 @@
 ;; screen buffer memory faster than interpreted schems could and without allocation.
 
 
+(define peek (rib 20 0 1))
 (define poke (rib 21 0 1))
 
 ;; (define screen 2048)

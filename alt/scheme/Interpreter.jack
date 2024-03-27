@@ -298,7 +298,7 @@ class Interpreter {
         return;
     }
 
-    /* arg1 :: x y -- x")  # i.e. "drop" */
+    /* arg1 :: x y -- x)  # i.e. "drop" */
     function void handleArg1() {
         let stack = stack[1];
 
@@ -664,22 +664,33 @@ class Interpreter {
         return;
     }
 
-    /*  peek :: x -- RAM[x] */
-    function void handlePeek() {
-        var int x, y, z;
-        var Rib tmp;
+    /*  peek :: x -- RAM[x]
 
-        // TODO
-        do Interpreter.halt();
+     Note: the address is limited to the range of (tagged) int. It certainly can address low RAM,
+     including the screen buffer and the location for the keyboard/TTY.
+     */
+    function void handlePeek() {
+        var int x;
+        var Array tmp;
+
+        let tmp = 0;
+
+        let x = stack[0];
+        let stack[0] = tmp[x];
+
+        return;
     }
 
-    /*  poke :: x y -- y (and write the value y at RAM[x]) */
-    function void handlePoke() {
+    /*  poke :: x y -- y (and write the value y at RAM[x])
+
+     Note: the address is limited to the range of (tagged) int. It certainly can address low RAM,
+     including the screen buffer and the location for the keyboard/TTY.
+    */
+   function void handlePoke() {
         var int y;
         var Array tmp;
 
         // Note: one rib becomes garbage:
-        // TODO: inline it
         // let y = Interpreter.pop();
         let y = stack[0];
         let stack = stack[1];
