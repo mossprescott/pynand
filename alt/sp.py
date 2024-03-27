@@ -252,11 +252,17 @@ class Translator(solved_07.Translator):
         self.asm.instr("M=D")
 
     def _push_d(self):
-        # TODO: no need for this as soon as everything's switched to use SP++ directly
+        """Push the value in D. When the value came from memory, it still needs to be stored in D
+        temporarily so the push op can access the bus. So the superclass's implementation will
+        use this one-cycle push sequence, and there's no need to re-implement those operarations
+        here."""
         self.asm.instr("SP++=D")
 
     def _pop_d(self):
-        # TODO: no need for this as soon as everything's switched to use --SP directly?
+        """Pop the top of the statck to D. When the value will be written to memory, it still
+        needs to be stored in D temporarily so the pop op can access the bus. So the superclass's
+        implementation will use this one-cycle pop sequence, and there's no need to re-implement
+        those operarations here."""
         self.asm.instr("D=--SP")
 
     def _binary(self, opcode, op):
@@ -386,6 +392,8 @@ class Translator(solved_07.Translator):
 
 
     # TODO: improve the common sequence for `return`.
+    # That would save one cycle per word of saved state per call, but minimal ROM space, since
+    # the sequence is shared.
 
 
     def finish(self):

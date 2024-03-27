@@ -30,7 +30,7 @@ implementations.
 
 Other differences:
 
-- Subroutine results are stored in r0 (aka @5)
+- Subroutine results are stored in @12 (aka r7)
 - Return addresses are stored at @4 (aka THAT)
 - Each call site just pushes arguments, stashes the return address and then jumps to the "function"
     address. It's up to each function to do any saving of registers and adjustment of the stack
@@ -39,8 +39,29 @@ Other differences:
 
 These changes mean that the debug/trace logging done by some test cases doesn't always show the
 correct arguments, locals, return addresses, and result values.
+
+Extensions:
+
+Two additional primitives are provided, to support dynamic dispatch (that is, storing the address
+of a function or method and invoking it later):
+
+- Jack.symbol(<string>): address of the given label.
+- Jack.invoke(ptr): call the function referred to by the pointer.
+
+For example, this code sequence:
+
+    var int fooPtr;  // the type doesn't matter
+    let fooPtr = Jack.symbol("main.foo");
+    ...
+    do Jack.invoke(fooPtr);
+
+has the same effect as this simple call:
+
+    do Main.foo();
 """
 
+
+from collections import Counter
 import itertools
 from os import name
 from typing import Dict, Generic, List, NamedTuple, Optional, Sequence, Set, Tuple, TypeVar, Union
@@ -52,10 +73,31 @@ from nand.solutions import solved_07, solved_11
 from nand.solutions.solved_11 import SymbolTable, VarKind
 
 
+OPTIMIZE_LEAF_FUNCTIONS = True
+"""If True, a simpler call/return sequence is used for functions that do not need to manipulate the
+stack (because they don't call any subroutines).
+Saves ~30 instructions per leaf function in ROM, plus another ~30 at runtime. For small functions like
+Math.min/max/abs, this might save ~50% of the space and ~70% of the time.
+Possibly makes tracing/debugging confusing or useless in these functions.
+"""
+
+PRINT_LIVENESS = False
+"""Print each function before assigning variables to registers.
+Each statement is annotated with the set of variables which are 'live' at the beginning of
+that statement. A live variable contains a value that will be used later; it must not be overwritten
+at that point."""
+
+PRINT_IR = False
+"""Print each function immediately before emitting code.
+Variables have been assigned to concrete locations, and each statement represents a unit
+of work for which code can be generated directly.
+"""
+
+
 # IR
 #
 # A simplified AST for statements and expressions:
-# - no expressions; each statement does a single calculation
+# - no nested expressions; each statement does a single calculation
 # - if and while are still here, to simplify control-flow analysis
 # - separate representations for local variables, which are not at first assigned to a specific
 #     location, and other variables, for which the location is fixed in the symbol table.
@@ -76,7 +118,7 @@ from nand.solutions.solved_11 import SymbolTable, VarKind
 
 class Eval(NamedTuple):
     """Evaluate an expression and store the result somewhere."""
-    dest: "Local"
+    dest: "Local"  # Actually Reg or Static after rewriting
     expr: "Expr"
 
 class IndirectWrite(NamedTuple):
@@ -85,7 +127,7 @@ class IndirectWrite(NamedTuple):
     value: "Value"
 
 class Store(NamedTuple):
-    """Store a value to a location identified by segment and index."""
+    """Store a value to a location identified by segment and index (i.e. argument or local)."""
     location: "Location"
     value: "Value"
 
@@ -104,8 +146,8 @@ class While(NamedTuple):
     body: Sequence["Stmt"]
 
 class Return(NamedTuple):
-    """Evaluate expr, store the value in the "RESULT" register, and return to the caller."""
-    expr: "Expr"
+    """Evaluate expr (if present), store the value in the "RESULT" register, and return to the caller."""
+    expr: Optional["Expr"]
 
 class Push(NamedTuple):
     """Used only with Subroutine calls. Acts like Eval, but the destination is the stack."""
@@ -113,7 +155,7 @@ class Push(NamedTuple):
 
 class Discard(NamedTuple):
     """Call a subroutine, then pop the stack, discarding the result."""
-    expr: "CallSub"
+    expr: Union["CallSub", "Invoke"]
 
 Stmt = Union[Eval, IndirectWrite, Store, If, While, Push, Discard]
 
@@ -134,10 +176,10 @@ class Local(NamedTuple):
     name: str  # TODO: parameterize, so we can annotate, etc.?
 
 class Location(NamedTuple):
-    """A location identified by segment and index."""
+    """A location identified by segment (argument/local) and index."""
     kind: VarKind
     idx: int
-    name: str  # include for debugging purposes
+    name: str  # For debugging
 
 class Reg(NamedTuple):
     """A variable which is local the the subroutine scope, does not need to persist
@@ -145,7 +187,17 @@ class Reg(NamedTuple):
     idx: int
     name: str  # include for debugging purposes
 
-Value = Union[Const, Local, Reg]
+class Static(NamedTuple):
+    """A static variable; just as efficient to access as Reg."""
+    name: str
+
+class Temp(NamedTuple):
+    """Pseudo-register location used when we know a variable is live only between adjacent
+    instructions, and it's safe to simply store it in D."""
+    name: str  # for debugging
+
+
+Value = Union[Const, Local, Reg, Static]
 """A value that's eligible to be referenced in any statement or expression."""
 
 class Binary(NamedTuple):
@@ -161,7 +213,18 @@ class IndirectRead(NamedTuple):
     """Get the value given an address, aka peek()."""
     address: "Value"
 
-Expr = Union[CallSub, Const, Local, Location, Reg, Binary, Unary, IndirectRead]
+# Extensions:
+
+class Symbol(NamedTuple):
+    """Address of an arbitrary symbol."""
+    name: str
+
+class Invoke(NamedTuple):
+    """Call a subroutine given the address of its entry point."""
+    ptr: "Value"
+    # numArgs?
+
+Expr = Union[CallSub, Const, Local, Location, Reg, Static, Binary, Unary, IndirectRead, Symbol, Invoke]
 
 
 class Subroutine(NamedTuple):
@@ -209,12 +272,14 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     elif ast.kind == "constructor":
         this_expr = next_var("this")
 
-    def resolve_name(name: str) -> Union[Local, Location]:
+    def resolve_name(name: str) -> Union[Local, Location, Static]:
         # TODO: this makes sense for locals, arguments, and statics, but "this" needs to get flattened.
         # How to deal with that?
         kind = symbol_table.kind_of(name)
         if kind == "local":
             return Local(name)
+        elif kind == "static":
+            return Static(name)
         else:
             index = symbol_table.index_of(name)
             return Location(kind, index, name)
@@ -226,6 +291,12 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 if isinstance(loc, Local):
                     expr_stmts, expr = flatten_expression(stmt.expr, force=False)
                     let_stmt = Eval(dest=loc, expr=expr)
+                    return expr_stmts + [let_stmt]
+                elif isinstance(loc, Static):
+                    # Note: writing to a static is simple (no need to generate target address), so the
+                    # RHS doesn't need to be in a register.
+                    expr_stmts, expr = flatten_expression(stmt.expr, force=False)
+                    let_stmt = Eval(loc, expr)
                     return expr_stmts + [let_stmt]
                 elif loc.kind == "this":
                     if isinstance(this_expr, Local):
@@ -278,7 +349,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
                 stmts, expr = flatten_expression(stmt.expr, force=False)
                 return stmts + [Return(expr)]
             else:
-                return [Return(Const(0))]
+                return [Return(None)]
 
         else:
             raise Exception(f"Unknown statement: {stmt}")
@@ -288,35 +359,34 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         preparing a value to be compared with zero.
         """
 
-        # Collapse simple negated conditions:
-        if isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
-            if isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "<":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op(">="), expr.expr.right)
-            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == ">":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("<="), expr.expr.right)
-            elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "=":
-                expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("!="), expr.expr.right)
+        # First apply AST-level simplification, which reduces the number of possible shapes:
+        expr = simplify_expression(expr)
 
         # Collapse anything that's become a comparison between two values:
         if isinstance(expr, jack_ast.BinaryExpression) and expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
             if expr.right == jack_ast.IntegerConstant(0):
                 left_stmts, left_value = flatten_expression(expr.left)
                 return left_stmts, left_value, expr.op.symbol
-            elif expr.left == jack_ast.IntegerConstant(0):
-                right_stmts, right_value = flatten_expression(expr.right)
-                return right_stmts, right_value, negate_cmp(expr.op.symbol)
             else:
                 left_stmts, left_value = flatten_expression(expr.left)
                 right_stmts, right_value = flatten_expression(expr.right)
                 diff_var = next_var()
                 diff_stmt = Eval(diff_var, Binary(left_value, jack_ast.Op("-"), right_value))
                 return left_stmts + right_stmts + [diff_stmt], diff_var, expr.op.symbol
+        elif isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
+            expr_stmts, expr_value = flatten_expression(expr.expr)
+            return expr_stmts, expr_value, "="
         else:
             expr_stmts, expr_value = flatten_expression(expr)
             return expr_stmts, expr_value, "!="
 
+
     def negate_cmp(cmp: Cmp) -> Cmp:
+        """Negate the value."""
         return {"<": ">=", ">": "<=", "=": "!=", "<=": ">", ">=": "<", "!=": "="}[cmp]
+    def invert_cmp(cmp: Cmp) -> Cmp:
+        """Reverse the operand order."""
+        return {"<": ">", ">": "<", "=": "=", "<=": ">=", ">=": "<=", "!=": "!="}[cmp]
 
     def flatten_expression(expr: jack_ast.Expression, force=True) -> Tuple[List[Stmt], Expr]:
         """Reduce an expression to something that's definitely trivial, possibly preceded
@@ -326,6 +396,8 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
         or a local.) If not, it may be an expression which can only appear as the right-hand side
         of Eval or Push.
         """
+
+        expr = simplify_expression(expr)
 
         if isinstance(expr, jack_ast.IntegerConstant):
             return [], Const(expr.value)
@@ -345,7 +417,7 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
 
         elif isinstance(expr, jack_ast.VarRef):
             loc = resolve_name(expr.name)
-            if isinstance(loc, Local):
+            if isinstance(loc, (Local, Static)):
                 return [], loc  # Never wrapped
             elif loc.kind == "this":
                 if isinstance(this_expr, Local):
@@ -394,42 +466,43 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
             flat_expr = IndirectRead(address_expr)
 
         elif isinstance(expr, jack_ast.SubroutineCall):
-            pairs = [flatten_expression(a, force=False) for a in expr.args]
-            arg_stmts = [s for ss, x in pairs for s in ss + [Push(x)]]
-            if expr.class_name is not None:
-                stmts = arg_stmts
-                flat_expr = CallSub(expr.class_name, expr.sub_name, len(expr.args))
-            elif expr.var_name is not None:
-                instance_stmts, instance_expr = flatten_expression(jack_ast.VarRef(expr.var_name), force=False)
-                stmts = instance_stmts + [Push(instance_expr)] + arg_stmts
-                target_class = symbol_table.type_of(expr.var_name)
-                flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+            if expr.class_name == "Jack" and expr.sub_name == "symbol":
+                assert len(expr.args) == 1 and isinstance(expr.args[0], jack_ast.StringConstant)
+                stmts = []
+                flat_expr = Symbol(expr.args[0].value)
+
+            elif expr.class_name == "Jack" and expr.sub_name == "invoke":
+                # TODO: handle arguments, when someone needsw them
+                assert len(expr.args) == 1
+                target_stmts, target_expr = flatten_expression(expr.args[0])
+                stmts = target_stmts
+                flat_expr = Invoke(target_expr)
+
             else:
-                stmts = [Push(this_expr)] + arg_stmts
-                target_class = symbol_table.class_name
-                flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+                pairs = [flatten_expression(a, force=False) for a in expr.args]
+                arg_stmts = [s for ss, x in pairs for s in ss + [Push(x)]]
+                if expr.class_name is not None:
+                    stmts = arg_stmts
+                    flat_expr = CallSub(expr.class_name, expr.sub_name, len(expr.args))
+                elif expr.var_name is not None:
+                    instance_stmts, instance_expr = flatten_expression(jack_ast.VarRef(expr.var_name), force=False)
+                    stmts = instance_stmts + [Push(instance_expr)] + arg_stmts
+                    target_class = symbol_table.type_of(expr.var_name)
+                    flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
+                else:
+                    stmts = [Push(this_expr)] + arg_stmts
+                    target_class = symbol_table.class_name
+                    flat_expr = CallSub(target_class, expr.sub_name, len(expr.args) + 1)
 
         elif isinstance(expr, jack_ast.BinaryExpression):
-            # TODO: this transformation is the same as the standard compiler; share that code?
-            if expr.op.symbol == "*":
-                return flatten_expression(jack_ast.SubroutineCall("Math", None, "multiply", [expr.left, expr.right]), force=force)
-            elif expr.op.symbol == "/":
-                return flatten_expression(jack_ast.SubroutineCall("Math", None, "divide", [expr.left, expr.right]), force=force)
-            else:
-                left_stmts, left_expr = flatten_expression(expr.left)
-                right_stmts, right_expr = flatten_expression(expr.right)
-                stmts = left_stmts + right_stmts
-                flat_expr = Binary(left_expr, expr.op, right_expr)
+            left_stmts, left_expr = flatten_expression(expr.left)
+            right_stmts, right_expr = flatten_expression(expr.right)
+            stmts = left_stmts + right_stmts
+            flat_expr = Binary(left_expr, expr.op, right_expr)
 
         elif isinstance(expr, jack_ast.UnaryExpression):
             stmts, child_expr = flatten_expression(expr.expr)
-            if isinstance(child_expr, Const) and expr.op.symbol == "-":
-                # This is ok because this VM handles negative constant values
-                flat_expr = Const(-child_expr.value)
-            # elif isinstance(child_expr, Const) and expr.op.symbol == "~":
-                # TODO: figure out how to evaluate logical negation at compile time, accounting for word size...
-            else:
-                flat_expr = Unary(expr.op, child_expr)
+            flat_expr = Unary(expr.op, child_expr)
         else:
             raise Exception(f"Unknown expression: {expr}")
 
@@ -461,6 +534,85 @@ def flatten_subroutine(ast: jack_ast.SubroutineDec, symbol_table: SymbolTable) -
     num_args = symbol_table.count("argument")
     num_vars = None  # bogus, but this isn't meaningful until the next phase anyway
     return Subroutine(ast.name, num_args, num_vars, statements)
+
+
+def simplify_expression(expr: jack_ast.Expression) -> jack_ast.BinaryExpression:
+    """Reduce/canonicalize conditions to a more regular form:
+
+    Replace * and / expressions with calls to multiply/divide.
+
+    For comparison expressions:
+    - if there's a constant, it's on the right
+    - if the constant can be re-written to 0, it is
+    - flatten negated conditions and negative integer constants
+    """
+
+    if isinstance(expr, jack_ast.UnaryExpression) and expr.op.symbol == "~":
+        if isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "<":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op(">="), expr.expr.right)
+        elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == ">":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("<="), expr.expr.right)
+        elif isinstance(expr.expr, jack_ast.BinaryExpression) and expr.expr.op.symbol == "=":
+            expr = jack_ast.BinaryExpression(expr.expr.left, jack_ast.Op("!="), expr.expr.right)
+
+    def simplify_constant(x: jack_ast.Expression) -> Optional[int]:
+        """If possible, reduce the expression to a (possibly negative) constant."""
+        if isinstance(x, jack_ast.UnaryExpression) and x.op.symbol == "-" and isinstance(x.expr, jack_ast.IntegerConstant):
+            return -x.expr.value
+        elif isinstance(x, jack_ast.IntegerConstant):
+            return x.value
+        else:
+            return None
+
+    if isinstance(expr, jack_ast.BinaryExpression):
+        left = simplify_expression(expr.left)
+        right = simplify_expression(expr.right)
+
+        # TODO: this transformation is the same as the standard compiler; share that code?
+        if expr.op.symbol == "*":
+            return jack_ast.SubroutineCall("Math", None, "multiply", [left, right])
+        elif expr.op.symbol == "/":
+            return jack_ast.SubroutineCall("Math", None, "divide", [left, right])
+        elif expr.op.symbol in ("<", ">", "=", "<=", ">=", "!="):
+            def invert_cmp(cmp: Cmp) -> Cmp:
+                """Reverse the operand order."""
+                return {"<": ">", ">": "<", "=": "=", "<=": ">=", ">=": "<=", "!=": "!="}[cmp]
+
+            simple_left = simplify_constant(expr.left)
+            simple_right = simplify_constant(expr.right)
+
+            if simple_left is not None and simple_right is None:
+                # Constant on the left; reverse the order:
+                return simplify_expression(jack_ast.BinaryExpression(expr.right,
+                                                                    jack_ast.Op(invert_cmp(expr.op.symbol)),
+                                                                    expr.left))
+            elif simple_right is not None:
+                # Constant on the right; match some common cases:
+                # The idea is to compare with 0 whenever possible, because that's what the chip
+                # actually provides directly.
+                zero = jack_ast.IntegerConstant(0)
+                if expr.op.symbol == "<" and simple_right == 1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op("<="), zero)
+                elif expr.op.symbol == ">=" and simple_right == 1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op(">"), zero)
+                elif expr.op.symbol == ">" and simple_right == -1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op(">="), zero)
+                elif expr.op.symbol == "<=" and simple_right == -1:
+                    return jack_ast.BinaryExpression(expr.left, jack_ast.Op("<"), zero)
+                else:
+                    return jack_ast.BinaryExpression(expr.left,
+                                                    expr.op,
+                                                    jack_ast.IntegerConstant(simple_right))
+        else:
+            return jack_ast.BinaryExpression(left, expr.op, right)
+
+    elif (isinstance(expr, jack_ast.UnaryExpression)
+          and expr.op.symbol == "-"
+          and isinstance(expr.expr, jack_ast.IntegerConstant)):
+        return jack_ast.IntegerConstant(-expr.expr.value)
+
+    # Nothing matched:
+    return expr
 
 
 class LiveStmt(NamedTuple):
@@ -540,7 +692,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         if len(test_liveness) > 0:
             live_at_test_start = test_liveness[0].before
         else:
-            live_at_test_start = live_at_body_start
+            live_at_test_start = live_at_test_end
 
         stmt = While(test_liveness, stmt.value, stmt.cmp, body_liveness)
         live = live_at_test_start
@@ -584,7 +736,7 @@ def analyze_liveness(stmts: Sequence[Stmt], live_at_end: Set[str] = set()) -> Li
         elif isinstance(stmt, Push):
             read.update(refs(stmt.expr))
         elif isinstance(stmt, Discard):
-            pass
+            read.update(refs(stmt.expr))
         else:
             raise Exception(f"Unknown statement: {stmt}")
 
@@ -607,6 +759,8 @@ def refs(expr: Expr) -> Set[str]:
         return refs(expr.value)
     elif isinstance(expr, IndirectRead):
         return refs(expr.address)
+    elif isinstance(expr, Invoke):
+        return refs(expr.ptr)
     else:
         return set()
 
@@ -620,8 +774,8 @@ def need_saving(liveness: Sequence[LiveStmt]) -> Set[str]:
 
     result = set()
     for l in liveness:
-        if isinstance(l.statement, (Eval, Push, Discard)) and isinstance(l.statement.expr, CallSub):
-            result.update(l.before)
+        if isinstance(l.statement, (Eval, Push, Discard)) and isinstance(l.statement.expr, (CallSub, Invoke)):
+            result.update(l.during)
         elif isinstance(l.statement, If):
             result.update(need_saving(l.statement.when_true))
             if l.statement.when_false is not None:
@@ -658,7 +812,7 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             return [], value
 
     def rewrite_expr(expr: Expr) -> Tuple[List[Stmt], Expr]:
-        if isinstance(expr, (CallSub, Const, Location)):
+        if isinstance(expr, (CallSub, Const, Location, Static)):
             return [], expr
         elif isinstance(expr, Local):
             if expr in map:
@@ -675,6 +829,11 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
         elif isinstance(expr, IndirectRead):
             stmts, address = rewrite_value(expr.address)
             return stmts, IndirectRead(address)
+        elif isinstance(expr, Symbol):
+            return [], expr
+        elif isinstance(expr, Invoke):
+            stmts, ptr = rewrite_value(expr.ptr)
+            return stmts, Invoke(ptr)
         else:
             raise Exception(f"Unknown Expr: {expr}")
 
@@ -707,13 +866,17 @@ def promote_locals(stmts: Sequence[Stmt], map: Dict[Local, Location], prefix: st
             body = rewrite_statements(stmt.body)
             return [While(test + value_stmts, value, stmt.cmp, body)]
         elif isinstance(stmt, Return):
-            value_stmts, value = rewrite_expr(stmt.expr)
-            return value_stmts + [Return(value)]
+            if stmt.expr is not None:
+                value_stmts, value = rewrite_expr(stmt.expr)
+                return value_stmts + [Return(value)]
+            else:
+                return [Return(None)]
         elif isinstance(stmt, Push):
             expr_stmts, expr = rewrite_expr(stmt.expr)
             return expr_stmts + [Push(expr)]
         elif isinstance(stmt, Discard):
-            return [stmt]
+            expr_stmts, expr = rewrite_expr(stmt.expr)
+            return expr_stmts + [Discard(expr)]
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
@@ -838,24 +1001,24 @@ def color_locals(liveness: Sequence[LiveStmt]) -> List[Set[Local]]:
     return color_sets
 
 
-def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]:
+def resolve_locals(stmts: Sequence[Stmt], map: Dict[Local, V], fail_on_unmapped=True) -> List[Stmt]:
     """Rewrite statements and expressions, updating references to locals to refer to the given
-    registers. If any local is not accounted for, fail.
+    registers. If fail_on_unmapped and any local is not accounted for, fail.
     """
 
     def rewrite_value(value: Value) -> Value:
-        if isinstance(value, Local):
-            # TODO: a more informative error
+        if value in map:
             return map[value]
+        elif fail_on_unmapped and isinstance(value, Local):
+            raise Exception(f"No assignment for local: {value}")
         else:
             return value
 
     def rewrite_expr(expr: Expr) -> Expr:
-        if isinstance(expr, (CallSub, Const, Location)):
+        if isinstance(expr, (CallSub, Const, Location, Static, Temp)):
             return expr
         elif isinstance(expr, Local):
-            # TODO: a more informative error
-            return map[expr]
+            return rewrite_value(expr)
         elif isinstance(expr, Binary):
             left_value = rewrite_value(expr.left)
             right_value = rewrite_value(expr.right)
@@ -866,6 +1029,11 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
         elif isinstance(expr, IndirectRead):
             address = rewrite_value(expr.address)
             return IndirectRead(address)
+        elif isinstance(expr, Symbol):
+            return expr
+        elif isinstance(expr, Invoke):
+            ptr = rewrite_value(expr.ptr)
+            return Invoke(ptr)
         else:
             raise Exception(f"Unknown Expr: {expr}")
 
@@ -879,7 +1047,6 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             value = rewrite_value(stmt.value)
             return IndirectWrite(address, value)
         elif isinstance(stmt, Store):
-            # print(f"rewrite Store: {stmt}")
             value = rewrite_value(stmt.value)
             return Store(stmt.location, value)
         elif isinstance(stmt, If):
@@ -893,13 +1060,14 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
             body = rewrite_statements(stmt.body)
             return While(test, value, stmt.cmp, body)
         elif isinstance(stmt, Return):
-            value = rewrite_expr(stmt.expr)
+            value = rewrite_expr(stmt.expr) if stmt.expr is not None else None
             return Return(value)
         elif isinstance(stmt, Push):
             expr = rewrite_expr(stmt.expr)
             return Push(expr)
         elif isinstance(stmt, Discard):
-            return stmt
+            expr = rewrite_expr(stmt.expr)
+            return Discard(expr)
         else:
             raise Exception(f"Unknown Stmt: {stmt}")
 
@@ -912,6 +1080,141 @@ def lock_down_locals(stmts: Sequence[Stmt], map: Dict[Local, Reg]) -> List[Stmt]
     return rewrite_statements(stmts)
 
 
+def find_transients(stmts: Sequence[LiveStmt]) -> Set[str]:
+    """Identify Locals that exist only to carry a result between a pair of adjacent statements,
+    where the code generator is able to keep the value in D:
+    - live only in one statement (i.e. assigned in one, then used in the next)
+    - the statement that uses it doesn't need to overwrite D
+    """
+
+    counts = Counter()
+
+    def count_stmt(s: LiveStmt):
+        for l in s.before: counts[l] += 1
+        if isinstance(s.statement, If):
+            for cs in s.statement.when_true: count_stmt(cs)
+            for cs in s.statement.when_false or []: count_stmt(cs)
+        elif isinstance(s.statement, While):
+            for cs in s.statement.test: count_stmt(cs)
+            for cs in s.statement.body: count_stmt(cs)
+            # Tricky: the value's refs aren't represented in LiveStmt
+            for l in refs(s.statement.value):
+                counts[l] += 1
+
+    for s in stmts: count_stmt(s)
+
+    # Candidate locals: live only in a single statement, the one where they're used
+    one_time = { l for (l, x) in counts.items() if x == 1 }
+
+    # Try re-writing the statement where the var is used:
+    def visit_stmts(l: Local, stmts: Sequence[LiveStmt]) -> bool:
+        return any (visit_stmt(l, s) for s in stmts)
+
+    def visit_stmt(l: Local, stmt: LiveStmt) -> bool:
+        if isinstance(stmt.statement, If):
+            if l in refs(stmt.statement.value): return True
+            elif any(visit_stmt(l, s) for s in stmt.statement.when_true): return True
+            elif (stmt.statement.when_false is not None
+                    and any(visit_stmt(l, s) for s in stmt.statement.when_false)): return True
+        elif isinstance(stmt.statement, While):
+            if l in refs(stmt.statement.value): return True
+            elif any(visit_stmt(l, s) for s in stmt.statement.test): return True
+            elif any(visit_stmt(l, s) for s in stmt.statement.body): return True
+        elif l in stmt.before:
+            # Tricky: this little hack fails if the stmt is nested, so we just don't do this path
+            # if it's If/While
+            rewritten, = resolve_locals([stmt.statement], { Local(l): Temp(l) }, fail_on_unmapped=False)
+            return is_translatable(rewritten)
+        else:
+            return False
+
+    # FIXME: this is patently O(n^2). Fix that by constructing a map of one-time locals to the
+    # statements that use them, and then only inspect those.
+    return { l for l in one_time if visit_stmts(l, stmts) }
+
+
+def is_translatable(stmt: Stmt) -> bool:
+    """True if the statement can be translated to assembly without disturbing Temp values stored in D.
+    The statement may contain unresolved Locals; they are assumed to represent Reg locations that
+    will be assigned later.
+
+    Note: If/While aren't handled here, because a) their test values are always transient
+    """
+
+    def translatable_expr(expr: Expr) -> bool:
+        if isinstance(expr, CallSub):
+            raise Exception("silly question: a CallSub can't refer to a one-time (or any) local")
+        elif isinstance(expr, Const):
+            # A constant should never in and of itself require D to be overwritten.
+            return True
+        elif isinstance(expr, (Local, Reg, Static)):
+            # These are all places values can be accessed from without touching D
+            return True
+        elif isinstance(expr, Temp):
+            # The temp location itself is trivially ok
+            return True
+        elif isinstance(expr, Location):
+            # Accessing a stack-allocated variable may involve overwriting D
+            return False
+        elif isinstance(expr, Binary):
+            # Tricky: a binary expression can take one or both of its arguments from D, in some cases.
+            if isinstance(expr.left, Temp) and isinstance(expr.right, Temp):
+                return True
+            elif isinstance(expr.left, Temp) and a_only(expr.right):
+                return True
+            elif a_only(expr.left) and isinstance(expr.right, Temp):
+                return True
+            else:
+                # print(f"unsafe: {_Expr_str(expr)}")
+                # return False
+                raise Exception("Doesn't happen?!")
+        elif isinstance(expr, Unary):
+            # *Not* and *negate* can be done in place
+            return translatable_expr(expr.value)
+        elif isinstance(expr, IndirectRead):
+            # The *read* isn't a problem
+            return translatable_expr(expr.address)
+        elif isinstance(expr, Symbol):
+            return True
+        elif isinstance(expr, Invoke):
+            # Need D to set up the return address
+            return False
+        else:
+            raise Exception(f"Unexpected expr: {expr}")
+
+    def a_only(expr: Expr) -> bool:
+        """True if the value of the expression can be constructed directly in A (see value_to_a)."""
+        return isinstance(expr, (Const, Reg, Local, Static))
+
+    if isinstance(stmt, Eval):
+        return translatable_expr(stmt.expr)
+    elif isinstance(stmt, IndirectWrite):
+        # The *value* can come from D, if the *address* doesn't need to touch it:
+        if a_only(stmt.address) and translatable_expr(stmt.value):
+            return True
+        # Or, the *address* can come from D, if the value can be constructed by the ALU:
+        elif translatable_expr(stmt.address) and isinstance(stmt.value, Const) and (-1 <= stmt.value.value <= 1):
+            return True
+        else:
+            return False
+    elif isinstance(stmt, Store):
+        # TODO: this could be ok if the code generator can construct the address without D,
+        # which it can, if the index is 0 or 1 (or even -1), or even some larger values
+        # with some additional cycles if it's till cheaper than copying to a Register and
+        # back (which is 4 instructions).
+        return False
+    elif isinstance(stmt, (If, While)):
+        raise Exception("Not handled here")
+    elif isinstance(stmt, Return):
+        return stmt.expr is None or translatable_expr(stmt.expr)
+    elif isinstance(stmt, Push):
+        return translatable_expr(stmt.expr)
+    elif isinstance(stmt, Discard):
+        return translatable_expr(stmt.expr)
+    else:
+        raise Exception(f"Unexpected stmt: {stmt}")
+
+
 def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
     """The input is IR with all locals represented by Local.
 
@@ -921,6 +1224,11 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
     # TODO: treat THIS and THAT as additional locations for "saved" vars.
     # TODO: color vars needing saving as well? probably not worth it for stack-allocated.
+
+    #
+    # Identify locals that need to be stored on the stack (because their values
+    # need to persist across subroutine calls):
+    #
 
     promoted_count = 0
     def next_location(var: Local) -> Location:
@@ -933,45 +1241,63 @@ def phase_two(ast: Subroutine, reg_count: int = 8) -> Subroutine:
 
     need_promotion = need_saving(liveness)
 
-    # for s in liveness:
-    #     print(_Stmt_str(s))
-    # print(f"need saving: {need_promotion}")
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness))
+        print(f"need saving: [{', '.join(str(n) for n in need_promotion)}]")
+        print()
 
     body = promote_locals(ast.body, { Local(l): next_location(Local(l)) for l in need_promotion }, "p_")
 
-    while True:
-        liveness2 = analyze_liveness(body)
-        need_promotion2 = need_saving(liveness2)
+    liveness2 = analyze_liveness(body)
+    need_promotion2 = need_saving(liveness2)
 
-        # Sanity check: additional promotion
-        if len(need_promotion2) > 0:
-            # for s in liveness2:
-            #     print(_Stmt_str(s))
-            # print(f"need saving after one round: {need_promotion2}")
-            raise Exception(f"More than one round of promotion needed. Need promotion: {need_promotion2}; in {ast.name}()")
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness2))
 
-        local_sets = color_locals(liveness2)
+    # Sanity check: additional promotion needed
+    if len(need_promotion2) > 0:
+        raise Exception(f"One-pass promotion inadequate Need promotion: {need_promotion2}; in {ast.name}()")
 
-        if len(local_sets) > reg_count:
-            unallocatable_sets = local_sets[reg_count:]
 
-            print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
+    #
+    # Identify temps that can be passed in D for zero overhead:
+    #
 
-            body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
+    transients = find_transients(liveness2)
+    body = resolve_locals(body, {Local(l): Temp(l) for l in transients}, fail_on_unmapped=False)
+    liveness3 = analyze_liveness(body)  # TODO: is it safe to re-analyze?
 
-        else:
-            reg_map = {
-                l: Reg(idx=i, name=l.name)
-                for i, ls in enumerate(local_sets)
-                for l in ls
-            }
+    if PRINT_LIVENESS:
+        print(ast._replace(body=liveness3))
+        print()
 
-            reg_pressure = 0 if reg_map == {} else max(r.idx+1 for r in reg_map.values())
-            # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+    #
+    # Anything left now can be stored in a register, and they better all fit:
+    #
 
-            reg_body = lock_down_locals(body, reg_map)
+    local_sets = color_locals(liveness3)
 
-            return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
+    if len(local_sets) > reg_count:
+        unallocatable_sets = local_sets[reg_count:]
+
+        print(f"Unable to fit local variables in {reg_count} registers; no space for {[ {l.name for l in s} for s in unallocatable_sets]}")
+
+        raise Exception("One-pass promotion failed!?")
+        # body = promote_locals(body, { l: next_location(l) for s in unallocatable_sets for l in s }, "q_")
+
+    else:
+        reg_map = {
+            l: Reg(idx=i, name=l.name)
+            for i, ls in enumerate(local_sets)
+            for l in ls
+        }
+
+        reg_pressure = 0 if reg_map == {} else max(r.idx+1 for r in reg_map.values())
+        # print(f"Registers allocated in {ast.name}: {reg_pressure} ({100*reg_pressure/reg_count:.1f}%)")
+
+        reg_body = resolve_locals(body, reg_map, fail_on_unmapped=True)
+
+        return Subroutine(ast.name, ast.num_args, promoted_count, reg_body)
 
 
 def compile_class(ast: jack_ast.Class) -> Class:
@@ -1000,9 +1326,14 @@ RETURN_ADDRESS = "R4"  # Note: have to avoid using the "temp" registers if this 
 RESULT = "R12" # for now, just use one of the registers also used for local variables.
 
 class Translator(solved_07.Translator):
-    def __init__(self):
-        self.asm = AssemblySource()
+    def __init__(self, asm=None):
+        self.asm = asm if asm else AssemblySource()
         solved_07.Translator.__init__(self, self.asm)
+
+        # HACK: stash the leaf-ishness of the current subroutine statefully, so we don't have to
+        # thread it through the traversal. When we're dealing with a leaf, this is the number of
+        # args. Otherwise, None.
+        self.leaf_sub_args = None
 
         # self.preamble()  # called by the loader, apparently
 
@@ -1015,7 +1346,8 @@ class Translator(solved_07.Translator):
             self.translate_subroutine(s, class_ast.name)
 
     def translate_subroutine(self, subroutine_ast: Subroutine, class_name: str):
-        # print(subroutine_ast)
+        if PRINT_IR:
+            print(subroutine_ast); print()
 
         # if self.last_function_start is not None:
         #     instrs = self.asm.instruction_count - self.last_function_start
@@ -1032,60 +1364,121 @@ class Translator(solved_07.Translator):
         self.asm.start(f"function {class_name}.{subroutine_ast.name} {subroutine_ast.num_vars}")
         self.asm.label(f"{self.function_namespace}")
 
-        # Note: this could be done with a common sequence in the preamble, but jumping there and
-        # back would cost at least 6 cycles or so, and the goal here is to get small by generating
-        # tighter code, not save space in ROM by adding runtime overhead.
-        # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
-        # at all.
-        self.asm.comment("push the return address, then LCL and ARG")
-        self.asm.instr(f"@{RETURN_ADDRESS}")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@LCL")
-        self.asm.instr("D=M")
-        self._push_d()
-        self.asm.instr("@ARG")
-        self.asm.instr("D=M")
-        self._push_d()
+        def uses_stack(stmt: Stmt):
+            if isinstance(stmt, Eval):
+                return isinstance(stmt.expr, (CallSub, Invoke))
+            elif isinstance(stmt, IndirectWrite):
+                return False
+            elif isinstance(stmt, Store):
+                return False
+            elif isinstance(stmt, If):
+                return any(uses_stack(s) for s in stmt.when_true + (stmt.when_false or []))
+            elif isinstance(stmt, While):
+                return any(uses_stack(s) for s in stmt.test + stmt.body)
+            elif isinstance(stmt, Return):
+                return isinstance(stmt.expr, (CallSub, Invoke))  # FIXME: does this happen?
+            elif isinstance(stmt, Push):
+                return True
+            elif isinstance(stmt, Discard):
+                return isinstance(stmt.expr, (CallSub, Invoke))
+            else:
+                raise Exception(f"Unknown Stmt: {stmt}")
 
-        self.asm.comment("LCL = SP")
-        self.asm.instr("@SP")
-        self.asm.instr("D=M")
-        self.asm.instr("@LCL")
-        self.asm.instr("M=D")
+        is_leaf = OPTIMIZE_LEAF_FUNCTIONS and not any(uses_stack(s) for s in subroutine_ast.body)
 
-        self.asm.comment("ARG = SP - (num_args + 3)")
-        self.asm.instr(f"@{subroutine_ast.num_args + 3}")
-        self.asm.instr("D=A")
-        self.asm.instr("@SP")
-        self.asm.instr("D=M-D")
-        self.asm.instr("@ARG")
-        self.asm.instr("M=D")
+        if is_leaf:
+            # TODO: if solved_07.INITIALIZE_LOCALS?
+            if subroutine_ast.num_vars > 0:
+                # Note: this is probably pretty rare. You need to have a leaf function with more
+                # live variables than there are registers (typically 8).
+                self.asm.comment(f"initialize locals ({subroutine_ast.num_vars})")
+                self.asm.instr("@SP")
+                self.asm.instr("M=0")
+                for _ in range(subroutine_ast.num_vars-1):
+                    self.asm.instr("A=A+1")
+                    self.asm.instr("M=0")
+            else:
+                self.asm.comment("no locals to initialize (leaf function), so no-op")
+                # Bogus: so the function label and the first stmt don't end up at the same address
+                self.asm.instr("D=D")
 
-        if subroutine_ast.num_vars > 0:
-            self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
-            self.reserve_local_space(subroutine_ast.num_vars)
+        else:
+            # Note: this could be done with a common sequence in the preamble, but jumping there and
+            # back would cost at least 6 cycles or so, and the goal here is to get small by generating
+            # tighter code, not save space in ROM by adding runtime overhead.
+            # TODO: avoid this overhead entirely for leaf functions, by just not adjusting the stack
+            # at all.
+            self.asm.comment("push the return address, then LCL and ARG")
+            self.asm.instr(f"@{RETURN_ADDRESS}")
+            self.asm.instr("D=M")
+            self._push_d()
+            self.asm.instr("@LCL")
+            self.asm.instr("D=M")
+            self._push_d()
+            self.asm.instr("@ARG")
+            self.asm.instr("D=M")
+            self._push_d()
+
+            self.asm.comment("LCL = SP")
+            self.asm.instr("@SP")
+            self.asm.instr("D=M")
+            self.asm.instr("@LCL")
+            self.asm.instr("M=D")
+
+            self.asm.comment("ARG = SP - (num_args + 3)")
+            self.asm.instr(f"@{subroutine_ast.num_args + 3}")
+            self.asm.instr("D=A")
+            self.asm.instr("@SP")
+            self.asm.instr("D=M-D")
+            self.asm.instr("@ARG")
+            self.asm.instr("M=D")
+
+            if subroutine_ast.num_vars > 0:
+                self.asm.comment(f"space for locals ({subroutine_ast.num_vars})")
+                self.reserve_local_space(subroutine_ast.num_vars)
 
         # Now the body:
+        if is_leaf:
+            self.leaf_sub_args = subroutine_ast.num_args
+        else:
+            self.leaf_sub_args = None
+
         for s in subroutine_ast.body:
             self._handle(s)
+
         self.asm.blank()
 
         instr_count_after = self.asm.instruction_count
 
-        # print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}")
+        # print(f"Translated {class_name}.{subroutine_ast.name}; instructions: {instr_count_after - instr_count_before:,d}\n")  # DEBUG
 
 
     # Statements:
 
     def handle_Eval(self, ast: Eval):
-        assert isinstance(ast.dest, Reg)
+        assert isinstance(ast.dest, (Reg, Static, Temp))
 
         if not isinstance(ast.expr, CallSub):
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Stmt_str(ast)}")
 
+        # Easy case: leave the result in D for the next statement to pick up
+        if isinstance(ast.dest, Temp):
+            self._handle(ast.expr)
+            return
+
+        symbol_name = self.symbol(ast.dest)
+
         # Do the update in-place if possible:
-        if isinstance(ast.expr, Binary) and isinstance(ast.expr.left, Reg) and ast.dest.idx == ast.expr.left.idx:
+        if (isinstance(ast.expr, Binary)
+            and symbol_name == self.symbol(ast.expr.left) and symbol_name == self.symbol(ast.expr.right)):
+            # This pretty much only handles x = x + x, but that occurs the in hot loop in multiply
+            op = self.binary_op_alu(ast.expr.op)
+            if op is not None:
+                self.asm.instr(f"@{symbol_name}")
+                self.asm.instr(f"D=M")
+                self.asm.instr(f"M=M{op}D")
+                return
+        elif isinstance(ast.expr, Binary) and symbol_name == self.symbol(ast.expr.left):
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
                 right_imm = self.immediate(ast.expr.right)
@@ -1093,34 +1486,36 @@ class Translator(solved_07.Translator):
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX + 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.idx}")
+                        self.asm.instr(f"@{symbol_name}")
                         self.asm.instr(f"M=M{right_imm:+}")
                 elif op == "-" and right_imm is not None:
                     if right_imm == 0:
                         pass  # nothing to do: rX = rX - 0
                     else:
-                        self.asm.instr(f"@R{5+ast.dest.idx}")
+                        self.asm.instr(f"@{symbol_name}")
                         self.asm.instr(f"M=M{-right_imm:+}")
                 else:
-                    self._handle(ast.expr.right)  # D = right
-                    self.asm.instr(f"@R{5+ast.dest.idx}")
+                    if not isinstance(ast.expr.right, Temp):
+                        self._handle(ast.expr.right)  # D = right
+                    self.asm.instr(f"@{symbol_name}")
                     self.asm.instr(f"M=M{op}D")
                 return
-        elif isinstance(ast.expr, Binary) and isinstance(ast.expr.right, Reg) and ast.dest.idx == ast.expr.right.idx:
+        elif isinstance(ast.expr, Binary) and symbol_name == self.symbol(ast.expr.right):
             op = self.binary_op_alu(ast.expr.op)
             if op is not None:
-                self._handle(ast.expr.left)  # D = left
-                self.asm.instr(f"@R{5+ast.dest.idx}")
+                if not isinstance(ast.expr.left, Temp):
+                    self._handle(ast.expr.left)  # D = left
+                self.asm.instr(f"@{symbol_name}")
                 self.asm.instr(f"M=D{op}M")
                 return
-        elif isinstance(ast.expr, Unary) and ast.dest == ast.expr:
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+        elif isinstance(ast.expr, Unary) and symbol_name == self.symbol(ast.expr.value):
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr(f"M={self.unary_op(ast.expr.op)}M")
             return
 
         imm = self.immediate(ast.expr)
         if imm is not None:
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr(f"M={imm}")
         else:
             self._handle(ast.expr)
@@ -1128,7 +1523,7 @@ class Translator(solved_07.Translator):
             if isinstance(ast.expr, CallSub):
                 self.asm.start(f"eval-result {_Expr_str(ast.dest)} = <result>")
 
-            self.asm.instr(f"@R{5+ast.dest.idx}")
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr("M=D")
 
     def handle_IndirectWrite(self, ast: IndirectWrite):
@@ -1136,8 +1531,16 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.value)
         if imm is not None:
-            self.value_to_a(ast.address)
+            if isinstance(ast.address, Temp):
+                # TODO: this is a little silly; the previous instruction could probably just
+                # load the value into A if we knew that's where it would be useful
+                self.asm.instr("A=D")
+            else:
+                self.value_to_a(ast.address)
             self.asm.instr(f"M={imm}")
+        elif isinstance(ast.value, Temp):
+            self.value_to_a(ast.address)
+            self.asm.instr("M=D")
         else:
             self._handle(ast.value)
             self.value_to_a(ast.address)
@@ -1148,19 +1551,16 @@ class Translator(solved_07.Translator):
 
         imm = self.immediate(ast.value)
 
-        kind, index = ast.location.kind, ast.location.idx
-        if kind == "static":
-            if imm is not None:
-                self.asm.instr(f"@{self.class_namespace}.static{index}")
-                self.asm.instr(f"M={imm}")
+        kind = ast.location.kind
+        if self.leaf_sub_args is not None:
+            # LCL and ARG are not used; just index off of SP (below for args, above for locals)
+            segment_ptr = "SP"
+            if kind == "argument":
+                index = -self.leaf_sub_args + ast.location.idx
+            elif kind == "local":
+                index = ast.location.idx
             else:
-                self._handle(ast.value)
-                self.asm.instr(f"@{self.class_namespace}.static{index}")
-                self.asm.instr("M=D")
-
-        elif kind == "field":
-            raise Exception(f"should have been rewritten: {ast}")
-
+                raise Exception(f"Unknown location: {ast}")
         else:
             if kind == "argument":
                 segment_ptr = "ARG"
@@ -1168,51 +1568,66 @@ class Translator(solved_07.Translator):
                 segment_ptr = "LCL"
             else:
                 raise Exception(f"Unknown location: {ast}")
+            index = ast.location.idx
 
-            # Super common case: initialize a var to 0 or 1 (or -1):
-            if imm is not None:
+        # Super common case: initialize a var to 0 or 1 (or -1):
+        if imm is not None:
+            if index == 0:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M")
+                self.asm.instr(f"M={imm}")
+            elif index == 1:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M+1")
+                self.asm.instr(f"M={imm}")
+            elif index == -1:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-1")
+                self.asm.instr(f"M={imm}")
+            elif index > 0:
+                self.asm.instr(f"@{index}")
+                self.asm.instr("D=A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M+D")
+                self.asm.instr(f"M={imm}")
+            else:
+                self.asm.instr(f"@{-index}")
+                self.asm.instr("D=A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-D")
+                self.asm.instr(f"M={imm}")
+
+        else:
+            # For small index, compute the destination address without clobbering D:
+            # Note: not optimizing negative indexes because we rarely see store to argument
+            if 0 <= index <= 6:
+                self._handle(ast.value)
+                self.asm.instr(f"@{segment_ptr}")
                 if index == 0:
-                    self.asm.instr(f"@{segment_ptr}")
                     self.asm.instr("A=M")
-                    self.asm.instr(f"M={imm}")
-                elif index == 1:
-                    self.asm.instr(f"@{segment_ptr}")
-                    self.asm.instr("A=M+1")
-                    self.asm.instr(f"M={imm}")
                 else:
-                    self.asm.instr(f"@{index}")
-                    self.asm.instr("D=A")
-                    self.asm.instr(f"@{segment_ptr}")
-                    self.asm.instr("A=M+D")
-                    self.asm.instr(f"M={imm}")
+                    self.asm.instr("A=M+1")
+                    for _ in range(index-1):
+                        self.asm.instr("A=A+1")
+                self.asm.instr("M=D")
 
             else:
-                if index <= 6:
-                    self._handle(ast.value)
-                    self.asm.instr(f"@{segment_ptr}")
-                    if index == 0:
-                        self.asm.instr("A=M")
-                    else:
-                        self.asm.instr("A=M+1")
-                        for _ in range(index-1):
-                            self.asm.instr("A=A+1")
-                    self.asm.instr("M=D")
-
-                else:
+                if index > 0:
                     self.asm.instr(f"@{index}")
                     self.asm.instr("D=A")
-                    self.asm.instr(f"@{segment_ptr}")
-                    self.asm.instr("D=M+D")
-                    self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
-                    self.asm.instr("M=D")
-                    self._handle(ast.value)
-                    self.asm.instr("@R15")
-                    self.asm.instr("A=M")
-                    self.asm.instr("M=D")
+                else:
+                    self.asm.instr(f"@{-index}")
+                    self.asm.instr("D=-A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("D=M+D")
+                self.asm.instr("@R15")  # code smell: needing R15 shows that this isn't actually atomic
+                self.asm.instr("M=D")
+                self._handle(ast.value)
+                self.asm.instr("@R15")
+                self.asm.instr("A=M")
+                self.asm.instr("M=D")
 
     def handle_If(self, ast: If):
-        self.asm.comment("if...")
-
         if ast.when_false is None:
             # Awesome: when there's no else, and the condition is simple, it turns into a single branch.
             # TODO: to avoid constructing boolean values, probably want to put left _and_ right values
@@ -1221,7 +1636,8 @@ class Translator(solved_07.Translator):
             end_label = self.asm.next_label("end")
 
             self.asm.start(f"if {_Expr_str(ast.value)} {ast.cmp} 0?")
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"@{end_label}")
             self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
@@ -1235,15 +1651,17 @@ class Translator(solved_07.Translator):
             false_label = self.asm.next_label("false")
 
             self.asm.start(f"if/else {_Expr_str(ast.value)} {ast.cmp} 0?")
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"@{false_label}")
             self.asm.instr(f"D;J{self.compare_op_neg(ast.cmp)}")
 
             for s in ast.when_true:
                 self._handle(s)
 
-            self.asm.instr(f"@{end_label}")
-            self.asm.instr(f"0;JMP")
+            if not isinstance(ast.when_true[-1], Return):
+                self.asm.instr(f"@{end_label}")
+                self.asm.instr(f"0;JMP")
 
             self.asm.label(false_label)
             for s in ast.when_false:
@@ -1272,7 +1690,8 @@ class Translator(solved_07.Translator):
             self._handle(s)
 
         self.asm.start(f"while-test {_Expr_str(ast.value)} {ast.cmp} 0?")
-        self._handle(ast.value)
+        if not isinstance(ast.value, Temp):
+            self._handle(ast.value)
         self.asm.instr(f"@{body_label}")
         self.asm.instr(f"D;J{self.compare_op_pos(ast.cmp)}")
 
@@ -1281,7 +1700,7 @@ class Translator(solved_07.Translator):
             self.handle_CallSub(ast.expr)
             self.asm.comment(f"leave the result in {RESULT}")
 
-        else:
+        elif ast.expr is not None:
             self.asm.start(f"eval-{self.describe_expr(ast.expr)} {_Expr_str(ast.expr)} (for return)")
 
             # Save a cycle for "return 0":
@@ -1294,7 +1713,30 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
 
-        self.return_op()
+        if self.leaf_sub_args is not None:
+            self.asm.start("return (from leaf)")
+            if self.leaf_sub_args > 0:
+                if self.leaf_sub_args == 1:
+                    self.asm.comment("pop 1 argument")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-1")
+                elif self.leaf_sub_args == 2:
+                    self.asm.comment("pop 2 arguments")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-1")
+                    self.asm.instr("M=M-1")
+                else:
+                    self.asm.comment("pop arguments")
+                    self.asm.instr(f"@{self.leaf_sub_args}")
+                    self.asm.instr("D=A")
+                    self.asm.instr("@SP")
+                    self.asm.instr("M=M-D")
+            self.asm.instr(f"@{RETURN_ADDRESS}")
+            self.asm.instr("A=M")
+            self.asm.instr("0;JMP")
+
+        else:
+            self.return_op()
 
     def handle_Push(self, ast):
         if not isinstance(ast.expr, CallSub):
@@ -1308,7 +1750,8 @@ class Translator(solved_07.Translator):
             self.asm.instr("A=M-1")
             self.asm.instr(f"M={imm}")
         else:
-            self._handle(ast.expr)
+            if not isinstance(ast.expr, Temp):
+                self._handle(ast.expr)
 
             if isinstance(ast.expr, CallSub):
                 self.asm.start(f"push-result {_Expr_str(ast.expr)}")
@@ -1321,9 +1764,16 @@ class Translator(solved_07.Translator):
     def handle_Discard(self, ast: Discard):
         # Note: now that results are passed in a register, there's no cleanup to do when
         # the result is not used.
-        self.call(ast.expr)
+
+        if isinstance(ast.expr, CallSub):
+            self.call(ast.expr)
+        elif isinstance(ast.expr, Invoke):
+            self.invoke(ast.expr)
+        else:
+            raise Exception(f"Unexpected expr; {_Stmt_str(ast)}")
 
         self.asm.comment(f"ignore the result")
+
 
     def compare_op_neg(self, cmp: Cmp):
         return {
@@ -1372,6 +1822,22 @@ class Translator(solved_07.Translator):
 
         self.asm.label(return_label)
 
+    def invoke(self, ast: Invoke):
+        return_label = self.asm.next_label("return_address")
+
+        self.asm.start(f"call (* {_Expr_str(ast.ptr)})")
+
+        self.asm.instr(f"@{return_label}")
+        self.asm.instr("D=A")
+        self.asm.instr(f"@{RETURN_ADDRESS}")
+        self.asm.instr("M=D")
+
+        self.value_to_a(ast.ptr)
+        self.asm.instr("0;JMP")
+
+        self.asm.label(return_label)
+
+
 
     def handle_Const(self, ast: Const):
         if -1 <= ast.value <= 1:
@@ -1385,18 +1851,25 @@ class Translator(solved_07.Translator):
 
     def handle_Location(self, ast: Location):
         kind, index = ast.kind, ast.idx
-        if ast.kind == "static":
-            self.asm.instr(f"@{self.class_namespace}.static{ast.idx}")
-            self.asm.instr("D=M")
-        elif ast.kind == "field":
+        if ast.kind in ("field", "static"):
             raise Exception(f"should have been rewritten: {ast}")
         else:
-            if ast.kind == "argument":
-               segment_ptr = "ARG"
-            elif ast.kind == "local":
-                segment_ptr = "LCL"
+            if self.leaf_sub_args is not None:
+                # LCL and ARG are not used; just index off of SP (below for args, above for locals)
+                segment_ptr = "SP"
+                if ast.kind == "argument":
+                    index = -self.leaf_sub_args + ast.idx
+                elif ast.kind == "local":
+                    index = ast.index
+                else:
+                    raise Exception(f"Unknown location: {ast}")
             else:
-                raise Exception(f"Unknown location: {ast}")
+                if ast.kind == "argument":
+                    segment_ptr = "ARG"
+                elif ast.kind == "local":
+                    segment_ptr = "LCL"
+                else:
+                    raise Exception(f"Unknown location: {ast}")
 
             if index == 0:
                 self.asm.instr(f"@{segment_ptr}")
@@ -1408,36 +1881,73 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{segment_ptr}")
                 self.asm.instr("A=M+1")
                 self.asm.instr("A=A+1")
-            else:
+            elif index > 0:
                 self.asm.instr(f"@{index}")
                 self.asm.instr("D=A")
                 self.asm.instr(f"@{segment_ptr}")
-                self.asm.instr("A=D+M")
+                self.asm.instr("A=M+D")
+            elif index == -1:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-1")
+            elif index == -2:
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-1")
+                self.asm.instr("A=A-1")
+            else:
+                self.asm.instr(f"@{-index}")
+                self.asm.instr("D=A")
+                self.asm.instr(f"@{segment_ptr}")
+                self.asm.instr("A=M-D")
             self.asm.instr("D=M")
+
 
     def handle_Reg(self, ast: Reg):
         self.asm.instr(f"@R{5+ast.idx}")
         self.asm.instr("D=M")
 
+
+    def handle_Static(self, ast: Static):
+        symbol_name = f"{self.class_namespace}.static_{ast.name}"
+        self.asm.instr(f"@{symbol_name}")
+        self.asm.instr("D=M")
+
+    def handle_Temp(self, ast: Temp):
+        raise Exception("Unsafe! Callers should explicitly handle Temp when they can do so safely.")
+
     def handle_Binary(self, ast: Binary):
-        left_imm = self.immediate(ast.left)
+        left_symbol = self.symbol(ast.left)
         alu_op = self.binary_op_alu(ast.op)
         right_imm = self.immediate(ast.right)
 
-        if alu_op == "+" and isinstance(ast.left, Reg) and right_imm is not None:
+        if alu_op == "+" and left_symbol is not None and right_imm is not None:
             # e.g. r0 + 1  ->  @R5; D=M+1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            self.asm.instr(f"@{left_symbol}")
             self.asm.instr(f"D=M{right_imm:+}")
             return
-        elif alu_op == "-" and isinstance(ast.left, Reg) and right_imm is not None:
+        elif alu_op == "-" and left_symbol is not None and right_imm is not None:
             # e.g. r0 - 1  ->  @R5; D=M-1
-            self.asm.instr(f"@R{5+ast.left.idx}")
+            self.asm.instr(f"@{left_symbol}")
             self.asm.instr(f"D=M{-right_imm:+}")
             return
         elif alu_op is not None:
-            self._handle(ast.left)     # D = left
-            self.value_to_a(ast.right) # A = right
-            self.asm.instr(f"D=D{alu_op}A")
+            left_in_d = isinstance(ast.left, Temp)
+            right_in_d = isinstance(ast.right, Temp)
+            if left_in_d and right_in_d:
+                # e.g. x = x + x
+                self.asm.instr("A=D")
+                self.asm.instr(f"D=D{alu_op}A")
+            elif left_in_d:
+                                           # D = left (from previous instr)
+                self.value_to_a(ast.right) # A = right
+                self.asm.instr(f"D=D{alu_op}A")
+            elif right_in_d:
+                self.value_to_a(ast.left) # A = left
+                                          # D = right (from previous instr)
+                self.asm.instr(f"D=A{alu_op}D")  # Note reversed operands (for -)
+            else:
+                self._handle(ast.left)     # D = left
+                self.value_to_a(ast.right) # A = right
+                self.asm.instr(f"D=D{alu_op}A")
             return
 
         cmp_op = self.binary_op_cmp(ast.op)
@@ -1445,7 +1955,7 @@ class Translator(solved_07.Translator):
             # Massive savings here for this compiler; by pushing the comparison all the way into
             # the ALU, this is one branch, with a specific condition code, to pick the right result.
             # But having to leave the result in D kind of spoils the party; for one thing, have to
-            # branch again to skip the no-taken branch, which would have written the other result.
+            # branch again to skip the not-taken branch, which would have written the other result.
 
             # TODO: this is almost certainly wrong for signed values where the difference overflows, though:
             #    -30,000 > 30,000
@@ -1457,14 +1967,34 @@ class Translator(solved_07.Translator):
             # Note: if the right operand is -1,0,1, we shave a few cycles. An earlier phase should
             # take care of rewriting conditions into that form where possible.
 
-            self._handle(ast.left)          # D = left
-            if right_imm == 0:
-                pass                        # comparing with zero, so D already has left - 0, effectively
-            elif right_imm is not None and -1 <= right_imm <= 1:
-                self.asm.instr(f"D=D{-right_imm:+d}")     # D = left - right (so, positive if left > right)
-            else:
+            # Now it breaks down into 6 possible cases, depending on whether there's an immediate
+            # on the right, and whether either operand is in D:
+            if right_imm is not None:
+                if isinstance(ast.left, Temp):
+                    pass                               # D = left (from previous instr)
+                else:
+                    self._handle(ast.left)             # D = left
+
+                if right_imm == 0:
+                    pass                               # D = left - 0 (with no additional work)
+                else:
+                    self.asm.instr(f"D=D{-right_imm:+d}")  # D = left - right (so, positive if left > right)
+
+            elif isinstance(ast.left, Temp):
+                                            # D = left (from previous instr)
                 self.value_to_a(ast.right)  # A = right
                 self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+
+            elif isinstance(ast.right, Temp):
+                                            # D = right (from previous instr)
+                self.value_to_a(ast.left)   # A = left
+                self.asm.instr("D=A-D")     # D = left - right (so, positive if left > right)
+
+            else:
+                self._handle(ast.left)      # D = left
+                self.value_to_a(ast.right)  # A = right
+                self.asm.instr("D=D-A")     # D = left - right (so, positive if left > right)
+
 
             self.asm.instr(f"@{true_label}")
             self.asm.instr(f"D;J{cmp_op}")
@@ -1478,7 +2008,7 @@ class Translator(solved_07.Translator):
             self.asm.label(end_label)
             return
 
-        raise Exception(f"TODO: {ast}")
+        raise Exception(f"Unexpected expr: {_Expr_str(ast)}")
 
     def binary_op_alu(self, op: jack_ast.Op) -> Optional[str]:
         return {
@@ -1493,6 +2023,9 @@ class Translator(solved_07.Translator):
             "<": "LT",
             ">": "GT",
             "=": "EQ",
+            "<=": "LE",
+            ">=": "GE",
+            "!=": "NE",
         }.get(op.symbol)
 
     def handle_Unary(self, ast: Unary):
@@ -1501,15 +2034,25 @@ class Translator(solved_07.Translator):
             self.asm.instr(f"D={self.unary_op(ast.op)}M")
         else:
             # Note: ~(Const) isn't being evaluated in the compiler yet, but should be.
-            self._handle(ast.value)
+            if not isinstance(ast.value, Temp):
+                self._handle(ast.value)
             self.asm.instr(f"D={self.unary_op(ast.op)}D")
 
     def unary_op(self, op: jack_ast.Op) -> str:
         return {"-": "-", "~": "!"}[op.symbol]
 
     def handle_IndirectRead(self, ast: IndirectRead):
-        self.value_to_a(ast.address)
+        if isinstance(ast.address, Temp):
+            # TODO: this is a little silly; the previous instruction could probably just
+            # load the value into A if we knew that's where it would be useful
+            self.asm.instr("A=D")
+        else:
+            self.value_to_a(ast.address)
         self.asm.instr("D=M")
+
+    def handle_Symbol(self, ast: Symbol):
+        self.asm.instr(f"@{ast.name}")
+        self.asm.instr("D=A")
 
     def immediate(self, ast: Expr) -> Optional[int]:
         """If the expression is a constant which the ALU can take as an "immediate" operand
@@ -1519,6 +2062,18 @@ class Translator(solved_07.Translator):
             return ast.value
         else:
             return None
+
+    def symbol(self, ast: Expr) -> Optional[str]:
+        """If the expression is a reference to a Reg or Static which has a known (symbolic) address,
+        then construct it.
+        """
+        if isinstance(ast, Reg):
+            return f"R{5+ast.idx}"
+        elif isinstance(ast, Static):
+            return f"{self.class_namespace}.static_{ast.name}"
+        else:
+            return None
+
 
     def describe_expr(self, expr) -> str:
         """A short suffix categorizing the type of expression, for example 'const'.
@@ -1535,24 +2090,40 @@ class Translator(solved_07.Translator):
             return "load"
         elif isinstance(expr, Reg):
             return "copy"
+        elif isinstance(expr, Static):
+            return "copy"  # Confusing? These "loads" are as efficient as reg-reg copies
+        elif isinstance(expr, Temp):
+            return "direct"
         elif isinstance(expr, Binary):
             return "binary"
         elif isinstance(expr, Unary):
             return "unary"
         elif isinstance(expr, IndirectRead):
             return "read"
+        elif isinstance(expr, Symbol):
+            return "symbol"
+        elif isinstance(expr, Invoke):
+            return "invoke"
         else:
             raise Exception(f"Unknown expr: {expr}")
 
 
     # Helpers:
 
-    def value_to_a(self, ast: Union[Reg, Const]):
-        """Load a register or constant value into A, without overwriting D, and in one less cycle,
-        in some cases."""
+    def value_to_a(self, ast: Union[Reg, Static, Const]):
+        """Load a register, static or constant value into A, without overwriting D, and in one less cycle,
+        in some cases.
+
+        Note: these values are essentially the types in Value, except Locals have been eliminated
+        at this point.
+        """
 
         if isinstance(ast, Reg):
             self.asm.instr(f"@R{5+ast.idx}")
+            self.asm.instr("A=M")
+        elif isinstance(ast, Static):
+            symbol_name = f"{self.class_namespace}.static_{ast.name}"
+            self.asm.instr(f"@{symbol_name}")
             self.asm.instr("A=M")
         elif isinstance(ast, Const):
             if -1 <= ast.value <= 1:
@@ -1563,7 +2134,7 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{-ast.value}")
                 self.asm.instr("A=-A")
         else:
-            raise Exception(f"Unknown Value: {ast}")
+            raise Exception(f"Unexpected Value: {ast}")
 
     def _handle(self, ast):
         self.__getattribute__(f"handle_{ast.__class__.__name__}")(ast)
@@ -1598,7 +2169,6 @@ class Translator(solved_07.Translator):
 
     def _return(self):
         "Override the normal sequence; much less stack adjustment required."
-        # TODO: use this only for non-leaf subroutines
 
         label = self.asm.next_label("return_common")
 
@@ -1641,6 +2211,8 @@ class Translator(solved_07.Translator):
         self.asm.instr("A=M")
         self.asm.instr("0;JMP")
 
+        self.asm.blank()
+
         return label
 
 
@@ -1675,7 +2247,10 @@ def _Stmt_str(stmt: Stmt) -> str:
     elif isinstance(stmt, While):
         return f"while ({'; '.join(_Stmt_str(s) for s in stmt.test)}; {_Expr_str(stmt.value)} {stmt.cmp} zero)\n" + jack_ast._indent("\n".join(_Stmt_str(s) for s in stmt.body))
     elif isinstance(stmt, Return):
-        return f"return {_Expr_str(stmt.expr)}"
+        if stmt.expr is not None:
+            return f"return {_Expr_str(stmt.expr)}"
+        else:
+            return "return"
     elif isinstance(stmt, Push):
         return f"push {_Expr_str(stmt.expr)}"
     elif isinstance(stmt, Discard):
@@ -1701,12 +2276,20 @@ def _Expr_str(expr: Expr) -> str:
         return f"{expr.name} ({expr.kind} {expr.idx})"
     elif isinstance(expr, Reg):
         return f"{expr.name} (r{expr.idx})"
+    elif isinstance(expr, Static):
+        return f"{expr.name} (static)"
+    elif isinstance(expr, Temp):
+        return f"{expr.name} (D)"
     elif isinstance(expr, Binary):
         return f"{_Expr_str(expr.left)} {expr.op.symbol} {_Expr_str(expr.right)}"
     elif isinstance(expr, Unary):
         return f"{expr.op.symbol} {_Expr_str(expr.value)}"
     elif isinstance(expr, IndirectRead):
         return f"mem[{_Expr_str(expr.address)}]"
+    elif isinstance(expr, Symbol):
+        return f"&{expr.name}"
+    elif isinstance(expr, Invoke):
+        return f"call (* {_Expr_str(expr.ptr)})"
     else:
         raise Exception(f"Unknown Expr: {expr}")
 

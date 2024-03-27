@@ -108,6 +108,20 @@ class AssemblySource:
         return start, ends
 
 
+    def pretty(self, start_addr=0):
+        """Lines of code, including the location in ROM of each instruction, as a geneerator."""
+        loc = start_addr
+        for l in self.lines:
+            raw = l.strip()
+            if raw == "" or raw.startswith("//"):
+                yield f"         {l}"
+            elif raw.startswith("("):
+                yield f"      {l}"
+            else:
+                yield f"{loc:5d}: {l}"
+                loc += 1
+
+
     # TODO: find a better home for this (nand.runtime? .execute?, .debug?)
     def run(self, assembler, computer, stop_cycles=None, debug=False, tty=None):
         """Step through the execution of the generated program, using the provided assembler and

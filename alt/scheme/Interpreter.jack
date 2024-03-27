@@ -1,0 +1,1050 @@
+class Interpreter {
+    // For any kind of efficiency, the compiler wants to allocate these pointers as statics in the
+    // usual range (starting at addr 16). And ordinarily its own stack state is stored in
+    // locations 0-3 or so.
+    // For that matter, its stack grows up from 256 (which is fine as long as it doesn't collide
+    // with the screen buffer at 2048.)
+    static Rib stack;
+    static Rib pc;
+    static Rib nextRib;
+
+    // Pointers to the functions that handle each primitive:
+    static Array handlers;
+
+    //
+    // IO
+    //
+
+    static int cursorX;
+    static int cursorY;
+
+    static Array bufferStart;
+    static Array bufferEnd;
+
+    // Code of the key that was returned by getchar on the most recent call.
+    static int lastKeyPressed;
+
+    static Array tty;  // DEBUG
+
+
+    /*
+     When we arrive here, the assembly prelude has already initialized many of the statics with the
+     starting values.
+     */
+    function void main() {
+        // Register-allocated:
+        var int opcode;    // only used to dispatch before any handling
+        var Rib symbol;    // only used to find the value of a symbol
+        var Rib code;      // temp used to extract proc's entry point
+        var Rib newStack;  // temp used when assembling callee's stack
+        var Rib cont;      // existing continuation
+        var Rib proc;      // used only for dispatch
+
+        // Stack-allocated:
+        var Rib savedProc;      // saved to construct cont
+        var Rib newCont;        // saved to update after constructing stack
+        var Rib symbolToUpdate; // need the location to update after .pop()
+
+        // Initialize state:
+
+        let tty = 4095;  // DEBUG
+
+        // Bottom of the "heap" area:
+        let nextRib = 32767 + 1;  // Note: will overflow to -32768
+
+        do Interpreter.initSymbolTable();
+
+        do Interpreter.initPrimitiveVectors();
+
+        do Interpreter.initIO();
+
+        // Bottom of the stack: "primordial continuation" in ROM
+        let stack = Jack.symbol("rib_outer_cont");
+
+        // Skip the bogus "main" instr:
+        let pc = Jack.symbol("main");
+        let pc = pc[2];
+
+        while (1) {
+            let opcode = pc[0];
+
+            if (opcode = 0) {
+                if (pc[2] = 0) {
+                    // jump
+
+                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
+                    let proc = symbol[0];
+
+                    if (proc[0] & (~31)) {  // not between 0 and 31
+                        // closure
+
+                        let savedProc = proc;
+
+                        let cont = Interpreter.findContinuation();
+
+                        // Note: can't overwrite the old continuation because it may be in ROM
+                        let newCont = Interpreter.alloc(cont[0], savedProc, cont[2]);
+
+                        let stack = Interpreter.wrangleClosureParams(savedProc, newCont);
+
+                        let code = savedProc[0];
+                        let pc = code[2];
+                    }
+                    else {
+                        // primitive
+
+                        do Jack.invoke(handlers[proc[0]]);
+
+                        let cont = Interpreter.findContinuation();
+
+                        // Overwrite top stack entry so the stack consists of the just-pushed
+                        // result on top of the saved stack from the continuation.
+                        let stack[1] = cont[0];
+
+                        // PC = next instruction from the continuation
+                        let pc = cont[2];
+                    }
+                }
+                else {
+                    // call
+
+                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
+                    let proc = symbol[0];
+
+                    if (proc[0] & (~31)) {  // not between 0 and 31
+                        // closure
+
+                        let savedProc = proc;
+
+                        // New continuation:
+                        //   x = saved stack (after popping args)
+                        //   y = proc rib
+                        //   z = next instruction
+                        let newCont = Interpreter.alloc(-1, proc, pc[2]);  // tricky: faster to use proc from register in first call
+                        let newStack = Interpreter.wrangleClosureParams(savedProc, newCont);
+                        let newCont[0] = stack;
+                        let stack = newStack;
+
+                        // Now jump to the entry point of the proc:
+                        let code = savedProc[0];
+                        let pc = code[2];
+                    }
+                    else {
+                        // primitive
+
+                        do Jack.invoke(handlers[proc[0]]);
+
+                        let pc = pc[2];
+                    }
+                }
+            }
+            else {
+            if (opcode = 1) {
+                // set
+
+                let symbolToUpdate = Interpreter.getTarget();  // actually an entry or symbol
+
+                let symbolToUpdate[0] = Interpreter.pop();
+
+                let pc = pc[2];
+            }
+            else {
+            if (opcode = 2) {
+                // get
+
+                let symbol = Interpreter.getTarget();  // actually an entry or symbol
+
+                do Interpreter.push(symbol[0]);
+
+                let pc = pc[2];
+            }
+            else {
+            if (opcode = 3) {
+                // const
+
+                do Interpreter.push(pc[1]);
+
+                let pc = pc[2];
+            }
+            else {
+            if (opcode = 4) {
+                // if
+
+                if (Interpreter.pop() = Jack.symbol("rib_false")) {
+                    let pc = pc[2];
+                }
+                else {
+                    let pc = pc[1];
+                }
+            }
+            else {
+            // if (opcode = 5) {
+            // halt
+                do Interpreter.halt();
+            // }
+            }}}}}
+        }
+
+        return;
+    }
+
+
+
+    /**
+    Allocate symbols (which must be in RAM so their values can be updated in place) and the
+    pairs that form the list that is the symbol table.
+    The decoded instructions in ROM refer to the addresses where these symbols are expected to
+    located in memory.
+    */
+    function void initSymbolTable() {
+        var Array ptr;
+        var Rib symbol;
+        var Rib entry;
+
+        let entry = Jack.symbol("rib_nil");
+        let ptr = Jack.symbol("symbol_names_start");
+        while (ptr < Jack.symbol("symbol_names_end")) {
+            // let tty[0] = ptr; // DEBUG
+            let symbol = Interpreter.alloc(ptr[1], ptr[0], 2);  // symbol type
+            let entry = Interpreter.alloc(symbol, entry, 0);  // pair type
+            let ptr = ptr + 2;
+        }
+
+        return;
+    }
+
+
+    function void initPrimitiveVectors() {
+        // Just below the screen buffer
+        let handlers = Jack.symbol("SCREEN") - 32;
+
+        let handlers[ 0] = Jack.symbol("interpreter.handleRib");
+        let handlers[ 1] = Jack.symbol("interpreter.handleId");
+        let handlers[ 2] = Jack.symbol("interpreter.handleArg1");
+        let handlers[ 3] = Jack.symbol("interpreter.handleArg2");
+        let handlers[ 4] = Jack.symbol("interpreter.handleClose");
+        let handlers[ 5] = Jack.symbol("interpreter.handleRibQ");
+        let handlers[ 6] = Jack.symbol("interpreter.handleField0");
+        let handlers[ 7] = Jack.symbol("interpreter.handleField1");
+        let handlers[ 8] = Jack.symbol("interpreter.handleField2");
+        let handlers[ 9] = Jack.symbol("interpreter.handleField0_set");
+        let handlers[10] = Jack.symbol("interpreter.handleField1_set");
+        let handlers[11] = Jack.symbol("interpreter.handleField2_set");
+        let handlers[12] = Jack.symbol("interpreter.handleEqvQ");
+        let handlers[13] = Jack.symbol("interpreter.handleLt");
+        let handlers[14] = Jack.symbol("interpreter.handlePlus");
+        let handlers[15] = Jack.symbol("interpreter.handleMinus");
+        let handlers[16] = Jack.symbol("interpreter.handleTimes");
+        let handlers[17] = Jack.symbol("interpreter.handleQuotient");
+        let handlers[18] = Jack.symbol("interpreter.handleGetchar");
+        let handlers[19] = Jack.symbol("interpreter.handlePutchar");
+        let handlers[20] = Jack.symbol("interpreter.handlePeek");
+        let handlers[21] = Jack.symbol("interpreter.handlePoke");
+        let handlers[22] = Jack.symbol("interpreter.handleHalt");
+        let handlers[23] = Jack.symbol("interpreter.handleScreenAddr");
+
+        // Extra, just to simplify the dispatching logic:
+        let handlers[24] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[25] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[26] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[27] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[28] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[29] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[30] = Jack.symbol("interpreter.handleUnimp");
+        let handlers[31] = Jack.symbol("interpreter.handleUnimp");
+
+        return;
+    }
+
+    function void initIO() {
+        // Allocate space for one full line of characters, just below where the primitive vectors are stored
+        let bufferStart = handlers - 80;   // a constant
+        let bufferEnd = bufferStart;  // ptr to the word *after* the last word containing a character
+
+        let cursorX = 0;
+        let cursorY = 0;
+        let lastKeyPressed = 0;
+
+        return;
+    }
+
+    /* rib :: x y z -- rib(x, y, z) */
+    function void handleRib() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let z = stack[0];
+
+        let tmp = stack[1];
+        let y = tmp[0];
+
+        // The entry holding x will be the new top of stack:
+        let stack = tmp[1];
+        let x = stack[0];
+
+        // Now re-use the second entry's rib as the newly-constructed rib:
+        let tmp[0] = x;
+        let tmp[1] = y;
+        let tmp[2] = z;
+        let stack[0] = tmp;
+
+        return;
+    }
+
+    /* id :: x -- x */
+    function void handleId() {
+        return;
+    }
+
+    /* arg1 :: x y -- x)  # i.e. "drop" */
+    function void handleArg1() {
+        let stack = stack[1];
+
+        return;
+    }
+
+    /* arg2 :: x y -- y */
+    function void handleArg2() {
+        var int y;
+
+        // y = pop()
+        let y = stack[0];
+        let stack = stack[1];
+
+        // replace(y)
+        let stack[0] = y;
+
+        return;
+    }
+
+    /* close :: x -- rib(x[0], stack, 1) */
+    function void handleClose() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: modifyinging the top entry on the stack in place,
+        // but allocating a new rib for the closure.
+        let tmp = stack[0];
+        let stack[0] = Interpreter.alloc(tmp[0], stack[1], 1);
+
+        return;
+    }
+
+    /* rib? :: x -- bool(x is a rib) */
+    function void handleRibQ() {
+        var int x, y, z;
+        var Rib tmp;
+
+        let tmp = stack[0];
+        if (Rib.isRib(tmp)) {
+            let stack[0] = Jack.symbol("rib_true");
+        }
+        else {
+            let stack[0] = Jack.symbol("rib_false");
+        }
+
+        return;
+    }
+
+    /* field0 :: rib(x, _, _) -- x */
+    function void handleField0() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[0];
+
+        return;
+    }
+
+    /* field1 :: rib(_, y, _) -- y */
+    function void handleField1() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[1];
+
+        return;
+    }
+
+    /* field2 :: rib(_, _, z) -- z */
+    function void handleField2() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // No allocation: the top entry on the stack is updated in place
+        let tmp = stack[0];
+        let stack[0] = tmp[2];
+
+        return;
+    }
+
+    /* field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z)) */
+    function void handleField0_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let x = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[0] = x;
+        // Update the second entry on the stack in place:
+        let stack[0] = x;
+
+        return;
+    }
+
+    /*  field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z)) */
+    function void handleField1_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let y = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[1] = y;
+        // Update the second entry on the stack in place:
+        let stack[0] = y;
+
+        return;
+    }
+
+    /*  field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z)) */
+    function void handleField2_set() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        let z = Interpreter.pop();
+        let tmp = stack[0];
+        let tmp[2] = z;
+        // Update the second entry on the stack in place:
+        let stack[0] = z;
+
+        return;
+    }
+
+    /*  eqv? :: x y -- bool(x is identical to y) */
+    function void handleEqvQ() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage (top entry of stack)
+
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        if (x = y) {
+            let stack[0] = Jack.symbol("rib_true");
+        }
+        else {
+            let stack[0] = Jack.symbol("rib_false");
+        }
+
+        return;
+    }
+
+    /*  < :: x y -- bool(x < y) */
+    function void handleLt() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        if (x < y) {
+            let stack[0] = Jack.symbol("rib_true");
+        }
+        else {
+            let stack[0] = Jack.symbol("rib_false");
+        }
+
+        return;
+    }
+
+    /*  + :: x y -- x + y */
+    function void handlePlus() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        let stack[0] = x + y;
+
+        return;
+    }
+
+    /*  - :: x y -- x - y */
+    function void handleMinus() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+        // Update second stack entry in place:
+        let stack[0] = x - y;
+
+        return;
+    }
+
+    /*  * :: x y -- x * y */
+    function void handleTimes() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+
+        // Update second stack entry in place:
+        let stack[0] = Interpreter.multiply(x, y);
+
+        return;
+    }
+
+
+    /*  quotient :: x y -- x / y */
+    function void handleQuotient() {
+        var int x, y, z;
+        var Rib tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let x = stack[0];
+
+        // Update second stack entry in place:
+        let stack[0] = Interpreter.divide(x, y);
+
+        return;
+    }
+
+
+    /*  getchar :: -- <char from keyboard> (blocks an entire line is entered, while echoing characters)
+
+     Once a line is captured, multiple calls will return successive characters until all are
+     consumed. Then the next call will block again.
+
+     Note: this will only catch keypresses that occur after the instruction is executed.
+     */
+    function void handleGetchar() {
+        var Array keyboard;
+        var int c, underscore;
+        var Array cursorAddr;
+
+        if (~(bufferEnd > bufferStart)) {
+            let keyboard = Jack.symbol("KEYBOARD");
+            let underscore = 95;
+
+            while ((bufferEnd = bufferStart) | ~(c = 10)) {
+
+                let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+                let cursorAddr[0] = 0;
+
+                // First wait for the key to be different than the last call/iteration:
+                let c = keyboard[0];
+                while (c = lastKeyPressed) {
+                    let cursorAddr[0] = underscore - cursorAddr[0];  // blink
+                    let c = keyboard[0];
+                }
+
+                // Now wait for any key to be pressed:
+                while (c = 0) {
+                    let cursorAddr[0] = underscore - cursorAddr[0];  // blink
+                    let c = keyboard[0];
+                }
+
+                let lastKeyPressed = c;
+
+                if (c = 128) {
+                    // newline, in the weird HACK keymap
+
+                    // Clear the blicking cursor:
+                    let cursorAddr[0] = 0;
+
+                    //move the cursor to the next line:
+                    let cursorX = 0;
+                    let cursorY = cursorY + 1;
+
+                    // Map to regular newline
+                    let c = 10;
+
+                    // Add the
+                    let bufferEnd[0] = c;
+                    let bufferEnd = bufferEnd + 1;
+                }
+                else { if (c = 129) {
+                    // backspace
+                    if (bufferEnd > bufferStart) {
+                        // Clear the blinking cursor:
+                        let cursorAddr[0] = 0;
+
+                        // Move left and delete the last character from the buffer:
+                        let cursorX = cursorX - 1;
+                        let bufferEnd = bufferEnd - 1;
+                    }
+                }
+                else { if (cursorX < 80) {
+                    let cursorAddr[0] = c;
+                    let cursorX = cursorX + 1;
+                    let bufferEnd[0] = c;
+                    let bufferEnd = bufferEnd + 1;
+                }}}
+                // TODO: if we're at the bottom of the screen, scroll everything up
+            }
+
+            // An entire line has been captured; yield the first character and return:
+            do Interpreter.push(bufferStart[0]);
+            let bufferStart = bufferStart + 1;
+
+            return;
+        }
+        else {
+            // Some characters were captured previously, so return the next in the sequence:
+            let c = bufferStart[0];
+            let bufferStart = bufferStart+1;
+            if (~(bufferStart < bufferEnd)) {
+                // No more characters after this; reset the buffer
+                let bufferStart = handlers - 80;
+                let bufferEnd = bufferStart;
+            }
+            do Interpreter.push(c);
+            return;
+        }
+    }
+
+    /*  putchar :: c -- c (and draw the character at the current position) */
+    function void handlePutchar() {
+        var int c;
+        var Array cursorAddr;
+
+        // let c = Interpreter.peek();
+        let c = stack[0];
+
+        if (c = 10) {
+            let cursorX = 0;
+            let cursorY = cursorY + 1;
+            // TODO: if we're at the bottom of the screen, scroll everything up
+        }
+        else {
+            let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
+            let cursorAddr[0] = c;
+
+            let cursorX = cursorX + 1;
+        }
+
+        return;
+    }
+
+    /*  peek :: x -- RAM[x]
+
+     Note: the address is limited to the range of (tagged) int. It certainly can address low RAM,
+     including the screen buffer and the location for the keyboard/TTY.
+     */
+    function void handlePeek() {
+        var int x;
+        var Array tmp;
+
+        let tmp = 0;
+
+        let x = stack[0];
+        let stack[0] = tmp[x];
+
+        return;
+    }
+
+    /*  poke :: x y -- y (and write the value y at RAM[x])
+
+     Note: the address is limited to the range of (tagged) int. It certainly can address low RAM,
+     including the screen buffer and the location for the keyboard/TTY.
+    */
+   function void handlePoke() {
+        var int y;
+        var Array tmp;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+
+        let tmp = stack[0];
+        let tmp[0] = y;
+
+        // Update the second stack entry in place
+        let stack[0] = y;
+
+        return;
+    }
+
+    /*  halt :: -- (no more instructions are executed) */
+    function void handleHalt() {
+        do Interpreter.halt();
+    }
+
+    /* screenAddr :: x y -- address of character at column x, line y
+
+     Cheat: calculate the address of a character in the screen buffer, using
+     hand-coded "shift" and adds to multiply by 80, and without any allocation.
+
+     Doing its own (interpreter) stack manipulation to keep variables local and avoid arguments
+     on the (Jack) stack, and doing it by hand so this can be a leaf function.
+
+     TODO: implement function inlining and just use pop/peek/replace
+    */
+    function void handleScreenAddr() {
+        var int x, y, addr;
+        // var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
+
+        // let tty[0] = -42;
+
+        // let y = Interpreter.pop();
+        let y = stack[0];
+        let stack = stack[1];
+        // let x = Interpreter.pop();
+        let x = stack[0];  // i.e. peek()
+
+        // // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
+        // let acc0 = y + y;       //  2y
+        // let acc1 = acc0 + acc0; //  4y
+        // let acc2 = acc1 + y;    //  5y
+        // let acc3 = acc2 + acc2; // 10y
+        // let acc4 = acc3 + acc3; // 20y
+        // let acc5 = acc4 + acc4; // 40y
+        // let acc6 = acc5 + acc5; // 80y
+
+        // let addr = 2048 + acc6 + x;
+
+        let addr = Interpreter.screenAddr(x, y);
+
+        // do Interpreter.push(addr);
+        let stack[0] = addr;  // replace();
+
+        return;
+    }
+
+    function Array screenAddr(int x, int y) {
+        var int acc0, acc1, acc2, acc3, acc4, acc5, acc6;
+
+        // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
+        let acc0 = y + y;       //  2y
+        let acc1 = acc0 + acc0; //  4y
+        let acc2 = acc1 + y;    //  5y
+        let acc3 = acc2 + acc2; // 10y
+        let acc4 = acc3 + acc3; // 20y
+        let acc5 = acc4 + acc4; // 40y
+        let acc6 = acc5 + acc5; // 80y
+
+        return 2048 + acc6 + x;
+    }
+
+    /* Handler for any unused primitive code. */
+    function void handleUnimp() {
+        // TODO
+        do Interpreter.halt();
+    }
+
+    /**
+     Decode the "y" value from a jump/call, set, or get instruction, and return the rib that
+     contains the target, which might be a stack entry or a symbol. In either case, the actual
+     target is found in the "x" field of the result.
+     */
+    function Rib getTarget() {
+        var int slotOrGlobal;
+        var int i;
+        var Rib ptr;
+
+        let slotOrGlobal = pc[1];
+        if ((slotOrGlobal > -1) & (slotOrGlobal < 1000)) {
+            // y is slot # of target
+            let i = slotOrGlobal;
+            let ptr = stack;
+            while (i > 0) {
+                let ptr = ptr[1];
+                let i = i - 1;
+            }
+            return ptr;
+        }
+        else {
+            // y is addr of target symbol
+            return slotOrGlobal;
+        }
+    }
+
+    /**
+     Pop numArgs objects from the stack, assembling them into a new stack (in reverse order),
+     on top of the just-allocated continuation rib.
+
+     Note aggressive manual inlining here to reduce call overhead because this
+     is part of the most expensive code path.
+     */
+    function Rib wrangleClosureParams(Rib proc, Rib cont) {
+        var Rib code;
+        var int numArgs;
+        var int x;
+        var Rib newStack;
+
+        let code = proc[0];
+        let numArgs = code[0];
+        let newStack = cont;
+        while (numArgs > 0) {
+            // let x = Interpreter.pop();
+            let x = stack[0];
+            let stack = stack[1];
+
+            // Note: can't re-use the stack entries, because they seem to be shared
+            // with captured environment in some cases:
+            // let newStack = Interpreter.alloc(x, newStack, 0);
+            let nextRib[0] = x;
+            let nextRib[1] = newStack;
+            let nextRib[2] = 0;
+            let newStack = nextRib;
+            let nextRib = nextRib + 3;
+
+            let numArgs = numArgs - 1;
+        }
+        return newStack;
+    }
+
+    /**
+     This was lifted verbatim from Math.jack in the solutions for project 12 from the book, except
+     for inlining abs().
+     Does that mean it's good? Maybe, but it probably works.
+     */
+    function int multiply(int x, int y) {
+        var int localX, localY;
+        var boolean neg;
+        var int tmp;
+        var int sum, shiftedX, shiftedBit;
+
+        // local copies for quick access
+        let localX = x;
+        let localY = y;
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        // Note: testing each operand only once to minimize branching.
+        let neg = false;
+        if (localY < 0) {
+            let localY = -localY;
+            let neg = ~neg;
+        }
+        if (localX < 0) {
+            let localX = -localX;
+            let neg = ~neg;
+        }
+
+        // Put the smaller (abs.) value in y (because this is O(log y)):
+        if (localX < localY) {
+            let tmp = localY;
+            let localY = localX;
+            let localX = tmp;
+        }
+
+        let sum = 0;
+        let shiftedX = localX;
+        let shiftedBit = 1;
+
+        while ((shiftedBit > 0) & ~(shiftedBit > localY)) {
+            if (localY & shiftedBit) {
+                let sum = sum + shiftedX;
+            }
+            let shiftedX = shiftedX + shiftedX;
+            let shiftedBit = shiftedBit + shiftedBit;
+        }
+
+        // Check the original signs and adjust the result:
+        if (neg) {
+            return -sum;
+        }
+        else {
+            return sum;
+        }
+    }
+
+    /**
+     This was lifted verbatim from Math.jack in the solutions for project 12 from the book, except
+     for inlining abs().
+     Does that mean it's good? Maybe, but it probably works.
+     */
+     function int divide(int x, int y) {
+        var boolean neg;
+        var int q, r;
+
+        if (y = 0) {
+            do Interpreter.halt();
+        }
+
+        // Get sign, then take absolute values (inline to save fn calls):
+        // Note: testing each operand only once to minimize branching.
+        let neg = false;
+        if (y < 0) {
+            let y = -y;
+            let neg = ~neg;
+        }
+        if (x < 0) {
+            let x = -x;
+            let neg = ~neg;
+        }
+
+        // No more bits to look at:
+        if (y > x) {
+            return 0;
+        }
+
+        // Try dividing by 2y:
+        if ((y+y) < 0) {
+            // If 2*y overflows, it's definitely > x.
+            let q = 0;
+        }
+        else {
+            let q = Interpreter.dividePos(x, y+y);
+        }
+        let r = q+q;
+        if (~((x - Interpreter.multiply(r, y)) < y)) {
+            let r = r + 1;
+        }
+
+        if (neg) {
+            return -r;
+        }
+        else {
+            return r;
+        }
+    }
+
+    /** Divide x by y, assuming both a positive. */
+    function int dividePos(int x, int y) {
+        var int q, r;
+
+        // No more bits to look at:
+        if (y > x) {
+            return 0;
+        }
+
+        // Try dividing by 2y:
+        if ((y+y) < 0) {
+            // If 2*y overflows, it's definitely > x.
+            let q = 0;
+        }
+        else {
+            let q = Interpreter.dividePos(x, y+y);
+        }
+        let r = q+q;
+        if (~((x - Interpreter.multiply(r, y)) < y)) {
+            let r = r + 1;
+        }
+
+        return r;
+    }
+
+    /** Allocate a rib on the heap, filling in the three fields. */
+    function Rib alloc(int x, int y, int z) {
+        var Rib r;
+
+        // Note: makes this not a leaf function, but most callers have already inlined it anyway
+        do Interpreter.checkHeap();
+
+        let r = nextRib;
+        let r[0] = x;
+        let r[1] = y;
+        let r[2] = z;
+        let nextRib = nextRib + 3;
+        return r;
+    }
+
+    /**
+     Make sure there's space to allocate a rib, otherwise halt.
+
+     TODO: make space by collecting garbage.
+     */
+    function void checkHeap() {
+        if (~Rib.isRib(nextRib)) {
+            do Interpreter.halt();
+        }
+        else {
+            return;
+        }
+    }
+
+    function void push(int obj) {
+        // let stack = Interpreter.alloc(obj, stack, 0); // pair-type
+
+        // Avoid function call overhead by doing the allocation directly here:
+        let nextRib[0] = obj;
+        let nextRib[1] = stack;
+        let nextRib[2] = 0;  // pair type
+        let stack = nextRib;
+        let nextRib = nextRib+3;
+
+        return;
+    }
+
+    /** Discard the top entry from the stack, return its CAR. */
+    // TODO: get the compiler to inline this
+    function int pop() {
+        var int r;
+        let r = stack[0];
+        let stack = stack[1];
+        return r;
+    }
+
+    // /** Get the object on the top of the stack, without removing it. */
+    // // TODO: get the compiler to inline this
+    // function int peek() {
+    //     return stack[0];
+    // }
+
+    // /** Overwrite the object on the top of the stack, avoiding allocation. */
+    // // TODO: get the compiler to inline this
+    // function void replace(int obj) {
+    //     let stack[0] = obj;
+    //     return;
+    // }
+
+    /**
+     Address of the continuation rib in the current stack frame: the first entry in the
+     stack with z != 0.
+     */
+    function Rib findContinuation() {
+        var Rib ptr;
+
+        let ptr = stack;
+        while (ptr[2] = 0) {
+            let ptr = ptr[1];
+        }
+        return ptr;
+    }
+
+    function void halt() {
+        while (1) {
+            // let tty[0] = -1; // DEBUG
+        }
+    }
+}

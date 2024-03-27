@@ -10,6 +10,48 @@ from alt.reg import *
 from alt.reg import _Stmt_str
 
 
+def test_simplify_expression():
+    binary = jack_ast.BinaryExpression
+    def tilde(exp): return jack_ast.UnaryExpression(jack_ast.Op("~"), exp)
+    x = jack_ast.VarRef("x")
+    op = jack_ast.Op
+    const = jack_ast.IntegerConstant
+    def neg(exp): return jack_ast.UnaryExpression(jack_ast.Op("-"), exp)
+
+    assert (simplify_expression(neg(const(1)))
+                             == const(-1))
+
+    assert (simplify_expression(binary(x, op("+"), neg(const(1))))
+                             == binary(x, op("+"), const(-1)))
+
+    assert (simplify_expression(binary(x, op("<"), const(0)))
+                             == binary(x, op("<"), const(0)))
+
+    assert (simplify_expression(tilde(binary(x, op("<"), const(0))))
+                                   == binary(x, op(">="), const(0)))
+
+    assert (simplify_expression(binary(x, op(">"), neg(const(100))))
+                             == binary(x, op(">"), const(-100)))
+
+    assert (simplify_expression(binary(const(0), op("<"), x))
+                             == binary(x, op(">"), const(0)))
+
+    # These case might seem fiddly, but they do tend to come up and comparing with 0
+    # is just a lot simpler:
+    assert (simplify_expression(binary(x, op(">"), const(-1)))
+                             == binary(x, op(">="), const(0)))
+
+    assert (simplify_expression(binary(x, op("<="), const(-1)))
+                             == binary(x, op("<"), const(0)))
+
+    assert (simplify_expression(binary(x, op("<"), const(1)))
+                             == binary(x, op("<="), const(0)))
+
+    assert (simplify_expression(binary(x, op(">="), const(1)))
+                             == binary(x, op(">"), const(0)))
+
+
+
 def test_if_liveness():
     src = """
 class Main {
