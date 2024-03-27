@@ -46,22 +46,18 @@ Two additional primitives are provided, to support dynamic dispatch (that is, st
 of a function or method and invoking it later):
 
 - Jack.symbol(<string>): address of the given label.
-- Jack.invoke(ptr): call the function/method referred to by the pointer.
+- Jack.invoke(ptr): call the function referred to by the pointer.
 
 For example, this code sequence:
 
-```
-var int fptr;  // the type doesn't matter
-let fooPtr = Jack.symbol("main.foo");
-...
-do Jack.invoke(fooPtr);
-```
+    var int fooPtr;  // the type doesn't matter
+    let fooPtr = Jack.symbol("main.foo");
+    ...
+    do Jack.invoke(fooPtr);
 
 has the same effect as this simple call:
 
-```
-do Main.foo();
-```
+    do Main.foo();
 """
 
 
