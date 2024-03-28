@@ -33,6 +33,7 @@ def MemorySystem(inputs, outputs):
 
     # SOLVERS: replace this with one or more Nands and/or components defined above
     # Hint: you'll need a RAM(14), a RAM(13), an Input, and an Output.
+    # DO NOT use the RAMxx you built in project_03, it will be too slow to simulate.
     n1 = solved_05.MemorySystem(in_=in_, load=load, address=address)
 
     outputs.out = n1.out

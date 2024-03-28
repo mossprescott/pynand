@@ -197,8 +197,9 @@ def ram_test(ram, size):
 
     ram.load = 1
     for i in addrs:
-        ram.in_ = i
         ram.address = i
+        ram.tick(); ram.tock()  # Note: one-cycle latency is now expected for writes also
+        ram.in_ = i
         ram.tick(); ram.tock()
         assert ram.out == i
 
@@ -206,6 +207,7 @@ def ram_test(ram, size):
     ram.load = 0
     for i in addrs:
         ram.address = i
+        ram.tick(); ram.tock()  # Note: one-cycle latency is now expected for the "real" RAM
         assert ram.out == i
 
 

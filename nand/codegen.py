@@ -157,6 +157,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             return f"_{all_comps.index(comp)}_dff"
         elif comp.label == "Register":
             return f"_{all_comps.index(comp)}_reg"
+        elif comp.label == "MemorySystem":
+            return f"_{all_comps.index(comp)}_mem"
         else:
             return f"_{all_comps.index(comp)}_out"
 
@@ -174,14 +176,14 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 value = f"({expr})"
             elif conn.comp.label == "DFF":
                 value = f"_{all_comps.index(conn.comp)}_dff"
-            elif conn.comp.label == "Register":
-                value = f"_{all_comps.index(conn.comp)}_reg"
+            # elif conn.comp.label == "Register":
+            #     value = f"_{all_comps.index(conn.comp)}_reg"
             else:
                 value = f"_{all_comps.index(conn.comp)}_{conn.name}"
         elif conn.comp.label == "DFF":
             value = f"_{all_comps.index(conn.comp)}_dff"
-        elif conn.comp.label == "Register":
-            value = f"_{all_comps.index(conn.comp)}_reg"
+        # elif conn.comp.label == "Register":
+        #     value = f"_{all_comps.index(conn.comp)}_reg"
         elif conn.comp.label == "MemorySystem" and conn.name == "tty_ready":
             # Tricky: this seems pretty bogus. MemorySystem is the first primitive
             # which has more than one output, and it can be computed from the
@@ -215,6 +217,8 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 return f"self._{conn.name}"
             elif conn.comp.label == "Register":
                 return f"_{all_comps.index(conn.comp)}_reg"
+            elif conn.comp.label == "MemorySystem":
+                return f"_{all_comps.index(conn.comp)}_mem"
             elif inlinable(conn.comp):
                 expr = component_expr(conn.comp)
                 if expr:
@@ -289,17 +293,13 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
             return None
         elif comp.label == "Register":
             return None
+        elif comp.label == "MemorySystem":
+            return None
         elif isinstance(comp, DFF):
             return None
         elif isinstance(comp, ROM):
             # Note: the ROM is read on every cycle, so no point in trying to inline it away
             return None
-        elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always
-            # register A (so, saved in self). But is that true for chips that add more ways to access
-            # the RAM?
-            address = src_many(comp, 'address', 14)
-            return f"self._ram[{address}] if 0 <= {address} < 0x4000 else (self._screen[{address} & 0x1fff] if 0x4000 <= {address} < 0x6000 else (self._keyboard if {address} == 0x6000 else 0))"
         else:
             raise Exception(f"Unrecognized primitive: {comp}")
 
@@ -338,10 +338,22 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         if comp.label in ("DFF", "Register"):
             comp_name = output_name(comp)
             l(3, f"{comp_name} = self.{comp_name}")
+        elif comp.label == "MemorySystem":
+            comp_name = output_name(comp)
+            l(3, f"if 0 <= self._latched_address < 0x4000:")
+            l(4,   f"{comp_name} = self._ram[self._latched_address]")
+            l(3, f"elif 0x4000 <= self._latched_address < 0x6000:")
+            l(4,   f"{comp_name} = self._screen[self._latched_address & 0x1fff]")
+            l(3, f"elif self._latched_address == 0x6000:")
+            l(4,   f"{comp_name} = self._keyboard")
+            l(3, f"else:")
+            l(4,   f"{comp_name} = 0")
+
+            # l(3, f"{comp_name} = self._ram[self._latched_address] if 0 <= self._latched_address < 0x4000 else (self._screen[self._latched_address & 0x1fff] if 0x4000 <= self._latched_address < 0x6000 else (self._keyboard if self._latched_address == 0x6000 else 0))")
     for comp in all_comps:
         if isinstance(comp, (Const, DFF)):
             pass
-        elif comp.label == "Register":
+        elif comp.label in ("Register", "MemorySystem"):
             pass
         elif isinstance(comp, ROM):
             # TODO: trap index errors with try/except
@@ -423,19 +435,19 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
                 l(5,   f"self.{output_name(comp)} = {src_many(comp, 'in_')}")
             any_state = True
         elif comp.label == "MemorySystem":
-            # Note: the source of address better not be a big computation. At the moment it's always
-            # register A (so, saved in self)
-            address_expr = src_many(comp, 'address', 14)
+            # Note: we also write to the latched address, because that's what's most useful
             in_name = f"_{all_comps.index(comp)}_in"
             l(4, f"if {src_one(comp, 'load')}:")
             l(5,   f"{in_name} = {src_many(comp, 'in_')}")
-            l(5,   f"if 0 <= {address_expr} < 0x4000:")
-            l(6,     f"self._ram[{address_expr}] = {in_name}")
-            l(5,   f"elif 0x4000 <= {address_expr} < 0x6000:")
-            l(6,     f"self._screen[{address_expr} & 0x1fff] = {in_name}")
-            l(5,   f"elif {address_expr} == 0x6000:")
+            l(5,   f"if 0 <= self._latched_address < 0x4000:")
+            l(6,     f"self._ram[self._latched_address] = {in_name}")
+            l(5,   f"elif 0x4000 <= self._latched_address < 0x6000:")
+            l(6,     f"self._screen[self._latched_address & 0x1fff] = {in_name}")
+            l(5,   f"elif self._latched_address == 0x6000:")
             l(6,     f"self._tty = {in_name}")
             l(6,     f"self._tty_ready = {in_name} != 0")
+            address_expr = src_many(comp, 'address', 14)
+            l(4, f"self._latched_address = {address_expr}")
             any_state = True
         elif isinstance(comp, (Const, ROM)):
             pass
@@ -501,6 +513,7 @@ class SOC(Chip):
 
     def __init__(self):
         self._rom = []
+        self._latched_address = 0
         self._ram = [0]*(1 << 14)
         self._screen = [0]*(1 << 13)
         self._keyboard = 0

@@ -42,6 +42,8 @@ def MemorySystem(inputs, outputs):
     keyboard = Input()
     tty = Output(in_=in_, load=load_bank.d)
 
+    # Note: this is mapping keyboard/input to _all_ high addresses, which definitely seems like
+    # cheating.
     outputs.out = Mux4Way16(a=ram.out, b=ram.out, c=screen.out, d=keyboard.out, sel=bank).out
 
     # Tricky: need to expose some "output" from the Output component in order for the component
@@ -63,7 +65,11 @@ def CPU(inputs, outputs):
     not_i = Not(in_=i).out
 
     alu = lazy()
-    a_reg = Register(in_=Mux16(a=instruction, b=alu.out, sel=i).out, load=Or(a=not_i, b=da).out)
+
+    a_in = Mux16(a=instruction, b=alu.out, sel=i).out
+    a_load = Or(a=not_i, b=da).out
+
+    a_reg = Register(in_=a_in, load=a_load)
     d_reg = Register(in_=alu.out, load=And(a=i, b=dd).out)
     jump_lt = And(a=alu.ng, b=jlt).out
     jump_eq = And(a=alu.zr, b=jeq).out
@@ -75,11 +81,22 @@ def CPU(inputs, outputs):
     alu.set(ALU(x=d_reg.out, y=Mux16(a=a_reg.out, b=inM, sel=a).out,
                 zx=c5, nx=c4, zy=c3, ny=c2, f=c1, no=c0))
 
+    # Tricky: the memory now requires the address to be presented one-cycle ahead, so "pipeline"
+    # it from the instruction/alu which is being written to A in this cycle.
+    addr = Mux16(a=a_reg.out, b=a_in, sel=a_load).out
 
-    outputs.outM = alu.out                   # M value output
-    outputs.writeM = And(a=dm, b=i).out      # Write to M?
-    outputs.addressM = a_reg.out             # Address in data memory (of M) (latched)
-    outputs.pc = pc.out                      # address of next instruction (latched)
+    # Don't write to memory if a reset is happening, mostly because there's a test from the
+    # original materials that checks. Note: writes to A and D are not suppressed; I suppose
+    # one could argue that it doesn't matter because the program shouldn't assume they're zero?
+    write = And(a=And(
+                a=dm,
+                b=i).out,
+                b=Not(in_=reset).out).out
+
+    outputs.outM = alu.out    # M value output
+    outputs.writeM = write    # Write to M?
+    outputs.addressM = addr   # Address in data memory (of M)
+    outputs.pc = pc.out       # address of next instruction (latched)
 
 
 @chip
