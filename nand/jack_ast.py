@@ -33,7 +33,11 @@ class ArrayRef(NamedTuple):
     array_index: "ExpressionRec"
 
 class SubroutineCall(NamedTuple):
-    """Note: either class_name or var_name or neither may be present."""
+    """Note: either class_name or var_name or neither may be present.
+    Also: this is the only kind of expression that can have side effects. For example, the callee
+    might update a static or field or write to memory. Therefore order of evaluation needs to
+    be preserved only when these are involved.
+    """
 
     class_name: Optional[str]
     var_name: Optional[str]

@@ -16,6 +16,7 @@ from alt.reduce import REDUCE_PLATFORM
 from alt.shift import SHIFT_PLATFORM
 from alt.sp import SP_PLATFORM
 from alt.threaded import THREADED_PLATFORM
+import alt.big
 
 def main():
     std = measure(BUNDLED_PLATFORM)
@@ -34,6 +35,8 @@ def main():
     # Note: currently the eight-bit CPU doesn't run correctly in the "codegen" simulator, so it's
     # a little painful to measure its performance directly. However, by design it takes exactly
     # two cycles per instruction, so we can just report that with a relatively clear conscience.
+    print_relative_result("alt/big.py", std, (gate_count(alt.big.BigComputer)['nands'], std[1], std[2]*2, std[3]*2))  # Cheeky
+    # Similar
 
 
 def print_result(name, t):

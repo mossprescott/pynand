@@ -27,11 +27,7 @@ def run(ic, optimize = True):
     if optimize:
         ic = simplify(ic)
     nv, stateful = synthesize(ic)
-    if any(isinstance(c, ROM) for c in ic.sorted_components()):
-        w = NandVectorComputerWrapper(nv, stateful)
-    else:
-        w = NandVectorWrapper(nv)
-    return w
+    return NandVectorWrapper(nv, stateful)
 
 
 def synthesize(ic):
@@ -519,11 +515,40 @@ def custom_op(f):
 
 
 class NandVectorWrapper:
-    """Convenient syntax around a NandVector. You get one of these from run(chip).
+    """Wrapper with extra operations for the full Computer, when the expected components are found.
+
+    If there are any ROMs, init_rom operates on one, chosen arbitrarily.
+
+    If there are any RAMs, peek/poke operate on the largest RAM.
+    If there is more than one RAM, peek_/poke_screen operate on the *second* largest RAM.
+
+    If there is a ROM and an output "pc", run_program is can be used to run a sequence of
+    instructions completely.
+
+    If there is an input "reset", reset_program will use it to reset the processor state.
+
+    If there is any Input, set_keydown will set the keycode that can be read through it.
+
+    If there is any Output, get_tty will read the last character written to it, and reset it's
+    "ready" flag.
     """
 
-    def __init__(self, vector):
+    def __init__(self, vector, stateful):
         self._vector = vector
+        self._stateful = stateful
+
+        def nth(seq, n):
+            lst = list(seq)
+            if len(lst) > n:
+                return lst[n]
+
+        self._rom = nth((c for c in self._stateful if isinstance(c, ROMOps)), 0)
+        rams_by_size_desc = sorted((c for c in self._stateful if isinstance(c, RAMOps)),
+                                   key=lambda c: c.comp.address_bits, reverse=True)
+        self._mem = nth(rams_by_size_desc, 0)
+        self._screen = nth(rams_by_size_desc, 1)
+        self._keyboard = nth((c for c in self._stateful if isinstance(c, InputOps)), 0)
+        self._tty = nth((c for c in self._stateful if isinstance(c, OutputOps)), 0)
 
     def __setattr__(self, name, value):
         """Set the value of a single- or multiple-bit input."""
@@ -583,32 +608,14 @@ class NandVectorWrapper:
     def internal(self):
         return dict([(name, self.get_internal(name)) for (name, _) in self._vector.internal.keys()])
 
-    def components(self, types):
-        """List of internal components (e.g. RAM, ROM).
 
-        Note: types should be one or more of the types defined in nand.component, not the wrappers
-        with the same names defined in this module.
-        """
-        return [c for c in self._components if isinstance(c, types)]
-
-    def __repr__(self):
-        return str(self.outputs())
-
-
-class NandVectorComputerWrapper(NandVectorWrapper):
-    """Wrapper with extra operations for the full Computer."""
-
-    def __init__(self, vector, stateful):
-        NandVectorWrapper.__init__(self, vector)
-        self._stateful = stateful
-        self._rom, = [c for c in self._stateful if isinstance(c, ROMOps)]
-        self._mem, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 14]
-        self._screen, = [c for c in self._stateful if isinstance(c, RAMOps) and c.comp.address_bits == 13]
-        self._keyboard, = [c for c in self._stateful if isinstance(c, InputOps)]
-        self._tty, = [c for c in self._stateful if isinstance(c, OutputOps)]
+    # High-level
 
     def run_program(self, instructions):
         """Install and run a sequence of instructions, stopping when pc runs off the end."""
+
+        if ('pc', 0) not in self._vector.outputs:
+            raise MissingComponent("'pc' not present (or not exposed as an output)")
 
         self.init_rom(instructions)
 
@@ -617,6 +624,9 @@ class NandVectorComputerWrapper(NandVectorWrapper):
 
     def reset_program(self):
         """Reset pc so the program will run again from the top."""
+
+        if ('reset', 0) not in self._vector.inputs:
+            raise MissingComponent("No 'reset' input present")
 
         self.reset = 1
         self.ticktock()
@@ -628,6 +638,9 @@ class NandVectorComputerWrapper(NandVectorWrapper):
         If there's any space left over, an two-instruction infinite loop is written immediately
         after the program, which could in theory be used to detect termination.
         """
+
+        if self._rom is None:
+            raise MissingComponent("No ROM present")
 
         size = len(instructions)
 
@@ -645,26 +658,63 @@ class NandVectorComputerWrapper(NandVectorWrapper):
 
     def peek(self, address):
         """Read a single word from the Computer's memory."""
+
+        if self._mem is None:
+            raise MissingComponent("No RAM present")
+
         return self._mem.storage[address]
 
     def poke(self, address, value):
         """Write a single word to the Computer's memory."""
+
+        if self._mem is None:
+            raise MissingComponent("No RAM present")
+
         self._mem.storage[address] = value
 
     def peek_screen(self, address):
-        """Read a value from the display RAM. Address must be between 0x000 and 0x1FFF."""
+        """Read a value from the separate display RAM.
+
+        Assuming the standard memory layout, address must be between 0x000 and 0x1FFF.
+        """
+
+        if self._screen is None:
+            raise MissingComponent("No separate screen RAM present")
+
         return self._screen.storage[address]
 
     def poke_screen(self, address, value):
-        """Write a value to the display RAM. Address must be between 0x000 and 0x1FFF."""
+        """Write a value to the separate display RAM.
+
+        Assuming the standard memory layout, address must be between 0x000 and 0x1FFF.
+        """
+
+        if self._screen is None:
+            raise MissingComponent("No separate screen RAM present")
+
         self._screen.storage[address] = value
+
+    def peek_rom(self, address):
+        """Read a single word from the Computer's ROM."""
+
+        if self._rom is None:
+            raise MissingComponent("No ROM present")
+
+        return self._rom.storage[address]
 
     def set_keydown(self, keycode):
         """Provide the code which identifies a single key which is currently pressed."""
+
+        if self._keyboard is None:
+            raise MissingComponent("No Input present")
+
         self._keyboard.set(keycode)
 
     def get_tty(self):
         """Read one word of output which has been written to the tty port, and reset it to 0."""
+
+        if self._tty is None:
+            raise MissingComponent("No Output present")
 
         # Tricky: clearing the value in the Output component flips its `ready` output, most of the time.
         self._vector.dirty = True
@@ -674,5 +724,30 @@ class NandVectorComputerWrapper(NandVectorWrapper):
     # that subclasses can override.
     @property
     def sp(self):
-        """Read the current value of the stack pointer, which is normally stored at RAM[0]."""
-        return self.peek(0)
+        """Read the current value of the stack pointer, which is normally stored at RAM[0], but may
+        be an ordinary output in some cases.
+        """
+        if "sp" in self.outputs():
+            return self.__getattr__("sp")
+        else:
+            return self.peek(0)
+
+    def __repr__(self):
+        return str(self.outputs())
+
+
+class MissingComponent(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
+
+# def has_rom(ic):
+#     """Check for presence of exactly one ROM (any size)."""
+#     roms = [c for c in ic.sorted_components() if isinstance(c, ROM)]
+#     return len(roms) == 1
+
+
+# def has_ram(ic, address_bits):
+#     """Check for presence of exactly one RAM with the expected size."""
+#     rams = [c for c in ic.sorted_components() if isinstance(c, RAM) and c.address_bits == address_bits]
+#     return len(rams) == 1
