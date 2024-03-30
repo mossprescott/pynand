@@ -14,12 +14,13 @@ experience as compared to the tools provided by the authors:
 
 You need to have Python installed, at least version 3.6.
 
-Pytest is required to run the tests: `pip3 install pytest`.
+*Pytest* is required to run the tests: `pip3 install pytest`.
 
-For the full Computer simulation including display and keyboard, `pygame` is required:
-`pip3 install pygame`. On Mac OS X, you may need to install a dev version:
-`pip3 install pygame==2.0.0dev6`. To install pygame on M1 Mac (Big Sur), this may help:
-https://www.quora.com/How-do-you-install-Pygame-on-a-MacBook-M1?share=1.
+For the full computer simulation including display and keyboard, *Pygame* is required:
+`pip3 install pygame`.
+
+And for the best performance, you can install the static compiler *Cython*:
+`pip3 install cython`
 
 
 ## Step 1: Do the Exercises
@@ -57,19 +58,23 @@ running programs on your own designs as soon as you complete a single component 
 ## Step 2: Enjoy
 
 Run `./computer.py examples/Pong.asm`. Bask in the glory of a CPU you built from scratch.
-Note: the awesomeness starts after about 100,000 cycles.
+Note: the awesomeness starts after about 4 million cycles.
 
 ![Pong screenshot](examples/Pong.png)
 
+Depending on your hardware, you might need to use the simulator's options to get a playable
+game. Try `./computer.py --help` to get started.
+
 You can also run VM/Jack programs with `./computer.py [dir]`. The test programs for the
-compiler are available under `examples/project_11` (along with Pong in Jack source form),
-and the more interesting examples for testing the OS are in `examples/project_12`.
+compiler are available under [`examples/project_11`](examples/project_11/) (along with Pong in Jack
+source form), and the more interesting examples for testing the OS are in
+[`examples/project_12`](examples/project_11/).
 
 More interesting/challenging programs can be found on the internet if you're persistent.
 Beware: many JACK programs you can find are quite large and may or may not fit in ROM when
 the standard compiler/translator are used. I suspect their authors only ever tested them with
 the course's included "VM simulator", which doesn't require the program to be translated!
-You can try one of the alternative implementations (under `alt/`), several of which are
+You can try one of the alternative implementations (under [`alt/`](alt/)), several of which are
 aimed at supporting large programs.
 
 
@@ -94,10 +99,13 @@ Some experiments can be found in this repo under [alt/](alt/README.md).
 What language do you like to write? Can you compile _that_ language, or something like it, to
 the Hack VM? Or directly to assembly?
 
+One interesting (and still experimental) alternative language is included: an interactive
+interpreter for the Scheme language, ca 1991. See [alt/scheme](alt/scheme/).
+
 
 ## License
 
-This code is open source (MIT License), to the extent that I created it. However, if you want 
+This code is open source (MIT License), to the extent that I created it. However, if you want
 to base your own work on it you should be aware that the original work is covered by a different
 license, and I can provide no advice on the implications.
 
