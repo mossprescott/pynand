@@ -46,16 +46,17 @@ can implement your own "keyDown" and "drawChar" operations using `(peek 4095)` a
 
 ## Memory Layout
 
-| Address | Label                            | Contents | Description |
-| 0       | `interpreter.static_stack`       | SP       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry.                   |
-| 1       | `interpreter.static_pc`          | PC       | Address of the rib currently being interpreted.   |
-| 2       | `interpreter.static_nextRib`     | NEXT_RIB | Address where the next allocation will occur.     |
+| Address | Jack                            | Assembly | Description |
+|---------|----------------------------------|----------|-------------|
+| 0       | `Interpreter.stack`       | `SP`       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry.                   |
+| 1       | `Interpreter.pc`          | `PC`       | Address of the rib currently being interpreted.   |
+| 2       | `Interpreter.nextRib`     | `NEXT_RIB` | Address where the next allocation will occur.     |
 | ...     |                                  |          | TBD: values used by the garbage collector to keep track of free space. |
 | 256–    |                                  |          | Jack stack.                                       |
-| 1936–2015 | `interpreter.static_bufferStart`/`End` |  | Space to store a line of input from the keyboard. |
-| 2016–2047 | `interpreter.static_handlers`  |          | Function pointer for each primitive handler.      |
-| 2048-4048 |                                |          | Screen buffer: 80x25 characters.                  |
-| 4095      |                                | KEYBOARD | Mapped to the keyboard for input and "tty" for output. |
+| 1936–2015 | `Interpreter.bufferStart`/`End` |  | Space to store a line of input from the keyboard. |
+| 2016–2047 | `Interpreter.handlers`  |          | Function pointer for each primitive handler.      |
+| 2048-4048 |                                | `SCREEN` | Screen buffer: 80x25 characters.                  |
+| 4095      |                                | `KEYBOARD` | Mapped to the keyboard for input and "tty" for output. |
 | 4096–32767 |                               |          | ROM: interpreter, symbol names, instructions.     |
 | 32768–65536 |                              |          | Heap.                                             |
 
