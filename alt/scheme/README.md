@@ -10,7 +10,7 @@ Goals:
 - implement as little as possible in assembly/Jack; just the bare interpreter and Ribbit primitives,
   plus a few additions for accessing the hardware.
 
-![evaluating (+ 1 2)](capture.mov)
+![evaluating (+ 1 2)](capture.gif)
 
 
 ## Virtual Machine
