@@ -1709,7 +1709,8 @@ class Translator(solved_07.Translator):
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr(f"M={imm}")
             else:
-                self._handle(ast.expr)
+                if not isinstance(ast.expr, Temp):
+                    self._handle(ast.expr)
                 self.asm.instr(f"@{RESULT}")
                 self.asm.instr("M=D")
 
