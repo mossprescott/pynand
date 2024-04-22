@@ -49,7 +49,7 @@ For authentic Macintosh fonts, see https://archive.org/details/AppleMacintoshSys
 
 from nand import chip, lazy, RAM, ROM, Input, Output, DFF
 import nand.syntax
-from nand.vector import unsigned
+from nand.vector import extend_sign, unsigned
 from project_01 import And, Or, Not
 from project_03 import Mux, Mux16, Register, PC, ALU
 from nand.solutions import solved_06
@@ -289,7 +289,7 @@ def parse_op(string, symbols={}):
         value = eval(m.group(1))
         if value < -32768 or value > 65535:
             raise Exception(f"Constant value out of range: {value} ({string})")
-        return unsigned(value)
+        return extend_sign(value)
     else:
         return solved_06.parse_op(string, symbols)
 
