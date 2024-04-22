@@ -1,9 +1,17 @@
 #! /usr/bin/env pytest
 
-from nand import run, unsigned
+import nand
+from nand import unsigned
 from project_02 import *
 
-def test_halfAdder():
+
+def run(simulator):
+    def f(chip, **args):
+        return nand.run(chip, simulator=simulator, **args)
+    return f
+
+
+def test_halfAdder(run=run("vector")):
     result = run(HalfAdder, a=0, b=0)
     assert result.sum == 0 and result.carry == 0
 
@@ -16,38 +24,38 @@ def test_halfAdder():
     result = run(HalfAdder, a=1, b=1)
     assert result.sum == 0 and result.carry == 1
 
-def test_fullAdder():
+def test_fullAdder(run=run("vector")):
     result = run(FullAdder, a=0, b=0, c=0)
     assert result.sum == 0 and result.carry == 0
-    
+
     result = run(FullAdder, a=0, b=0, c=1)
     assert result.sum == 1 and result.carry == 0
-    
+
     result = run(FullAdder, a=0, b=1, c=0)
     assert result.sum == 1 and result.carry == 0
-    
+
     result = run(FullAdder, a=0, b=1, c=1)
     assert result.sum == 0 and result.carry == 1
-    
+
     result = run(FullAdder, a=1, b=0, c=0)
     assert result.sum == 1 and result.carry == 0
-    
+
     result = run(FullAdder, a=1, b=0, c=1)
     assert result.sum == 0 and result.carry == 1
-    
+
     result = run(FullAdder, a=1, b=1, c=0)
     assert result.sum == 0 and result.carry == 1
-    
+
     result = run(FullAdder, a=1, b=1, c=1)
     assert result.sum == 1 and result.carry == 1
 
-def test_inc16():
+def test_inc16(run=run("vector")):
     assert run(Inc16, in_= 0).out ==  1
     assert run(Inc16, in_=-1).out ==  0
     assert run(Inc16, in_= 5).out ==  6
     assert run(Inc16, in_=-5).out == -4
-    
-def test_add16():
+
+def test_add16(run=run("vector")):
     assert run(Add16, a=0, b=0).out == 0
     assert run(Add16, a=0, b=-1).out == -1
     assert run(Add16, a=-1, b=-1).out == -2
@@ -57,24 +65,24 @@ def test_add16():
     assert unsigned(run(Add16, a=0x3CC3, b=0x0FF0).out) == 0x4CB3
     assert unsigned(run(Add16, a=0x1234, b=0x9876).out) == 0xAAAA
 
-def test_zero16():
+def test_zero16(run=run("vector")):
     assert run(Zero16, in_=0).out == True
     assert run(Zero16, in_=12345).out == False
     for i in range(16):
         assert run(Zero16, in_=(1 << i)).out == False
 
-def test_neg16():
+def test_neg16(run=run("vector")):
     assert run(Neg16, in_=      0).out == False
     assert run(Neg16, in_=  32767).out == False
     assert run(Neg16, in_=     -1).out == True
     assert run(Neg16, in_= -32768).out == True
 
-def test_alu_nostat():
+def test_alu_nostat(run=run("vector")):
     alu = run(ALU)
-    
+
     alu.x = 0
-    alu.y = -1 
-    
+    alu.y = -1
+
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 0   # 0
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1; assert alu.out == 1   # 1
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == -1  # -1
@@ -97,7 +105,7 @@ def test_alu_nostat():
 
     alu.x = 23456
     alu.y = 7890
-    
+
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == 0      # 0
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1; assert alu.out == 1      # 1
     alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0; assert alu.out == -1     # -1
@@ -118,11 +126,11 @@ def test_alu_nostat():
     alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1; assert unsigned(alu.out) == 0x5FF2 # X | Y
 
 
-def test_alu(chip=ALU):
+def test_alu(chip=ALU, run=run("vector")):
     alu = run(chip)
 
     alu.x = 0
-    alu.y = -1 
+    alu.y = -1
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
@@ -180,7 +188,7 @@ def test_alu(chip=ALU):
 
 
     alu.x = 17
-    alu.y = 3 
+    alu.y = 3
 
     alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
     assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
