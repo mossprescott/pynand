@@ -77,6 +77,15 @@ def test_neg16(run=run("vector")):
     assert run(Neg16, in_=     -1).out == True
     assert run(Neg16, in_= -32768).out == True
 
+    # If a 16-bit "unsigned" value somehow sneaks in, it should be treated as negative:
+    assert run(Neg16, in_=  32768).out == True
+    assert run(Neg16, in_=  54605).out == True
+    assert run(Neg16, in_=  65535).out == True
+
+    # On the other hand, a 17-bit value wraps to positive:
+    assert run(Neg16, in_=  -65536).out == False
+
+
 def test_alu_nostat(run=run("vector")):
     alu = run(ALU)
 
