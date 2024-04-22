@@ -56,126 +56,41 @@ def test_and3():
         assert and3.out == (a and b and c)
 
 
+# Repeat the ALU tests:
+
+import test_02
+
+
+# Note: not running the same tests on "compiled" because of the extra dependency
+run_codegen = test_02.run(simulator="codegen")
+
+
+def test_halfAdder():
+    test_02.test_halfAdder(run_codegen)
+
+def test_fullAdder():
+    test_02.test_fullAdder(run_codegen)
+
+def test_inc16():
+    test_02.test_inc16(run_codegen)
+
+def test_add16():
+    test_02.test_add16(run_codegen)
+
+def test_zero16():
+    test_02.test_zero16(run_codegen)
+
+def test_neg16():
+    test_02.test_neg16(run_codegen)
+
+def test_alu_nostat():
+    test_02.test_alu_nostat(run_codegen)
+
 def test_alu():
-    alu = run(project_02.ALU.constr())
-
-    # HACK: copied verbatim from test_02
-
-    alu.x = 0
-    alu.y = -1
-
-    alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # 1
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y + 1
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 0  # X - 1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # Y - 1
-    assert alu.out == -2 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # X + Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # X - Y
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
+    test_02.test_alu(run=run_codegen)
 
 
-    alu.x = 17
-    alu.y = 3
-
-    alu.zx = 1; alu.nx = 0; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # 0
-    assert alu.out == 0 and alu.zr == 1 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # 1
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 1; alu.ny = 0; alu.f = 1; alu.no = 0  # -1
-    assert alu.out == -1 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 0  # X
-    assert alu.out == 17 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # Y
-    assert alu.out == 3 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 0; alu.no = 1  # !X
-    assert alu.out == -18 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 1  # !Y
-    assert alu.out == -4 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # -X
-    assert alu.out == -17 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # -Y
-    assert alu.out == -3 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 1  # X + 1
-    assert alu.out == 18 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y + 1
-    assert alu.out == 4 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 1; alu.ny = 1; alu.f = 1; alu.no = 0  # X - 1
-    assert alu.out == 16 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 1; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # Y - 1
-    assert alu.out == 2 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 0  # X + Y
-    assert alu.out == 20 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 0; alu.f = 1; alu.no = 1  # X - Y
-    assert alu.out == 14 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 1; alu.f = 1; alu.no = 1  # Y - X
-    assert alu.out == -14 and alu.zr == 0 and alu.ng == 1
-
-    alu.zx = 0; alu.nx = 0; alu.zy = 0; alu.ny = 0; alu.f = 0; alu.no = 0  # X & Y
-    assert alu.out == 1 and alu.zr == 0 and alu.ng == 0
-
-    alu.zx = 0; alu.nx = 1; alu.zy = 0; alu.ny = 1; alu.f = 0; alu.no = 1  # X | Y
-    assert alu.out == 19 and alu.zr == 0 and alu.ng == 0
-
+# Repeat the CPU tests:
 
 def test_pc():
     pc = run(project_03.PC.constr())

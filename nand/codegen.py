@@ -282,7 +282,7 @@ def generate_python(ic, inline=True, prefix_super=False, cython=False):
         elif comp.label == 'Eq16':
             return binary16(comp, "({a} & 0xffff) == ({b} & 0xffff)")
         elif comp.label == 'Neg16':
-            return unary16(comp, "{} < 0")
+            return unary16(comp, "({} & 0x8000) != 0")
         elif comp.label == 'Inc16':
             return None
         elif comp.label == 'Dec16':
