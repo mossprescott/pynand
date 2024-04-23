@@ -102,8 +102,9 @@ class Inspector:
                     if 0 <= x < len(PRIMITIVES):
                         return f"proc({PRIMITIVES[x]})"
                     else:
-                        num_args, instr = self.peek(x), self.peek(x+2)
-                        return f"proc(args={num_args}, env={list_str(self.stack(y))}, instr={self.show_addr(instr)}){self.show_addr(val)}"
+                        params = tag.untag_rib(x)
+                        num_args, instr = self.peek(params), self.peek(params+2)
+                        return f"proc(args={num_args}, env={list_str(self.stack(tag.untag_rib(y)))}, instr={self.show_addr(instr)}){self.show_addr(addr)}"
                 elif z == 2:  # symbol
                     return f"symbol({self._obj(y)} = {self._obj(x)})"
                 elif z == 3:  # string
@@ -121,7 +122,7 @@ class Inspector:
                         return elems
                 elif z == 5:
                     # Unexpected, but show the contents just in case
-                    return f"special({self.show_obj(x)}, {self.show_obj(y)}){self.show_addr(val)}"
+                    return f"special({self.show_obj(x)}, {self.show_obj(y)}){self.show_addr(addr)}"
                 else:
                     return f"TODO: ({x}, {y}, {z})"
 
