@@ -31,11 +31,8 @@ class Obj {
     /* Convert to a raw pointer. */
     function Rib untagRib(Obj obj) {
         // TODO: (optionally) check the tag bit
-        var int raw;
 
-        // Note: first negate to avoid overflow
-        let raw = -obj;
-        return raw + raw + raw;
+        return -(obj + obj + obj);
     }
 
     /* Strip off the sig bit. */
