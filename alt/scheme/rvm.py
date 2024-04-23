@@ -443,19 +443,10 @@ def decode(input, asm):
                     break
                 else:
                     params_lbl = asm.next_label("params")
-                    # print(f"{repr(n)}; {body}")
-                    # HACK: somehow values over 3 are already strings
-                    if isinstance(n, str) and n.startswith("#"):
-                        print(f"already hash-prefixed: {n}")
-                        n = n[1:]
-                    emit_rib(params_lbl, f"#{n}", "#0", body)
-                    # FIXME: is this even close?
+                    params_obj = emit_rib(params_lbl, f"#{n}", "#0", f"#{body}")
                     proc_label = asm.next_label("proc")
-                    asm.label(proc_label)
-                    asm.instr(f"@{params_lbl}")
-                    asm.instr(f"#{nil_obj}")
-                    asm.instr("#1")
-                    n = f"@{proc_label}"
+                    proc_obj = emit_rib(proc_label, f"#{params_obj}", f"#{nil_obj}", "#1")
+                    n = proc_obj
                     op = 4
 
         instr_obj = emit_instr(op-1, n, pop(), sym)
