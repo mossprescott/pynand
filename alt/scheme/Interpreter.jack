@@ -170,7 +170,7 @@ class Interpreter {
 
                 do Interpreter.push(symbol[0]);
 
-                let pc = pc[2];
+                let pc = Obj.untagRib(pc[2]);
             }
             else {
             if (opcode = 3) {
@@ -185,10 +185,10 @@ class Interpreter {
                 // if
 
                 if (Interpreter.pop() = rib_false) {
-                    let pc = pc[2];
+                    let pc = Obj.untagRib(pc[2]);
                 }
                 else {
-                    let pc = pc[1];
+                    let pc = Obj.untagRib(pc[1]);
                 }
             }
             else {
@@ -824,28 +824,32 @@ class Interpreter {
      Note aggressive manual inlining here to reduce call overhead because this
      is part of the most expensive code path.
      */
-    function Rib wrangleClosureParams(Rib proc, Rib cont) {
-        var Rib code;
+    function Rib wrangleClosureParams(Rib proc, Obj cont) {
+        var Obj code;
         var int numArgs;
         var int x;
-        var Rib newStack;
+        var Obj newStack;
+        var Rib ptr;
 
         let code = proc[0];
-        let numArgs = code[0];
+        let ptr = Obj.untagRib(code);
+        let numArgs = ptr[0];
         let newStack = cont;
         while (numArgs > 0) {
             // let x = Interpreter.pop();
-            let x = stack[0];
-            let stack = stack[1];
+            let ptr = Obj.untagRib(stack);
+            let x = ptr[0];
+            let stack = ptr[1];
 
             // Note: can't re-use the stack entries, because they seem to be shared
             // with captured environment in some cases:
             // let newStack = Interpreter.alloc(x, newStack, 0);
-            let nextRib[0] = x;
-            let nextRib[1] = newStack;
-            let nextRib[2] = 0;
+            let ptr = Obj.untagRib(nextRib);
+            let ptr[0] = x;
+            let ptr[1] = newStack;
+            let ptr[2] = 0;
             let newStack = nextRib;
-            let nextRib = nextRib + 3;
+            let nextRib = nextRib -1;
 
             let numArgs = numArgs - 1;
         }
