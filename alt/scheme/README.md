@@ -69,22 +69,24 @@ interpreter's own stack grows up from address 256.*
 
 For simplicity, ribs are stored as described in the paper, three words each.
 
-**TODO**: The high bit of each word is used as a tag to identify whether the word points to a rib.
-- A word with the high bit set is a 15-bit signed integer value. To recover an ordinary 16-bit value when
-    needed, bit 14 is copied to bit 15. For many operations, it's sufficient to treat values as unsigned
-    and just make sure to set the high bit if it might have been cleared (e.g. due to overflow.)
-- A word with the high bit unset is the address of a rib in memory, treated as unsigned and
-    divided by three, so that every possible rib address fits in the range of 15-bit unsigned values.
+The high bit of each "object" word is used as a tag to identify whether the word points to a rib
+or represents an unboxed integer.
+- Any word with the high bit set is the address of a rib in memory, divided by three and negated.
+- A word with the high bit unset contains a signed integer value in the low 15 bits. To recover an
+    ordinary 16-bit value when needed, bit 14 is copied to bit 15. For many operations it's
+    sufficient to treat values as unsigned and just make sure to clear the high bit if it could
+    have become set due to overflow.
+- Small integer values that are part of the encoding of ribs are left as is. This includes the
+    types of values, instruction opcodes, length of strings and vectors, the number of args for
+    closures/procs, and slot numbers.
+
+Therefore, for the purposes of garbage collection, only negative values are identified as pointers
+that need to be traced.
 
 Note: Ribbit's C implementation uses the *low* bit to tag integers, but that's not practical on this
 CPU, which does not provide a right-shift instruction. Masking off the high bit can be done efficiently.
 On the other hand, rib addresses only ever need to be generated incrementally so we only need the
-`extract` operation: multiply by 3 (with two "+" instructions.)
-
-Future:
-- really squeeze the bits and get each rib into 2 words. If possible, this saves 33% of the space,
-    and adds a *lot* of cycles to decode the bits in the interpreter. And it might mean reducing
-    the maximum number of ribs that can be addressed, which defeats the purpose.
+`extract` operation: multiply by -3 (with two "+" instructions and one "negate".)
 
 
 ## Initialization
