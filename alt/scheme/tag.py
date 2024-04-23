@@ -1,27 +1,30 @@
 """Encoding for integer, slot, and rib pointer values."""
 
 from alt import big
+from nand.vector import extend_sign
+
 
 # FIXME: use the rvm's actual/current value
 MAX_SLOT = big.ROM_BASE/3
 
 
 def is_int(obj):
-    return obj & 0x8000 != 0
-
-def is_slot(obj):
-    return 0 <= obj <= MAX_SLOT
+    return not is_rib(obj)
 
 def is_rib(obj):
-    return not is_int(obj) and not is_slot(obj)
+    # TODO: test addr is in range?
+    return extend_sign(obj) < 0
 
+# No need now that ribs are always < 0
+# def is_slot(obj):
+#     return 0 <= obj <= MAX_SLOT
 
 def tag_int(x):
-    return x | 0x8000
+    return x & 0x7FFF
 
 def tag_rib(addr):
     assert addr % 3 == 0
-    return addr//3
+    return -(addr//3)
 
 
 def untag_int(obj):
@@ -36,4 +39,4 @@ def untag_int(obj):
 
 def untag_rib(obj):
     assert is_rib(obj)
-    return 3*obj
+    return -3*extend_sign(obj)

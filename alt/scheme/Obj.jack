@@ -1,0 +1,56 @@
+/* Decoding and inspection of values encoded into words in memory. */
+class Obj {
+    function boolean isInt(Obj obj) {
+        return obj > -1;
+    }
+
+    function boolean isRib(Obj obj) {
+        return obj < 0;
+    }
+
+    // /* Note: a slot index appears in an instruction where a rib can appear, but a regular int cannot.
+    // */
+    // function boolean isSlot(int obj) {
+    //     return ~(obj > 1365);
+    // }
+
+    /* Convert to a native 16-bit int value. */
+    function int untagInt(Obj obj) {
+        // TODO: (optionally) check the tag bit
+
+        // If bit 14 is set, the value is negative and we need to extend the sign bit.
+        if (~((obj & 16384) = 0)) {    // 0x4000
+            return obj | (32767 + 1);  // 0x8000 (32768 would overflow)
+        }
+        // Otherwise, the sign bit is already correct:
+        else {
+            return obj;
+        }
+    }
+
+    /* Convert to a raw pointer. */
+    function Rib untagRib(Obj obj) {
+        // TODO: (optionally) check the tag bit
+        var int raw;
+
+        // Note: first negate to avoid overflow
+        let raw = -obj;
+        return raw + raw + raw;
+    }
+
+    /* Strip off the sig bit. */
+    function Obj tagInt(int x) {
+        return x & 32767;
+    }
+
+    /*
+    Encode a ptr into Obj. You don't want to be doing this at runtime, but during initialization
+    is probably ok.
+    */
+    function Obj tagRibSlow(Rib ptr) {
+        var Obj obj;
+        let obj = -Interpreter.divide(ptr, 3);
+        // TODO: verify ptr was a multiple of 3
+        return obj;
+    }
+}

@@ -29,5 +29,5 @@ def test_rib(addr):
 
 @given(st.integers(-32768, 32767))
 def test_distinct(x):
-    """Every 16-bit value has exactly one possible interpretation."""
-    assert is_int(x) + is_slot(x) + is_rib(x) == 1
+    """No 16-bit value is both an int and rib."""
+    assert not is_int(x) or not is_rib(x)

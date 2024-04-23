@@ -21,6 +21,7 @@ from alt import big
 from nand.vector import extend_sign, unsigned
 from alt.scheme.inspector import Inspector
 from alt.scheme import asm
+from alt.scheme.tag import *
 
 TRACE_NONE = 0
 """No logging of Ribbit instructions."""
@@ -220,23 +221,49 @@ def decode(input, asm):
         else:
             return get_int(46*n + x-46)
 
+    def current_address():
+        return big.ROM_BASE + asm.instruction_count
+
+    def pad_to_3():
+        "Pad the instruction stream to a multiple of 3."
+        needed = (3 - (current_address() % 3)) % 3
+        if needed > 0:
+            asm.comment("padding")
+            for _ in range(needed): asm.instr("#0")
+            asm.blank()
 
     def emit_rib(lbl, x, y, z, comment=None):
+        pad_to_3()
+
+        obj = tag_rib(current_address())
+
         asm.label(lbl)
         if comment:
-            asm.comment(comment)
+            asm.comment(f"{comment} (r{abs(obj)})")
+        else:
+            asm.comment(f"(r{abs(obj)})")
         asm.instr(x)
         asm.instr(y)
         asm.instr(z)
 
-    def emit_pair(lbl, car, cdr, comment):             emit_rib(lbl, car, cdr, "#0", comment)
-    def emit_string(lbl, chars, count: int, comment):  emit_rib(lbl, chars, f"#{count}", "#3", comment)
+        return obj
+
+    def emit_pair(lbl, car, cdr, comment):             return emit_rib(lbl, car, cdr, "#0", comment)
+    def emit_string(lbl, chars, count: int, comment):  return emit_rib(lbl, chars, f"#{count}", "#3", comment)
+
+    # Three constants the runtime can refer to by name:
+    def special(name):
+        return emit_rib(name, "#0", "#0", "#5")
+    false_obj = special("rib_false")
+    true_obj = special("rib_true")
+    nil_obj = special("rib_nil")
+    asm.blank()
 
 
     # Strings for the symbol table, as constant ribs directly in the ROM:
 
     # One empty string that can be shared:
-    emit_string("rib_string_empty", "@rib_nil", 0, '""')
+    string_empty_obj = emit_string("rib_string_empty", f"#{nil_obj}", 0, '""')
 
     # First byte(s): number of symbols without names
     n = get_int(0)
@@ -244,54 +271,46 @@ def decode(input, asm):
 
     asm.blank()
 
-    accum = "@rib_nil"
+    accum = nil_obj
     acc_str = ""
     idx = 0
     while True:
         c = get_byte()
         if c == ord(",") or c == ord(";"):
             if acc_str == "":
-                lbl = "rib_string_empty"
+                obj = string_empty_obj
             else:
-                lbl = f"rib_string_{idx}"
-                emit_string(lbl, accum, len(acc_str), f'"{acc_str}"')
+                lbl = f"string_{idx}"
+                obj = emit_string(lbl, f"#{accum}", len(acc_str), f'"{acc_str}"')
                 idx += 1
-            sym_names.insert(0, (lbl, acc_str))
+            sym_names.insert(0, (obj, acc_str))
 
-            accum = "@rib_nil"
+            accum = nil_obj
             acc_str = ""
 
             if c == ord(";"):
                 break
         else:
             lbl = asm.next_label("char")
-            emit_pair(lbl, f"#{hex(c)}", accum, f"'{chr(c)}'")
-            accum = f"@{lbl}"
+            char_obj = emit_pair(lbl, f"#{c}", f"#{accum}", f"'{chr(c)}'")
+            accum = char_obj
             acc_str = chr(c) + acc_str
 
     asm.blank()
+
+    # Pad the heap base to a multiple of three, and encode it:
+    HEAP_BASE_OBJ = -((big.HEAP_BASE + 2) // 3)
 
     # Exactly one primitive proc rib is pre-defined: `rib`
     # As a completely over-the-top hack, the location of the symbol table in RAM is stashed in
     # the otherwise-unused second field.
     # Note: can't emit this rib until the size of the symbol_table is known, hence the odd sequence.
+    rib_obj = tag_rib(current_address())
     asm.label("rib_rib")
     asm.instr("#0")
     asm.comment("Location of symtbl:")
-    # asm.instr(symbol_ref(0)[0])
-    asm.instr(f"#{big.HEAP_BASE + 6*(len(sym_names)) - 3}")
+    asm.instr(f"#{HEAP_BASE_OBJ - 2*len(sym_names) + 1}")
     asm.instr("#1")
-    asm.blank()
-
-    # Three constants the runtime can refer to by name:
-    def special(name):
-        asm.label(name)
-        asm.instr("#0")
-        asm.instr("#0")
-        asm.instr("#5")
-    special("rib_false")
-    special("rib_true")
-    special("rib_nil")
     asm.blank()
 
     # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
@@ -300,29 +319,33 @@ def decode(input, asm):
     asm.label("symbol_names_start")
     sym_names_and_values = list(zip(
         sym_names,
-        ["rib_rib", "rib_false", "rib_true", "rib_nil"] + ["rib_false"]*(len(sym_names)-4)))
+        [rib_obj, false_obj, true_obj, nil_obj] + [false_obj]*(len(sym_names)-4)))
     for i in reversed(range(len(sym_names_and_values))):
-        (lbl, s), val = sym_names_and_values[i]
-        asm.comment(f'{i}: "{s}"')
-        asm.instr(f"@{lbl}")
-        asm.instr(f"@{val}")
+        (obj, s), val = sym_names_and_values[i]
+        asm.comment(f'{i}: "{s}" (r{abs(obj)} = r{abs(val)})')
+        asm.instr(f"#{obj}")
+        asm.instr(f"#{val}")
     asm.label("symbol_names_end")
 
     asm.blank()
 
-    # Primordial continuation:
-    # x (stack) = []
-    # y (proc) = 0
-    # z (instr) = halt
-    emit_rib("rib_outer_cont", "@rib_nil", "#0", "@instr_halt", "Bottom of stack: continuation to halt")
 
     asm.blank()
 
     # Decode RVM instructions:
 
+    pad_to_3()
+
     asm.comment("Instructions:")
 
-    emit_rib("instr_halt", "#5", "#0", "#0", "halt (secret opcode)")
+    halt_obj = emit_rib("instr_halt", "#5", "#0", "#0", "halt (secret opcode)")
+
+    # Primordial continuation:
+    # x (stack) = []
+    # y (proc) = 0
+    # z (instr) = halt
+    emit_rib("rib_outer_cont", f"#{nil_obj}", "#0", f"#{halt_obj}", "Bottom of stack: continuation to halt")
+
 
     stack = None
     def pop():
@@ -334,18 +357,19 @@ def decode(input, asm):
         stack = (x, stack)
 
     def symbol_ref(idx):
-        """Statically resolve a reference to the symbol table, to an address in RAM where that
-        rib will be allocated during initialization.
+        """Statically resolve a reference to the symbol table, to an (encoded0 address in RAM where
+        that rib will be allocated during initialization.
 
         The table is written from the end, and each entry is made of of two ribs, the `symbol`
         and a `pair`.
         """
         name = sym_names[idx][1]
         description = f'"{name}"({idx})'
-        return f"#{big.HEAP_BASE + 6*(len(sym_names) - idx - 1)}", description
+        return HEAP_BASE_OBJ - 2*(len(sym_names) - idx - 1), description
 
-    def emit_instr(op, arg, next, sym):
-        lbl = asm.next_label("instr")
+    def emit_instr(op: int, arg: int, next: int, sym):
+        obj = tag_rib(current_address())
+        lbl = f"instr{abs(obj)}"
 
         asm.label(lbl)
 
@@ -354,35 +378,33 @@ def decode(input, asm):
         else:
             target = arg
 
-        if op == 0 and next == "#0":
-            asm.comment(f"jump {target} ")
+        if op == 0 and next == 0:
+            asm.comment(f"jump {target}")
         elif op == 0:
-            asm.comment(f"call {target} -> {next}")
+            asm.comment(f"call {target} -> r{abs(next)}")
         elif op == 1:
-            asm.comment(f"set {target} -> {next}")
+            asm.comment(f"set {target} -> r{abs(next)}")
         elif op == 2:
-            asm.comment(f"get {target} -> {next}")
+            asm.comment(f"get {target} -> r{abs(next)}")
         elif op == 3:
-            asm.comment(f"const {target} -> {next}")
+            asm.comment(f"const {target} -> r{abs(next)}")
         elif op == 4:
-            asm.comment(f"if -> {arg} else {next}")
+            asm.comment(f"if -> r{abs(arg)} else r{abs(next)}")
         else:
             raise Exception(f"Unknown op: {op} ({arg}, {next})")
 
         asm.instr(f"#{op}")
-        asm.instr(arg)
-        asm.instr(next)
+        asm.instr(f"#{arg}")
+        asm.instr(f"#{next}")
 
-        return lbl
+        return obj
+
 
     # For each encoded instruction, emit three words of data into the ROM:
     # - references to symbols are statically resolved to addresses in *RAM*,
-    #   where the references
+    #   where the symbols will reside after initialization
 
-    # TODO: reverse the instruction stream so it reads *forward* in the commented assembly listing?
-
-    # FIXME: this horribleness is ripped off from https://github.com/udem-dlteam/ribbit/blob/dev/src/host/py/rvm.py directly
-    # What part of this happens at runtime?
+    # ripped off from https://github.com/udem-dlteam/ribbit/blob/dev/src/host/py/rvm.py directly
     while True:
         if pos >= len(input)-1: break  # TEMP
 
@@ -402,11 +424,11 @@ def decode(input, asm):
             n = pop()
         else:
             if op == 0:
-                push("#0")
+                push(0)
                 op += 1
 
             if n == d:
-                n = f"#{get_int(0)}"
+                n = get_int(0)
             elif n >= d:
                 idx = get_int(n-d-1)
                 n, sym = symbol_ref(idx)
@@ -431,29 +453,18 @@ def decode(input, asm):
                     proc_label = asm.next_label("proc")
                     asm.label(proc_label)
                     asm.instr(f"@{params_lbl}")
-                    asm.instr("@rib_nil")
+                    asm.instr(f"#{nil_obj}")
                     asm.instr("#1")
                     n = f"@{proc_label}"
                     op = 4
 
-            # HACK: this seems to happen with integer constants and slot numbers.
-            # Make it happen in the right place?
-            if isinstance(n, int):
-                n = f"#{n}"
-
-        instr_lbl = emit_instr(op-1, n, pop(), sym)
-        push(f"@{instr_lbl}")
+        instr_obj = emit_instr(op-1, n, pop(), sym)
+        push(instr_obj)
 
         sym = None
 
-    # This will be the body of the outer proc, so just "jump" straight to it:
-    start_instr = n
-    # Note: emit_instr would want to choose the label...
-    # emit_rib("main", "#0", start_instr, "#0", comment=f"jump {start_instr}")
-    # Note: there is no true no-op, and "id" is not yet initialized. This will leave junk on the
-    # stack. What we really want is to put the "main" label on start_instr when it's emitted.
-    # Using an illegal opcode here just to ensure we never actually try to interpret it.
-    emit_rib("main", "#42", "#0", start_instr)
+    # This label _follows_ the start instruction:
+    asm.label("main")
 
 
 BUILTINS = {
@@ -485,17 +496,15 @@ BUILTINS = {
 """Constants (mostly addresses) that are used in the generated assembly."""
 
 
-def tag_int(val):
-    """Encode an integer value so the runtime will interpret it as a signed integer."""
-    return val
 
-def tag_rib_pointer(addr):
-    """Encode an address so the runtime will interpret it as a pointer to a rib."""
-    assert addr < -big.ROM_BASE or addr >= big.ROM_BASE
-    return addr
+def pad_addr(addr):
+    """Pad an address to the nearest valid pointer (i.e. multiple of 3)."""
 
-FIRST_RIB = BUILTINS["FIRST_RIB_MINUS_ONE"] + 1
-assert BUILTINS["MAX_SLOT"] < tag_rib_pointer(FIRST_RIB)
+    return ((addr + 2) // 3) * 3
+
+
+FIRST_RIB = pad_addr(BUILTINS["FIRST_RIB_MINUS_ONE"] + 1)
+# assert BUILTINS["MAX_SLOT"] < tag_rib(FIRST_RIB)
 
 
 def asm_interpreter():
@@ -541,7 +550,7 @@ def jack_interpreter():
 
         translator.translate_class(ir)
 
-    for cl in "Interpreter", "Rib":
+    for cl in "Interpreter", "Obj", "Rib":
         load_class(f"alt/scheme/{cl}.jack")
 
     asm.label("interpreter_end")

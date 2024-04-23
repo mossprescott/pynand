@@ -2,9 +2,11 @@
 
 from nand.vector import extend_sign, unsigned
 from alt import big
+from alt.scheme import tag
 
 # Seems like overkill
 SHOW_SAVED_STACKS = False
+
 
 class Inspector:
     def __init__(self, computer, symbols, stack_loc, rom_base=big.ROM_BASE, rom_limit=big.HEAP_BASE):
@@ -32,29 +34,26 @@ class Inspector:
 
     def show_instr(self, addr):
         x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
-
         def show_target(with_value):
             """The target of a jump/call, get, or set: either a slot index or global."""
 
-            # FIXME: use the rvm's actual/current value
-            MAX_SLOT = big.ROM_BASE-1
-            if 0 <= y <= MAX_SLOT:
-                return f"#{y}"
+            if tag.is_rib(y):
+                return self.show_symbol(tag.untag_rib(y), with_value=with_value)
             else:
-                return self.show_symbol(y, with_value=with_value)
+                return f"#{y}"
 
         if x == 0 and z == 0:
             return f"jump {show_target(True)}"
         elif x == 0:
-            return f"call {show_target(True)}" # -> {self.show_addr(z)}"
+            return f"call {show_target(True)}" # -> {self.show_addr(tag.untag_rib(z))}"
         elif x == 1:
-            return f"set {show_target(False)}" # -> {self.show_addr(z)}"
+            return f"set {show_target(False)}" # -> {self.show_addr(tag.untag_rib(z))}"
         elif x == 2:
-            return f"get {show_target(False)}" # -> {self.show_addr(z)}"
+            return f"get {show_target(False)}" # -> {self.show_addr(tag.untag_rib(z))}"
         elif x == 3:
-            return f"const {self.show_obj(y)}" # -> {self.show_addr(z)}"
+            return f"const {self.show_obj(y)}" # -> {self.show_addr(tag.untag_rib(z))}"
         elif x == 4:
-            return f"if -> {self.show_addr(y)} else {self.show_addr(z)}"
+            return f"if -> {self.show_addr(tag.untag_rib(y))} else {self.show_addr(tag.untag_rib(z))}"
         elif x == 5:
             return "halt"
         else:
@@ -63,6 +62,7 @@ class Inspector:
 
     def show_symbol(self, addr, with_value=False):
         val, name, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
+        # print(f"symbol: @{addr}; {val, name, z}")
         assert z == 2
         rib_num = (addr - big.HEAP_BASE)//3
         name_and_addr = f"{self._obj(name)}{self.show_addr(addr)}(_{rib_num})"
@@ -75,54 +75,55 @@ class Inspector:
     def _obj(self, val, max_depth=10):
         """Python representation of an object, which may be an integer, special value, or rib."""
 
-        # FIXME: check tag
-        if -big.ROM_BASE < extend_sign(val) < big.ROM_BASE:
-            return extend_sign(val)
-        elif self.symbols_by_addr.get(val) == "rib_nil":
-            return []
-        elif self.symbols_by_addr.get(val) == "rib_true":
-            return True
-        elif self.symbols_by_addr.get(val) == "rib_false":
-            return False
+        if tag.is_int(val):
+            return tag.untag_int(val)
         else:
-            x, y, z = self.peek(val), self.peek(val+1), self.peek(val+2)
-            if z == 0:  # pair
-                car = self._obj(x)
-                if max_depth > 0:
-                    cdr = self._obj(y, max_depth=max_depth-1)
-                else:
-                    cdr = ["..."]
-                if isinstance(cdr, list):
-                    return [car] + cdr
-                else:
-                    # In at least one case, this is a "jump" instruction during compilation
-                    return (car, cdr, z)
-            elif z == 1:  # proc
-                if 0 <= x < len(PRIMITIVES):
-                    return f"proc({PRIMITIVES[x]})"
-                else:
-                    num_args, instr = self.peek(x), self.peek(x+2)
-                    return f"proc(args={num_args}, env={list_str(self.stack(y))}, instr={self.show_addr(instr)}){self.show_addr(val)}"
-            elif z == 2:  # symbol
-                return f"symbol({self._obj(y)} = {self._obj(x)})"
-            elif z == 3:  # string
-                chars = self._obj(x, max_depth=y)
-                if len(chars) != y:
-                    print(f"bad string: {chars, y, z}")
-                return "".join(chr(c) for c in chars)
-            elif z == 4:  # vector
-                elems = self._obj(x)
-                if not isinstance(elems, list) or len(elems) != y:
-                    raw = (elems, self._obj(y), z)
-                    print(f"bad vector: {raw}")
-                    return raw
-                else:
-                    return elems
-            elif z == 5:
-                # Unexpected, but show the contents just in case
-                return f"special({self.show_obj(x)}, {self.show_obj(y)}){self.show_addr(val)}"
+            addr = tag.untag_rib(val)
+            if self.symbols_by_addr.get(addr) == "rib_nil":
+                return []
+            elif self.symbols_by_addr.get(addr) == "rib_true":
+                return True
+            elif self.symbols_by_addr.get(addr) == "rib_false":
+                return False
             else:
-                return f"TODO: ({x}, {y}, {z})"
+                x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
+                if z == 0:  # pair
+                    car = self._obj(x)
+                    if max_depth > 0:
+                        cdr = self._obj(y, max_depth=max_depth-1)
+                    else:
+                        cdr = ["..."]
+                    if isinstance(cdr, list):
+                        return [car] + cdr
+                    else:
+                        # In at least one case, this is a "jump" instruction during compilation
+                        return (car, cdr, z)
+                elif z == 1:  # proc
+                    if 0 <= x < len(PRIMITIVES):
+                        return f"proc({PRIMITIVES[x]})"
+                    else:
+                        num_args, instr = self.peek(x), self.peek(x+2)
+                        return f"proc(args={num_args}, env={list_str(self.stack(y))}, instr={self.show_addr(instr)}){self.show_addr(val)}"
+                elif z == 2:  # symbol
+                    return f"symbol({self._obj(y)} = {self._obj(x)})"
+                elif z == 3:  # string
+                    chars = self._obj(x, max_depth=y)
+                    if len(chars) != y:
+                        print(f"bad string: {chars, y, z}")
+                    return "".join(chr(c) for c in chars)
+                elif z == 4:  # vector
+                    elems = self._obj(x)
+                    if not isinstance(elems, list) or len(elems) != y:
+                        raw = (elems, self._obj(y), z)
+                        print(f"bad vector: {raw}")
+                        return raw
+                    else:
+                        return elems
+                elif z == 5:
+                    # Unexpected, but show the contents just in case
+                    return f"special({self.show_obj(x)}, {self.show_obj(y)}){self.show_addr(val)}"
+                else:
+                    return f"TODO: ({x}, {y}, {z})"
 
 
     def show_obj(self, val):
@@ -134,7 +135,7 @@ class Inspector:
     def stack(self, addr=None):
         """Contents of the stack, bottom to top."""
         if addr is None:
-            addr = self.peek(self.stack_loc)
+            addr = tag.untag_rib(self.peek(self.stack_loc))
 
         if self.symbols_by_addr.get(addr) == "rib_nil":
             # This appears only after the outer continuation is invoked:
@@ -144,15 +145,16 @@ class Inspector:
             return ["<0>!"]
         else:
             x, y, z = self.peek(addr), self.peek(addr+1), self.peek(addr+2)
+            # print(f"stack: @{addr}; {x, y, z}")
 
             if z == 0:  # pair
-                return self.stack(y) + [self._obj(x)]
+                return self.stack(tag.untag_rib(y)) + [self._obj(x)]
             else:
                 if SHOW_SAVED_STACKS:
-                    saved_str = list_str(self.stack(x))
-                    cont = f"cont(saved={saved_str}; {self.show_addr(z)}){self.show_addr(addr)}"
+                    saved_str = list_str(self.stack(tag.untag_rib(x)))
+                    cont = f"cont(saved={saved_str}; {self.show_addr(tag.untag_rib(z))}){self.show_addr(addr)}"
                 else:
-                    cont = f"cont({self.show_addr(z)}){self.show_addr(addr)}"
+                    cont = f"cont({self.show_addr(tag.untag_rib(z))}){self.show_addr(addr)}"
 
                 if y == 0:
                     # outer continuation: there is no proc, and no further stack
@@ -162,7 +164,7 @@ class Inspector:
                     # which we're about to traverse. But need to show something so slot numbers make
                     # sense.
                     closure = "<closure>"
-                    return self.stack(self.peek(y+1)) + [closure, cont]
+                    return self.stack(tag.untag_rib(self.peek(tag.untag_rib(y)+1))) + [closure, cont]
 
 
     def show_stack(self):
