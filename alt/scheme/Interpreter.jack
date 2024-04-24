@@ -367,10 +367,11 @@ class Interpreter {
     /* rib? :: x -- bool(x is a rib) */
     function void handleRibQ() {
         var Rib ptr;
-        var int x, y, z;
+        var Obj x;
 
         let ptr = Obj.untagRib(stack);
-        if (Obj.isRib(ptr[0])) {
+        let x = ptr[0];
+        if (Obj.isRib(x)) {
             let ptr[0] = rib_true;
         }
         else {
@@ -382,84 +383,135 @@ class Interpreter {
 
     /* field0 :: rib(x, _, _) -- x */
     function void handleField0() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib stackPtr, xPtr;
+        var Obj x;
 
         // No allocation: the top entry on the stack is updated in place
-        let tmp = stack[0];
-        let stack[0] = tmp[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(x)) {
+            do Interpreter.halt();
+        }
+
+        let xPtr = Obj.untagRib(x);
+        let stackPtr[0] = xPtr[0];
 
         return;
     }
 
     /* field1 :: rib(_, y, _) -- y */
     function void handleField1() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib stackPtr, xPtr;
+        var Obj x;
 
         // No allocation: the top entry on the stack is updated in place
-        let tmp = stack[0];
-        let stack[0] = tmp[1];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(x)) {
+            do Interpreter.halt();
+        }
+
+        let xPtr = Obj.untagRib(x);
+        let stackPtr[0] = xPtr[1];
 
         return;
     }
 
     /* field2 :: rib(_, _, z) -- z */
     function void handleField2() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib stackPtr, xPtr;
+        var Obj x;
 
         // No allocation: the top entry on the stack is updated in place
-        let tmp = stack[0];
-        let stack[0] = tmp[2];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(x)) {
+            do Interpreter.halt();
+        }
+
+        let xPtr = Obj.untagRib(x);
+        let stackPtr[0] = xPtr[2];
 
         return;
     }
 
     /* field0-set! :: rib(_, y, z) x -- x (and update the rib in place: rib(x, y, z)) */
     function void handleField0_set() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib rPtr;
+        var Obj r, x;
 
         // Note: one rib becomes garbage (top entry of stack)
 
         let x = Interpreter.pop();
-        let tmp = stack[0];
-        let tmp[0] = x;
+
+        let r = Interpreter.peek();
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(r)) {
+            do Interpreter.halt();
+        }
+
+        let rPtr = Obj.untagRib(r);
+        let rPtr[0] = x;
+
         // Update the second entry on the stack in place:
-        let stack[0] = x;
+        do Interpreter.replace(x);
 
         return;
     }
 
     /*  field1-set! :: rib(x, _, z) y -- y (and update the rib in place: rib(x, y, z)) */
     function void handleField1_set() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib rPtr;
+        var Obj r, y;
 
         // Note: one rib becomes garbage (top entry of stack)
 
         let y = Interpreter.pop();
-        let tmp = stack[0];
-        let tmp[1] = y;
+
+        let r = Interpreter.peek();
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(r)) {
+            do Interpreter.halt();
+        }
+
+        let rPtr = Obj.untagRib(r);
+        let rPtr[1] = y;
+
         // Update the second entry on the stack in place:
-        let stack[0] = y;
+        do Interpreter.replace(y);
 
         return;
     }
 
     /*  field2-set! :: rib(x, y, _) z -- z (and update the rib in place: rib(x, y, z)) */
     function void handleField2_set() {
-        var int x, y, z;
-        var Rib tmp;
+        var Rib rPtr;
+        var Obj r, z;
 
         // Note: one rib becomes garbage (top entry of stack)
 
         let z = Interpreter.pop();
-        let tmp = stack[0];
-        let tmp[2] = z;
+
+        let r = Interpreter.peek();
+
+        // TODO: if CHECK_TYPES
+        if (~Obj.isRib(r)) {
+            do Interpreter.halt();
+        }
+
+        let rPtr = Obj.untagRib(r);
+        let rPtr[2] = z;
+
         // Update the second entry on the stack in place:
-        let stack[0] = z;
+        do Interpreter.replace(z);
 
         return;
     }
@@ -467,7 +519,7 @@ class Interpreter {
     /*  eqv? :: x y -- bool(x is identical to y) */
     function void handleEqvQ() {
         var Rib ptr;
-        var int x, y, z;
+        var Obj x, y;
         var Rib tmp;
 
         // Note: one rib becomes garbage (top entry of stack)
@@ -1086,18 +1138,22 @@ class Interpreter {
         return r;
     }
 
-    // /** Get the object on the top of the stack, without removing it. */
-    // // TODO: get the compiler to inline this
-    // function Obj peek() {
-    //     return stack[0];
-    // }
+    /** Get the object on the top of the stack, without removing it. */
+    // TODO: get the compiler to inline this
+    function Obj peek() {
+        var Rib ptr;
+        let ptr = Obj.untagRib(stack);
+        return ptr[0];
+    }
 
-    // /** Overwrite the object on the top of the stack, avoiding allocation. */
-    // // TODO: get the compiler to inline this
-    // function void replace(Obj obj) {
-    //     let stack[0] = obj;
-    //     return;
-    // }
+    /** Overwrite the object on the top of the stack, avoiding allocation. */
+    // TODO: get the compiler to inline this
+    function void replace(Obj obj) {
+        var Rib ptr;
+        let ptr = Obj.untagRib(stack);
+        let ptr[0] = obj;
+        return;
+    }
 
     /**
      Address of the continuation rib in the current stack frame: the first entry in the
