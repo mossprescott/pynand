@@ -48,7 +48,7 @@ class Interpreter {
         var Obj newStack;  // temp used when assembling callee's stack
         var Rib cont;      // existing continuation
         var Rib proc;      // used only for dispatch
-        var Rib stackPtr;
+        var Rib ptr;
 
         // Stack-allocated:
         var Rib savedProc;      // saved to construct cont
@@ -97,7 +97,8 @@ class Interpreter {
                         let cont = Interpreter.findContinuation();
 
                         // Note: can't overwrite the old continuation because it may be in ROM
-                        let newCont = Interpreter.alloc(cont[0], savedProc, cont[2]);
+                        // FIXME: avoid referencing symbol, which causes it to be spilled
+                        let newCont = Interpreter.alloc(cont[0], symbol[0], cont[2]);
 
                         let stack = Interpreter.wrangleClosureParams(savedProc, newCont);
 
@@ -113,8 +114,8 @@ class Interpreter {
 
                         // Overwrite top stack entry so the stack consists of the just-pushed
                         // result on top of the saved stack from the continuation.
-                        let stackPtr = Obj.untagRib(stack);
-                        let stackPtr[1] = cont[0];
+                        let ptr = Obj.untagRib(stack);
+                        let ptr[1] = cont[0];
 
                         // PC = next instruction from the continuation
                         let pc = Obj.untagRib(cont[2]);
@@ -137,7 +138,8 @@ class Interpreter {
                         //   z = next instruction
                         let newCont = Interpreter.alloc(-1, symbol[0], pc[2]);  // tricky: faster to use proc from register in first call
                         let newStack = Interpreter.wrangleClosureParams(savedProc, newCont);
-                        let newCont[0] = stack;
+                        let ptr = Obj.untagRib(newCont);
+                        let ptr[0] = stack;
                         let stack = newStack;
 
                         // Now jump to the entry point of the proc:
@@ -146,6 +148,7 @@ class Interpreter {
                     }
                     else {
                         // primitive
+
                         do Jack.invoke(handlers[proc[0]]);
 
                         let pc = Obj.untagRib(pc[2]);
@@ -320,49 +323,58 @@ class Interpreter {
 
     /* arg1 :: x y -- x)  # i.e. "drop" */
     function void handleArg1() {
-        let stack = stack[1];
+        var Rib ptr;
+
+        let ptr = Obj.untagRib(stack);
+        let stack = ptr[1];
 
         return;
     }
 
     /* arg2 :: x y -- y */
     function void handleArg2() {
-        var int y;
+        var Rib ptr;
+        var Obj y;
 
         // y = pop()
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
         // replace(y)
-        let stack[0] = y;
+        let ptr = Obj.untagRib(stack);
+        let ptr[0] = y;
 
         return;
     }
 
     /* close :: x -- rib(x[0], stack, 1) */
     function void handleClose() {
+        var Rib ptr1, ptr2;
         var int x, y, z;
-        var Rib tmp;
+        var Obj tmp;
 
         // Note: modifyinging the top entry on the stack in place,
         // but allocating a new rib for the closure.
-        let tmp = stack[0];
-        let stack[0] = Interpreter.alloc(tmp[0], stack[1], 1);
+        let ptr1 = Obj.untagRib(stack);
+        let tmp = ptr1[0];
+        let ptr2 = Obj.untagRib(tmp);
+        let ptr1[0] = Interpreter.alloc(ptr2[0], ptr1[1], 1);
 
         return;
     }
 
     /* rib? :: x -- bool(x is a rib) */
     function void handleRibQ() {
+        var Rib ptr;
         var int x, y, z;
-        var Rib tmp;
 
-        let tmp = stack[0];
-        if (Obj.isRib(tmp)) {
-            let stack[0] = rib_true;  // FIXME: tagged addr
+        let ptr = Obj.untagRib(stack);
+        if (Obj.isRib(ptr[0])) {
+            let ptr[0] = rib_true;
         }
         else {
-            let stack[0] = rib_false;  // FIXME: tagged addr
+            let ptr[0] = rib_false;
         }
 
         return;
@@ -454,21 +466,24 @@ class Interpreter {
 
     /*  eqv? :: x y -- bool(x is identical to y) */
     function void handleEqvQ() {
+        var Rib ptr;
         var int x, y, z;
         var Rib tmp;
 
         // Note: one rib becomes garbage (top entry of stack)
 
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
-        let x = stack[0];
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
         if (x = y) {
-            let stack[0] = rib_true;
+            let ptr[0] = rib_true;
         }
         else {
-            let stack[0] = rib_false;
+            let ptr[0] = rib_false;
         }
 
         return;
@@ -476,30 +491,9 @@ class Interpreter {
 
     /*  < :: x y -- bool(x < y) */
     function void handleLt() {
+        var Rib ptr;
         var int x, y, z;
         var Rib tmp;
-
-        // Note: one rib becomes garbage:
-        // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
-
-        let x = stack[0];
-        // Update second stack entry in place:
-        if (x < y) {
-            let stack[0] = rib_true;
-        }
-        else {
-            let stack[0] = rib_false;
-        }
-
-        return;
-    }
-
-    /*  + :: x y -- x + y */
-    function void handlePlus() {
-        var int x, y, z;
-        var Rib ptr;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
@@ -510,6 +504,31 @@ class Interpreter {
         let ptr = Obj.untagRib(stack);
         let x = ptr[0];
         // Update second stack entry in place:
+        if (x < y) {
+            let ptr[0] = rib_true;
+        }
+        else {
+            let ptr[0] = rib_false;
+        }
+
+        return;
+    }
+
+    /*  + :: x y -- x + y */
+    function void handlePlus() {
+        var Rib ptr;
+        var int x, y, z;
+
+        // Note: one rib becomes garbage:
+        // let y = Interpreter.pop();
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
+
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
+
+        // Update second stack entry in place:
         let ptr[0] = x + y;
 
         return;
@@ -517,35 +536,40 @@ class Interpreter {
 
     /*  - :: x y -- x - y */
     function void handleMinus() {
+        var Rib ptr;
         var int x, y, z;
-        var Rib tmp;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
-        let x = stack[0];
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
+
         // Update second stack entry in place:
-        let stack[0] = x - y;
+        let ptr[0] = x - y;
 
         return;
     }
 
     /*  * :: x y -- x * y */
     function void handleTimes() {
+        var Rib ptr;
         var int x, y, z;
-        var Rib tmp;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
-        let x = stack[0];
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
 
         // Update second stack entry in place:
-        let stack[0] = Interpreter.multiply(x, y);
+        let ptr[0] = Interpreter.multiply(x, y);
 
         return;
     }
@@ -553,18 +577,20 @@ class Interpreter {
 
     /*  quotient :: x y -- x / y */
     function void handleQuotient() {
+        var Rib ptr;
         var int x, y, z;
-        var Rib tmp;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
-        let x = stack[0];
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
 
         // Update second stack entry in place:
-        let stack[0] = Interpreter.divide(x, y);
+        let ptr[0] = Interpreter.divide(x, y);
 
         return;
     }
@@ -710,18 +736,24 @@ class Interpreter {
     */
    function void handlePoke() {
         var int y;
-        var Array tmp;
+        var Rib ptr;
+        var Array x;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
 
-        let tmp = stack[0];
-        let tmp[0] = y;
+        // let x = Interpreter.peek();
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
+
+        let x[0] = y;
 
         // Update the second stack entry in place
-        let stack[0] = y;
+        // Interpreter.replace(y);
+        let ptr[0] = y;
 
         return;
     }
@@ -743,13 +775,17 @@ class Interpreter {
     */
     function void handleScreenAddr() {
         var int x, y, addr;
+        var Rib ptr;
         // var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
 
         // let y = Interpreter.pop();
-        let y = stack[0];
-        let stack = stack[1];
-        // let x = Interpreter.pop();
-        let x = stack[0];  // i.e. peek()
+        let ptr = Obj.untagRib(stack);
+        let y = ptr[0];
+        let stack = ptr[1];
+
+        // let x = Interpreter.peek();
+        let ptr = Obj.untagRib(stack);
+        let x = ptr[0];
 
         // // 80x = 8*(4x + x) = 2(2(2(2(2(2x) + x))))
         // let acc0 = y + y;       //  2y
@@ -764,8 +800,9 @@ class Interpreter {
 
         let addr = Interpreter.screenAddr(x, y);
 
-        // do Interpreter.push(addr);
-        let stack[0] = addr;  // replace();
+        // do Interpreter.replace(addr);
+        let ptr = Obj.untagRib(stack);
+        let ptr[0] = addr;
 
         return;
     }
@@ -1063,7 +1100,7 @@ class Interpreter {
      Address of the continuation rib in the current stack frame: the first entry in the
      stack with z != 0.
      */
-    function Obj findContinuation() {
+    function Rib findContinuation() {
         var Obj obj;
         var Rib ptr;
 
@@ -1073,7 +1110,7 @@ class Interpreter {
             let obj = ptr[1];
             let ptr = Obj.untagRib(obj);
         }
-        return obj;
+        return ptr;
     }
 
     function void halt() {
