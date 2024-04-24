@@ -66,6 +66,38 @@ def test_add(run):
     assert inspect.stack() == [3]
     assert output == []
 
+@parameterize
+def test_add_negative(run):
+    program = "(+ 1 -2)"
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [-1]
+    assert output == []
+
+@parameterize
+def test_add_soft_overflow(run):
+    """A sum between 16k and 32k takes 15 bits and ends up as a negative tagged value."""
+
+    program = "(+ 10000 10000)"
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [-12768]
+    assert output == []
+
+
+@parameterize
+def test_add_hard_overflow(run):
+    """A sum between -16k and -32k takes 16 bits and needs to be re-tagged to be a valid int."""
+
+    program = "(+ -10000 -10000)"
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [12768]
+    assert output == []
+
 
 @parameterize
 def test_sub(run):
