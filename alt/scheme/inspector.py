@@ -165,7 +165,8 @@ class Inspector:
                     # which we're about to traverse. But need to show something so slot numbers make
                     # sense.
                     closure = "<closure>"
-                    return self.stack(tag.untag_rib(self.peek(tag.untag_rib(y)+1))) + [closure, cont]
+                    closure_obj = self.peek(tag.untag_rib(y)+1)
+                    return self.stack(tag.untag_rib(closure_obj)) + [closure, cont]
 
 
     def show_stack(self):
