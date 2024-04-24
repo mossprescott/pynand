@@ -517,7 +517,7 @@ class Interpreter {
     /*  + :: x y -- x + y */
     function void handlePlus() {
         var Rib ptr;
-        var int x, y, z;
+        var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
@@ -529,7 +529,8 @@ class Interpreter {
         let x = ptr[0];
 
         // Update second stack entry in place:
-        let ptr[0] = x + y;
+        // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
+        let ptr[0] = Obj.tagInt(x + y);
 
         return;
     }
@@ -537,7 +538,7 @@ class Interpreter {
     /*  - :: x y -- x - y */
     function void handleMinus() {
         var Rib ptr;
-        var int x, y, z;
+        var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
@@ -549,7 +550,8 @@ class Interpreter {
         let x = ptr[0];
 
         // Update second stack entry in place:
-        let ptr[0] = x - y;
+        // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
+        let ptr[0] = Obj.tagInt(x - y);
 
         return;
     }

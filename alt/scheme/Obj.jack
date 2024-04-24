@@ -35,7 +35,7 @@ class Obj {
         return -(obj + obj + obj);
     }
 
-    /* Strip off the sig bit. */
+    /* Strip off the sign bit. */
     function Obj tagInt(int x) {
         return x & 32767;
     }
