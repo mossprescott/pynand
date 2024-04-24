@@ -559,7 +559,7 @@ class Interpreter {
     /*  * :: x y -- x * y */
     function void handleTimes() {
         var Rib ptr;
-        var int x, y, z;
+        var int x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
@@ -571,7 +571,8 @@ class Interpreter {
         let x = ptr[0];
 
         // Update second stack entry in place:
-        let ptr[0] = Interpreter.multiply(x, y);
+        // Note: this code inspects the signs, so need to extend them to full 16-bit values
+        let ptr[0] = Obj.tagInt(Interpreter.multiply(Obj.untagInt(x), Obj.untagInt(y)));
 
         return;
     }
@@ -580,7 +581,7 @@ class Interpreter {
     /*  quotient :: x y -- x / y */
     function void handleQuotient() {
         var Rib ptr;
-        var int x, y, z;
+        var int x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
@@ -592,7 +593,7 @@ class Interpreter {
         let x = ptr[0];
 
         // Update second stack entry in place:
-        let ptr[0] = Interpreter.divide(x, y);
+        let ptr[0] = Obj.tagInt(Interpreter.divide(Obj.untagInt(x), Obj.untagInt(y)));
 
         return;
     }
