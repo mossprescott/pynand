@@ -267,7 +267,7 @@ def decode(input, asm):
 
     # First byte(s): number of symbols without names
     n = get_int(0)
-    sym_names = n*[("rib_string_empty", "")]
+    sym_names = n*[(string_empty_obj, "")]
 
     asm.blank()
 
