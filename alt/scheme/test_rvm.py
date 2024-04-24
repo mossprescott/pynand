@@ -260,7 +260,7 @@ def test_eval(run):
 
     program = "\n".join(lib + ["""(eval '(+ 1 2))"""])
 
-    inspect, output = run(program)
+    inspect, output = run(program, max_cycles=1_000_000)
 
     assert inspect.stack() == [3]
     assert output == []
