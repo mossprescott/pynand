@@ -724,7 +724,7 @@ class Interpreter {
             }
 
             // An entire line has been captured; yield the first character and return:
-            do Interpreter.push(bufferStart[0]);
+            do Interpreter.push(Obj.tagInt(bufferStart[0]));
             let bufferStart = bufferStart + 1;
 
             return;
@@ -738,7 +738,7 @@ class Interpreter {
                 let bufferStart = handlers - 80;
                 let bufferEnd = bufferStart;
             }
-            do Interpreter.push(c);
+            do Interpreter.push(Obj.tagInt(c));
             return;
         }
     }
@@ -748,8 +748,7 @@ class Interpreter {
         var int c;
         var Array cursorAddr;
 
-        // let c = Interpreter.peek();
-        let c = stack[0];
+        let c = Interpreter.peek();
 
         if (c = 10) {
             let cursorX = 0;
@@ -772,13 +771,15 @@ class Interpreter {
      including the screen buffer and the location for the keyboard/TTY.
      */
     function void handlePeek() {
-        var int x;
-        var Array tmp;
+        var Rib stackPtr;
+        var Obj x;
+        var Array ram;
 
-        let tmp = 0;
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
-        let x = stack[0];
-        let stack[0] = tmp[x];
+        let ram = 0;
+        let stackPtr[0] = ram[x];
 
         return;
     }
@@ -789,25 +790,26 @@ class Interpreter {
      including the screen buffer and the location for the keyboard/TTY.
     */
    function void handlePoke() {
-        var int y;
-        var Rib ptr;
-        var Array x;
+        var Rib stackPtr;
+        var Obj x, y;
+        var Array ram;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
         // let x = Interpreter.peek();
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
-        let x[0] = y;
+        let ram = 0;
+        let ram[x] = y;
 
         // Update the second stack entry in place
         // Interpreter.replace(y);
-        let ptr[0] = y;
+        let stackPtr[0] = y;
 
         return;
     }
@@ -817,7 +819,7 @@ class Interpreter {
         do Interpreter.halt();
     }
 
-    /* screenAddr :: x y -- address of character at column x, line y
+    /*  screenAddr :: x y -- address of character at column x, line y
 
      Cheat: calculate the address of a character in the screen buffer, using
      hand-coded "shift" and adds to multiply by 80, and without any allocation.
@@ -861,6 +863,20 @@ class Interpreter {
         return;
     }
 
+    /* Handler for any unused primitive code. */
+    function void handleUnimp() {
+        do Interpreter.halt();
+    }
+
+
+    //
+    // Helpers
+    //
+
+    /*
+     Calculate the address of a character on screen, given it's x and y coordinates.
+     Used by putchar aand exposed as a primitive.
+     */
     function Array screenAddr(int x, int y) {
         var int acc0, acc1, acc2, acc3, acc4, acc5, acc6;
 
@@ -874,11 +890,6 @@ class Interpreter {
         let acc6 = acc5 + acc5; // 80y
 
         return 2048 + acc6 + x;
-    }
-
-    /* Handler for any unused primitive code. */
-    function void handleUnimp() {
-        do Interpreter.halt();
     }
 
     /**
