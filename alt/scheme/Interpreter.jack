@@ -350,16 +350,15 @@ class Interpreter {
 
     /* close :: x -- rib(x[0], stack, 1) */
     function void handleClose() {
-        var Rib ptr1, ptr2;
-        var int x, y, z;
-        var Obj tmp;
+        var Rib stackPtr, xPtr;
+        var Obj x;
 
         // Note: modifyinging the top entry on the stack in place,
         // but allocating a new rib for the closure.
-        let ptr1 = Obj.untagRib(stack);
-        let tmp = ptr1[0];
-        let ptr2 = Obj.untagRib(tmp);
-        let ptr1[0] = Interpreter.alloc(ptr2[0], ptr1[1], 1);
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
+        let xPtr = Obj.untagRib(x);
+        let stackPtr[0] = Interpreter.alloc(xPtr[0], stackPtr[1], 1);
 
         return;
     }
@@ -518,24 +517,24 @@ class Interpreter {
 
     /*  eqv? :: x y -- bool(x is identical to y) */
     function void handleEqvQ() {
-        var Rib ptr;
+        var Rib stackPtr;
         var Obj x, y;
         var Rib tmp;
 
         // Note: one rib becomes garbage (top entry of stack)
 
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
         if (x = y) {
-            let ptr[0] = rib_true;
+            let stackPtr[0] = rib_true;
         }
         else {
-            let ptr[0] = rib_false;
+            let stackPtr[0] = rib_false;
         }
 
         return;
@@ -543,24 +542,24 @@ class Interpreter {
 
     /*  < :: x y -- bool(x < y) */
     function void handleLt() {
-        var Rib ptr;
-        var int x, y, z;
+        var Rib stackPtr;
+        var Obj x, y;
         var Rib tmp;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
         // Update second stack entry in place:
         if (x < y) {
-            let ptr[0] = rib_true;
+            let stackPtr[0] = rib_true;
         }
         else {
-            let ptr[0] = rib_false;
+            let stackPtr[0] = rib_false;
         }
 
         return;
@@ -568,63 +567,63 @@ class Interpreter {
 
     /*  + :: x y -- x + y */
     function void handlePlus() {
-        var Rib ptr;
+        var Rib stackPtr;
         var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
         // Update second stack entry in place:
         // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
-        let ptr[0] = Obj.tagInt(x + y);
+        let stackPtr[0] = Obj.tagInt(x + y);
 
         return;
     }
 
     /*  - :: x y -- x - y */
     function void handleMinus() {
-        var Rib ptr;
+        var Rib stackPtr;
         var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
         // Update second stack entry in place:
         // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
-        let ptr[0] = Obj.tagInt(x - y);
+        let stackPtr[0] = Obj.tagInt(x - y);
 
         return;
     }
 
     /*  * :: x y -- x * y */
     function void handleTimes() {
-        var Rib ptr;
-        var int x, y;
+        var Rib stackPtr;
+        var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
         // Update second stack entry in place:
         // Note: this code inspects the signs, so need to extend them to full 16-bit values
-        let ptr[0] = Obj.tagInt(Interpreter.multiply(Obj.untagInt(x), Obj.untagInt(y)));
+        let stackPtr[0] = Obj.tagInt(Interpreter.multiply(Obj.untagInt(x), Obj.untagInt(y)));
 
         return;
     }
@@ -632,20 +631,20 @@ class Interpreter {
 
     /*  quotient :: x y -- x / y */
     function void handleQuotient() {
-        var Rib ptr;
-        var int x, y;
+        var Rib stackPtr;
+        var Obj x, y;
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let ptr = Obj.untagRib(stack);
-        let y = ptr[0];
-        let stack = ptr[1];
+        let stackPtr = Obj.untagRib(stack);
+        let y = stackPtr[0];
+        let stack = stackPtr[1];
 
-        let ptr = Obj.untagRib(stack);
-        let x = ptr[0];
+        let stackPtr = Obj.untagRib(stack);
+        let x = stackPtr[0];
 
         // Update second stack entry in place:
-        let ptr[0] = Obj.tagInt(Interpreter.divide(Obj.untagInt(x), Obj.untagInt(y)));
+        let stackPtr[0] = Obj.tagInt(Interpreter.divide(Obj.untagInt(x), Obj.untagInt(y)));
 
         return;
     }
