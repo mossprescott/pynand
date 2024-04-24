@@ -555,7 +555,8 @@ class Interpreter {
         let stackPtr = Obj.untagRib(stack);
         let x = stackPtr[0];
         // Update second stack entry in place:
-        if (x < y) {
+        // Note: both values need sign extension to compare properly
+        if (Obj.untagInt(x) < Obj.untagInt(y)) {
             let stackPtr[0] = rib_true;
         }
         else {
