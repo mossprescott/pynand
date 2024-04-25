@@ -8,12 +8,6 @@ class Obj {
         return obj < 0;
     }
 
-    // /* Note: a slot index appears in an instruction where a rib can appear, but a regular int cannot.
-    // */
-    // function boolean isSlot(int obj) {
-    //     return ~(obj > 1365);
-    // }
-
     /* Convert to a native 16-bit int value. */
     function int untagInt(Obj obj) {
         // TODO: (optionally) check the tag bit
@@ -37,7 +31,7 @@ class Obj {
 
     /* Strip off the sign bit. */
     function Obj tagInt(int x) {
-        return x & 32767;
+        return x & 32767;  // 0x7FFF
     }
 
     /*
