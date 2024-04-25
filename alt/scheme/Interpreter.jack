@@ -83,11 +83,19 @@ class Interpreter {
             let opcode = pc[0];
 
             if (opcode = 0) {
+                let symbol = Interpreter.getTarget();  // actually an entry or symbol
+                let proc = Obj.untagRib(symbol[0]);
+
+                // Check for attempt to invoke a non-proc. This is usually a symbol that was never
+                // initialized. If not caught, this just mangles the stack and leaves the pc in
+                // the middle of nowhere:
+                // TODO: if CHECK_TYPES
+                if (~(proc[2] = 1)) {
+                    do Interpreter.halt();
+                }
+
                 if (pc[2] = 0) {
                     // jump
-
-                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
-                    let proc = Obj.untagRib(symbol[0]);
 
                     if (proc[0] & (~31)) {  // not between 0 and 31
                         // closure
@@ -123,9 +131,6 @@ class Interpreter {
                 }
                 else {
                     // call
-
-                    let symbol = Interpreter.getTarget();  // actually an entry or symbol
-                    let proc = Obj.untagRib(symbol[0]);
 
                     if (proc[0] & (~31)) {  // not between 0 and 31
                         // closure
