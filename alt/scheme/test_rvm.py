@@ -12,16 +12,20 @@ from nand.vector import unsigned
 
 SHOW_ALL_LABELS = False
 
+def run_vector(program, **args):
+    return run_to_halt(program, simulator="vector", interpreter="jack", **args)
+def run_codegen(program, **args):
+    return run_to_halt(program, simulator="codegen", interpreter="jack", **args)
+# Assembly is completely broken now (doesn't handle tagged objects)
+# def assembly(program, **args):
+#     return run_to_halt(program, simulator="codegen", interpreter="assembly", **args)
+
+def parameterize_both(f):
+    return pytest.mark.parametrize("run", [run_vector, run_codegen])(f)
 
 def parameterize(f):
-    def vector(program, **args):
-        return run_to_halt(program, simulator="vector", interpreter="jack", **args)
-    def codegen(program, **args):
-        return run_to_halt(program, simulator="codegen", interpreter="jack", **args)
-    # Assembly is completely broken now (doesn't handle tagged objects)
-    # def assembly(program, **args):
-    #     return run_to_halt(program, simulator="codegen", interpreter="assembly", **args)
-    return pytest.mark.parametrize("run", [vector, codegen])(f)
+    # vector is just too darn slow
+    return pytest.mark.parametrize("run", [run_codegen])(f)
 
 
 def run_jack(program):
@@ -206,7 +210,8 @@ def test_define(run):
     assert output == []
 
 
-@parameterize
+# Just run this one on the slow simulator as a sanity check:
+@parameterize_both
 def test_fact(run):
     program = """
     (define (fact n)
