@@ -57,6 +57,15 @@ def test_lt(run):
     assert inspect.stack() == [[True, False, False]]
     assert output == []
 
+@parameterize
+def test_lt_negative(run):
+    program = several("(< 1 -2)", "(< -2 1)", "(< -10000 10000)")
+
+    inspect, output = run(program)
+
+    assert inspect.stack() == [[False, True, True]]
+    assert output == []
+
 
 @parameterize
 def test_add(run):
