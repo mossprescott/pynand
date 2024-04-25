@@ -49,6 +49,7 @@ class Interpreter {
         var Rib cont;      // existing continuation
         var Rib proc;      // used only for dispatch
         var Rib ptr;
+        var int tmp;
 
         // Stack-allocated:
         var Rib savedProc;      // saved to construct cont
@@ -150,13 +151,15 @@ class Interpreter {
                         // Now jump to the entry point of the proc:
                         let code = Obj.untagRib(savedProc[0]);
                         let pc = Obj.untagRib(code[2]);
-                    }
+                     }
                     else {
                         // primitive
 
                         do Jack.invoke(handlers[proc[0]]);
 
-                        let pc = Obj.untagRib(pc[2]);
+                        // let pc = Obj.untagRib(pc[2]);
+                        let tmp = pc[2];
+                        let pc = -(tmp + tmp + tmp);
                     }
                 }
             }
@@ -168,7 +171,9 @@ class Interpreter {
 
                 let symbolToUpdate[0] = Interpreter.pop();
 
-                let pc = Obj.untagRib(pc[2]);
+                // let pc = Obj.untagRib(pc[2]);
+                let tmp = pc[2];
+                let pc = -(tmp + tmp + tmp);
             }
             else {
             if (opcode = 2) {
@@ -178,7 +183,9 @@ class Interpreter {
 
                 do Interpreter.push(symbol[0]);
 
-                let pc = Obj.untagRib(pc[2]);
+                // let pc = Obj.untagRib(pc[2]);
+                let tmp = pc[2];
+                let pc = -(tmp + tmp + tmp);
             }
             else {
             if (opcode = 3) {
@@ -186,18 +193,23 @@ class Interpreter {
 
                 do Interpreter.push(pc[1]);
 
-                let pc = Obj.untagRib(pc[2]);
+                // let pc = Obj.untagRib(pc[2]);
+                let tmp = pc[2];
+                let pc = -(tmp + tmp + tmp);
             }
             else {
             if (opcode = 4) {
                 // if
 
                 if (Interpreter.pop() = rib_false) {
-                    let pc = Obj.untagRib(pc[2]);
+                    // let pc = Obj.untagRib(pc[2]);
+                    let tmp = pc[2];
                 }
                 else {
-                    let pc = Obj.untagRib(pc[1]);
+                    // let pc = Obj.untagRib(pc[1]);
+                    let tmp = pc[1];
                 }
+                let pc = -(tmp + tmp + tmp);
             }
             else {
             // if (opcode = 5) {
@@ -553,15 +565,21 @@ class Interpreter {
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let y = stackPtr[0];
         let stack = stackPtr[1];
 
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let x = stackPtr[0];
         // Update second stack entry in place:
         // Note: both values need sign extension to compare properly
         if (Obj.untagInt(x) < Obj.untagInt(y)) {
+        // Tricky: "shifting" one bit to the left moves the sign bit into place, but then we run
+        // into Jack's overflow when comparing large numbers of different signs, so for now do it
+        // the slow, correct way.
+        // if ((x + x) < (y + y)) {
             let stackPtr[0] = rib_true;
         }
         else {
@@ -578,16 +596,19 @@ class Interpreter {
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let y = stackPtr[0];
         let stack = stackPtr[1];
 
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let x = stackPtr[0];
 
         // Update second stack entry in place:
         // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
-        let stackPtr[0] = Obj.tagInt(x + y);
+        // let stackPtr[0] = Obj.tagInt(x + y);
+        let stackPtr[0] = (x + y) & 32767;
 
         return;
     }
@@ -599,16 +620,19 @@ class Interpreter {
 
         // Note: one rib becomes garbage:
         // let y = Interpreter.pop();
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let y = stackPtr[0];
         let stack = stackPtr[1];
 
-        let stackPtr = Obj.untagRib(stack);
+        // let stackPtr = Obj.untagRib(stack);
+        let stackPtr = -(stack + stack + stack);
         let x = stackPtr[0];
 
         // Update second stack entry in place:
         // Note: x and y don't need to be un-tagged first, because bit 15 gets dropped anyway
-        let stackPtr[0] = Obj.tagInt(x - y);
+        // let stackPtr[0] = Obj.tagInt(x - y);
+        let stackPtr[0] = (x - y) & 32767;
 
         return;
     }
@@ -908,21 +932,26 @@ class Interpreter {
         var int slotOrGlobal;
         var int i;
         var Rib ptr;
+        var int tmp;
 
         let slotOrGlobal = pc[1];
-        if (~Obj.isRib(slotOrGlobal)) {
+        // if (~Obj.isRib(slotOrGlobal)) {
+        if (slotOrGlobal > -1) {
             // y is slot # of target
             let i = slotOrGlobal;
-            let ptr = Obj.untagRib(stack);
+            // let ptr = Obj.untagRib(stack);
+            let ptr = -(stack + stack + stack);
             while (i > 0) {
-                let ptr = Obj.untagRib(ptr[1]);
+                // let ptr = Obj.untagRib(ptr[1]);
+                let tmp = ptr[1]; let ptr = -(tmp + tmp + tmp);
                 let i = i - 1;
             }
             return ptr;
         }
         else {
             // y is addr of target symbol
-            return Obj.untagRib(slotOrGlobal);
+            // return Obj.untagRib(slotOrGlobal);
+            return -(slotOrGlobal + slotOrGlobal + slotOrGlobal);
         }
     }
 
@@ -941,19 +970,22 @@ class Interpreter {
         var Rib ptr;
 
         let code = proc[0];
-        let ptr = Obj.untagRib(code);
+        // let ptr = Obj.untagRib(code);
+        let ptr = -(code + code + code);
         let numArgs = ptr[0];
         let newStack = cont;
         while (numArgs > 0) {
             // let x = Interpreter.pop();
-            let ptr = Obj.untagRib(stack);
+            // let ptr = Obj.untagRib(stack);
+            let ptr = -(stack + stack + stack);
             let x = ptr[0];
             let stack = ptr[1];
 
             // Note: can't re-use the stack entries, because they seem to be shared
             // with captured environment in some cases:
             // let newStack = Interpreter.alloc(x, newStack, 0);
-            let ptr = Obj.untagRib(nextRib);
+            // let ptr = Obj.untagRib(nextRib);
+            let ptr = -(nextRib + nextRib + nextRib);
             let ptr[0] = x;
             let ptr[1] = newStack;
             let ptr[2] = 0;
@@ -1185,10 +1217,12 @@ class Interpreter {
         var Rib ptr;
 
         let obj = stack;
-        let ptr = Obj.untagRib(obj);
+        // let ptr = Obj.untagRib(obj);
+        let ptr = -(obj + obj + obj);
         while (ptr[2] = 0) {
             let obj = ptr[1];
-            let ptr = Obj.untagRib(obj);
+            // let ptr = Obj.untagRib(obj);
+            let ptr = -(obj + obj + obj);
         }
         return ptr;
     }

@@ -75,3 +75,6 @@
 ;; 2.1M cycles and 36% of the heap after adding a "screenAddress" primitive
 ;; 1.8M cycles after inlining calls in "call" sequence (wrangleClosureParams)
 ;; 1.6M cycles after replacing the big nested dispatch with a table of function pointers
+
+;; 4.8M cycles after implementing tagged pointers
+;; 2.8M cycles after manually inlining much of the untagging
