@@ -26,7 +26,7 @@ Additional primitives:
 - `screenAddr`; code: `23`; `y <- pop(); x <- pop(); r <- address of character at (x, y)`
 
 `peek` and `poke` can be used to read and write to any address, but most usefully the screen buffer
-(which is at 0x0400–0x0x07E7) and the location mapped to the keyboard (0x07FF).
+(which is at `0x0400`–`0x07E7`) and the location mapped to the keyboard (`0x07FF`).
 
 `halt` can be used to signal normal completion of a program.
 
