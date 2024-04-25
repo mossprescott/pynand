@@ -1128,12 +1128,16 @@ class Interpreter {
     }
 
     function void push(Obj obj) {
+        var int tmp;
+        var Rib ptr;
+
         // let stack = Interpreter.alloc(obj, stack, 0); // pair-type
 
         // Avoid function call overhead by doing the allocation directly here:
-        var Rib ptr;
 
-        let ptr = Obj.untagRib(nextRib);
+        // let ptr = Obj.untagRib(nextRib);
+        let tmp = nextRib;
+        let ptr = -(tmp + tmp + tmp);
 
         let ptr[0] = obj;
         let ptr[1] = stack;
