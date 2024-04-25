@@ -746,7 +746,7 @@ class Interpreter {
 
     /*  putchar :: c -- c (and draw the character at the current position) */
     function void handlePutchar() {
-        var int c;
+        var Obj c;
         var Array cursorAddr;
 
         let c = Interpreter.peek();
@@ -831,7 +831,8 @@ class Interpreter {
      TODO: implement function inlining and just use pop/peek/replace
     */
     function void handleScreenAddr() {
-        var int x, y, addr;
+        var Obj x, y;
+        var Array addr;
         var Rib ptr;
         // var int x, y, acc0, acc1, acc2, acc3, acc4, acc5, acc6, addr;
 
