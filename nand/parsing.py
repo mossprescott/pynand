@@ -117,7 +117,7 @@ to do arbitrary computation:
 2
 """
 
-from typing import Callable, Generic, Sequence, Optional, Tuple, Type, TypeVar
+from typing import Callable, Generic, List, Sequence, Optional, Tuple, TypeVar
 import sys
 
 # Gross hack so we can run on 3.6 and 3.7 (with less checking):
@@ -322,6 +322,62 @@ class ParseFailure(Exception, Generic[T]):
 
     def __str__(self):
         return f"Expected {self.expected} at location {self.loc.pos}; next token: {'<eof>' if self.loc.at_eof() else repr(self.loc.current_token())}"
+
+    def in_context(self, string: str):
+        """Show the location of the error in the context of the source, which must be a string."""
+        if self.loc.at_eof():
+            return str(self)
+        else:
+            return f"Expected {self.expected} {show_location(string, self.loc)}"
+
+
+
+def show_location(string, parse_loc: ParseLocation[str]) -> str:
+    tokens = parse_loc.tokens[:parse_loc.pos]
+
+    loc = find_token_position(string, tokens)
+
+    ls = line_starts(string)
+
+    line_idx = sum(1 for x in ls if x < loc[0]) - 1
+
+    lstart = ls[line_idx]
+    lend = ls[line_idx+1]-1
+    line = string[lstart:lend]
+    caret = " "*(loc[1] - lstart) + "^"
+
+    return f"""at line {line_idx+2}:\n{line}\n{caret}"""
+
+
+def find_token_position(string: str, tokens: List[str]) -> Tuple[int, int]:
+    """Find the position in the source string of the last token in a series of tokens parsed from
+    that string.
+
+    Returns (start index, end index) (inclusive and exclusive, respectively).
+
+    If there's any discrepancy between the token stream and the source text, this probably just
+    explodes in an unhelpful way.
+    """
+
+    end_index = 0
+    while tokens:
+        first, tokens = tokens[0][1], tokens[1:]
+        start_index = string.index(first, end_index)
+        end_index = start_index + len(first)
+
+    return (start_index, end_index)
+
+def line_starts(string: str) -> List[int]:
+    """Indexes of the first characters of each line."""
+
+    acc = 0
+    result = []
+    for l in string.splitlines(True):
+        result.append(acc)
+        acc += len(l)
+
+    return result
+
 
 
 #

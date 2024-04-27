@@ -343,4 +343,8 @@ ClassP = (
 
 # Used by BUNDLED_PLATFORM:
 def parse_class(string):
-    return ClassP.parse(lex(string))
+    try:
+        return ClassP.parse(lex(string))
+    except ParseFailure as x:
+        raise Exception(x.in_context(string))
+
