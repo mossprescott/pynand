@@ -145,7 +145,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr
     symbols = {}
     loc = start_addr
     for line in code_lines:
-        m = re.match(r"\((.*)\)", line)
+        m = re.match(r"\(([a-zA-Z_].*)\)", line)
         if m:
             name = m.group(1)
             if name in builtins:
@@ -166,7 +166,7 @@ def assemble(lines, parse_op=parse_op, min_static=16, max_static=255, start_addr
         if "(" in line:
             pass
         else:
-            m = re.match(r"@(\D.*)", line)
+            m = re.match(r"@([a-zA-Z_].*)", line)
             if m:
                 name = m.group(1)
                 if name in builtins:
