@@ -10,10 +10,8 @@ class Interpreter {
     // For that matter, its stack grows up from 256 (which is fine as long as it doesn't collide
     // with the screen buffer at 2048.)
 
-    // This is only ever used to inspect the contents of the rib, so it's stored in un-tagged form:
-    static Rib pc;
-
     // Roots:
+    static Obj pc;
     static Obj stack;
 
     // Pointers to the functions that handle each primitive:
@@ -65,6 +63,7 @@ class Interpreter {
         var Rib proc;      // used only for dispatch
         var Rib ptr;
         var int tmp;
+        var Rib pcPtr;
 
         // Stack-allocated:
         var Rib savedProc;      // saved to construct cont
@@ -92,10 +91,13 @@ class Interpreter {
         let stack = Obj.tagRibSlow(Jack.symbol("rib_outer_cont"));
 
         // Skip the bogus "main" instr:
-        let pc = Jack.symbol("main") - 3;
+        let pc = Obj.tagRibSlow(Jack.symbol("main") - 3);
 
         while (1) {
-            let opcode = pc[0];
+            // let pcPtr = Obj.untagRib(pc);
+            let pcPtr = -(pc + pc + pc);
+
+            let opcode = pcPtr[0];
 
             if (opcode = 0) {
                 let symbol = Interpreter.getTarget();  // actually an entry or symbol
@@ -109,7 +111,7 @@ class Interpreter {
                     do Interpreter.halt();
                 }
 
-                if (pc[2] = 0) {
+                if (pcPtr[2] = 0) {
                     // jump
 
                     if (proc[0] & (~31)) {  // not between 0 and 31
@@ -126,7 +128,7 @@ class Interpreter {
                         let stack = Interpreter.wrangleClosureParams(savedProc, newCont);
 
                         let code = Obj.untagRib(savedProc[0]);
-                        let pc = Obj.untagRib(code[2]);
+                        let pc = code[2];
                     }
                     else {
                         // primitive
@@ -141,7 +143,7 @@ class Interpreter {
                         let ptr[1] = cont[0];
 
                         // PC = next instruction from the continuation
-                        let pc = Obj.untagRib(cont[2]);
+                        let pc = cont[2];
                     }
                 }
                 else {
@@ -156,7 +158,7 @@ class Interpreter {
                         //   x = saved stack (after popping args)
                         //   y = proc rib
                         //   z = next instruction
-                        let newCont = Interpreter.alloc(-1, symbol[0], pc[2]);  // tricky: faster to use proc from register in first call
+                        let newCont = Interpreter.alloc(-1, symbol[0], pcPtr[2]);  // tricky: faster to use proc from register in first call
                         let newStack = Interpreter.wrangleClosureParams(savedProc, newCont);
                         let ptr = Obj.untagRib(newCont);
                         let ptr[0] = stack;
@@ -164,16 +166,14 @@ class Interpreter {
 
                         // Now jump to the entry point of the proc:
                         let code = Obj.untagRib(savedProc[0]);
-                        let pc = Obj.untagRib(code[2]);
+                        let pc = code[2];
                      }
                     else {
                         // primitive
 
                         do Jack.invoke(handlers[proc[0]]);
 
-                        // let pc = Obj.untagRib(pc[2]);
-                        let tmp = pc[2];
-                        let pc = -(tmp + tmp + tmp);
+                        let pc = pcPtr[2];
                     }
                 }
             }
@@ -185,9 +185,7 @@ class Interpreter {
 
                 let symbolToUpdate[0] = Interpreter.pop();
 
-                // let pc = Obj.untagRib(pc[2]);
-                let tmp = pc[2];
-                let pc = -(tmp + tmp + tmp);
+                let pc = pcPtr[2];
             }
             else {
             if (opcode = 2) {
@@ -197,33 +195,26 @@ class Interpreter {
 
                 do Interpreter.push(symbol[0]);
 
-                // let pc = Obj.untagRib(pc[2]);
-                let tmp = pc[2];
-                let pc = -(tmp + tmp + tmp);
+                let pc = pcPtr[2];
             }
             else {
             if (opcode = 3) {
                 // const
 
-                do Interpreter.push(pc[1]);
+                do Interpreter.push(pcPtr[1]);
 
-                // let pc = Obj.untagRib(pc[2]);
-                let tmp = pc[2];
-                let pc = -(tmp + tmp + tmp);
+                let pc = pcPtr[2];
             }
             else {
             if (opcode = 4) {
                 // if
 
                 if (Interpreter.pop() = rib_false) {
-                    // let pc = Obj.untagRib(pc[2]);
-                    let tmp = pc[2];
+                    let pc = pcPtr[2];
                 }
                 else {
-                    // let pc = Obj.untagRib(pc[1]);
-                    let tmp = pc[1];
+                    let pc = pcPtr[1];
                 }
-                let pc = -(tmp + tmp + tmp);
             }
             else {
             // if (opcode = 5) {
@@ -965,7 +956,9 @@ class Interpreter {
         var Rib ptr;
         var int tmp;
 
-        let slotOrGlobal = pc[1];
+        // let ptr = Obj.untagRib(pc);
+        let ptr = -(pc + pc + pc);
+        let slotOrGlobal = ptr[1];
         // if (~Obj.isRib(slotOrGlobal)) {
         if (slotOrGlobal > -1) {
             // y is slot # of target

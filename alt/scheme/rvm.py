@@ -144,8 +144,9 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
             next_rib = unsigned(inspector.peek(next_rib_loc))
             current_ribs = next_rib - heap_bottom
             max_ribs = heap_top - heap_bottom
+            pc_addr = untag_rib(inspector.peek(pc_loc))
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
-            print(f"  PC: {inspector.show_addr(inspector.peek(pc_loc))}")
+            print(f"  PC: {inspector.show_addr(pc_addr)}")
 
             # # HACK?
             # print(f"  symbols (n..0): ({inspector.show_addr(inspector.peek(symbol_table_loc))}) {inspector.show_stack(inspector.peek(symbol_table_loc))}")
@@ -153,7 +154,7 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
             # for addr in range(big.HEAP_BASE, unsigned(inspector.peek(next_rib_loc)), 3):
             #     print(f"    @{addr}; {inspector.show_obj(addr, deep=False)}")
 
-            print(f"  {inspector.show_instr(inspector.peek(pc_loc))}")
+            print(f"  {inspector.show_instr(pc_addr)}")
         elif trace_level >= TRACE_FINE and computer.pc in symbols_by_addr and computer.pc != halt_loop_addr:
             print(f"{cycles:3,d}: ({symbols_by_addr[computer.pc]})")
         elif trace_level >= TRACE_ALL:
