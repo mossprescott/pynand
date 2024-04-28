@@ -72,9 +72,11 @@ def assemble(encoded, interpreter, print_asm):
             **big.BUILTIN_SYMBOLS,
         }
         instrs, symbols, statics = big.assemble(asm.lines, builtins=builtins)
-        stack_loc =    statics["interpreter.static_stack"]
-        pc_loc =       statics["interpreter.static_pc"]
-        next_rib_loc = statics["interpreter.static_nextRib"]
+        stack_loc =       statics["interpreter.static_stack"]
+        pc_loc =          statics["interpreter.static_pc"]
+        heap_bottom_loc = statics["interpreter.static_heapBottom"]
+        heap_top_loc =    statics["interpreter.static_heapTop"]
+        next_rib_loc =    statics["interpreter.static_nextRib"]
         interp_loop_addr = first_loop_in_function(symbols, "Interpreter", "main")
         halt_loop_addr =   first_loop_in_function(symbols, "Interpreter", "halt")
         unexpected_statics = [s for s in statics if (".static_" not in s)]
@@ -109,13 +111,13 @@ def assemble(encoded, interpreter, print_asm):
         print(f"Total ROM:   {total_words:5,d} ({100*total_words/rom_capacity:2.1f}%)")
         print()
 
-    return instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr
+    return instrs, symbols, stack_loc, pc_loc, heap_bottom_loc, heap_top_loc, next_rib_loc, interp_loop_addr, halt_loop_addr
 
 
 def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
 
     # FIXME: Ug
-    instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, interpreter, print_asm)
+    instrs, symbols, stack_loc, pc_loc, heap_bottom_loc, heap_top_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, interpreter, print_asm)
 
     symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
     last_traced_exec = None
@@ -137,9 +139,11 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
 
             print(f"  stack ({inspector.show_addr(inspector.peek(stack_loc))}): {inspector.show_stack()}")
 
+            heap_bottom = unsigned(inspector.peek(heap_bottom_loc))
+            heap_top = unsigned(inspector.peek(heap_top_loc))
             next_rib = unsigned(inspector.peek(next_rib_loc))
-            current_ribs = (next_rib - big.HEAP_BASE)//3
-            max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
+            current_ribs = next_rib - heap_bottom
+            max_ribs = heap_top - heap_bottom
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
             print(f"  PC: {inspector.show_addr(inspector.peek(pc_loc))}")
 
@@ -157,9 +161,11 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
 
     def meters(computer, cycles):
         inspector = Inspector(computer, symbols, stack_loc)
+        heap_bottom = unsigned(inspector.peek(heap_bottom_loc))
+        heap_top = unsigned(inspector.peek(heap_top_loc))
         next_rib = unsigned(inspector.peek(next_rib_loc))
-        current_ribs = (next_rib - big.HEAP_BASE)//3
-        max_ribs = (big.HEAP_TOP - big.HEAP_BASE)//3
+        current_ribs = next_rib - heap_bottom
+        max_ribs = heap_top - heap_bottom
         return {
             f"mem: {100*current_ribs/max_ribs:0.1f}%"
         }
@@ -298,8 +304,9 @@ def decode(input, asm):
 
     asm.blank()
 
-    # Pad the heap base to a multiple of three, and encode it:
-    HEAP_BASE_OBJ = -((big.HEAP_BASE + 2) // 3)
+    # Obj-encoded address of the head entry in the symbol table, where it will be allocated during
+    # initialization:
+    symbol_table_obj = HEAP_START + 2*len(sym_names) - 1
 
     # Exactly one primitive proc rib is pre-defined: `rib`
     # As a completely over-the-top hack, the location of the symbol table in RAM is stashed in
@@ -309,12 +316,10 @@ def decode(input, asm):
     asm.label("rib_rib")
     asm.instr("#0")
     asm.comment("Location of symtbl:")
-    asm.instr(f"#{HEAP_BASE_OBJ - 2*len(sym_names) + 1}")
+    asm.instr(f"#{symbol_table_obj}")
     asm.instr("#1")
     asm.blank()
 
-    # TODO: move this table elsewhere, so the ribs for strings and instructions form a monolithic
-    # block of address space?
     asm.comment("Table of pointers to symbol name and initial value ribs in ROM:")
     asm.label("symbol_names_start")
     sym_names_and_values = list(zip(
@@ -365,7 +370,7 @@ def decode(input, asm):
         """
         name = sym_names[idx][1]
         description = f'"{name}"({idx})'
-        return HEAP_BASE_OBJ - 2*(len(sym_names) - idx - 1), description
+        return HEAP_START + 2*(len(sym_names) - idx - 1), description
 
     def emit_instr(op: int, arg: int, next: int, sym):
         obj = tag_rib(current_address())
@@ -476,10 +481,6 @@ BUILTINS = {
     "TEMP_2": 7,
     "TEMP_3": 8,
 
-    # Useful values/addresses:
-    "FIRST_RIB_MINUS_ONE": big.HEAP_BASE-1,
-    "MAX_RIB": big.HEAP_TOP,
-
     # The largest value that can ever be the index of a slot, as opposed to the address of a global (symbol)
     # TODO: adjust for encoded rib pointers
     "MAX_SLOT": big.ROM_BASE-1,
@@ -491,11 +492,13 @@ BUILTINS = {
 def pad_addr(addr):
     """Pad an address to the nearest valid pointer (i.e. multiple of 3)."""
 
-    return ((addr + 2) // 3) * 3
+    return ((unsigned(addr) + 2) // 3) * 3
 
 
-FIRST_RIB = pad_addr(BUILTINS["FIRST_RIB_MINUS_ONE"] + 1)
-# assert BUILTINS["MAX_SLOT"] < tag_rib(FIRST_RIB)
+# Addresses of the beginning and end of the space allocated for heap(s), encoded into the "Obj"
+# type, as negative int values. START is the lesser value (more negative), END is the greater.
+HEAP_START = tag_rib(pad_addr(-4))
+HEAP_END = tag_rib(pad_addr(-32768))
 
 
 def asm_interpreter():
@@ -514,8 +517,12 @@ def jack_interpreter():
             asm.instr(f"@{addr}")
             asm.instr(f"M={value}")
         else:
-            asm.instr(f"@{value}")
-            asm.instr("D=A")
+            if value < 0:
+                asm.instr(f"@{-value}")
+                asm.instr("D=-A")
+            else:
+                asm.instr(f"@{value}")
+                asm.instr("D=A")
             asm.instr(f"@{addr}")
             asm.instr("M=D")
 
@@ -528,6 +535,13 @@ def jack_interpreter():
     init_global("Jack frame pointer", "LCL", 0)
     init_global("Jack arg pointer", "ARG", 0)
     # THIS and THAT definitely don't need to be set up before the first function call
+
+    heap_middle = (HEAP_START + HEAP_END)//2
+    init_global("Initial heap (bottom)", "interpreter.static_heapBottom",      HEAP_START)
+    init_global("Initial heap (top)",    "interpreter.static_heapTop",         heap_middle)
+    init_global("Spare heap (bottom)",   "interpreter.static_spareHeapBottom", heap_middle)
+    init_global("Spare heap (top)",      "interpreter.static_spareHeapTop",    HEAP_END)
+
     asm.blank()
 
     translator = reg.Translator(asm)

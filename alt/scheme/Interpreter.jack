@@ -13,12 +13,27 @@ class Interpreter {
     // This is only ever used to inspect the contents of the rib, so it's stored in un-tagged form:
     static Rib pc;
 
-    // These two need to be encoded so they can be used as values and efficiently incremented:
+    // Roots:
     static Obj stack;
-    static Obj nextRib;
 
     // Pointers to the functions that handle each primitive:
     static Array handlers;
+
+    //
+    // GC
+    //
+
+    static Obj heapBottom;      // pre-initialized
+    static Obj heapTop;         // pre-initialized
+
+    static Obj spareHeapBottom; // pre-initialized
+    static Obj spareHeapTop;    // pre-initialized
+
+    static Obj nextRib;
+    static boolean inGC;
+
+    static int saveChar1;
+    static int saveChar2;
 
     //
     // IO
@@ -65,8 +80,7 @@ class Interpreter {
         let rib_true =  Obj.tagRibSlow(Jack.symbol("rib_true"));
         let rib_nil =   Obj.tagRibSlow(Jack.symbol("rib_nil"));
 
-        // Bottom of the "heap" area:
-        let nextRib = -10923; // Obj.tagRibSlow(32767 + 2);  // Note: 32768 would overflow
+        do Interpreter.initGC();
 
         do Interpreter.initSymbolTable();
 
@@ -990,7 +1004,7 @@ class Interpreter {
             let ptr[1] = newStack;
             let ptr[2] = 0;
             let newStack = nextRib;
-            let nextRib = nextRib -1;
+            let nextRib = nextRib + 1;
 
             let numArgs = numArgs - 1;
         }
@@ -1141,22 +1155,8 @@ class Interpreter {
         let ptr[0] = x;
         let ptr[1] = y;
         let ptr[2] = z;
-        let nextRib = nextRib - 1;
+        let nextRib = nextRib + 1;
         return r;
-    }
-
-    /**
-     Make sure there's space to allocate a rib, otherwise halt.
-
-     TODO: make space by collecting garbage.
-     */
-    function void checkHeap() {
-        if (~Obj.isRib(nextRib)) {
-            do Interpreter.halt();
-        }
-        else {
-            return;
-        }
     }
 
     function void push(Obj obj) {
@@ -1175,7 +1175,7 @@ class Interpreter {
         let ptr[1] = stack;
         let ptr[2] = 0;  // pair type
         let stack = nextRib;
-        let nextRib = nextRib-1;
+        let nextRib = nextRib + 1;
 
         return;
     }
@@ -1230,6 +1230,30 @@ class Interpreter {
     function void halt() {
         while (1) {
             // let tty[0] = -1; // DEBUG
+        }
+    }
+
+
+    // Garbage collection:
+
+    function void initGC() {
+        let nextRib = heapBottom;
+
+        let inGC = false;
+    }
+
+    /**
+     Make sure there's space to allocate a rib, otherwise halt.
+
+     TODO: make space by collecting garbage.
+     */
+     function void checkHeap() {
+        // Leave spave for a few allocations to happen without a check:
+        if (nextRib > (heapTop - 10)) {
+            do Interpreter.halt();
+        }
+        else {
+            return;
         }
     }
 }

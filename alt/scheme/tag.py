@@ -1,7 +1,7 @@
 """Encoding for integer, slot, and rib pointer values."""
 
 from alt import big
-from nand.vector import extend_sign
+from nand.vector import extend_sign, unsigned
 
 
 # FIXME: use the rvm's actual/current value
@@ -23,8 +23,11 @@ def tag_int(x):
     return x & 0x7FFF
 
 def tag_rib(addr):
+    addr = unsigned(addr)
     assert addr % 3 == 0
-    return -(addr//3)
+    obj = extend_sign(-(addr//3))
+    assert (-32768 <= obj < 0) or (MAX_SLOT < obj <= 32767)
+    return obj
 
 
 def untag_int(obj):
@@ -39,4 +42,4 @@ def untag_int(obj):
 
 def untag_rib(obj):
     assert is_rib(obj)
-    return -3*extend_sign(obj)
+    return extend_sign(-3*extend_sign(obj))
