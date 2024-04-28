@@ -790,20 +790,37 @@ class Interpreter {
     /*  putchar :: c -- c (and draw the character at the current position) */
     function void handlePutchar() {
         var Obj c;
-        var Array cursorAddr;
+
+        var Array ptr;
 
         let c = Interpreter.peek();
 
         if (c = 10) {
             let cursorX = 0;
-            let cursorY = cursorY + 1;
-            // TODO: if we're at the bottom of the screen, scroll everything up
+            if (cursorY < 24) {
+                let cursorY = cursorY + 1;
+            }
+            else {
+                // Copy every line but the first up:
+                let ptr = 2048;       // Top-left character on screen
+                while (ptr < 3968) {  // First character of the last line (2048 + 80*24)
+                    let ptr[0] = ptr[80];
+                    let ptr = ptr + 1;
+                }
+                // And clear the bottom line:
+                while (ptr < 4048) {  // First word past the end of the last line
+                    let ptr[0] = 0;
+                    let ptr = ptr + 1;
+                }
+            }
         }
         else {
-            let cursorAddr = Interpreter.screenAddr(cursorX, cursorY);
-            let cursorAddr[0] = c;
+            let ptr = Interpreter.screenAddr(cursorX, cursorY);
+            let ptr[0] = c;
 
-            let cursorX = cursorX + 1;
+            if (cursorX < 79) {
+                let cursorX = cursorX + 1;
+            }
         }
 
         return;
