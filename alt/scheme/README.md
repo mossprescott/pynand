@@ -117,11 +117,36 @@ suggests that space for 48,000 ribs is needed to bootstrap. Presumably that refe
 
 ## GC
 
-The program runs until memory is exhausted.
+Two heaps are allocated:
 
-**TODO**: collect garbage.
+The initial heap occupies ribs `-21844` (address `65532` == `-4`) through `-16384`.
+The "spare" heap occupies ribs `-16383` through `-10923` (address `32769` == `-32767`).
+Each heap has space for 5,461 ribs.
 
-See https://github.com/udem-dlteam/ribbit/issues/26.
+Because ribs are tracked using negative values, it's easier to think of the heaps as growing
+from the largest negative value towards zero. Considering raw addresses as signed values,
+that means the bottom of the initial heap is just below 0, and the top of the spare heap is at
+the most negative address, just before the address space wraps around to positive values
+(at the top of ROM.)
+
+Note: these allocations are based on a total of 32k words of available RAM. If the size of ROM
+becomes configurable, they could be expanded to, say, 48k. At that point, the heap(s) will be
+wrapping around from positive to negative address ranges, making this arithmetic even more
+confusing, but fortunately the tagged rib addresses will always be in a continuous range.
+
+Each time a new rib is allocated, a (tagged) pointer is incremented, starting at the bottom of the
+active heap (the most negative tagged pointer) and growing toward the top. When the interpreter
+needs to allocate a new rib and there's no space left in the active heap, the garbage collector
+is invoked.
+
+Starting with the top entry on the stack and the current instruction as roots, the garbage
+collector visits all reachable ribs and copies them to the spare heap. When all reachable ribs
+have been copied, the heap pointers are swapped, the spare becomes active, and any space
+occupied by un-copied ribs has effectively been reclaimed.
+
+Obviously throwing away half the heap space isn't making very good use of the small available RAM,
+but it does keep the code simple. Some tips on more efficient use of memory can be found at
+https://github.com/udem-dlteam/ribbit/issues/26.
 
 
 ## Performance
