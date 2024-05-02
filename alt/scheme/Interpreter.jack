@@ -1250,20 +1250,134 @@ class Interpreter {
         let nextRib = heapBottom;
 
         let inGC = false;
+
+        return;
     }
 
     /**
      Make sure there's space to allocate a rib, otherwise halt.
-
-     TODO: make space by collecting garbage.
      */
      function void checkHeap() {
         // Leave spave for a few allocations to happen without a check:
-        if (nextRib > (heapTop - 10)) {
+        // if (nextRib > (heapTop - 10)) {
+        if (nextRib > heapTop) {
+            // Panic! We didn't check often enough and wrote past the end of the heap
             do Interpreter.halt();
         }
+        if (nextRib > (heapBottom + 100)) {
+            do Interpreter.runGC();
+        }
+
+        return;
+    }
+
+    function void runGC() {
+        var Obj tmp1, tmp2;
+        var Array screen;
+        var Array scan;
+
+        // Set some state for tracing and the user:
+        let inGC = true;
+        let screen = 2048;
+        let saveChar1 = screen[78];
+        let saveChar2 = screen[79];
+        let screen[78] = 71; // G
+        let screen[79] = 67; // C
+
+
+        // Update all the pointers:
+
+        let tmp1 = heapBottom;
+        let tmp2 = heapTop;
+        let heapBottom = spareHeapBottom;
+        let heapTop = spareHeapTop;
+        let spareHeapBottom = tmp1;
+        let spareHeapTop = tmp2;
+
+        // start allocating at the bottom of the empty heap:
+        let nextRib = heapBottom;
+
+        // Now copy, starting with the two roots:
+
+
+        let stack = Interpreter.copy(stack);
+        let pc = Interpreter.copy(pc);
+
+        // Now walk over the already-copied ribs, one *word* at a time, copying additional referenced
+        // ribs.
+        // Tricky: decoded addresses grow *down* from untagRib(HeapBottom)[2] to untagRib(heapTop)[0].
+        // untagRib(nextRib) points to the first word of the next un-allocated slot, so its [2]
+        // is just before the last one we need to look at.
+        let scan = Obj.untagRib(heapBottom) + 2;
+        while (scan > (Obj.untagRib(nextRib) + 2)) {
+            let tty[0] = scan;  // DEBUG
+            let scan[0] = Interpreter.copy(scan[0]);
+            let tty[0] = Obj.untagRib(nextRib);  // DEBUG
+            let scan = scan - 1;
+        }
+
+        // Reset to the run state:
+
+        let inGC = false;
+        let screen[78] = saveChar1;
+        let screen[79] = saveChar2;
+
+        return;
+    }
+
+    /*
+     Inspect a word that is part of a "live" rib and copy the rib it refers to to the new heap, if
+     necessary.
+
+     A rib is copied if:
+     - the word is tagged as a rib pointer
+     - the referenced rib is not in ROM (that is, outside the range of the old/current heap)
+     - it hasn't already been copied; that is it doesn't have the "copied_obj" value (-1) in its first word
+
+     When a rib is copied, its first word is overwritten with -1, which is nominally a rib pointer,
+     but can never actually refer to a rib (so it should never appear in an un-copied rib). Then
+     the (tagged) pointer to the rib's new location is written to the rib's second word.
+
+     Return the (possibly updated) value.
+
+     When this is called, the heap pointers have already been swapped; "spareHeap" refers to the
+     "old" heap.
+    */
+    function Obj copy(Obj obj) {
+        var Rib oldPtr, newPtr;
+        var Obj result;
+
+        // let tty[0] = obj;  // DEBUG
+
+        if (Obj.isRib(obj) & ((~(obj < spareHeapBottom)) & (obj < spareHeapTop))) {
+            // let tty[0] = obj;  // DEBUG
+
+            let oldPtr = Obj.untagRib(obj);
+
+            if (oldPtr[0] = -1) {
+                // This rib has already been copied; retrieve and return the forwarding pointer:
+                return oldPtr[1];
+            }
+            else {
+                let result = nextRib;
+                let newPtr = Obj.untagRib(nextRib);
+
+                // Copy the raw words; they'll get updated as needed when the scan catches up
+                let newPtr[0] = oldPtr[0];
+                let newPtr[1] = oldPtr[1];
+                let newPtr[2] = oldPtr[2];
+
+                let oldPtr[0] = -1;  // "copied obj" semaphore value
+                let oldPtr[1] = result;
+
+                let nextRib = nextRib + 1;
+
+                return result;
+            }
+        }
         else {
-            return;
+            // let tty[0] = obj;  // DEBUG
+            return obj;
         }
     }
 }
