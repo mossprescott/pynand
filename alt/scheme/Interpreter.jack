@@ -94,6 +94,10 @@ class Interpreter {
         let pc = Obj.tagRibSlow(Jack.symbol("main") - 3);
 
         while (1) {
+            // Before looking at the instruction, make space in the heap in case any allocation
+            // is going to be needed:
+            do Interpreter.checkHeap();
+
             // let pcPtr = Obj.untagRib(pc);
             let pcPtr = -(pc + pc + pc);
 
@@ -230,22 +234,24 @@ class Interpreter {
 
 
     /**
-    Allocate symbols (which must be in RAM so their values can be updated in place) and the
-    pairs that form the list that is the symbol table.
-    The decoded instructions in ROM refer to the addresses where these symbols are expected to
-    located in memory.
+    Construct symbol ribs in low memory; they have to be in RAM so their values can be updated in
+    place. The decoded instructions in ROM refer to the addresses where these symbols are
+    expected to be located in memory, so they have to be allocated "statically", where the
+    garbage collector won't try to move them.
     */
     function void initSymbolTable() {
-        var Array ptr;
-        var Obj symbol;
-        var Obj entry;
+        var Array tablePtr, ribPtr;
 
-        let entry = rib_nil;
-        let ptr = Jack.symbol("symbol_names_start");
-        while (ptr < Jack.symbol("symbol_names_end")) {
-            let symbol = Interpreter.alloc(ptr[1], ptr[0], 2);  // symbol type
-            let entry = Interpreter.alloc(symbol, entry, 0);  // pair type
-            let ptr = ptr + 2;
+        let ribPtr = 1896;  // First aligned rib location under 1900 (approx where the input buffer lives)
+
+        let tablePtr = Jack.symbol("symbol_names_start");
+        while (tablePtr < Jack.symbol("symbol_names_end")) {
+            let ribPtr[0] = tablePtr[1];
+            let ribPtr[1] = tablePtr[0];
+            let ribPtr[2] = 2;  // symbol type
+
+            let tablePtr = tablePtr + 2;
+            let ribPtr = ribPtr - 3;
         }
 
         return;
@@ -1157,9 +1163,6 @@ class Interpreter {
         var Obj r;
         var Rib ptr;
 
-        // Note: makes this not a leaf function, but most callers have already inlined it anyway
-        do Interpreter.checkHeap();
-
         let r = nextRib;
         let ptr = Obj.untagRib(r);
         let ptr[0] = x;
@@ -1259,12 +1262,12 @@ class Interpreter {
      */
      function void checkHeap() {
         // Leave spave for a few allocations to happen without a check:
-        // if (nextRib > (heapTop - 10)) {
         if (nextRib > heapTop) {
             // Panic! We didn't check often enough and wrote past the end of the heap
             do Interpreter.halt();
         }
-        if (nextRib > (heapBottom + 100)) {
+        // if (nextRib > (heapTop - 5)) {  // Space for a handful of allocations in any single instruction
+        if (nextRib > (heapBottom + 1000)) {  // Run more often for stress testing
             do Interpreter.runGC();
         }
 
@@ -1297,11 +1300,19 @@ class Interpreter {
         // start allocating at the bottom of the empty heap:
         let nextRib = heapBottom;
 
-        // Now copy, starting with the two roots:
-
-
+        // Now copy, starting with the two standard roots:
         let stack = Interpreter.copy(stack);
         let pc = Interpreter.copy(pc);
+
+        // Walk over the pre-allocated symbols, which are found in low-memory (outside the heap),
+        // making them effectively roots:
+        let scan = 1896;
+        while (scan > 1500) {  // FIXME: stop after the actual table is read, by comparing table_start/_end?
+            let scan[0] = Interpreter.copy(scan[0]);
+            // Note: only the value can live on the heap, so only need to inspect the first word
+            // of each symbol rib:
+            let scan = scan - 3;
+        }
 
         // Now walk over the already-copied ribs, one *word* at a time, copying additional referenced
         // ribs.
@@ -1310,9 +1321,7 @@ class Interpreter {
         // is just before the last one we need to look at.
         let scan = Obj.untagRib(heapBottom) + 2;
         while (scan > (Obj.untagRib(nextRib) + 2)) {
-            let tty[0] = scan;  // DEBUG
             let scan[0] = Interpreter.copy(scan[0]);
-            let tty[0] = Obj.untagRib(nextRib);  // DEBUG
             let scan = scan - 1;
         }
 
@@ -1347,11 +1356,7 @@ class Interpreter {
         var Rib oldPtr, newPtr;
         var Obj result;
 
-        // let tty[0] = obj;  // DEBUG
-
         if (Obj.isRib(obj) & ((~(obj < spareHeapBottom)) & (obj < spareHeapTop))) {
-            // let tty[0] = obj;  // DEBUG
-
             let oldPtr = Obj.untagRib(obj);
 
             if (oldPtr[0] = -1) {
@@ -1376,7 +1381,6 @@ class Interpreter {
             }
         }
         else {
-            // let tty[0] = obj;  // DEBUG
             return obj;
         }
     }

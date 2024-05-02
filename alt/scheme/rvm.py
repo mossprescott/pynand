@@ -274,7 +274,7 @@ def decode(input, asm):
 
     # First byte(s): number of symbols without names
     n = get_int(0)
-    sym_names = n*[(string_empty_obj, "")]
+    sym_objs_and_names = n*[(string_empty_obj, "")]
 
     asm.blank()
 
@@ -290,7 +290,7 @@ def decode(input, asm):
                 lbl = f"string_{idx}"
                 obj = emit_string(lbl, f"#{accum}", len(acc_str), f'"{acc_str}"')
                 idx += 1
-            sym_names.insert(0, (obj, acc_str))
+            sym_objs_and_names.insert(0, (obj, acc_str))
 
             accum = nil_obj
             acc_str = ""
@@ -305,9 +305,31 @@ def decode(input, asm):
 
     asm.blank()
 
-    # Obj-encoded address of the head entry in the symbol table, where it will be allocated during
-    # initialization:
-    symbol_table_obj = HEAP_START + 2*len(sym_names) - 1
+    def symbol_ref(idx):
+        """Statically resolve a reference to the symbol table, to an (encoded) address in RAM where
+        that symbol rib will be allocated during initialization.
+
+        The table is written from the end, and each entry is made of of two ribs, the `symbol`
+        and a `pair`.
+        """
+        name = sym_objs_and_names[idx][1]
+        description = f'"{name}"({idx})'
+        FIRST_SYMBOL_OBJ = tag_rib(1896)
+        return FIRST_SYMBOL_OBJ + idx, description
+
+    asm.comment("Symbol table spine:")
+    symbol_table_obj = tag_rib(current_address())
+    for i, t in enumerate(sym_objs_and_names):
+        _, n = t
+        obj = tag_rib(current_address())
+        asm.comment(f"symbol {i} ({n!r})")
+        asm.instr(f"#{symbol_ref(i)[0]}")
+        if i == len(sym_objs_and_names)-1:
+            asm.instr(f"#{nil_obj}")
+        else:
+            asm.instr(f"#{obj-1}")
+        asm.instr(f"#0")  # pair type
+    asm.blank()
 
     # Exactly one primitive proc rib is pre-defined: `rib`
     # As a completely over-the-top hack, the location of the symbol table in RAM is stashed in
@@ -324,9 +346,9 @@ def decode(input, asm):
     asm.comment("Table of pointers to symbol name and initial value ribs in ROM:")
     asm.label("symbol_names_start")
     sym_names_and_values = list(zip(
-        sym_names,
-        [rib_obj, false_obj, true_obj, nil_obj] + [false_obj]*(len(sym_names)-4)))
-    for i in reversed(range(len(sym_names_and_values))):
+        sym_objs_and_names,
+        [rib_obj, false_obj, true_obj, nil_obj] + [false_obj]*(len(sym_objs_and_names)-4)))
+    for i in range(len(sym_names_and_values)):
         (obj, s), val = sym_names_and_values[i]
         asm.comment(f'{i}: "{s}" (r{abs(obj)} = r{abs(val)})')
         asm.instr(f"#{obj}")
@@ -361,17 +383,6 @@ def decode(input, asm):
     def push(x):
         nonlocal stack
         stack = (x, stack)
-
-    def symbol_ref(idx):
-        """Statically resolve a reference to the symbol table, to an (encoded0 address in RAM where
-        that rib will be allocated during initialization.
-
-        The table is written from the end, and each entry is made of of two ribs, the `symbol`
-        and a `pair`.
-        """
-        name = sym_names[idx][1]
-        description = f'"{name}"({idx})'
-        return HEAP_START + 2*(len(sym_names) - idx - 1), description
 
     def emit_instr(op: int, arg: int, next: int, sym):
         obj = tag_rib(current_address())
