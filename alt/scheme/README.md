@@ -46,23 +46,26 @@ can implement your own "keyDown" and "drawChar" operations using `(peek 4095)` a
 
 ## Memory Layout
 
-| Address | Jack                            | Assembly | Description |
-|---------|----------------------------------|----------|-------------|
-| 0       | `Interpreter.stack`       | `SP`       | Address of the cons list that represents the stack: i.e. a "pair" rib which contains the value at the top of the stack and points to the next entry.                   |
-| 1       | `Interpreter.pc`          | `PC`       | Address of the rib currently being interpreted.   |
-| 2       | `Interpreter.nextRib`     | `NEXT_RIB` | Address where the next allocation will occur.     |
-| ...     |                                  |          | TBD: values used by the garbage collector to keep track of free space. |
-| 256–    |                                  |          | Jack stack.                                       |
-| 1936–2015 | `Interpreter.bufferStart`/`End` |  | Space to store a line of input from the keyboard. |
-| 2016–2047 | `Interpreter.handlers`  |          | Function pointer for each primitive handler.      |
-| 2048-4048 |                                | `SCREEN` | Screen buffer: 80x25 characters.                  |
-| 4095      |                                | `KEYBOARD` | Mapped to the keyboard for input and "tty" for output. |
-| 4096–32767 |                               |          | ROM: interpreter, symbol names, instructions.     |
-| 32768–65536 |                              |          | Heap.                                             |
+| Address      | Pointer                         | Description |
+|--------------|---------------------------------|-------------|
+| 0–15         | `SP`, `R4`, ..., `R15`          | Jack SP and temporary storage ("registers".) |
+| 16–(255)     |                                 | Jack static variables: `@interpreter.static_...` |
+| 256–...      |                                 | Jack stack. |
+| 1024–...     |                                 | Pre-allocated symbol ribs. |
+| 1936–2015    | `Interpreter.bufferStart`/`End` | Space to store a line of input from the keyboard. |
+| 2016–2047    | `Interpreter.handlers`          | Function pointer for each primitive handler. |
+| 2048–4048    | `Jack.symbol("SCREEN")`         | Screen buffer: 80x25 characters. |
+| 4095         | `Jack.symbol("KEYBOARD")`       | Mapped to the keyboard for input and "tty" for output. |
+| 4096–(32767) |                                 | **ROM**: interpreter, symbol names, instructions, and symbol table list pairs. |
+| 32768–65536  |                                 | Heaps. |
 
-*Note: when the Jack interpreter is used, these locations are determined by the assembler,
-addresses 0-15 and are used by the interpreter's own stack pointers and temporary storage, and the
-interpreter's own stack grows up from address 256.*
+
+Note: the locations of all Jack static fields are determined by the assembler, starting at
+address 16. Addresses 0–15 and are used by the interpreter's own stack pointers and temporary
+storage, and the interpreter's own stack grows up from address 256.
+
+TODO: move the primitive handler table to ROM. This will save a little space in RAM, but more
+importantly prevent the table from being overwritten with hilarious consequences.
 
 
 ## Rib Representation
@@ -139,10 +142,30 @@ active heap (the most negative tagged pointer) and growing toward the top. When 
 needs to allocate a new rib and there's no space left in the active heap, the garbage collector
 is invoked.
 
-Starting with the top entry on the stack and the current instruction as roots, the garbage
-collector visits all reachable ribs and copies them to the spare heap. When all reachable ribs
-have been copied, the heap pointers are swapped, the spare becomes active, and any space
-occupied by un-copied ribs has effectively been reclaimed.
+Starting from a pre-defined set of roots, the garbage collector visits all referenced ribs. Every
+such rib that is in the "old" heap is copied to the "new" (formerly "spare") heap, while
+references to ribs that reside in ROM or elsewhere outside the heap are left alone. When all
+reachable ribs have been copied, the spare becomes active, and any space occupied by un-copied
+ribs has effectively been reclaimed (without ever being inspected.)
+
+The *roots* for GC are:
+- `stack`: the top entry rib is copied to the new heap, the pointer is updated, and the contents
+    are scanned for references
+- `pc`: similar to stack
+- pre-allocated symbol ribs: these ribs are allocated in RAM, so that their values can be updated,
+    but they cannot be moved because instructions in ROM can refer to their fixed addresses.
+    However their contents are scanned and any references they contain are updated as needed.
+
+Note: both `stack` and `pc` initially refer to ribs in ROM, but every "push" will result in
+a heap-allocagted rib in `stack`, and any runtime-compiled instructions will end up in the heap
+and pointed to by `pc`.
+
+The `pair` ribs that make up the cons-list containing the symbol table don't need to be updated,
+and can become garbage when the table is released. So it would be possible to allocate them in
+ROM, or outside the heap, or indeed in the heap. Because heap/RAM space seem to be at a premium,
+they are currently allocated in ROM. This also allows some comments to be added to the assembly
+source, which may be useful for debugging. *This issue is unique to this implementation; Ribbit's
+own interpreters load the program into the heap like any other ribs.*
 
 Obviously throwing away half the heap space isn't making very good use of the small available RAM,
 but it does keep the code simple. Some tips on more efficient use of memory can be found at
