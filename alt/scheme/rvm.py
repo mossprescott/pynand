@@ -142,8 +142,8 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
             heap_bottom = unsigned(inspector.peek(heap_bottom_loc))
             heap_top = unsigned(inspector.peek(heap_top_loc))
             next_rib = unsigned(inspector.peek(next_rib_loc))
-            current_ribs = next_rib - heap_bottom
-            max_ribs = heap_top - heap_bottom
+            current_ribs = max(1, next_rib - heap_bottom)
+            max_ribs = max(10, heap_top - heap_bottom)
             pc_addr = untag_rib(inspector.peek(pc_loc))
             print(f"  heap: {current_ribs:3,d} ({100*current_ribs/max_ribs:0.1f}%)")
             print(f"  PC: {inspector.show_addr(pc_addr)}")
@@ -165,8 +165,8 @@ def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, t
         heap_bottom = unsigned(inspector.peek(heap_bottom_loc))
         heap_top = unsigned(inspector.peek(heap_top_loc))
         next_rib = unsigned(inspector.peek(next_rib_loc))
-        current_ribs = next_rib - heap_bottom
-        max_ribs = heap_top - heap_bottom
+        current_ribs = max(1, next_rib - heap_bottom)
+        max_ribs = max(10, heap_top - heap_bottom)
         return {
             f"mem: {100*current_ribs/max_ribs:0.1f}%"
         }
