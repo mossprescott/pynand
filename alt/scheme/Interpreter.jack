@@ -1168,11 +1168,16 @@ class Interpreter {
         var Rib ptr;
 
         let r = nextRib;
-        let ptr = Obj.untagRib(r);
+
+        // let ptr = Obj.untagRib(r);
+        let ptr = -(r + r + r);
+
         let ptr[0] = x;
         let ptr[1] = y;
         let ptr[2] = z;
+
         let nextRib = nextRib + 1;
+
         return r;
     }
 
