@@ -78,3 +78,5 @@
 
 ;; 4.8M cycles after implementing tagged pointers
 ;; 2.8M cycles after manually inlining much of the untagging
+;; 3.6M cycles after implementing garbage collection
+;; 3.4M cycles after implementing push/pop/peek in assembly

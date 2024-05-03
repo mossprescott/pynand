@@ -191,7 +191,7 @@ class Interpreter {
 
                 let symbolToUpdate = Interpreter.getTarget();  // actually an entry or symbol
 
-                let symbolToUpdate[0] = Interpreter.pop();
+                let symbolToUpdate[0] = Interpreter.pop_asm();
 
                 let pc = pcPtr[2];
             }
@@ -201,7 +201,7 @@ class Interpreter {
 
                 let symbol = Interpreter.getTarget();  // actually an entry or symbol
 
-                do Interpreter.push(symbol[0]);
+                do Interpreter.push_asm(symbol[0]);
 
                 let pc = pcPtr[2];
             }
@@ -209,7 +209,7 @@ class Interpreter {
             if (opcode = 3) {
                 // const
 
-                do Interpreter.push(pcPtr[1]);
+                do Interpreter.push_asm(pcPtr[1]);
 
                 let pc = pcPtr[2];
             }
@@ -217,7 +217,7 @@ class Interpreter {
             if (opcode = 4) {
                 // if
 
-                if (Interpreter.pop() = rib_false) {
+                if (Interpreter.pop_asm() = rib_false) {
                     let pc = pcPtr[2];
                 }
                 else {
@@ -770,7 +770,7 @@ class Interpreter {
             }
 
             // An entire line has been captured; yield the first character and return:
-            do Interpreter.push(Obj.tagInt(bufferStart[0]));
+            do Interpreter.push_asm(Obj.tagInt(bufferStart[0]));
             let bufferStart = bufferStart + 1;
 
             return;
@@ -784,7 +784,7 @@ class Interpreter {
                 let bufferStart = handlers - 80;
                 let bufferEnd = bufferStart;
             }
-            do Interpreter.push(Obj.tagInt(c));
+            do Interpreter.push_asm(Obj.tagInt(c));
             return;
         }
     }
@@ -795,7 +795,7 @@ class Interpreter {
 
         var Array ptr;
 
-        let c = Interpreter.peek();
+        let c = Interpreter.peek_asm();
 
         if (c = 10) {
             let cursorX = 0;

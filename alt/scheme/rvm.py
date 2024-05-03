@@ -570,6 +570,98 @@ def jack_interpreter():
     for cl in "Interpreter", "Obj", "Rib":
         load_class(f"alt/scheme/{cl}.jack")
 
+
+    # Hand-rolled assembly versions of the common stack-adjusting operations.
+    # These still involve some some overhead for the function call (about 8 instructions on
+    # the caller side, plus about 4 in the callee, for no args on the stack). That pretty much
+    # wipes out the savings compared to directly inlining the function in JACK and taking the
+    # slightly worse codegen, except in the case of push(), which is too ugly to inline easily,
+    # and also compresses better.
+
+    # 28 instructions, down from 44 for the Jack version
+    asm.label("interpreter.push_asm")
+    asm.comment("r0 = untagRib(nextRib) + 1")
+    asm.instr("@interpreter.static_nextRib")
+    asm.instr("D=-M")
+    asm.instr("D=D-M")
+    asm.instr("D=D-M")
+    asm.instr("@R5")
+    asm.instr("M=D+1")
+    asm.comment("D = obj (argument 0) (and adjust SP)")
+    asm.instr("@SP")
+    asm.instr("AM=M-1")
+    asm.instr("D=M")
+    asm.comment("mem[r0-1] = D")
+    asm.instr("@R5")
+    asm.instr("A=M-1")
+    asm.instr("M=D")
+    asm.comment("mem[r0] = stack")
+    asm.instr("@interpreter.static_stack")
+    asm.instr("D=M")
+    asm.instr("@R5")
+    asm.instr("A=M")
+    asm.instr("M=D")
+    asm.comment("mem[r0+1] = 0 (pair type)")
+    asm.instr("A=A+1")
+    asm.instr("M=0")
+    asm.comment("stack (static) = nextRib (static)")
+    asm.instr("@interpreter.static_nextRib")
+    asm.instr("D=M")
+    asm.instr("@interpreter.static_stack")
+    asm.instr("M=D")
+    asm.comment("nextRib (static) = nextRib (static) + 1")
+    asm.instr("@interpreter.static_nextRib")
+    asm.instr("M=M+1")
+    asm.comment("return (from leaf)")
+    asm.instr("@R4")
+    asm.instr("A=M")
+    asm.instr("0;JMP")
+    asm.blank()
+
+
+    # 17 instructions, down from 30 for the Jack version
+    asm.label("interpreter.pop_asm")
+    asm.comment("ptr (r0) = -stack - stack - stack")
+    asm.instr("@interpreter.static_stack")
+    asm.instr("D=-M")
+    asm.instr("D=D-M")
+    asm.instr("D=D-M")
+    asm.instr("@R5")
+    asm.instr("AM=D")
+    asm.comment("r7 = mem[ptr (r0)] (for return)")
+    asm.instr("D=M")
+    asm.instr("@R12")
+    asm.instr("M=D")
+    asm.comment("stack = mem[ptr+1]")
+    asm.instr("@R5")
+    asm.instr("A=M+1")
+    asm.instr("D=M")
+    asm.instr("@interpreter.static_stack")
+    asm.instr("M=D")
+    asm.comment("return (from leaf)")
+    asm.instr("@R4")
+    asm.instr("A=M")
+    asm.instr("0;JMP")
+    asm.blank()
+
+
+    # 10 instructions, down from 17 for the Jack version
+    asm.label("interpreter.peek_asm")
+    asm.comment("ptr = untagRib(stack)")
+    asm.instr("@interpreter.static_stack")
+    asm.instr("D=-M")
+    asm.instr("D=D-M")
+    asm.instr("A=D-M")
+    asm.comment("r7 = mem[ptr] (for return)")
+    asm.instr("D=M")
+    asm.instr("@R12")
+    asm.instr("M=D")
+    asm.comment("return (from leaf)")
+    asm.instr("@R4")
+    asm.instr("A=M")
+    asm.instr("0;JMP")
+    asm.blank()
+
     asm.label("interpreter_end")
     asm.blank()
 
