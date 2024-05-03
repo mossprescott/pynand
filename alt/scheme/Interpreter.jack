@@ -1289,6 +1289,12 @@ class Interpreter {
         return;
     }
 
+    /*
+     Swap the heap pointers, then copy all reachable objects to the "new", empty heap.
+
+     Note: didn't bother with inlining untagRib in this code, because it's such a small portion
+     of the overall runtime, and this code is hard enough to follow as it is.
+    */
     function void runGC() {
         var Obj tmp1, tmp2;
         var Array screen;
