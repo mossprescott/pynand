@@ -96,7 +96,11 @@ class Interpreter {
         while (1) {
             // Before looking at the instruction, make space in the heap in case any allocation
             // is going to be needed:
-            do Interpreter.checkHeap();
+            // Reserve space for "jump/call" to a proc that takes several arguments, which have to
+            // be pushed onto a new stack. Better would be to look at the number of args before
+            // making this call; would have to make sure no allocation happens in the meantime,
+            // and it could be tricky because even the current instruction can be moved if GC runs.
+            do Interpreter.checkHeap(10);
 
             // let pcPtr = Obj.untagRib(pc);
             let pcPtr = -(pc + pc + pc);
@@ -1258,16 +1262,22 @@ class Interpreter {
     }
 
     /**
-     Make sure there's space to allocate a rib, otherwise halt.
+     Make sure there's space to allocate a rib, or make some by running the garbage collector;
+     otherwise halt.
+
+     Note: need to reserve enough space for the largest number ribs we expect could ever be
+     allocated before the next call. Since this is called before handling each instruction,
+     the largest size we need to accomodate is for the arguments of a call, plus the new
+     continuation.
      */
-     function void checkHeap() {
-        // Leave spave for a few allocations to happen without a check:
+     function void checkHeap(int maxAlloc) {
         if (nextRib > heapTop) {
             // Panic! We didn't check often enough and wrote past the end of the heap
             do Interpreter.halt();
         }
-        // if (nextRib > (heapTop - 5)) {  // Space for a handful of allocations in any single instruction
-        if (nextRib > (heapBottom + 1000)) {  // Run more often for stress testing
+
+        if (nextRib > (heapTop - maxAlloc)) {
+        // if (nextRib > (heapBottom + 1000)) {  // Run more often for stress testing
             do Interpreter.runGC();
         }
 
