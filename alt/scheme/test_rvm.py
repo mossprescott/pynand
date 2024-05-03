@@ -451,7 +451,7 @@ def run_to_halt(program, interpreter, max_cycles=250000, simulator="codegen"):
     encoded = rvm.compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
-    instrs, symbols, stack_loc, pc_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, True)
+    instrs, symbols, stack_loc, pc_loc, _, _, _, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, True)
 
     computer = nand.syntax.run(big.BigComputer, simulator=simulator)
 
