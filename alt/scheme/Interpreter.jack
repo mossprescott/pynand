@@ -1182,7 +1182,6 @@ class Interpreter {
     }
 
     function void push(Obj obj) {
-        var int tmp;
         var Rib ptr;
 
         // let stack = Interpreter.alloc(obj, stack, 0); // pair-type
@@ -1190,8 +1189,7 @@ class Interpreter {
         // Avoid function call overhead by doing the allocation directly here:
 
         // let ptr = Obj.untagRib(nextRib);
-        let tmp = nextRib;
-        let ptr = -(tmp + tmp + tmp);
+        let ptr = -(nextRib + nextRib + nextRib);
 
         let ptr[0] = obj;
         let ptr[1] = stack;
@@ -1207,9 +1205,13 @@ class Interpreter {
     function Obj pop() {
         var Rib ptr;
         var Obj r;
-        let ptr = Obj.untagRib(stack);
+
+        // let ptr = Obj.untagRib(stack);
+        let ptr = -(stack + stack + stack);
+
         let r = ptr[0];
         let stack = ptr[1];
+
         return r;
     }
 
@@ -1217,7 +1219,10 @@ class Interpreter {
     // TODO: get the compiler to inline this
     function Obj peek() {
         var Rib ptr;
-        let ptr = Obj.untagRib(stack);
+
+        // let ptr = Obj.untagRib(stack);
+        let ptr = -(stack + stack + stack);
+
         return ptr[0];
     }
 
@@ -1225,8 +1230,12 @@ class Interpreter {
     // TODO: get the compiler to inline this
     function void replace(Obj obj) {
         var Rib ptr;
-        let ptr = Obj.untagRib(stack);
+
+        // let ptr = Obj.untagRib(stack);
+        let ptr = -(stack + stack + stack);
+
         let ptr[0] = obj;
+
         return;
     }
 
@@ -1274,6 +1283,11 @@ class Interpreter {
      allocated before the next call. Since this is called before handling each instruction,
      the largest size we need to accomodate is for the arguments of a call, plus the new
      continuation.
+
+     TODO: there's relatively a lot of function-call overhead here, and this is definitely
+     called once per instruction. Because the only calls are tail-calls (one of which
+     actually never returns), it would be possible to remove all that overhead and just adjust
+     the stack before each call.
      */
      function void checkHeap(int maxAlloc) {
         if (nextRib > heapTop) {
