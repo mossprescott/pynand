@@ -353,11 +353,12 @@ class Interpreter {
         return;
     }
 
-    /* arg1 :: x y -- x)  # i.e. "drop" */
+    /* arg1 :: x y -- x  # i.e. "drop" */
     function void handleArg1() {
         var Rib ptr;
 
-        let ptr = Obj.untagRib(stack);
+        // let ptr = Obj.untagRib(stack);
+        let ptr = -(stack + stack + stack);
         let stack = ptr[1];
 
         return;
