@@ -17,10 +17,11 @@ See http://www.iro.umontreal.ca/~feeley/papers/YvonFeeleyVMIL21.pdf for the gene
 """
 
 from nand.translate import AssemblySource
-from alt import big
 from nand.vector import extend_sign, unsigned
+from nand.solutions import solved_06
+
+from alt import big
 from alt.scheme.inspector import Inspector
-from alt.scheme import asm
 from alt.scheme.tag import *
 
 TRACE_NONE = 0
@@ -36,21 +37,16 @@ DEFAULT_PRINT_ASM = False
 DEFAULT_TRACE_LEVEL = TRACE_COARSE
 
 
-def run(program, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run(program, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
     encoded = compile(program)
 
     if print_asm:
         print(f"encoded program: {repr(encoded)}")
 
-    run_compiled(encoded, interpreter, simulator, print_asm, trace_level, verbose_tty)
+    run_compiled(encoded, simulator, print_asm, trace_level, verbose_tty)
 
-def assemble(encoded, interpreter, print_asm):
-    if interpreter == "assembly":
-        asm = asm_interpreter()
-    elif interpreter == "jack":
-        asm = jack_interpreter()
-    else:
-        raise Exception(f"Unknown interpreter: {interpreter}")
+def assemble(encoded, print_asm):
+    asm = jack_interpreter()
 
     decode(encoded, asm)
 
@@ -58,30 +54,21 @@ def assemble(encoded, interpreter, print_asm):
         for l in asm.pretty(big.ROM_BASE): print(l)
         print()
 
-    if interpreter == "assembly":
-        instrs, symbols, statics = big.assemble(asm.lines, min_static=None, builtins=BUILTINS)
-        stack_loc =    BUILTINS["SP"]
-        pc_loc =       BUILTINS["PC"]
-        next_rib_loc = BUILTINS["NEXT_RIB"]
-        interp_loop_addr = symbols.get("exec_loop")
-        halt_loop_addr =   symbols.get("halt_loop")
-    elif interpreter == "jack":
-        from nand.solutions import solved_06
-        builtins = {
-            **solved_06.BUILTIN_SYMBOLS,
-            **big.BUILTIN_SYMBOLS,
-        }
-        instrs, symbols, statics = big.assemble(asm.lines, builtins=builtins)
-        stack_loc =       statics["interpreter.static_stack"]
-        pc_loc =          statics["interpreter.static_pc"]
-        heap_bottom_loc = statics["interpreter.static_heapBottom"]
-        heap_top_loc =    statics["interpreter.static_heapTop"]
-        next_rib_loc =    statics["interpreter.static_nextRib"]
-        interp_loop_addr = first_loop_in_function(symbols, "Interpreter", "main")
-        halt_loop_addr =   first_loop_in_function(symbols, "Interpreter", "halt")
-        unexpected_statics = [s for s in statics if (".static_" not in s)]
-        if unexpected_statics != []:
-            raise Exception(f"unexpected statics: {unexpected_statics}")
+    builtins = {
+        **solved_06.BUILTIN_SYMBOLS,
+        **big.BUILTIN_SYMBOLS,
+    }
+    instrs, symbols, statics = big.assemble(asm.lines, builtins=builtins)
+    stack_loc =       statics["interpreter.static_stack"]
+    pc_loc =          statics["interpreter.static_pc"]
+    heap_bottom_loc = statics["interpreter.static_heapBottom"]
+    heap_top_loc =    statics["interpreter.static_heapTop"]
+    next_rib_loc =    statics["interpreter.static_nextRib"]
+    interp_loop_addr = first_loop_in_function(symbols, "Interpreter", "main")
+    halt_loop_addr =   first_loop_in_function(symbols, "Interpreter", "halt")
+    unexpected_statics = [s for s in statics if (".static_" not in s)]
+    if unexpected_statics != []:
+        raise Exception(f"unexpected statics: {unexpected_statics}")
 
     assert symbols["start"] == big.ROM_BASE
 
@@ -114,10 +101,10 @@ def assemble(encoded, interpreter, print_asm):
     return instrs, symbols, stack_loc, pc_loc, heap_bottom_loc, heap_top_loc, next_rib_loc, interp_loop_addr, halt_loop_addr
 
 
-def run_compiled(encoded, interpreter, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
+def run_compiled(encoded, simulator, print_asm=DEFAULT_PRINT_ASM, trace_level=DEFAULT_TRACE_LEVEL, verbose_tty=True):
 
     # FIXME: Ug
-    instrs, symbols, stack_loc, pc_loc, heap_bottom_loc, heap_top_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, interpreter, print_asm)
+    instrs, symbols, stack_loc, pc_loc, heap_bottom_loc, heap_top_loc, next_rib_loc, interp_loop_addr, halt_loop_addr = assemble(encoded, print_asm)
 
     symbols_by_addr = { addr: name for (name, addr) in symbols.items() }
     last_traced_exec = None
@@ -513,10 +500,6 @@ HEAP_START = tag_rib(pad_addr(-4))
 HEAP_END = tag_rib(pad_addr(-32768))
 
 
-def asm_interpreter():
-    return asm.interpreter()
-
-
 def jack_interpreter():
     from nand.solutions import solved_10
     from alt import reg
@@ -689,8 +672,6 @@ def main():
     parser.add_argument("--simulator", action="store", default="codegen", help="One of 'vector' (slower, more precise); 'codegen' (faster, default); 'compiled' (experimental)")
     parser.add_argument("--trace", action="store_true", help="Print each Ribbit instruction as it is interpreted. Note: runs almost 3x slower.")
     parser.add_argument("--print", action="store_true", help="Print interpreter assembly and compiled instructions.")
-    # TEMP: experimental for now
-    parser.add_argument("--asm", action="store_true", help="Use the (partially-implemented) assembly interpreter.")
 
     args = parser.parse_args()
 
@@ -700,7 +681,6 @@ def main():
             src_lines += [] + f.readlines()
 
     run("".join(src_lines),
-        interpreter="jack" if not args.asm else "assembly",
         simulator=args.simulator,
         print_asm=args.print,
         trace_level=TRACE_COARSE if args.trace else TRACE_NONE)

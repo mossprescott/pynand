@@ -30,7 +30,7 @@ def main():
     # Probably want to cache the encoded result somewhere (or just go back to hard-coding it here.)
     print("Compiling...")
 
-    rvm.run(program, interpreter="jack", simulator="compiled",
+    rvm.run(program, simulator="compiled",
             print_asm=True,
             trace_level=rvm.TRACE_NONE)
 

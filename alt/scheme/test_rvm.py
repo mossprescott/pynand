@@ -13,12 +13,9 @@ from nand.vector import unsigned
 SHOW_ALL_LABELS = False
 
 def run_vector(program, **args):
-    return run_to_halt(program, simulator="vector", interpreter="jack", **args)
+    return run_to_halt(program, simulator="vector", **args)
 def run_codegen(program, **args):
-    return run_to_halt(program, simulator="codegen", interpreter="jack", **args)
-# Assembly is completely broken now (doesn't handle tagged objects)
-# def assembly(program, **args):
-#     return run_to_halt(program, simulator="codegen", interpreter="assembly", **args)
+    return run_to_halt(program, simulator="codegen", **args)
 
 def parameterize_both(f):
     return pytest.mark.parametrize("run", [run_vector, run_codegen])(f)
@@ -29,7 +26,7 @@ def parameterize(f):
 
 
 def run_jack(program):
-    return run_to_halt(program=program, simulator="codegen", interpreter="jack")
+    return run_to_halt(program=program, simulator="codegen")
 
 
 @parameterize
@@ -443,7 +440,7 @@ def several(*exprs):
     return "(define (cons $$x $$y) (rib $$x $$y 0))\n" + go(list(exprs))
 
 
-def run_to_halt(program, interpreter, max_cycles=250000, simulator="codegen"):
+def run_to_halt(program, max_cycles=250000, simulator="codegen"):
     """Compile and run a Scheme program, then return a function for inspecting the RAM, and a
     list of words that were written to the TTY port.
     """
@@ -451,7 +448,7 @@ def run_to_halt(program, interpreter, max_cycles=250000, simulator="codegen"):
     encoded = rvm.compile(program)
     # print(f"encoded program: {repr(encoded)}")
 
-    instrs, symbols, stack_loc, pc_loc, _, _, _, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, interpreter, True)
+    instrs, symbols, stack_loc, pc_loc, _, _, _, interp_loop_addr, halt_loop_addr = rvm.assemble(encoded, True)
 
     computer = nand.syntax.run(big.BigComputer, simulator=simulator)
 
