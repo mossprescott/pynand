@@ -28,6 +28,9 @@ class Interpreter {
     static Obj spareHeapTop;    // pre-initialized
 
     static Obj nextRib;
+
+    static int maxAlloc;
+
     static boolean inGC;
 
     static int saveChar1;
@@ -96,11 +99,7 @@ class Interpreter {
         while (1) {
             // Before looking at the instruction, make space in the heap in case any allocation
             // is going to be needed:
-            // Reserve space for "jump/call" to a proc that takes several arguments, which have to
-            // be pushed onto a new stack. Better would be to look at the number of args before
-            // making this call; would have to make sure no allocation happens in the meantime,
-            // and it could be tricky because even the current instruction can be moved if GC runs.
-            do Interpreter.checkHeap(10);
+            do Interpreter.checkHeap();
 
             // let pcPtr = Obj.untagRib(pc);
             let pcPtr = -(pc + pc + pc);
@@ -1271,6 +1270,12 @@ class Interpreter {
     function void initGC() {
         let nextRib = heapBottom;
 
+        // Reserve space for "jump/call" to a proc that takes several arguments, which have to
+        // be pushed onto a new stack. Better would be to look at the number of args before
+        // calling checkHeap; would have to make sure no allocation happens in the meantime,
+        // and it could be tricky because even the current instruction can be moved if GC runs.
+        let maxAlloc = 10;
+
         let inGC = false;
 
         return;
@@ -1290,7 +1295,7 @@ class Interpreter {
      actually never returns), it would be possible to remove all that overhead and just adjust
      the stack before each call.
      */
-     function void checkHeap(int maxAlloc) {
+     function void checkHeap() {
         if (nextRib > heapTop) {
             // Panic! We didn't check often enough and wrote past the end of the heap
             do Interpreter.halt();
