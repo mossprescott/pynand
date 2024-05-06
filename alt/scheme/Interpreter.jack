@@ -99,7 +99,9 @@ class Interpreter {
         while (1) {
             // Before looking at the instruction, make space in the heap in case any allocation
             // is going to be needed:
-            do Interpreter.checkHeap();
+            // do Interpreter.checkHeap();
+            if (nextRib > heapTop) { do Interpreter.halt(); }
+            if (nextRib > (heapTop - maxAlloc)) { do Interpreter.runGC(); }
 
             // let pcPtr = Obj.untagRib(pc);
             let pcPtr = -(pc + pc + pc);
@@ -108,7 +110,9 @@ class Interpreter {
 
             if (opcode = 0) {
                 let symbol = Interpreter.getTarget();  // actually an entry or symbol
-                let proc = Obj.untagRib(symbol[0]);
+                // let proc = Obj.untagRib(symbol[0]);
+                let tmp = symbol[0];
+                let proc = -(tmp + tmp + tmp);
 
                 // Check for attempt to invoke a non-proc. This is usually a symbol that was never
                 // initialized. If not caught, this just mangles the stack and leaves the pc in
@@ -134,7 +138,10 @@ class Interpreter {
 
                         let stack = Interpreter.wrangleClosureParams(savedProc, newCont);
 
-                        let code = Obj.untagRib(savedProc[0]);
+                        // let code = Obj.untagRib(savedProc[0]);
+                        let tmp = savedProc[0];
+                        let code = -(tmp + tmp + tmp);
+
                         let pc = code[2];
                     }
                     else {
@@ -146,7 +153,8 @@ class Interpreter {
 
                         // Overwrite top stack entry so the stack consists of the just-pushed
                         // result on top of the saved stack from the continuation.
-                        let ptr = Obj.untagRib(stack);
+                        // let ptr = Obj.untagRib(stack);
+                        let ptr = -(stack + stack + stack);
                         let ptr[1] = cont[0];
 
                         // PC = next instruction from the continuation
@@ -167,12 +175,16 @@ class Interpreter {
                         //   z = next instruction
                         let newCont = Interpreter.alloc(-1, symbol[0], pcPtr[2]);  // tricky: faster to use proc from register in first call
                         let newStack = Interpreter.wrangleClosureParams(savedProc, newCont);
-                        let ptr = Obj.untagRib(newCont);
+                        // let ptr = Obj.untagRib(newCont);
+                        let ptr = -(newCont + newCont + newCont);
                         let ptr[0] = stack;
                         let stack = newStack;
 
                         // Now jump to the entry point of the proc:
-                        let code = Obj.untagRib(savedProc[0]);
+                        // let code = Obj.untagRib(savedProc[0]);
+                        let tmp = savedProc[0];
+                        let code = -(tmp + tmp + tmp);
+
                         let pc = code[2];
                      }
                     else {

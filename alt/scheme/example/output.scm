@@ -80,3 +80,4 @@
 ;; 2.8M cycles after manually inlining much of the untagging
 ;; 3.6M cycles after implementing garbage collection
 ;; 3.4M cycles after implementing push/pop/peek in assembly
+;; 2.6 cycles after inlining some calls in the main loop
