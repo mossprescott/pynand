@@ -9,7 +9,7 @@ requires-python = ">=3.9"
 dependencies = ["pygame"]
 
 [tool.setuptools]
-packages = ["nand", "nand.solutions"]
+packages = ["nand", "nand.solutions", "alt.reg"]
 py-modules = ["computer", "project_01", "project_02", "project_03", "project_04", "project_05", "project_06", "project_07", "project_08", "project_10", "project_11", "project_12"]
 
 [tool.setuptools.package-data]
