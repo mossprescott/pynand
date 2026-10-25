@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynand"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = ["pygame"]
+
+[tool.setuptools]
+packages = ["nand", "nand.solutions"]
+py-modules = ["computer", "project_01", "project_02", "project_03", "project_04", "project_05", "project_06", "project_07", "project_08", "project_10", "project_11", "project_12"]
+
+[tool.setuptools.package-data]
+"nand.solutions" = ["solved_12/*.jack"]
