@@ -1,7 +1,11 @@
+import os
+
 from nand.solutions import solved_10
 
+_JACK_DIR = os.path.join(os.path.dirname(__file__), "solved_12")
+
 def _parse_jack_file(class_name):
-    with open(f"nand/solutions/solved_12/{class_name}.jack") as f:
+    with open(os.path.join(_JACK_DIR, f"{class_name}.jack")) as f:
         src = "\n".join(f.readlines())
         return solved_10.parse_class(src)
 
